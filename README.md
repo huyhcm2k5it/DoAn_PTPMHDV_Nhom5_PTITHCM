@@ -8,7 +8,8 @@ Repository scaffold based on the agreed structure, before implementation begins.
 - `apps/android/`: Kotlin + Jetpack Compose; Hung owns Android PATIENT.
 - `services/`: Nine independent services: Quan - Patient, Appointment, Pharmacy; Huy - Catalog, Clinical, Diagnostic; Hung - Identity, Billing, Notification.
 - `contracts/`: HTTP and message contracts.
-- `infra/`: Compose, Envoy, RabbitMQ, MongoDB, and PostgreSQL.
+- `infra/compose/`: Docker Compose configuration.
+- `envoy/`, `rabbitmq/`, `mongo/`, `postgres/`: Root-level configuration for the gateway and data services, as shown in the directory diagram.
 - `tests/`: E2E and performance tests.
 - `docs/`: Project documentation.
 - `.github/workflows/`: CI.
