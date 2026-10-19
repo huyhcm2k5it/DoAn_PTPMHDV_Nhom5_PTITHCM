@@ -179,7 +179,7 @@ erDiagram
 
     patients {
         uuid id PK
-        uuid ownerUserId LREF
+        uuid ownerUserId FK "LREF"
         enum relation
         string fullName
         date birthDate
@@ -188,8 +188,8 @@ erDiagram
     }
     profile_audit {
         uuid id PK
-        uuid patientId ref
-        uuid actorUserId LREF
+        uuid patientId FK
+        uuid actorUserId FK "LREF"
         string action
         timestamp at
     }
@@ -224,7 +224,7 @@ erDiagram
     }
     doctors {
         uuid id PK
-        uuid identity_user_id LREF_UK
+        uuid identity_user_id UK "LREF"
         uuid department_id FK
         text display_name
     }
@@ -283,15 +283,15 @@ erDiagram
 
     schedules {
         uuid id PK
-        uuid doctorId LREF
-        uuid serviceId LREF
+        uuid doctorId FK "LREF"
+        uuid serviceId FK "LREF"
         string room
         UTC startAt
         int capacityPerSlot
     }
     slots {
         uuid id PK
-        uuid scheduleId ref
+        uuid scheduleId FK
         UTC startAt
         int capacity
         int heldCount
@@ -299,22 +299,22 @@ erDiagram
     }
     holds {
         uuid id PK
-        uuid slotId ref
-        uuid patientId LREF
+        uuid slotId FK
+        uuid patientId FK "LREF"
         enum status
         UTC expiresAt
     }
     appointments {
         uuid id PK
-        uuid holdId ref_UK
-        uuid patientId LREF
-        uuid slotId ref
+        uuid holdId UK "ref"
+        uuid patientId FK "LREF"
+        uuid slotId FK
         enum state
         bigint priceSnapshotVnd
     }
     queue_tickets {
         uuid id PK
-        uuid appointmentId ref
+        uuid appointmentId FK
         enum ticketType
         int returnRound
         enum state
@@ -348,8 +348,8 @@ erDiagram
 
     visits {
         uuid id PK
-        uuid appointment_id LREF_UK
-        uuid doctor_user_id LREF
+        uuid appointment_id UK "LREF"
+        uuid doctor_user_id FK "LREF"
         enum state
         UTC started_at
         UTC signed_at
@@ -366,7 +366,7 @@ erDiagram
         uuid visit_id FK
         string request_key
         enum state
-        uuid order_id LREF
+        uuid order_id FK "LREF"
     }
     prescriptions {
         uuid id PK
@@ -377,7 +377,7 @@ erDiagram
     prescription_items {
         uuid id PK
         uuid prescription_id FK
-        uuid medicine_id LREF
+        uuid medicine_id FK "LREF"
         int quantity
     }
 ```
@@ -409,8 +409,8 @@ erDiagram
 
     lab_orders {
         uuid id PK
-        uuid clinical_request_id LREF_UK
-        uuid visit_id LREF
+        uuid clinical_request_id UK "LREF"
+        uuid visit_id FK "LREF"
         jsonb test_codes
         enum state
     }
@@ -437,7 +437,7 @@ erDiagram
     reviews {
         uuid id PK
         uuid result_id FK
-        uuid reviewer_user_id LREF
+        uuid reviewer_user_id FK "LREF"
         enum decision
     }
 ```
@@ -467,27 +467,27 @@ erDiagram
 
     inventory {
         uuid id PK
-        uuid medicineId LREF_UK
+        uuid medicineId UK "LREF"
         int onHand
         int reserved
     }
     prescription_projection {
         uuid id PK
-        uuid prescriptionId LREF
+        uuid prescriptionId FK "LREF"
         int revision
-        uuid visitId LREF
+        uuid visitId FK "LREF"
     }
     medication_holds {
         uuid id PK
-        uuid prescriptionId LREF
+        uuid prescriptionId FK "LREF"
         int revision
         int attemptNo
         enum status
     }
     dispenses {
         uuid id PK
-        uuid holdId ref_UK
-        uuid prescriptionId LREF
+        uuid holdId UK "ref"
+        uuid prescriptionId FK "LREF"
         int revision
         UTC dispensedAt
     }
@@ -520,9 +520,9 @@ erDiagram
 
     charges {
         uuid id PK
-        uuid patient_id LREF
+        uuid patient_id FK "LREF"
         text source_type
-        uuid source_id LREF
+        uuid source_id FK "LREF"
         int source_revision
         bigint amount_vnd
         text state
@@ -543,7 +543,7 @@ erDiagram
     }
     receipts {
         uuid id PK
-        uuid payment_id FK_UK
+        uuid payment_id UK "FK"
         uuid charge_id FK
         text receipt_no UK
         bigint amount_vnd
@@ -577,7 +577,7 @@ erDiagram
 erDiagram
     notifications {
         uuid id PK
-        uuid recipient_user_id LREF
+        uuid recipient_user_id FK "LREF"
         uuid event_id
         text kind
         text message_code
