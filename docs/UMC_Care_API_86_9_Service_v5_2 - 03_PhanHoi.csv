@@ -1,0 +1,523 @@
+,,,,,
+"Response HTTP · success, lỗi và dữ liệu trả về",,,,,
+UMC Care · hợp đồng API v5.2 đã rà soát · 17/10/2026 · chưa biểu thị trạng thái đã code,,,,,
+,,,,,
+API ID,HTTP status,Loại,Error code,Ý nghĩa,Dữ liệu / schema
+IA-001,201,Thành công,,Hoàn tất thao tác tạo tài khoản và otp đăng ký. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"userId: string:uuid, status: string, otpExpiresAt: string:date-time"
+IA-001,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+IA-001,409,Lỗi,PHONE_ALREADY_REGISTERED,PHONE_ALREADY_REGISTERED: Số điện thoại đã có tài khoản.,ErrorResponse
+IA-001,429,Lỗi,RATE_LIMITED,RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.,ErrorResponse
+IA-001,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+IA-002,200,Thành công,,Hoàn tất thao tác xác minh otp theo purpose. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"verified: boolean, status: string"
+IA-002,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+IA-002,409,Lỗi,"OTP_EXPIRED, OTP_ALREADY_USED",OTP_EXPIRED: OTP đã quá hạn.; OTP_ALREADY_USED: OTP đã được dùng.,ErrorResponse
+IA-002,429,Lỗi,RATE_LIMITED,RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.,ErrorResponse
+IA-002,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+IA-003,200,Thành công,,Hoàn tất thao tác gửi lại otp có rate limit. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"accepted: boolean, retryAfterSeconds: integer:int32"
+IA-003,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+IA-003,409,Lỗi,OTP_NOT_RESENDABLE_YET,OTP_NOT_RESENDABLE_YET: Chưa hết thời gian chờ để gửi lại OTP.,ErrorResponse
+IA-003,429,Lỗi,RATE_LIMITED,RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.,ErrorResponse
+IA-003,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+IA-004,200,Thành công,,Hoàn tất thao tác đăng nhập cho cả ba actor. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"accessToken: string, refreshToken: string, actorType: string, expiresInSeconds: integer:int32"
+IA-004,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+IA-004,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+IA-004,429,Lỗi,RATE_LIMITED,RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.,ErrorResponse
+IA-004,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+IA-005,200,Thành công,,Hoàn tất thao tác đổi access token. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"accessToken: string, refreshToken: string, expiresInSeconds: integer:int32"
+IA-005,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+IA-005,401,Lỗi,INVALID_REFRESH_TOKEN,"INVALID_REFRESH_TOKEN: Refresh token không hợp lệ, hết hạn hoặc đã bị thu hồi.",ErrorResponse
+IA-005,429,Lỗi,RATE_LIMITED,RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.,ErrorResponse
+IA-005,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+IA-006,200,Thành công,,Hoàn tất thao tác thu hồi phiên. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,revoked: boolean
+IA-006,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+IA-006,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+IA-006,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+IA-006,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+IA-007,200,Thành công,,Hoàn tất thao tác xin otp đặt lại mật khẩu. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"accepted: boolean, retryAfterSeconds: integer:int32"
+IA-007,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+IA-007,429,Lỗi,RATE_LIMITED,RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.,ErrorResponse
+IA-007,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+IA-008,200,Thành công,,Hoàn tất thao tác đặt lại bằng otp. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,changed: boolean
+IA-008,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+IA-008,409,Lỗi,"OTP_EXPIRED, OTP_ALREADY_USED",OTP_EXPIRED: OTP đã quá hạn.; OTP_ALREADY_USED: OTP đã được dùng.,ErrorResponse
+IA-008,429,Lỗi,RATE_LIMITED,RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.,ErrorResponse
+IA-008,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+IA-009,200,Thành công,,Hoàn tất thao tác đổi mật khẩu. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,changed: boolean
+IA-009,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+IA-009,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+IA-009,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+IA-009,409,Lỗi,CURRENT_PASSWORD_MISMATCH,CURRENT_PASSWORD_MISMATCH: Mật khẩu hiện tại không khớp.,ErrorResponse
+IA-009,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+IA-010,200,Thành công,,Hoàn tất thao tác phiên/quyền và authorization lease ký tối đa 30 giây cho thao tác nhạy cảm. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"userId: string:uuid, actorType: string, capabilities: CapabilityAssignment[], expiresAt: string:date-time"
+IA-010,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+IA-010,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+IA-010,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+IA-011,200,Thành công,,Hoàn tất thao tác danh sách nhân viên và scope. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"items: StaffAccount[], total: integer:int32"
+IA-011,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+IA-011,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+IA-011,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+IA-011,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+IA-012,200,Thành công,,Hoàn tất thao tác gán vai trò và khoa. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"staffId: string:uuid, version: integer:int32, capabilities: CapabilityAssignment[]"
+IA-012,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+IA-012,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+IA-012,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+IA-012,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+IA-012,409,Lỗi,"STAFF_VERSION_CONFLICT, LAST_ADMIN_REQUIRED",STAFF_VERSION_CONFLICT: Quyền STAFF đã đổi kể từ phiên bản client đọc.; LAST_ADMIN_REQUIRED: Không được thu hồi ADMIN cuối cùng.,ErrorResponse
+IA-012,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+IA-013,200,Thành công,,Hoàn tất thao tác tra cứu thao tác nhạy cảm. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"items: AuditEvent[], total: integer:int32"
+IA-013,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+IA-013,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+IA-013,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+IA-013,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+IA-014,200,Thành công,,Hoàn tất thao tác adapter phục hồi tắt mặc định. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"userId: string:uuid, verified: boolean, status: string"
+IA-014,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+IA-014,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+IA-014,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+IA-014,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+PT-001,200,Thành công,,Hoàn tất thao tác hồ sơ thuộc tài khoản. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"items: Patient[], total: integer:int32"
+PT-001,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+PT-001,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+PT-001,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+PT-001,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+PT-003,201,Thành công,,Hoàn tất thao tác tạo hồ sơ bản thân/người thân. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,patient: Patient
+PT-003,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+PT-003,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+PT-003,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+PT-003,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+PT-003,409,Lỗi,DUPLICATE_PATIENT_PROFILE,DUPLICATE_PATIENT_PROFILE: Hồ sơ bệnh nhân trùng theo quy tắc nhận diện.,ErrorResponse
+PT-003,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+PT-002,200,Thành công,,Hoàn tất thao tác tìm hồ sơ theo định danh demo. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"items: Patient[], total: integer:int32"
+PT-002,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+PT-002,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+PT-002,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+PT-002,429,Lỗi,RATE_LIMITED,RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.,ErrorResponse
+PT-002,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+PT-004,200,Thành công,,Hoàn tất thao tác chi tiết theo owner hoặc scope tiếp nhận/điều trị được xác minh. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,patient: Patient
+PT-004,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+PT-004,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+PT-004,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+PT-004,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+PT-004,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+PT-005,200,Thành công,,Hoàn tất thao tác sửa hồ sơ theo quyền. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,patient: Patient
+PT-005,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+PT-005,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+PT-005,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+PT-005,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+PT-005,409,Lỗi,STATE_CONFLICT,STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
+PT-005,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+CA-001,200,Thành công,,Hoàn tất thao tác danh mục khoa. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,items: Department[]
+CA-001,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+CA-002,200,Thành công,,Hoàn tất thao tác bác sĩ theo khoa. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"items: Doctor[], total: integer:int32"
+CA-002,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+CA-002,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+CA-003,200,Thành công,,Hoàn tất thao tác dịch vụ khám và giá. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,items: MedicalService[]
+CA-003,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+CA-003,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+AP-004,200,Thành công,,Hoàn tất thao tác slot còn chỗ. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,items: Slot[]
+AP-004,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+AP-004,429,Lỗi,RATE_LIMITED,RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.,ErrorResponse
+AP-004,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+AP-005,201,Thành công,,Hoàn tất thao tác tạo ca/phòng/capacity. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,schedule: Schedule
+AP-005,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+AP-005,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+AP-005,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+AP-005,409,Lỗi,SCHEDULE_OVERLAP,SCHEDULE_OVERLAP: Ca bác sĩ/phòng trùng khoảng giờ.,ErrorResponse
+AP-005,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+AP-006,200,Thành công,,Hoàn tất thao tác sửa ca tương lai. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,schedule: Schedule
+AP-006,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+AP-006,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+AP-006,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+AP-006,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+AP-006,409,Lỗi,"SCHEDULE_VERSION_CONFLICT, BOOKED_CAPACITY_CONFLICT",SCHEDULE_VERSION_CONFLICT: Ca làm việc đã đổi kể từ khi client đọc.; BOOKED_CAPACITY_CONFLICT: Sửa ca làm việc làm mất chỗ của lịch đã giữ hoặc đặt.,ErrorResponse
+AP-006,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+CA-004,201,Thành công,,Hoàn tất thao tác tạo phiên bản giá tương lai cho khám/lab/thuốc. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"priceVersionId: string:uuid, revision: integer, effectiveFrom: string:date-time"
+CA-004,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+CA-004,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+CA-004,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+CA-004,409,Lỗi,OVERLAPPING_PRICE_PERIOD,OVERLAPPING_PRICE_PERIOD: Khoảng hiệu lực giá giao nhau với phiên bản hiện có.,ErrorResponse
+CA-004,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+AP-008,201,Thành công,,Hoàn tất thao tác giữ slot nguyên tử. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"holdId: string:uuid, expiresAt: string:date-time, state: string"
+AP-008,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+AP-008,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+AP-008,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+AP-008,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+AP-008,409,Lỗi,"SLOT_FULL, PATIENT_TIME_CONFLICT",SLOT_FULL: Slot đã hết sức chứa tại thời điểm ghi.; PATIENT_TIME_CONFLICT: Bệnh nhân đã có lịch hoặc hold hoạt động trùng giờ.,ErrorResponse
+AP-008,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+AP-009,200,Thành công,,Hoàn tất thao tác nhả hold. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"holdId: string:uuid, state: string"
+AP-009,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+AP-009,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+AP-009,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+AP-009,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+AP-009,409,Lỗi,STATE_CONFLICT,STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
+AP-009,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+AP-010,202,Thành công,,Đã nhận lệnh và commit local/outbox; kết quả liên service còn chờ. Client đọc Location hoặc data.statusUrl để theo dõi.,"requestId: string:uuid, appointmentId: string:uuid, state: string, statusUrl: string:uri-reference"
+AP-010,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+AP-010,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+AP-010,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+AP-010,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+AP-010,409,Lỗi,"HOLD_EXPIRED, HOLD_ALREADY_CONSUMED",HOLD_EXPIRED: Hold đã hết hạn theo đồng hồ server.; HOLD_ALREADY_CONSUMED: Hold đã được chuyển thành lịch.,ErrorResponse
+AP-010,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+AP-011,200,Thành công,,Hoàn tất thao tác chi tiết lịch và phí. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"appointment: Appointment, chargeStatus: string, refundStatus: string, chargeSync: ChargePreparationStatus"
+AP-011,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+AP-011,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+AP-011,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+AP-011,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+AP-011,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+AP-012,200,Thành công,,Hoàn tất thao tác lịch theo hồ sơ. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"items: Appointment[], total: integer:int32"
+AP-012,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+AP-012,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+AP-012,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+AP-012,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+AP-012,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+AP-013,200,Thành công,,Hoàn tất thao tác đổi slot nguyên tử. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"appointment: Appointment, slotHistory: object[]"
+AP-013,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+AP-013,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+AP-013,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+AP-013,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+AP-013,409,Lỗi,"SLOT_FULL, RESCHEDULE_WINDOW_CLOSED, APPOINTMENT_STATE_CONFLICT",SLOT_FULL: Slot đã hết sức chứa tại thời điểm ghi.; RESCHEDULE_WINDOW_CLOSED: Đã quá hạn cho phép đổi lịch.; APPOINTMENT_STATE_CONFLICT: Lịch hẹn ở trạng thái không cho phép đổi/hủy.,ErrorResponse
+AP-013,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+AP-014,200,Thành công,,Hoàn tất thao tác hủy và phát căn cứ hoàn. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"appointmentId: string:uuid, state: string, refundStatus: string"
+AP-014,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+AP-014,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+AP-014,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+AP-014,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+AP-014,409,Lỗi,"CANCELLATION_WINDOW_CLOSED, APPOINTMENT_STATE_CONFLICT",CANCELLATION_WINDOW_CLOSED: Đã quá hạn cho phép hủy lịch.; APPOINTMENT_STATE_CONFLICT: Lịch hẹn ở trạng thái không cho phép đổi/hủy.,ErrorResponse
+AP-014,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+AP-015,200,Thành công,,Hoàn tất thao tác tiếp nhận và cấp vé. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"appointmentId: string:uuid, state: string, ticket: QueueTicket"
+AP-015,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+AP-015,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+AP-015,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+AP-015,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+AP-015,409,Lỗi,"APPOINTMENT_NOT_PAID, ALREADY_CHECKED_IN",APPOINTMENT_NOT_PAID: Lịch chưa có bằng chứng thanh toán hợp lệ.; ALREADY_CHECKED_IN: Lịch đã check-in và không được check-in lặp.,ErrorResponse
+AP-015,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+AP-016,200,Thành công,,Hoàn tất thao tác hàng chờ hôm nay. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"items: QueueTicket[], total: integer:int32"
+AP-016,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+AP-016,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+AP-016,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+AP-016,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+AP-017,200,Thành công,,Hoàn tất thao tác gọi vé first hoặc return theo tickettype. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,ticket: QueueTicket
+AP-017,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+AP-017,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+AP-017,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+AP-017,409,Lỗi,"QUEUE_EMPTY, TICKET_ALREADY_CALLED",QUEUE_EMPTY: Không còn vé phù hợp để gọi.; TICKET_ALREADY_CALLED: Vé đã được gọi.,ErrorResponse
+AP-017,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+AP-018,200,Thành công,,Hoàn tất thao tác vắng mặt first trước visit → no_show. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"ticketId: string:uuid, state: string"
+AP-018,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+AP-018,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+AP-018,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+AP-018,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+AP-018,409,Lỗi,STATE_CONFLICT,STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
+AP-018,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+AP-019,200,Thành công,,Hoàn tất thao tác summary đặt/hủy/completed kèm asof và syncstatus theo ngày việt nam. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"booked: integer:int32, cancelled: integer:int32, checkedIn: integer:int32, completed: integer:int32, asOf: string:date-time"
+AP-019,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+AP-019,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+AP-019,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+AP-019,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+CL-001,200,Thành công,,Hoàn tất thao tác danh sách lượt bác sĩ. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"items: Visit[], total: integer:int32, startRequest: StartRequestStatus"
+CL-001,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+CL-001,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+CL-001,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+CL-001,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+CL-001,404,Lỗi,START_REQUEST_NOT_FOUND,START_REQUEST_NOT_FOUND: Không thấy operationId start visit thuộc quyền người gọi.,ErrorResponse
+CL-002,202,Thành công,,Đã nhận lệnh và commit local/outbox; kết quả liên service còn chờ. Client đọc Location hoặc data.statusUrl để theo dõi.,"requestId: string:uuid, operationId: string:uuid, state: string, statusUrl: string:uri-reference"
+CL-002,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+CL-002,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+CL-002,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+CL-002,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+CL-002,409,Lỗi,"TICKET_VERSION_CONFLICT, TICKET_ALREADY_CLAIMED",TICKET_VERSION_CONFLICT: Phiên bản vé không còn khớp.; TICKET_ALREADY_CLAIMED: Vé đã được claim bởi lượt khám khác.,ErrorResponse
+CL-002,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+CL-003,200,Thành công,,Hoàn tất thao tác chi tiết visit. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"visit: Visit, notes: VisitNote[], prescriptions: Prescription[], labRequests: LabRequestStatus[]"
+CL-003,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+CL-003,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+CL-003,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+CL-003,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+CL-003,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+CL-004,200,Thành công,,"Hoàn tất thao tác lưu nháp triệu chứng, khám, nhận định và chẩn đoán. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.","visitId: string:uuid, version: integer:int32, state: string"
+CL-004,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+CL-004,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+CL-004,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+CL-004,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+CL-004,409,Lỗi,"VISIT_VERSION_CONFLICT, VISIT_ALREADY_SIGNED",VISIT_VERSION_CONFLICT: Lượt khám đã đổi kể từ phiên bản client đọc.; VISIT_ALREADY_SIGNED: Lượt khám đã được ký; không sửa bản nháp.,ErrorResponse
+CL-004,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+CL-005,202,Thành công,,Đã nhận lệnh và commit local/outbox; kết quả liên service còn chờ. Client đọc Location hoặc data.statusUrl để theo dõi.,"requestId: string:uuid, state: string, statusUrl: string:uri-reference"
+CL-005,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+CL-005,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+CL-005,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+CL-005,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+CL-005,409,Lỗi,"VISIT_NOT_ACTIVE, LAB_REQUEST_DUPLICATE",VISIT_NOT_ACTIVE: Lượt khám chưa hoặc không còn cho phép chỉ định LAB.; LAB_REQUEST_DUPLICATE: Yêu cầu LAB trùng khóa/requestHash của lượt khám.,ErrorResponse
+CL-005,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+CL-006,201,Thành công,,Hoàn tất thao tác tạo toa draft. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,prescription: Prescription
+CL-006,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+CL-006,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+CL-006,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+CL-006,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+CL-006,409,Lỗi,STATE_CONFLICT,STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
+CL-006,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+CL-007,200,Thành công,,Hoàn tất thao tác sửa toa draft. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,prescription: Prescription
+CL-007,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+CL-007,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+CL-007,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+CL-007,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+CL-007,409,Lỗi,STATE_CONFLICT,STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
+CL-007,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+CL-008,200,Thành công,,Hoàn tất thao tác xóa toa draft. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"prescriptionId: string:uuid, state: string"
+CL-008,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+CL-008,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+CL-008,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+CL-008,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+CL-008,409,Lỗi,STATE_CONFLICT,STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
+CL-008,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+CL-009,200,Thành công,,Hoàn tất thao tác ký toa final. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,prescription: Prescription
+CL-009,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+CL-009,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+CL-009,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+CL-009,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+CL-009,409,Lỗi,"PRESCRIPTION_NOT_DRAFT, PRICE_VERSION_CONFLICT",PRESCRIPTION_NOT_DRAFT: Toa không ở trạng thái DRAFT để sửa/chốt.; PRICE_VERSION_CONFLICT: Bản giá/toa client sử dụng không còn hiệu lực.,ErrorResponse
+CL-009,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+CL-010,200,Thành công,,Hoàn tất thao tác ký kết luận và kết thúc. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,visit: Visit
+CL-010,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+CL-010,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+CL-010,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+CL-010,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+CL-010,409,Lỗi,"VISIT_NOT_READY, LAB_RESULT_PENDING",VISIT_NOT_READY: Lượt khám chưa đủ điều kiện ký hoàn tất.; LAB_RESULT_PENDING: Còn yêu cầu/order LAB chưa có kết quả kết thúc.,ErrorResponse
+CL-010,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+CL-011,200,Thành công,,Hoàn tất thao tác bản khám đã ký. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"items: Visit[], total: integer:int32"
+CL-011,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+CL-011,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+CL-011,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+CL-011,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+CL-011,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+DI-001,201,Thành công,,Hoàn tất thao tác adapter phục hồi tắt mặc định. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"order: LabOrder, chargeStatus: string"
+DI-001,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+DI-001,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+DI-001,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+DI-001,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+DI-001,409,Lỗi,STATE_CONFLICT,STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
+DI-001,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+DI-002,200,Thành công,,Hoàn tất thao tác hàng chờ lab. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"items: LabOrder[], total: integer:int32"
+DI-002,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+DI-002,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+DI-002,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+DI-002,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+DI-003,200,Thành công,,Hoàn tất thao tác order theo quyền. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"order: LabOrder, specimens: Specimen[], results: LabResult[]"
+DI-003,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+DI-003,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+DI-003,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+DI-003,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+DI-003,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+DI-004,201,Thành công,,Hoàn tất thao tác lấy mẫu khi order paid và fence cục bộ hợp lệ. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,specimen: Specimen
+DI-004,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+DI-004,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+DI-004,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+DI-004,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+DI-004,409,Lỗi,"ORDER_NOT_PAID, SPECIMEN_ALREADY_COLLECTED",ORDER_NOT_PAID: Order LAB chưa có bằng chứng PAID/fence trong Diagnostic.; SPECIMEN_ALREADY_COLLECTED: Mẫu đã được lấy; thao tác tạo/hủy không còn hợp lệ.,ErrorResponse
+DI-004,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+DI-005,200,Thành công,,Hoàn tất thao tác từ chối mẫu có lý do. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,specimen: Specimen
+DI-005,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+DI-005,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+DI-005,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+DI-005,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+DI-005,409,Lỗi,SPECIMEN_ALREADY_PROCESSED,"SPECIMEN_ALREADY_PROCESSED: Mẫu đã đi tiếp quy trình, không thể từ chối ở trạng thái này.",ErrorResponse
+DI-005,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+DI-006,201,Thành công,,Hoàn tất thao tác tạo mẫu lấy lại. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,specimen: Specimen
+DI-006,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+DI-006,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+DI-006,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+DI-006,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+DI-006,409,Lỗi,STATE_CONFLICT,STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
+DI-006,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+DI-007,201,Thành công,,Hoàn tất thao tác tạo kết quả draft. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,result: LabResult
+DI-007,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+DI-007,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+DI-007,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+DI-007,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+DI-007,409,Lỗi,STATE_CONFLICT,STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
+DI-007,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+DI-008,200,Thành công,,Hoàn tất thao tác sửa draft/rework. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,result: LabResult
+DI-008,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+DI-008,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+DI-008,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+DI-008,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+DI-008,409,Lỗi,"RESULT_VERSION_CONFLICT, RESULT_ALREADY_PUBLISHED",RESULT_VERSION_CONFLICT: Kết quả LAB đã đổi kể từ phiên bản client đọc.; RESULT_ALREADY_PUBLISHED: Kết quả đã công bố và bất biến.,ErrorResponse
+DI-008,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+DI-009,200,Thành công,,Hoàn tất thao tác gửi duyệt. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,result: LabResult
+DI-009,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+DI-009,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+DI-009,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+DI-009,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+DI-009,409,Lỗi,RESULT_INCOMPLETE,RESULT_INCOMPLETE: Kết quả thiếu chỉ số hoặc dữ liệu bắt buộc để gửi duyệt.,ErrorResponse
+DI-009,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+DI-010,200,Thành công,,Hoàn tất thao tác trả sửa có lý do. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,result: LabResult
+DI-010,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+DI-010,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+DI-010,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+DI-010,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+DI-010,409,Lỗi,RESULT_NOT_IN_REVIEW,RESULT_NOT_IN_REVIEW: Kết quả không ở trạng thái chờ duyệt.,ErrorResponse
+DI-010,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+DI-011,200,Thành công,,Hoàn tất thao tác reviewer khác người nhập duyệt và công bố trong một lệnh. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,result: LabResult
+DI-011,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+DI-011,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+DI-011,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+DI-011,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+DI-011,409,Lỗi,"SELF_REVIEW_FORBIDDEN, RESULT_NOT_IN_REVIEW",SELF_REVIEW_FORBIDDEN: Người nhập/sửa revision này không được tự duyệt nó.; RESULT_NOT_IN_REVIEW: Kết quả không ở trạng thái chờ duyệt.,ErrorResponse
+DI-011,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+DI-012,200,Thành công,,Hoàn tất thao tác hủy trước mẫu. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"order: LabOrder, refundStatus: string"
+DI-012,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+DI-012,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+DI-012,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+DI-012,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+DI-012,409,Lỗi,SPECIMEN_ALREADY_COLLECTED,SPECIMEN_ALREADY_COLLECTED: Mẫu đã được lấy; thao tác tạo/hủy không còn hợp lệ.,ErrorResponse
+DI-012,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+DI-013,200,Thành công,,Hoàn tất thao tác kết quả đã công bố. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"items: LabResult[], total: integer:int32"
+DI-013,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+DI-013,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+DI-013,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+DI-013,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+DI-013,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+PH-001,200,Thành công,,Hoàn tất thao tác tồn khả dụng. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"items: StockItem[], total: integer:int32"
+PH-001,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+PH-001,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+PH-001,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+PH-001,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+PH-002,201,Thành công,,Hoàn tất thao tác nhập bổ sung. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"stockReceiptId: string:uuid, medicineId: string:uuid, onHand: integer:int32, available: integer:int32"
+PH-002,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+PH-002,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+PH-002,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+PH-002,409,Lỗi,STATE_CONFLICT,STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
+PH-002,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+PH-003,200,Thành công,,Hoàn tất thao tác toa final chờ cấp. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"items: Prescription[], total: integer:int32"
+PH-003,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+PH-003,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+PH-003,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+PH-003,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+PH-004,200,Thành công,,Hoàn tất thao tác pharmacy xem toa/tồn. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"prescription: Prescription, stock: StockItem[], holds: MedicationHold[], view: string, prescriptionId: string:uuid, latestHoldState: string, dispensedAt: string:date-time"
+PH-004,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+PH-004,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+PH-004,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+PH-004,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+PH-004,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+PH-005,202,Thành công,,Đã nhận lệnh và commit local/outbox; kết quả liên service còn chờ. Client đọc Location hoặc data.statusUrl để theo dõi.,"requestId: string:uuid, holdId: string:uuid, state: string, statusUrl: string:uri-reference"
+PH-005,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+PH-005,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+PH-005,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+PH-005,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+PH-005,409,Lỗi,"INSUFFICIENT_STOCK, PRESCRIPTION_REVISION_CONFLICT",INSUFFICIENT_STOCK: Không đủ tất cả dòng thuốc để giữ toàn toa.; PRESCRIPTION_REVISION_CONFLICT: Revision toa trong Pharmacy khác revision yêu cầu.,ErrorResponse
+PH-005,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+PH-006,200,Thành công,,Hoàn tất thao tác nhả hold chưa thu. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"holdId: string:uuid, state: string"
+PH-006,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+PH-006,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+PH-006,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+PH-006,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+PH-006,409,Lỗi,STATE_CONFLICT,STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
+PH-006,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+PH-007,202,Thành công,,Đã nhận lệnh và commit local/outbox; kết quả liên service còn chờ. Client đọc Location hoặc data.statusUrl để theo dõi.,"requestId: string:uuid, holdId: string:uuid, state: string, statusUrl: string:uri-reference"
+PH-007,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+PH-007,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+PH-007,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+PH-007,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+PH-007,409,Lỗi,"SETTLEMENT_NOT_CONFIRMED, HOLD_EXPIRED",SETTLEMENT_NOT_CONFIRMED: Chưa có SettlementDecision hợp lệ để chốt/phát thuốc.; HOLD_EXPIRED: Hold đã hết hạn theo đồng hồ server.,ErrorResponse
+PH-007,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+PH-008,200,Thành công,,Hoàn tất thao tác phát một lần. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"dispenseId: string:uuid, holdId: string:uuid, state: string"
+PH-008,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+PH-008,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+PH-008,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+PH-008,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+PH-008,409,Lỗi,"ALREADY_DISPENSED, SETTLEMENT_NOT_CONFIRMED",ALREADY_DISPENSED: Hold đã phát thuốc; không phát lần hai.; SETTLEMENT_NOT_CONFIRMED: Chưa có SettlementDecision hợp lệ để chốt/phát thuốc.,ErrorResponse
+PH-008,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+BI-001,201,Thành công,,Hoàn tất thao tác adapter phục hồi tắt mặc định. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,charge: Charge
+BI-001,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+BI-001,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+BI-001,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+BI-001,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+BI-001,409,Lỗi,STATE_CONFLICT,STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
+BI-001,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+BI-013,200,Thành công,,Hoàn tất thao tác hàng chờ thu theo trạng thái/ngày. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"items: Charge[], total: integer:int32"
+BI-013,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+BI-013,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+BI-013,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+BI-013,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+BI-002,200,Thành công,,Hoàn tất thao tác khoản thu cùng latestpayment/saga/refundstate theo quyền. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"charge: Charge, latestPayment: Payment, saga: SettlementSagaStatus, refundState: string"
+BI-002,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+BI-002,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+BI-002,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+BI-002,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+BI-002,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+BI-003,200,Thành công,,Hoàn tất thao tác các khoản thu của hồ sơ. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"items: Charge[], total: integer:int32"
+BI-003,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+BI-003,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+BI-003,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+BI-003,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+BI-003,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+BI-004,202,Thành công,,Đã nhận lệnh và commit local/outbox; kết quả liên service còn chờ. Client đọc Location hoặc data.statusUrl để theo dõi.,"requestId: string:uuid, paymentId: string:uuid, state: string, statusUrl: string:uri-reference"
+BI-004,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+BI-004,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+BI-004,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+BI-004,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+BI-004,409,Lỗi,"CHARGE_NOT_PAYABLE, DUPLICATE_TRANSACTION",CHARGE_NOT_PAYABLE: Charge không còn ở trạng thái có thể thanh toán.; DUPLICATE_TRANSACTION: transactionId đã được dùng cho giao dịch khác.,ErrorResponse
+BI-004,429,Lỗi,RATE_LIMITED,RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.,ErrorResponse
+BI-004,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+BI-005,202,Thành công,,Đã nhận lệnh và commit local/outbox; kết quả liên service còn chờ. Client đọc Location hoặc data.statusUrl để theo dõi.,"requestId: string:uuid, paymentId: string:uuid, state: string, statusUrl: string:uri-reference"
+BI-005,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+BI-005,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+BI-005,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+BI-005,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+BI-005,409,Lỗi,"CHARGE_NOT_PAYABLE, DUPLICATE_TRANSACTION",CHARGE_NOT_PAYABLE: Charge không còn ở trạng thái có thể thanh toán.; DUPLICATE_TRANSACTION: transactionId đã được dùng cho giao dịch khác.,ErrorResponse
+BI-005,429,Lỗi,RATE_LIMITED,RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.,ErrorResponse
+BI-005,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+BI-006,200,Thành công,,Hoàn tất thao tác biên nhận. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,receipt: Receipt
+BI-006,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+BI-006,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+BI-006,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+BI-006,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+BI-006,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+BI-007,201,Thành công,,Hoàn tất thao tác yêu cầu hoàn theo căn cứ. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,refund: Refund
+BI-007,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+BI-007,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+BI-007,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+BI-007,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+BI-007,409,Lỗi,"REFUND_NOT_ELIGIBLE, REFUND_EXCEEDS_PAID",REFUND_NOT_ELIGIBLE: Không có căn cứ hoặc trạng thái phù hợp để hoàn tiền.; REFUND_EXCEEDS_PAID: Tổng hoàn dự kiến vượt số tiền thực đã thu.,ErrorResponse
+BI-007,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+BI-014,200,Thành công,,Hoàn tất thao tác hàng chờ hoàn theo trạng thái/ngày. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"items: Refund[], total: integer:int32"
+BI-014,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+BI-014,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+BI-014,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+BI-014,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+BI-008,200,Thành công,,Hoàn tất thao tác thực hiện hoàn mô phỏng. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,refund: Refund
+BI-008,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+BI-008,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+BI-008,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+BI-008,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+BI-008,409,Lỗi,"REFUND_ALREADY_EXECUTED, REFUND_EXCEEDS_PAID",REFUND_ALREADY_EXECUTED: Yêu cầu hoàn đã được thực hiện.; REFUND_EXCEEDS_PAID: Tổng hoàn dự kiến vượt số tiền thực đã thu.,ErrorResponse
+BI-008,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+BI-009,200,Thành công,,Hoàn tất thao tác trạng thái hoàn. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,refund: Refund
+BI-009,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+BI-009,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+BI-009,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+BI-009,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+BI-009,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+BI-010,200,Thành công,,Hoàn tất thao tác báo cáo thu/hoàn. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"receivedVnd: integer:int64, refundedVnd: integer:int64, asOf: string:date-time"
+BI-010,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+BI-010,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+BI-010,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+BI-010,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+NO-001,200,Thành công,,Hoàn tất thao tác danh sách thông báo. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"items: Notification[], total: integer:int32"
+NO-001,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+NO-001,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+NO-001,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+NO-001,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+NO-002,200,Thành công,,Hoàn tất thao tác đánh dấu đã đọc. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"notificationId: string:uuid, readAt: string:date-time"
+NO-002,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+NO-002,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+NO-002,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+NO-002,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
+NO-002,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+CA-005,200,Thành công,,Hoàn tất thao tác danh mục thuốc để kê toa. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,data: MedicineCatalogItem[]
+CA-005,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+CA-005,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+CA-005,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+CA-005,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+CA-006,200,Thành công,,"Hoàn tất thao tác danh mục test, đơn vị, khoảng tham chiếu, giá version. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",data: LabTestCatalogItem[]
+CA-006,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+CA-006,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+CA-006,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
+CA-006,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse

@@ -1,0 +1,14 @@
+,,,,
+API UMC Care · 9 service / 86 HTTP,,,,
+UMC Care · hợp đồng API v5.2 đã rà soát · 17/10/2026 · chưa biểu thị trạng thái đã code,,,,
+,,,,
+Service,Người phụ trách,Backend,DB riêng,HTTP operations
+Identity,Hưng,Django,PostgreSQL,14
+Patient,Quân,Node.js,MongoDB,5
+Catalog,Huy,Go,PostgreSQL,6
+Appointment,Quân,Node.js,MongoDB,15
+Clinical,Huy,Go,PostgreSQL,11
+Diagnostic,Huy,Go,PostgreSQL,13
+Pharmacy,Quân,Node.js,MongoDB,8
+Billing,Hưng,Django,PostgreSQL,12
+Notification,Hưng,Django,PostgreSQL,2

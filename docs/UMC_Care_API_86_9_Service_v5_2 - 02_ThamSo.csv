@@ -1,0 +1,319 @@
+,,,,,,
+Tham số request · path / query / header / body,,,,,,
+UMC Care · hợp đồng API v5.2 đã rà soát · 17/10/2026 · chưa biểu thị trạng thái đã code,,,,,,
+,,,,,,
+API ID,Vị trí,Trường,Kiểu,Bắt buộc,Ràng buộc / mặc định,Mô tả
+IA-001,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+IA-001,body,phone,string,Có,,Số điện thoại dùng định danh hoặc tra cứu tài khoản; server chuẩn hóa trước khi so khớp.
+IA-001,body,password,string,Có,,"Mật khẩu người dùng; chỉ truyền qua HTTPS, không ghi log hoặc trả lại trong response."
+IA-002,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+IA-002,body,phone,string,Có,,Số điện thoại dùng định danh hoặc tra cứu tài khoản; server chuẩn hóa trước khi so khớp.
+IA-002,body,purpose,string,Có,"enum=['REGISTER', 'RESET']",Mục đích OTP để server kiểm đúng luồng REGISTER hoặc RESET.
+IA-002,body,otpCode,string,Có,,Mã OTP người dùng nhập; chỉ hợp lệ một lần trong thời hạn do Identity quản lý.
+IA-003,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+IA-003,body,phone,string,Có,,Số điện thoại dùng định danh hoặc tra cứu tài khoản; server chuẩn hóa trước khi so khớp.
+IA-003,body,purpose,string,Có,"enum=['REGISTER', 'RESET']",Mục đích OTP để server kiểm đúng luồng REGISTER hoặc RESET.
+IA-004,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+IA-004,body,phone,string,Có,,Số điện thoại dùng định danh hoặc tra cứu tài khoản; server chuẩn hóa trước khi so khớp.
+IA-004,body,password,string,Có,,"Mật khẩu người dùng; chỉ truyền qua HTTPS, không ghi log hoặc trả lại trong response."
+IA-005,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+IA-005,body,refreshToken,string,Có,,Refresh token còn hiệu lực dùng đổi access token hoặc đăng xuất phiên.
+IA-006,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+IA-006,body,refreshToken,string,Có,,Refresh token còn hiệu lực dùng đổi access token hoặc đăng xuất phiên.
+IA-007,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+IA-007,body,phone,string,Có,,Số điện thoại dùng định danh hoặc tra cứu tài khoản; server chuẩn hóa trước khi so khớp.
+IA-008,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+IA-008,body,phone,string,Có,,Số điện thoại dùng định danh hoặc tra cứu tài khoản; server chuẩn hóa trước khi so khớp.
+IA-008,body,otpCode,string,Có,,Mã OTP người dùng nhập; chỉ hợp lệ một lần trong thời hạn do Identity quản lý.
+IA-008,body,newPassword,string,Có,,Mật khẩu mới sau xác minh OTP hoặc mật khẩu hiện tại.
+IA-009,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+IA-009,body,currentPassword,string,Có,,Mật khẩu hiện tại để xác nhận người đang đổi mật khẩu.
+IA-009,body,newPassword,string,Có,,Mật khẩu mới sau xác minh OTP hoặc mật khẩu hiện tại.
+IA-011,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
+IA-011,query,limit,integer,Không,minimum=1; maximum=100; default=20,Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema.
+IA-011,query,departmentId,string:uuid,Không,,"ID khoa dùng lọc bác sĩ, dịch vụ hoặc tài khoản theo ngữ cảnh API."
+IA-012,path,staffId,string:uuid,Có,,ID tài khoản nhân viên cần xem hoặc cập nhật quyền.
+IA-012,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+IA-012,body,capabilities,CapabilityAssignment[],Có,,"Danh sách capability được cấp/thu hồi cho STAFF; mỗi phần tử có capability, scopeKey, enabled."
+IA-012,body,capabilities[].capability,string,Có,,"Trong mỗi phần tử: Tên quyền tác vụ STAFF như RECEPTION, LAB_TECH hoặc LAB_REVIEW."
+IA-012,body,capabilities[].scopeKey,string,Có,,"Trong mỗi phần tử: Phạm vi áp dụng capability, ví dụ khoa hoặc toàn hệ thống theo cấu hình."
+IA-012,body,capabilities[].enabled,boolean,Có,,"Trong mỗi phần tử: true để cấp, false để thu hồi capability."
+IA-012,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+IA-013,query,from,string:date,Không,,"Mốc bắt đầu khoảng tra cứu theo thời gian của API, bao gồm mốc này."
+IA-013,query,to,string:date,Không,,"Mốc kết thúc khoảng tra cứu theo thời gian của API, không bao gồm mốc này."
+IA-013,query,actorUserId,string:uuid,Không,,ID người thực hiện được lọc trong nhật ký kiểm toán.
+IA-013,query,action,string,Không,,Tên hành động cần lọc trong nhật ký kiểm toán.
+IA-013,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
+IA-013,query,limit,integer,Không,minimum=1; maximum=100; default=20,Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema.
+IA-014,query,phone,string,Có,,Số điện thoại dùng định danh hoặc tra cứu tài khoản; server chuẩn hóa trước khi so khớp.
+PT-001,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
+PT-001,query,limit,integer,Không,minimum=1; maximum=100; default=20,Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema.
+PT-003,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+PT-003,body,ownerPhone,string,Không,,Số điện thoại tài khoản chủ sở hữu hồ sơ người thân.
+PT-003,body,relation,string,Có,"enum=['SELF', 'OTHER']",Quan hệ giữa người tạo và bệnh nhân được khai báo trong hồ sơ.
+PT-003,body,fullName,string,Có,,Họ tên bệnh nhân dùng trên hồ sơ và chứng từ mô phỏng.
+PT-003,body,birthDate,string:date,Có,,Ngày sinh bệnh nhân theo định dạng date.
+PT-003,body,sex,string,Không,,Giới tính được khai báo trong hồ sơ bệnh nhân.
+PT-003,body,bhytSelfDeclared,string,Không,,Thông tin BHYT tự khai; demo không tích hợp cổng kiểm tra BHYT thật.
+PT-002,query,phone,string,Không,,Số điện thoại dùng định danh hoặc tra cứu tài khoản; server chuẩn hóa trước khi so khớp.
+PT-002,query,name,string,Không,,Chuỗi tên dùng tìm bác sĩ hoặc danh mục theo API.
+PT-002,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
+PT-002,query,limit,integer,Không,minimum=1; maximum=100; default=20,Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema.
+PT-004,path,patientId,string:uuid,Có,,ID hồ sơ bệnh nhân; server kiểm quyền chủ sở hữu hoặc capability tương ứng.
+PT-005,path,patientId,string:uuid,Có,,ID hồ sơ bệnh nhân; server kiểm quyền chủ sở hữu hoặc capability tương ứng.
+PT-005,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+PT-005,body,fullName,string,Không,,Họ tên bệnh nhân dùng trên hồ sơ và chứng từ mô phỏng.
+PT-005,body,birthDate,string:date,Không,,Ngày sinh bệnh nhân theo định dạng date.
+PT-005,body,sex,string,Không,,Giới tính được khai báo trong hồ sơ bệnh nhân.
+PT-005,body,bhytSelfDeclared,string,Không,,Thông tin BHYT tự khai; demo không tích hợp cổng kiểm tra BHYT thật.
+PT-005,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+CA-002,query,departmentId,string:uuid,Không,,"ID khoa dùng lọc bác sĩ, dịch vụ hoặc tài khoản theo ngữ cảnh API."
+CA-002,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
+CA-002,query,limit,integer,Không,minimum=1; maximum=100; default=20,Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema.
+CA-003,query,departmentId,string:uuid,Không,,"ID khoa dùng lọc bác sĩ, dịch vụ hoặc tài khoản theo ngữ cảnh API."
+CA-003,query,at,string:date-time,Không,,Thời điểm cần tra cứu giá có hiệu lực; không tự dùng giá hiện tại cho lịch đã chốt.
+AP-004,query,doctorId,string:uuid,Có,,"ID bác sĩ gắn với lịch, hàng chờ hoặc yêu cầu LAB."
+AP-004,query,serviceId,string:uuid,Có,,ID dịch vụ khám được chọn; giá được chốt bằng snapshot/version tại thời điểm phù hợp.
+AP-004,query,date,string:date,Có,,Ngày cần xem ca hoặc slot trống theo định dạng date.
+AP-005,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+AP-005,body,doctorId,string:uuid,Có,,"ID bác sĩ gắn với lịch, hàng chờ hoặc yêu cầu LAB."
+AP-005,body,serviceId,string:uuid,Có,,ID dịch vụ khám được chọn; giá được chốt bằng snapshot/version tại thời điểm phù hợp.
+AP-005,body,room,string,Có,,Mã/phòng khám dùng bố trí ca làm việc.
+AP-005,body,startAt,string:date-time,Có,,Thời điểm bắt đầu ca làm việc theo UTC ISO-8601.
+AP-005,body,endAt,string:date-time,Có,,Thời điểm kết thúc ca làm việc theo UTC ISO-8601; phải sau startAt.
+AP-005,body,slotMinutes,integer:int32,Có,,Độ dài một slot khám tính bằng phút.
+AP-005,body,capacityPerSlot,integer:int32,Có,,Số lượt tối đa có thể giữ/đặt trong mỗi slot.
+AP-006,path,scheduleId,string:uuid,Có,,ID ca làm việc cần đọc hoặc cập nhật.
+AP-006,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+AP-006,body,room,string,Không,,Mã/phòng khám dùng bố trí ca làm việc.
+AP-006,body,startAt,string:date-time,Không,,Thời điểm bắt đầu ca làm việc theo UTC ISO-8601.
+AP-006,body,endAt,string:date-time,Không,,Thời điểm kết thúc ca làm việc theo UTC ISO-8601; phải sau startAt.
+AP-006,body,capacityPerSlot,integer:int32,Không,,Số lượt tối đa có thể giữ/đặt trong mỗi slot.
+AP-006,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+CA-004,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+CA-004,body,itemType,string,Có,"enum=['EXAM', 'LAB', 'MEDICINE']",Loại mục danh mục được định giá hoặc tra cứu.
+CA-004,body,itemId,string:uuid,Có,,ID mục danh mục thuộc itemType.
+CA-004,body,amountVnd,integer:int64,Có,minimum=0,"Số tiền nguyên VND của giá, charge hoặc refund theo operation; không dùng số thực."
+CA-004,body,effectiveFrom,string:date-time,Có,,Thời điểm bắt đầu hiệu lực của bản giá.
+CA-004,body,effectiveTo,string:date-time,Không,,"Thời điểm kết thúc hiệu lực của bản giá, nếu có."
+AP-008,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+AP-008,body,patientId,string:uuid,Có,,ID hồ sơ bệnh nhân; server kiểm quyền chủ sở hữu hoặc capability tương ứng.
+AP-008,body,slotId,string:uuid,Có,,"ID slot muốn giữ; số chỗ hiển thị chỉ tham khảo, transaction giữ chỗ quyết định."
+AP-009,path,holdId,string:uuid,Có,,"ID hold đã tạo; dùng để tiêu thụ, nhả, chốt hoặc phát theo operation."
+AP-009,query,expectedVersion,integer:int32,Không,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+AP-009,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+AP-010,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+AP-010,body,holdId,string:uuid,Có,,"ID hold đã tạo; dùng để tiêu thụ, nhả, chốt hoặc phát theo operation."
+AP-010,body,patientId,string:uuid,Có,,ID hồ sơ bệnh nhân; server kiểm quyền chủ sở hữu hoặc capability tương ứng.
+AP-011,path,appointmentId,string:uuid,Có,,ID lịch hẹn cần đọc hoặc chuyển trạng thái.
+AP-012,path,patientId,string:uuid,Có,,ID hồ sơ bệnh nhân; server kiểm quyền chủ sở hữu hoặc capability tương ứng.
+AP-012,query,state,string,Không,,Trạng thái dùng lọc danh sách; giá trị phải thuộc state machine của tài nguyên.
+AP-012,query,from,string:date,Không,,"Mốc bắt đầu khoảng tra cứu theo thời gian của API, bao gồm mốc này."
+AP-012,query,to,string:date,Không,,"Mốc kết thúc khoảng tra cứu theo thời gian của API, không bao gồm mốc này."
+AP-012,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
+AP-012,query,limit,integer,Không,minimum=1; maximum=100; default=20,Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema.
+AP-013,path,appointmentId,string:uuid,Có,,ID lịch hẹn cần đọc hoặc chuyển trạng thái.
+AP-013,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+AP-013,body,newSlotId,string:uuid,Có,,ID slot mới khi đổi lịch; server kiểm sức chứa và xung đột giờ trong transaction.
+AP-013,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+AP-014,path,appointmentId,string:uuid,Có,,ID lịch hẹn cần đọc hoặc chuyển trạng thái.
+AP-014,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+AP-014,body,reasonCode,string,Có,,"Mã lý do nghiệp vụ cho thao tác hủy, từ chối hoặc hoàn; được ghi vào audit."
+AP-014,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+AP-015,path,appointmentId,string:uuid,Có,,ID lịch hẹn cần đọc hoặc chuyển trạng thái.
+AP-015,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+AP-015,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+AP-016,query,ticketType,string,Không,"enum=['FIRST', 'RETURN']",Loại vé hàng chờ FIRST hoặc RETURN.
+AP-016,query,doctorId,string:uuid,Không,,"ID bác sĩ gắn với lịch, hàng chờ hoặc yêu cầu LAB."
+AP-016,query,date,string:date,Không,,Ngày cần xem ca hoặc slot trống theo định dạng date.
+AP-016,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
+AP-016,query,limit,integer,Không,minimum=1; maximum=100; default=20,Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema.
+AP-017,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+AP-017,body,ticketType,string,Có,"enum=['FIRST', 'RETURN']",Loại vé hàng chờ FIRST hoặc RETURN.
+AP-017,body,doctorId,string:uuid,Không,,"ID bác sĩ gắn với lịch, hàng chờ hoặc yêu cầu LAB."
+AP-018,path,ticketId,string:uuid,Có,,ID vé hàng chờ cần gọi hoặc claim cho lượt khám.
+AP-018,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+AP-018,body,reasonCode,string,Có,,"Mã lý do nghiệp vụ cho thao tác hủy, từ chối hoặc hoàn; được ghi vào audit."
+AP-018,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+AP-019,query,from,string:date,Có,,"Mốc bắt đầu khoảng tra cứu theo thời gian của API, bao gồm mốc này."
+AP-019,query,to,string:date,Có,,"Mốc kết thúc khoảng tra cứu theo thời gian của API, không bao gồm mốc này."
+CL-001,query,date,string:date,Không,,Ngày cần xem ca hoặc slot trống theo định dạng date.
+CL-001,query,state,string,Không,,Trạng thái dùng lọc danh sách; giá trị phải thuộc state machine của tài nguyên.
+CL-001,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
+CL-001,query,limit,integer,Không,minimum=1; maximum=100; default=20,Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema.
+CL-001,query,operationId,string:uuid,Không,,ID start_requests do CL-002 trả; dùng đọc tiến độ startRequest trong CL-001.
+CL-002,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+CL-002,body,ticketId,string:uuid,Có,,ID vé hàng chờ cần gọi hoặc claim cho lượt khám.
+CL-002,body,doctorId,string:uuid,Có,,"ID bác sĩ gắn với lịch, hàng chờ hoặc yêu cầu LAB."
+CL-002,body,expectedTicketVersion,integer,Có,,Phiên bản vé client đã đọc; Appointment từ chối claim nếu đã đổi.
+CL-003,path,visitId,string:uuid,Có,,ID lượt khám; Clinical kiểm quyền bác sĩ hoặc bệnh nhân trước khi trả dữ liệu.
+CL-004,path,visitId,string:uuid,Có,,ID lượt khám; Clinical kiểm quyền bác sĩ hoặc bệnh nhân trước khi trả dữ liệu.
+CL-004,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+CL-004,body,symptoms,string,Có,,"Triệu chứng trong bản nháp bệnh án; PUT gửi cả bốn trường draft, có thể là chuỗi rỗng."
+CL-004,body,findings,string,Có,,Dấu hiệu khám trong bản nháp bệnh án; có thể là chuỗi rỗng.
+CL-004,body,assessment,string,Có,,Đánh giá lâm sàng trong bản nháp bệnh án; có thể là chuỗi rỗng.
+CL-004,body,diagnosis,string,Có,,Chẩn đoán trong bản nháp bệnh án; có thể là chuỗi rỗng.
+CL-004,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+CL-005,path,visitId,string:uuid,Có,,ID lượt khám; Clinical kiểm quyền bác sĩ hoặc bệnh nhân trước khi trả dữ liệu.
+CL-005,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+CL-005,body,tests,object[],Có,minItems=1,"Danh sách xét nghiệm được chỉ định; mỗi dòng gồm testId và revision, ít nhất một dòng."
+CL-005,body,tests[].testId,string:uuid,Có,,Trong mỗi phần tử: ID xét nghiệm trong Catalog đã được chọn cho chỉ định.
+CL-005,body,tests[].revision,integer,Có,,Trong mỗi phần tử: Phiên bản định nghĩa xét nghiệm đã chọn; Clinical đối chiếu với Catalog projection trước khi chỉ định.
+CL-006,path,visitId,string:uuid,Có,,ID lượt khám; Clinical kiểm quyền bác sĩ hoặc bệnh nhân trước khi trả dữ liệu.
+CL-006,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+CL-006,body,lines,PrescriptionLine[],Có,,Các dòng thuốc của toa; mỗi dòng tuân theo PrescriptionLine và bản FINAL không được sửa đè.
+CL-006,body,lines[].medicineCode,string,Có,,Trong mỗi phần tử: Mã thuốc tại thời điểm chốt dòng toa.
+CL-006,body,lines[].nameSnapshot,string,Không,,"Trong mỗi phần tử: Tên thuốc chụp tại thời điểm lập toa, không sửa theo danh mục về sau."
+CL-006,body,lines[].doseText,string,Có,,Trong mỗi phần tử: Liều dùng bác sĩ ghi cho dòng thuốc.
+CL-006,body,lines[].quantity,integer:int32,Có,,Trong mỗi phần tử: Số đơn vị thuốc bác sĩ kê trong dòng toa; phải là số nguyên dương.
+CL-006,body,lines[].instruction,string,Không,,Trong mỗi phần tử: Hướng dẫn dùng thuốc của dòng toa.
+CL-007,path,prescriptionId,string:uuid,Có,,"ID toa thuốc cần xem, sửa hoặc giữ toàn bộ thuốc."
+CL-007,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+CL-007,body,lines,PrescriptionLine[],Có,,Các dòng thuốc của toa; mỗi dòng tuân theo PrescriptionLine và bản FINAL không được sửa đè.
+CL-007,body,lines[].medicineCode,string,Có,,Trong mỗi phần tử: Mã thuốc tại thời điểm chốt dòng toa.
+CL-007,body,lines[].nameSnapshot,string,Không,,"Trong mỗi phần tử: Tên thuốc chụp tại thời điểm lập toa, không sửa theo danh mục về sau."
+CL-007,body,lines[].doseText,string,Có,,Trong mỗi phần tử: Liều dùng bác sĩ ghi cho dòng thuốc.
+CL-007,body,lines[].quantity,integer:int32,Có,,Trong mỗi phần tử: Số đơn vị thuốc bác sĩ kê trong dòng toa; phải là số nguyên dương.
+CL-007,body,lines[].instruction,string,Không,,Trong mỗi phần tử: Hướng dẫn dùng thuốc của dòng toa.
+CL-007,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+CL-008,path,prescriptionId,string:uuid,Có,,"ID toa thuốc cần xem, sửa hoặc giữ toàn bộ thuốc."
+CL-008,query,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+CL-008,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+CL-009,path,prescriptionId,string:uuid,Có,,"ID toa thuốc cần xem, sửa hoặc giữ toàn bộ thuốc."
+CL-009,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+CL-009,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+CL-010,path,visitId,string:uuid,Có,,ID lượt khám; Clinical kiểm quyền bác sĩ hoặc bệnh nhân trước khi trả dữ liệu.
+CL-010,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+CL-010,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+CL-011,path,patientId,string:uuid,Có,,ID hồ sơ bệnh nhân; server kiểm quyền chủ sở hữu hoặc capability tương ứng.
+CL-011,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
+CL-011,query,limit,integer,Không,minimum=1; maximum=100; default=20,Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema.
+DI-001,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+DI-001,body,visitId,string:uuid,Có,,ID lượt khám; Clinical kiểm quyền bác sĩ hoặc bệnh nhân trước khi trả dữ liệu.
+DI-001,body,testCodes,string[],Có,,Các mã xét nghiệm của adapter phục hồi nội bộ; luồng chính dùng CL-005.
+DI-002,query,state,string,Không,,Trạng thái dùng lọc danh sách; giá trị phải thuộc state machine của tài nguyên.
+DI-002,query,date,string:date,Không,,Ngày cần xem ca hoặc slot trống theo định dạng date.
+DI-002,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
+DI-002,query,limit,integer,Không,minimum=1; maximum=100; default=20,Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema.
+DI-003,path,orderId,string:uuid,Có,,"ID order LAB cần lấy mẫu, hủy hoặc xem trạng thái."
+DI-004,path,orderId,string:uuid,Có,,"ID order LAB cần lấy mẫu, hủy hoặc xem trạng thái."
+DI-004,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+DI-004,body,barcode,string,Không,,Mã nhận dạng mẫu; server bảo đảm không trùng trong phạm vi mẫu.
+DI-004,body,note,string,Không,,Ghi chú nghiệp vụ cho thao tác lấy mẫu.
+DI-005,path,specimenId,string:uuid,Có,,ID mẫu LAB cần từ chối hoặc xem.
+DI-005,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+DI-005,body,reasonCode,string,Có,,"Mã lý do nghiệp vụ cho thao tác hủy, từ chối hoặc hoàn; được ghi vào audit."
+DI-005,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+DI-006,path,orderId,string:uuid,Có,,"ID order LAB cần lấy mẫu, hủy hoặc xem trạng thái."
+DI-006,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+DI-006,body,barcode,string,Không,,Mã nhận dạng mẫu; server bảo đảm không trùng trong phạm vi mẫu.
+DI-007,path,orderId,string:uuid,Có,,"ID order LAB cần lấy mẫu, hủy hoặc xem trạng thái."
+DI-007,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+DI-007,body,items,LabResultItem[],Có,,Các chỉ số kết quả LAB; mỗi phần tử theo LabResultItem.
+DI-007,body,items[].testCode,string,Có,,Trong mỗi phần tử: Mã xét nghiệm mà chỉ số kết quả thuộc về.
+DI-007,body,items[].valueText,string,Có,,"Trong mỗi phần tử: Giá trị kết quả dưới dạng văn bản, chưa công bố khi còn DRAFT."
+DI-007,body,items[].unit,string,Không,,Trong mỗi phần tử: Đơn vị hiển thị của chỉ số LAB nếu có.
+DI-007,body,items[].referenceRange,string,Không,,Trong mỗi phần tử: Khoảng tham chiếu đã chụp cho chỉ số LAB nếu có.
+DI-007,body,items[].flag,string,Không,,Trong mỗi phần tử: Cờ diễn giải kết quả LAB nếu có.
+DI-008,path,resultId,string:uuid,Có,,"ID bộ kết quả LAB cần sửa, gửi duyệt hoặc công bố."
+DI-008,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+DI-008,body,items,LabResultItem[],Có,,Các chỉ số kết quả LAB; mỗi phần tử theo LabResultItem.
+DI-008,body,items[].testCode,string,Có,,Trong mỗi phần tử: Mã xét nghiệm mà chỉ số kết quả thuộc về.
+DI-008,body,items[].valueText,string,Có,,"Trong mỗi phần tử: Giá trị kết quả dưới dạng văn bản, chưa công bố khi còn DRAFT."
+DI-008,body,items[].unit,string,Không,,Trong mỗi phần tử: Đơn vị hiển thị của chỉ số LAB nếu có.
+DI-008,body,items[].referenceRange,string,Không,,Trong mỗi phần tử: Khoảng tham chiếu đã chụp cho chỉ số LAB nếu có.
+DI-008,body,items[].flag,string,Không,,Trong mỗi phần tử: Cờ diễn giải kết quả LAB nếu có.
+DI-008,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+DI-009,path,resultId,string:uuid,Có,,"ID bộ kết quả LAB cần sửa, gửi duyệt hoặc công bố."
+DI-009,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+DI-009,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+DI-010,path,resultId,string:uuid,Có,,"ID bộ kết quả LAB cần sửa, gửi duyệt hoặc công bố."
+DI-010,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+DI-010,body,reason,string,Có,,Lý do trả kết quả về trạng thái REWORK.
+DI-010,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+DI-011,path,resultId,string:uuid,Có,,"ID bộ kết quả LAB cần sửa, gửi duyệt hoặc công bố."
+DI-011,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+DI-011,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+DI-012,path,orderId,string:uuid,Có,,"ID order LAB cần lấy mẫu, hủy hoặc xem trạng thái."
+DI-012,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+DI-012,body,reasonCode,string,Có,,"Mã lý do nghiệp vụ cho thao tác hủy, từ chối hoặc hoàn; được ghi vào audit."
+DI-012,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+DI-013,path,patientId,string:uuid,Có,,ID hồ sơ bệnh nhân; server kiểm quyền chủ sở hữu hoặc capability tương ứng.
+DI-013,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
+DI-013,query,limit,integer,Không,minimum=1; maximum=100; default=20,Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema.
+PH-001,query,code,string,Không,,Mã danh mục dùng tra cứu chính xác.
+PH-001,query,name,string,Không,,Chuỗi tên dùng tìm bác sĩ hoặc danh mục theo API.
+PH-001,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
+PH-001,query,limit,integer,Không,minimum=1; maximum=100; default=20,Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema.
+PH-002,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+PH-002,body,medicineId,string:uuid,Có,,ID thuốc trong danh mục được nhập bổ sung tồn.
+PH-002,body,quantity,integer:int32,Có,,Số đơn vị thuốc nhập thêm vào tồn từ chứng từ này; phải là số nguyên dương.
+PH-002,body,batchRef,string,Không,,Mã lô chứng từ nhập tồn để truy vết.
+PH-003,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
+PH-003,query,limit,integer,Không,minimum=1; maximum=100; default=20,Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema.
+PH-004,path,prescriptionId,string:uuid,Có,,"ID toa thuốc cần xem, sửa hoặc giữ toàn bộ thuốc."
+PH-004,query,revision,integer:int32,Không,,Revision của toa FINAL cần xem; bỏ qua để lấy revision hiện hành theo quyền.
+PH-005,path,prescriptionId,string:uuid,Có,,"ID toa thuốc cần xem, sửa hoặc giữ toàn bộ thuốc."
+PH-005,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+PH-005,body,prescriptionRevision,integer,Có,,Revision FINAL của toa; Pharmacy từ chối nếu projection đã khác.
+PH-006,path,holdId,string:uuid,Có,,"ID hold đã tạo; dùng để tiêu thụ, nhả, chốt hoặc phát theo operation."
+PH-006,query,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+PH-006,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+PH-007,path,holdId,string:uuid,Có,,"ID hold đã tạo; dùng để tiêu thụ, nhả, chốt hoặc phát theo operation."
+PH-007,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+PH-007,body,expectedAttemptNo,integer,Có,,Lần giữ thuốc client đang chốt; chống chốt nhầm hold cũ sau retry.
+PH-008,path,holdId,string:uuid,Có,,"ID hold đã tạo; dùng để tiêu thụ, nhả, chốt hoặc phát theo operation."
+PH-008,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+PH-008,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+BI-001,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+BI-001,body,sourceType,string,Có,"enum=['APPOINTMENT', 'LAB_ORDER', 'MED_HOLD']","Loại nguồn charge: APPOINTMENT, LAB_ORDER hoặc MED_HOLD."
+BI-001,body,sourceId,string:uuid,Có,,"ID tài nguyên nguồn của charge hoặc refund, không phải ID bản ghi Billing."
+BI-001,body,sourceRevision,integer:int32,Có,,Revision/attempt của nguồn để khóa giao dịch và chống áp dụng tiền cho phiên bản cũ.
+BI-001,body,amountVnd,integer:int64,Có,minimum=0,"Số tiền nguyên VND của giá, charge hoặc refund theo operation; không dùng số thực."
+BI-001,body,priceSnapshot,object,Có,,Snapshot giá đã được owner nguồn xác nhận; adapter nội bộ tắt trong luồng demo chuẩn.
+BI-001,body,patientId,string:uuid,Có,,ID hồ sơ bệnh nhân; server kiểm quyền chủ sở hữu hoặc capability tương ứng.
+BI-013,query,state,string,Không,,Trạng thái dùng lọc danh sách; giá trị phải thuộc state machine của tài nguyên.
+BI-013,query,from,string:date,Không,,"Mốc bắt đầu khoảng tra cứu theo thời gian của API, bao gồm mốc này."
+BI-013,query,to,string:date,Không,,"Mốc kết thúc khoảng tra cứu theo thời gian của API, không bao gồm mốc này."
+BI-013,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
+BI-013,query,limit,integer,Không,minimum=1; maximum=100; default=20,Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema.
+BI-002,path,chargeId,string:uuid,Có,,ID khoản thu do Billing sở hữu.
+BI-003,path,patientId,string:uuid,Có,,ID hồ sơ bệnh nhân; server kiểm quyền chủ sở hữu hoặc capability tương ứng.
+BI-003,query,state,string,Không,,Trạng thái dùng lọc danh sách; giá trị phải thuộc state machine của tài nguyên.
+BI-003,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
+BI-003,query,limit,integer,Không,minimum=1; maximum=100; default=20,Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema.
+BI-004,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+BI-004,body,chargeId,string:uuid,Có,,ID khoản thu do Billing sở hữu.
+BI-004,body,transactionId,string,Có,,Mã giao dịch bên ngoài hoặc mô phỏng; retry cùng giao dịch không được thu hai lần.
+BI-005,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+BI-005,body,chargeId,string:uuid,Có,,ID khoản thu do Billing sở hữu.
+BI-005,body,transactionId,string,Có,,Mã giao dịch bên ngoài hoặc mô phỏng; retry cùng giao dịch không được thu hai lần.
+BI-005,body,counterReference,string,Có,,Mã tham chiếu giao dịch tại quầy do CASHIER ghi.
+BI-006,path,receiptId,string:uuid,Có,,ID biên nhận đã phát hành cần đọc.
+BI-007,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+BI-007,body,chargeId,string:uuid,Có,,ID khoản thu do Billing sở hữu.
+BI-007,body,sourceId,string:uuid,Có,,"ID tài nguyên nguồn của charge hoặc refund, không phải ID bản ghi Billing."
+BI-007,body,reasonCode,string,Có,,"Mã lý do nghiệp vụ cho thao tác hủy, từ chối hoặc hoàn; được ghi vào audit."
+BI-007,body,amountVnd,integer:int64,Có,minimum=0,"Số tiền nguyên VND của giá, charge hoặc refund theo operation; không dùng số thực."
+BI-014,query,state,string,Không,,Trạng thái dùng lọc danh sách; giá trị phải thuộc state machine của tài nguyên.
+BI-014,query,from,string:date,Không,,"Mốc bắt đầu khoảng tra cứu theo thời gian của API, bao gồm mốc này."
+BI-014,query,to,string:date,Không,,"Mốc kết thúc khoảng tra cứu theo thời gian của API, không bao gồm mốc này."
+BI-014,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
+BI-014,query,limit,integer,Không,minimum=1; maximum=100; default=20,Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema.
+BI-008,path,refundId,string:uuid,Có,,ID yêu cầu hoàn tiền do Billing sở hữu.
+BI-008,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+BI-008,body,transactionId,string,Có,,Mã giao dịch bên ngoài hoặc mô phỏng; retry cùng giao dịch không được thu hai lần.
+BI-008,body,scenario,string,Có,"enum=['SUCCESS', 'FAIL']",Kết quả mô phỏng adapter hoàn tiền: SUCCESS hoặc FAIL.
+BI-008,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+BI-009,path,refundId,string:uuid,Có,,ID yêu cầu hoàn tiền do Billing sở hữu.
+BI-010,query,from,string:date,Có,,"Mốc bắt đầu khoảng tra cứu theo thời gian của API, bao gồm mốc này."
+BI-010,query,to,string:date,Có,,"Mốc kết thúc khoảng tra cứu theo thời gian của API, không bao gồm mốc này."
+NO-001,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
+NO-001,query,limit,integer,Không,minimum=1; maximum=100; default=20,Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema.
+NO-001,query,unreadOnly,boolean,Không,,Chỉ lấy thông báo chưa đọc khi true.
+NO-002,path,notificationId,string:uuid,Có,,ID thông báo cần đánh dấu đã đọc.
+NO-002,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
+CA-005,query,q,string,Không,,Từ khóa tìm kiếm tự do theo phạm vi API.
+CA-005,query,status,string,Không,,Trạng thái dùng lọc danh sách theo API.
+CA-006,query,q,string,Không,,Từ khóa tìm kiếm tự do theo phạm vi API.
+CA-006,query,status,string,Không,,Trạng thái dùng lọc danh sách theo API.
