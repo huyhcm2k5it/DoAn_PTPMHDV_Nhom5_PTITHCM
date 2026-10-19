@@ -1,0 +1,20 @@
+,,
+Quy ước thiết kế và đối chiếu slide,,
+UMC Care · hợp đồng API v5.2 đã rà soát · 17/10/2026 · chưa biểu thị trạng thái đã code,,
+,,
+Chủ đề,Quy ước áp dụng,Căn cứ / kiểm tra
+Phạm vi,"Giữ 86 API ID/method/route của mốc v5; 83 qua Gateway, 3 adapter nội bộ tắt mặc định.",Không đổi phạm vi nghiệp vụ; contract chi tiết v5.2 là nguồn code API.
+GET,Đọc tài nguyên; không gửi request body; query dùng cho lọc và phân trang.,"RestfulApi.pdf trang 10, 13, 19–21, 35; RFC 9110 §9.3.1."
+POST,Tạo tài nguyên hoặc thực hiện lệnh nghiệp vụ có điều kiện; lệnh retry cần Idempotency-Key.,"RestfulApi.pdf trang 10, 12, 35; RFC 9110 §9.3.3."
+PUT,Thay toàn bộ biểu diễn đích; CL-004 nhận cả bốn trường draft và expectedVersion.,"RestfulApi.pdf trang 10, 14, 35; RFC 9110 §9.3.4."
+PATCH,Sửa một phần hoặc chuyển trạng thái có điều kiện đã mô tả trong operation.,Bổ sung cho ví dụ CRUD trên slide; giữ contract v5.
+DELETE,Nhả hold hoặc xóa draft; không dùng cho hủy lịch có hậu quả hoàn tiền.,"RestfulApi.pdf trang 10, 15, 35; RFC 9110 §9.3.5."
+URI,"Tài nguyên ở path; query chỉ dùng lọc; chữ thường, không đuôi file. Route /cancel, /publish... là lệnh nghiệp vụ neo vào ID tài nguyên.","RestfulApi.pdf trang 19–21, 31–35."
+Stateless,"Mỗi request mang credential và tham số đủ để xử lý. Refresh dùng refreshToken trong body, không cần access token còn hạn.",RestfulApi.pdf trang 16–18.
+JSON,Request/response HTTP dùng application/json; lỗi dùng ErrorResponse chung.,RestfulApi.pdf trang 22–25; Day 5 slide 7.
+202,Accepted chỉ xác nhận local commit/outbox. Response có statusUrl và Location; client poll trước khi hiển thị nghiệp vụ hoàn tất.,Day 5 slide 6 về bất đồng bộ.
+409,Trả error code nghiệp vụ theo operation; cùng Idempotency-Key khác payload là xung đột.,Đối chiếu sheet 03_PhanHoi và x-error-codes trong OpenAPI.
+Nguồn schema,Sheet 02_ThamSo và 03_PhanHoi lấy từ OpenAPI v5.2; operationId = API ID đổi dấu - thành _.,Không tự suy đoán kiểu dữ liệu từ ô tóm tắt.
+RabbitMQ,Event = chuyện đã xảy ra; command = yêu cầu owner thực hiện. Tách khỏi 86 HTTP operations.,Day 5: Message Queue / Pub-Sub / async IPC.
+Routing message,"Sheet 04/05 ghi exchange, routing key và queue theo AsyncAPI; dấu ? là trường tùy chọn. Nội dung và kiểu chi tiết trong AsyncAPI.",SRS mục cấu hình RabbitMQ; AsyncAPI x-rabbitmq.
+ReserveSettlement,"Billing chọn đúng một queue theo sourceType: APPOINTMENT→appointment, LAB_ORDER→diagnostic, MED_HOLD→pharmacy.",AsyncAPI x-rabbitmq.targetBySourceType; không fan-out command.

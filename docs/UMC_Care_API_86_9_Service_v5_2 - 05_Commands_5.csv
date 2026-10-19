@@ -1,0 +1,10 @@
+,,,,,,,
+5 RabbitMQ commands · yêu cầu owner xử lý,,,,,,,
+UMC Care · hợp đồng API v5.2 đã rà soát · 17/10/2026 · chưa biểu thị trạng thái đã code,,,,,,,
+,,,,,,,
+Command,Producer,Owner nhận,Payload fields (? = tùy chọn),Exchange,Routing key,Queue nhận,Phản hồi / quy tắc
+RequestCharge,Appointment Diagnostic Pharmacy,Billing,"requestId, sourceType, sourceId, sourceRevision, patientId, recipientUserId, linesSnapshot, amountVnd, snapshotHash",umc.commands.{producer}.v1,billing.request-charge.v1,cmd.billing.v1,"requestId, sourceType, sourceId, sourceRevision, patientId, recipientUserId, linesSnapshot, amountVnd, snapshotHash → ChargePrepared"
+CreateLabOrder,Clinical,Diagnostic,"requestId, visitId, patientId, doctorId, testSnapshot, requestHash, authorizedAt",umc.commands.{producer}.v1,diagnostic.create-lab-order.v1,cmd.diagnostic.v1,"requestId, visitId, patientId, doctorId, testSnapshot, requestHash, authorizedAt → LabOrderResolved"
+ClaimQueueTicket,Clinical,Appointment,"requestId, ticketId, expectedTicketVersion, doctorId, patientId",umc.commands.{producer}.v1,appointment.claim-queue-ticket.v1,cmd.appointment.v1,"requestId, ticketId, expectedTicketVersion, doctorId, patientId → QueueTicketClaimed"
+ReserveSettlement,Billing,Appointment Diagnostic Pharmacy theo sourceType,"settlementId, chargeId, sourceType, sourceId, sourceRevision, amountHash, attemptVersion",umc.commands.{producer}.v1,{target}.reserve-settlement.v1,cmd.{target}.v1,"settlementId, chargeId, sourceType, sourceId, sourceRevision, amountHash, attemptVersion → SettlementReserved"
+QuerySettlement,Appointment Diagnostic Pharmacy,Billing,"requestId, settlementId, sourceType, sourceId, sourceRevision",umc.commands.{producer}.v1,billing.query-settlement.v1,cmd.billing.v1,"requestId, settlementId, sourceType, sourceId, sourceRevision → SettlementDecision"
