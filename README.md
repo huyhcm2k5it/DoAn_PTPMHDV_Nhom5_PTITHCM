@@ -18,18 +18,4 @@ Each service owns its database, migrations, tests, and workers. A service must n
 
 ## MongoDB foundation tests
 
-Requires Node.js 24.x. Install the pinned dependencies and run:
-
-```powershell
-npm ci --ignore-scripts
-npm run typecheck
-npm test
-```
-
-The first test run downloads the official MongoDB 8.0.16 binary (Windows archive is approximately 756 MB). Subsequent runs reuse the cache. An optional `MONGOMS_DOWNLOAD_DIR` environment variable selects the cache directory. MongoDB runs as a temporary, authenticated, one-member replica set on loopback; no Docker daemon or existing database is used. The test fixture stops its own server and cleans its temporary data afterward.
-
-`npm test` compiles and runs the current Mongo foundation suite, not an HTTP/E2E application suite. Storage bootstraps live in `services/{patient,appointment,pharmacy}/src/db/indexes.ts`; shared primitives live in `mongo/`. They establish required identities, selected numeric invariants and unique keys, not the complete validation/state machines for all 28 APIs. The transaction callback may be retried: perform only local database work inside it, pass the session to every operation, and publish external messages from a committed outbox afterward.
-
-Bootstrap creates collections/indexes for a fresh owner database; incompatible existing collection options fail and require an explicit migration. It never drops data or silently rewrites an existing validator. `provisionOwnerUser` creates a first-time service user with `readWrite` on exactly its owner database; rotation/reconciliation of an existing user belongs to deployment tooling. Passwords are supplied by the caller and must come from the deployment secret configuration.
-
-Availability/hold lookup indexes are ordinary indexes. No TTL index deletes holds, stock reservations, idempotency records or outbox evidence before their owning cleanup workflow has safely processed them. Schedule interval overlap still requires guarded domain logic; a `(doctorId, startAt)` lookup index does not by itself prevent overlap.
+The MongoDB test package, dependencies and TypeScript configuration live in [`tests/mongo`](tests/mongo/README.md). Follow its README to install dependencies and run the foundation suite.
