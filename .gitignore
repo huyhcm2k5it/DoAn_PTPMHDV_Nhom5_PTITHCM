@@ -1,0 +1,10 @@
+.runtime/
+.superpowers/
+.env
+.env.local
+node_modules/
+dist/
+coverage/
+*.exe
+*.test
+*.log

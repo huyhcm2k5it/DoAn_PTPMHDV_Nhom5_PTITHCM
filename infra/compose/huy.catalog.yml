@@ -1,0 +1,56 @@
+# Huy standalone development environment; do not combine with the team's stack unchanged.
+name: umc-huy
+services:
+  postgres-huy:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: huy_bootstrap
+      POSTGRES_DB: huy_bootstrap
+      POSTGRES_PASSWORD: ${HUY_POSTGRES_PASSWORD:?set HUY_POSTGRES_PASSWORD}
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD:?set CATALOG_DB_PASSWORD}
+      CLINICAL_DB_PASSWORD: ${CLINICAL_DB_PASSWORD:?set CLINICAL_DB_PASSWORD}
+      DIAGNOSTIC_DB_PASSWORD: ${DIAGNOSTIC_DB_PASSWORD:?set DIAGNOSTIC_DB_PASSWORD}
+    ports: ["127.0.0.1:55432:5432"]
+    volumes:
+      - huy-pg:/var/lib/postgresql
+      - ./postgres/huy/init.sh:/docker-entrypoint-initdb.d/10-huy.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U huy_bootstrap -d huy_bootstrap"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  catalog-migrate:
+    build: ../../services/catalog
+    image: umc-huy-catalog:local
+    entrypoint: ["/migrate"]
+    environment:
+      DATABASE_URL: postgres://catalog_owner:${CATALOG_DB_PASSWORD:?set CATALOG_DB_PASSWORD}@postgres-huy:5432/catalog_db?sslmode=disable
+    depends_on:
+      postgres-huy: {condition: service_healthy}
+  catalog:
+    build: ../../services/catalog
+    image: umc-huy-catalog:local
+    ports: ["127.0.0.1:8081:8081"]
+    environment:
+      DATABASE_URL: postgres://catalog_owner:${CATALOG_DB_PASSWORD:?set CATALOG_DB_PASSWORD}@postgres-huy:5432/catalog_db?sslmode=disable
+      LISTEN_ADDR: :8081
+    depends_on:
+      catalog-migrate: {condition: service_completed_successfully}
+  clinical:
+    build: ../../services/clinical
+    ports: ["127.0.0.1:8082:8082"]
+    environment:
+      DATABASE_URL: postgres://clinical_owner:${CLINICAL_DB_PASSWORD:?set CLINICAL_DB_PASSWORD}@postgres-huy:5432/clinical_db?sslmode=disable
+      LISTEN_ADDR: :8082
+    depends_on:
+      postgres-huy: {condition: service_healthy}
+  diagnostic:
+    build: ../../services/diagnostic
+    ports: ["127.0.0.1:8083:8083"]
+    environment:
+      DATABASE_URL: postgres://diagnostic_owner:${DIAGNOSTIC_DB_PASSWORD:?set DIAGNOSTIC_DB_PASSWORD}@postgres-huy:5432/diagnostic_db?sslmode=disable
+      LISTEN_ADDR: :8083
+    depends_on:
+      postgres-huy: {condition: service_healthy}
+volumes:
+  huy-pg:
