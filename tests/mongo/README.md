@@ -1,22 +1,24 @@
 # MongoDB foundation tests
 
-This is a standalone test package for the Mongo storage primitives of Patient, Appointment and Pharmacy. It does not configure the Go/Django services or the web/Android applications.
+This standalone JavaScript/CommonJS package verifies the Mongo storage primitives owned by Patient, Appointment and Pharmacy through Mongoose connections. The Node backend choice is Express + Mongoose + JavaScript, using `require` and `module.exports`. Express routes/controllers and application models belong to the next service-scaffolding task.
 
-Requires Node.js 24.x. From the repository root, enter this package and run:
+Requires Node.js 24.x. From the repository root:
 
 ```powershell
 cd tests/mongo
 npm ci --ignore-scripts
-npm run typecheck
+npm run check
 npm test
 ```
 
-The first test run downloads the official MongoDB 8.0.16 binary (Windows archive is approximately 756 MB). Subsequent runs reuse the cache. An optional `MONGOMS_DOWNLOAD_DIR` environment variable selects the cache directory. MongoDB runs as a temporary, authenticated, one-member replica set on loopback; no Docker daemon or existing database is used. The test fixture stops its own server and cleans its temporary data afterward.
+There is no TypeScript compiler/build step for this package. `npm run check` checks JavaScript syntax; `npm test` runs the tests directly. Storage bootstrap functions live in `services/{patient,appointment,pharmacy}/src/db/indexes.js` and accept an open Mongoose connection. Shared primitives live in repository-root `mongo/`. This test package owns Mongoose for the harness; each service will declare its own Express/Mongoose dependencies when scaffolded.
 
-`npm test` compiles and runs the current Mongo foundation suite, not an HTTP/E2E application suite. Storage bootstraps live in repository-root `services/{patient,appointment,pharmacy}/src/db/indexes.ts`; shared primitives live in repository-root `mongo/`. They establish required identities, selected numeric invariants and unique keys, not the complete validation/state machines for all 28 APIs. The transaction callback may be retried: perform only local database work inside it, pass the session to every operation, and publish external messages from a committed outbox afterward.
+The first run downloads the official MongoDB 8.0.16 binary (approximately 756 MB on Windows); later runs reuse the cache. `MONGOMS_DOWNLOAD_DIR` optionally selects the cache directory. Tests start a temporary, authenticated, one-member WiredTiger replica set on loopback, and stop it with its temporary data afterward. No existing database or Docker Engine is used.
 
-Bootstrap creates collections/indexes for a fresh owner database; incompatible existing collection options fail and require an explicit migration. It never drops data or silently rewrites an existing validator. `provisionOwnerUser` creates a first-time service user with `readWrite` on exactly its owner database; rotation/reconciliation of an existing user belongs to deployment tooling. Passwords are supplied by the caller and must come from the deployment secret configuration.
+The suite covers business-key uniqueness, selected database-level ownership/numeric validators, local transaction rollback with outbox, guarded slot races, all-item stock rollback, and database ownership credentials. These are foundation contracts; they do not establish completed HTTP endpoints or application E2E workflows. Raw collection operations intentionally test that database constraints cannot be bypassed by omitting ODM validation. A Mongoose document regression additionally verifies that abort resets document state and allows retry.
 
-Availability/hold lookup indexes are ordinary indexes. No TTL index deletes holds, stock reservations, idempotency records or outbox evidence before their owning cleanup workflow has safely processed them. Schedule interval overlap still requires guarded domain logic; a `(doctorId, startAt)` lookup index does not by itself prevent overlap.
+`withMongoTransaction(connection, callback)` delegates to Mongoose `connection.transaction()`, preserving Mongoose document change tracking on rollback. The callback may run again: pass its session to each operation, use sequential database operations, and publish external messages only after commit through the outbox. Models should be bound to their owner connection; avoid a shared default model connection across services.
 
-The test TypeScript configuration emits an ES-module copy of the owner source into this package’s `.test-build` folder and resolves the MongoDB driver from this package’s dependencies. It does not establish runtime dependencies or a build configuration for the future service applications; each service will own those when scaffolded.
+Bootstrap creates collections/indexes for a fresh owner database; incompatible existing options fail and need an explicit migration. It does not drop data or silently overwrite validators. The current validators guard selected storage invariants, not every API field or state transition. `provisionOwnerUser` creates a first-time readWrite user for exactly one owner DB; deployment tooling owns secret validation, rotation and reconciliation.
+
+Expiry indexes are ordinary indexes. A cleanup workflow must safely release capacity/stock and respect settlement locks before removing records. The schedule lookup index alone does not prevent interval overlap; guarded domain operations remain required.

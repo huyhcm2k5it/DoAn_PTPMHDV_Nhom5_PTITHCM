@@ -1,7 +1,6 @@
-import type { Db } from 'mongodb';
-import { entity, installStorage, requiredFields, technicalStorage, type CollectionStorage } from '../../../../mongo/storage.js';
+const { entity, installStorage, requiredFields, technicalStorage } = require('../../../../mongo/storage.js');
 
-export const patientStorage: readonly CollectionStorage[] = [
+const patientStorage = [
   {
     ...entity('patients', [{ name: 'ix_patients_owner', key: { ownerUserId: 1 } }]),
     validator: requiredFields(['id', 'ownerUserId'], {
@@ -13,4 +12,6 @@ export const patientStorage: readonly CollectionStorage[] = [
   ...technicalStorage,
 ];
 
-export async function ensurePatientStorage(db: Db): Promise<void> { await installStorage(db, patientStorage); }
+async function ensurePatientStorage(connection) { await installStorage(connection, patientStorage); }
+
+module.exports = { patientStorage, ensurePatientStorage };

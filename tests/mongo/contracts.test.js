@@ -1,21 +1,23 @@
-import assert from 'node:assert/strict';
-import { after, before, beforeEach, test } from 'node:test';
-import { randomBytes } from 'node:crypto';
-import { MongoClient, MongoServerError, type Db } from 'mongodb';
-import { MongoMemoryReplSet } from 'mongodb-memory-server';
-import { ensurePatientStorage } from '../../services/patient/src/db/indexes.js';
-import { ensureAppointmentStorage } from '../../services/appointment/src/db/indexes.js';
-import { ensurePharmacyStorage } from '../../services/pharmacy/src/db/indexes.js';
-import { withMongoTransaction } from '../../mongo/transaction.js';
-import { ownerDatabases, provisionOwnerUser, type MongoOwner } from '../../mongo/service-users.js';
+const mongoose = require('mongoose');
+const assert = require('node:assert/strict');
+const { after, before, beforeEach, test } = require('node:test');
+const { randomBytes } = require('node:crypto');
+const { MongoServerError } = mongoose.mongo;
+const { MongoMemoryReplSet } = require('mongodb-memory-server');
+const { ensurePatientStorage } = require('../../services/patient/src/db/indexes.js');
+const { ensureAppointmentStorage } = require('../../services/appointment/src/db/indexes.js');
+const { ensurePharmacyStorage } = require('../../services/pharmacy/src/db/indexes.js');
+const { withMongoTransaction } = require('../../mongo/transaction.js');
+const { ownerDatabases, provisionOwnerUser } = require('../../mongo/service-users.js');
 
-let server: MongoMemoryReplSet;
-let client: MongoClient;
-let patient: Db, appointment: Db, pharmacy: Db;
+let server;
+let connection;
+let patientConnection, appointmentConnection, pharmacyConnection;
+let patient, appointment, pharmacy;
 const password = randomBytes(24).toString('hex');
 const mongoVersion = '8.0.16';
-const isDuplicate = (e: unknown) => e instanceof MongoServerError && e.code === 11000;
-const isInvalid = (e: unknown) => e instanceof MongoServerError && e.code === 121;
+const isDuplicate = (e) => e instanceof MongoServerError && e.code === 11000;
+const isInvalid = (e) => e instanceof MongoServerError && e.code === 121;
 
 before(async () => {
   server = await MongoMemoryReplSet.create({
@@ -25,16 +27,20 @@ before(async () => {
       keyfileContent: randomBytes(96).toString('base64'),
     } },
   });
-  client = await new MongoClient(server.getUri(), {
+  connection = await mongoose.createConnection(server.getUri(), {
+    dbName: 'admin', autoCreate: false, autoIndex: false,
     auth: { username: 'umc-test-root', password }, authSource: 'admin',
     serverSelectionTimeoutMS: 10000,
-  }).connect();
-  patient = client.db('patient_db');
-  appointment = client.db('appointment_db');
-  pharmacy = client.db('pharmacy_db');
-  await ensurePatientStorage(patient);
-  await ensureAppointmentStorage(appointment);
-  await ensurePharmacyStorage(pharmacy);
+  }).asPromise();
+  patientConnection = connection.useDb('patient_db', { useCache: true });
+  patient = patientConnection.db;
+  appointmentConnection = connection.useDb('appointment_db', { useCache: true });
+  appointment = appointmentConnection.db;
+  pharmacyConnection = connection.useDb('pharmacy_db', { useCache: true });
+  pharmacy = pharmacyConnection.db;
+  await ensurePatientStorage(patientConnection);
+  await ensureAppointmentStorage(appointmentConnection);
+  await ensurePharmacyStorage(pharmacyConnection);
 }, { timeout: 240000 });
 
 beforeEach(async () => {
@@ -46,7 +52,7 @@ beforeEach(async () => {
   }
 });
 
-after(async () => { await client?.close(); await server?.stop(); });
+after(async () => { await connection?.close(); await server?.stop(); });
 
 test('Patient rejects a repeated opaque patient id but allows several profiles for one owner', async () => {
   await patient.collection('patients').insertMany([
@@ -164,7 +170,7 @@ test('Pharmacy cannot dispense the same hold twice under different prescriptions
 
 for (const [name, getDb] of [
   ['Patient', () => patient], ['Appointment', () => appointment], ['Pharmacy', () => pharmacy],
-] as const) {
+]) {
   test(`${name} inbox accepts different consumers but rejects repeat message/consumer`, async () => {
     const c = getDb().collection('inbox');
     await c.insertMany([{ message_id: 'msg1', consumer_name: 'c1' }, { message_id: 'msg1', consumer_name: 'c2' }]);
@@ -185,12 +191,12 @@ for (const [name, getDb] of [
 
 test('Storage bootstrap is repeatable without replacing existing data', async () => {
   await patient.collection('patients').insertOne({ id: 'p1', ownerUserId: 'u1' });
-  await ensurePatientStorage(patient); await ensureAppointmentStorage(appointment); await ensurePharmacyStorage(pharmacy);
+  await ensurePatientStorage(patientConnection); await ensureAppointmentStorage(appointmentConnection); await ensurePharmacyStorage(pharmacyConnection);
   assert.equal(await patient.collection('patients').countDocuments(), 1);
 });
 
 test('Transaction commits patient, audit and outbox together', async () => {
-  const value = await withMongoTransaction(client, async session => {
+  const value = await withMongoTransaction(connection, async session => {
     await patient.collection('patients').insertOne({ id: 'p1', ownerUserId: 'u1' }, { session });
     await patient.collection('profile_audit').insertOne({ id: 'aud1', patientId: 'p1' }, { session });
     await patient.collection('outbox').insertOne({ message_id: 'msg1' }, { session });
@@ -201,7 +207,7 @@ test('Transaction commits patient, audit and outbox together', async () => {
 });
 
 test('Transaction abort rolls back patient, audit and outbox', async () => {
-  await assert.rejects(withMongoTransaction(client, async session => {
+  await assert.rejects(withMongoTransaction(connection, async session => {
     await patient.collection('patients').insertOne({ id: 'p1', ownerUserId: 'u1' }, { session });
     await patient.collection('profile_audit').insertOne({ id: 'aud1', patientId: 'p1' }, { session });
     await patient.collection('outbox').insertOne({ message_id: 'msg1' }, { session });
@@ -213,7 +219,7 @@ test('Transaction abort rolls back patient, audit and outbox', async () => {
 test('Two concurrent transactions cannot reserve the last slot twice', async () => {
   const c = appointment.collection('slots');
   await c.insertOne({ id: 'sl1', scheduleId: 's1', startAt: new Date(), capacity: 1, heldCount: 0, confirmedCount: 0 });
-  const reserve = () => withMongoTransaction(client, async session => {
+  const reserve = () => withMongoTransaction(connection, async session => {
     const result = await c.updateOne({ id: 'sl1', $expr: { $lt: [{ $add: ['$heldCount', '$confirmedCount'] }, '$capacity'] } }, { $inc: { heldCount: 1 } }, { session });
     return result.modifiedCount;
   });
@@ -225,7 +231,7 @@ test('Two concurrent transactions cannot reserve the last slot twice', async () 
 test('A failure on the second prescription line rolls back the first stock reservation', async () => {
   const c = pharmacy.collection('inventory');
   await c.insertMany([{ id: 'i1', medicineId: 'm1', onHand: 5, reserved: 0 }, { id: 'i2', medicineId: 'm2', onHand: 0, reserved: 0 }]);
-  await assert.rejects(withMongoTransaction(client, async session => {
+  await assert.rejects(withMongoTransaction(connection, async session => {
     for (const medicineId of ['m1', 'm2']) {
       const result = await c.updateOne({ medicineId, $expr: { $gt: [{ $subtract: ['$onHand', '$reserved'] }, 0] } }, { $inc: { reserved: 1 } }, { session });
       if (!result.modifiedCount) throw new Error('insufficient-stock');
@@ -236,28 +242,52 @@ test('A failure on the second prescription line rolls back the first stock reser
 
 test('A duplicate outbox record aborts the corresponding domain write', async () => {
   await patient.collection('outbox').insertOne({ message_id: 'msg1' });
-  await assert.rejects(withMongoTransaction(client, async session => {
+  await assert.rejects(withMongoTransaction(connection, async session => {
     await patient.collection('patients').insertOne({ id: 'p1', ownerUserId: 'u1' }, { session });
     await patient.collection('outbox').insertOne({ message_id: 'msg1' }, { session });
   }), isDuplicate);
   assert.equal(await patient.collection('patients').countDocuments(), 0);
 });
 
-for (const owner of ['patient', 'appointment', 'pharmacy'] as const) {
+for (const owner of ['patient', 'appointment', 'pharmacy']) {
 test(`${owner} service user writes only its owner database`, async () => {
   const pwd = randomBytes(16).toString('hex');
-  await provisionOwnerUser(client, owner, pwd);
+  await provisionOwnerUser(connection, owner, pwd);
   const dbName = ownerDatabases[owner];
-  const serviceClient = await new MongoClient(server.getUri(), { auth: { username: `${owner}-service`, password: pwd }, authSource: dbName }).connect();
+  const serviceClient = await mongoose.createConnection(server.getUri(), { dbName, auth: { username: `${owner}-service`, password: pwd }, authSource: dbName, autoCreate: false, autoIndex: false }).asPromise();
   try {
-    await serviceClient.db(dbName).collection('owner_permission_probe').insertOne({ value: 'own-write' });
-    const denied = (e: unknown) => e instanceof MongoServerError && e.code === 13;
-    for (const other of Object.keys(ownerDatabases) as MongoOwner[]) {
+    await serviceClient.db.collection('owner_permission_probe').insertOne({ value: 'own-write' });
+    const denied = (e) => e instanceof MongoServerError && e.code === 13;
+    for (const other of Object.keys(ownerDatabases)) {
       if (other === owner) continue;
-      const collection = serviceClient.db(ownerDatabases[other]).collection('owner_permission_probe');
+      const collection = serviceClient.useDb(ownerDatabases[other], { useCache: true }).db.collection('owner_permission_probe');
       await assert.rejects(collection.findOne({}), denied);
       await assert.rejects(collection.insertOne({ value: 'foreign-write' }), denied);
     }
   } finally { await serviceClient.close(); }
 });
 }
+
+test('Transaction abort restores Mongoose document state so a failed create can be retried', async () => {
+  const mongooseConnection = await mongoose.createConnection(server.getUri(), {
+    dbName: 'patient_db', auth: { username: 'umc-test-root', password }, authSource: 'admin',
+    autoCreate: false, autoIndex: false,
+  }).asPromise();
+  try {
+    const schema = new mongoose.Schema({ id: { type: String, required: true }, ownerUserId: { type: String, required: true } }, {
+      id: false, versionKey: false, collection: 'patients', autoCreate: false, autoIndex: false,
+    });
+    const Patient = mongooseConnection.model('TransactionPatient', schema);
+    const doc = new Patient({ id: 'mongoose-patient', ownerUserId: 'u1' });
+    await assert.rejects(withMongoTransaction(mongooseConnection, async session => {
+      await doc.save({ session });
+      throw new Error('mongoose-abort-marker');
+    }), /mongoose-abort-marker/);
+    assert.equal(await Patient.countDocuments({ id: 'mongoose-patient' }), 0);
+    assert.equal(doc.isNew, true);
+    await withMongoTransaction(mongooseConnection, async session => {
+      await doc.save({ session });
+    });
+    assert.equal(await Patient.countDocuments({ id: 'mongoose-patient' }), 1);
+  } finally { await mongooseConnection.close(); }
+});

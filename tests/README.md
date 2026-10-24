@@ -6,6 +6,6 @@
 
 ## Suites
 
-- [`mongo`](mongo/README.md): independent Node/TypeScript package for real MongoDB replica-set storage and transaction contract tests. Run its commands from `tests/mongo`.
+- [`mongo`](mongo/README.md): independent JavaScript/CommonJS and Mongoose package for real MongoDB replica-set storage and transaction contract tests. Run its commands from `tests/mongo`.
 - `e2e`: future application journey tests.
 - `performance`: future performance checks.

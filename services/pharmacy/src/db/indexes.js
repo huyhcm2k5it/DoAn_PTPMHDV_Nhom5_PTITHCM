@@ -1,7 +1,6 @@
-import type { Db } from 'mongodb';
-import { entity, installStorage, requiredFields, technicalStorage, type CollectionStorage } from '../../../../mongo/storage.js';
+const { entity, installStorage, requiredFields, technicalStorage } = require('../../../../mongo/storage.js');
 
-export const pharmacyStorage: readonly CollectionStorage[] = [
+const pharmacyStorage = [
   {
     ...entity('inventory', [{ name: 'uq_inventory_medicine', key: { medicineId: 1 }, unique: true }]),
     validator: requiredFields(['id', 'medicineId', 'onHand', 'reserved'], {
@@ -25,4 +24,6 @@ export const pharmacyStorage: readonly CollectionStorage[] = [
   ...technicalStorage,
 ];
 
-export async function ensurePharmacyStorage(db: Db): Promise<void> { await installStorage(db, pharmacyStorage); }
+async function ensurePharmacyStorage(connection) { await installStorage(connection, pharmacyStorage); }
+
+module.exports = { pharmacyStorage, ensurePharmacyStorage };

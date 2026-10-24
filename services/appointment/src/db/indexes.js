@@ -1,7 +1,6 @@
-import type { Db } from 'mongodb';
-import { entity, installStorage, requiredFields, technicalStorage, type CollectionStorage } from '../../../../mongo/storage.js';
+const { entity, installStorage, requiredFields, technicalStorage } = require('../../../../mongo/storage.js');
 
-export const appointmentStorage: readonly CollectionStorage[] = [
+const appointmentStorage = [
   entity('schedules', [
     { name: 'ix_schedules_doctor_start', key: { doctorId: 1, startAt: 1 } },
     { name: 'ix_schedules_room_start', key: { room: 1, startAt: 1 } },
@@ -39,4 +38,6 @@ export const appointmentStorage: readonly CollectionStorage[] = [
   ...technicalStorage,
 ];
 
-export async function ensureAppointmentStorage(db: Db): Promise<void> { await installStorage(db, appointmentStorage); }
+async function ensureAppointmentStorage(connection) { await installStorage(connection, appointmentStorage); }
+
+module.exports = { appointmentStorage, ensureAppointmentStorage };

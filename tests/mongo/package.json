@@ -2,21 +2,18 @@
   "name": "@umc-care/mongo-contract-tests",
   "version": "0.0.0",
   "private": true,
-  "type": "module",
+  "type": "commonjs",
   "engines": {
     "node": ">=24 <25"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test --test-concurrency=1 .test-build/tests/mongo/contracts.test.js"
+    "check": "node --check contracts.test.js && node --check ../../mongo/storage.js && node --check ../../mongo/transaction.js && node --check ../../mongo/service-users.js && node --check ../../services/patient/src/db/indexes.js && node --check ../../services/appointment/src/db/indexes.js && node --check ../../services/pharmacy/src/db/indexes.js",
+    "test": "node --test --test-concurrency=1 contracts.test.js"
   },
   "dependencies": {
-    "mongodb": "7.7.0"
+    "mongoose": "9.11.4"
   },
   "devDependencies": {
-    "@types/node": "24.19.2",
-    "mongodb-memory-server": "11.3.0",
-    "typescript": "7.0.2"
+    "mongodb-memory-server": "11.3.0"
   }
 }
