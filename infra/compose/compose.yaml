@@ -1,0 +1,112 @@
+name: umc-care-local
+services:
+  mongo:
+    image: mongo:8.0.16
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all", "--keyFile", "/run/secrets/mongo-keyfile"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: $MONGO_ROOT_USER
+      MONGO_INITDB_ROOT_PASSWORD: $MONGO_ROOT_PASSWORD
+    secrets:
+      - source: mongo-keyfile
+        target: mongo-keyfile
+        mode: 0400
+    volumes: [mongo_data:/data/db]
+    networks: [private]
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --host localhost --username \"$$MONGO_INITDB_ROOT_USERNAME\" --password \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval \"db.adminCommand({ping:1}).ok\""]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    restart: unless-stopped
+  mongo-bootstrap:
+    image: mongo:8.0.16
+    depends_on:
+      mongo: { condition: service_healthy }
+    environment:
+      MONGO_ROOT_USER: $MONGO_ROOT_USER
+      MONGO_ROOT_PASSWORD: $MONGO_ROOT_PASSWORD
+      PATIENT_DB_PASSWORD: $PATIENT_DB_PASSWORD
+      APPOINTMENT_DB_PASSWORD: $APPOINTMENT_DB_PASSWORD
+      PHARMACY_DB_PASSWORD: $PHARMACY_DB_PASSWORD
+    volumes:
+      - ../../mongo/init-replica.js:/bootstrap/init-replica.js:ro
+      - ../../mongo/init-users.js:/bootstrap/init-users.js:ro
+    networks: [private]
+    entrypoint: ["sh", "-ec"]
+    command:
+      - |
+        uri="mongodb://$$MONGO_ROOT_USER:$$MONGO_ROOT_PASSWORD@mongo:27017/admin?authSource=admin"
+        mongosh "$$uri" --quiet --eval "load('/bootstrap/init-replica.js'); initializeReplica()"
+        mongosh "$$uri" --quiet --eval "load('/bootstrap/init-users.js'); createOwnerUsers({patient:'$$PATIENT_DB_PASSWORD',appointment:'$$APPOINTMENT_DB_PASSWORD',pharmacy:'$$PHARMACY_DB_PASSWORD'})"
+    restart: "no"
+  rabbitmq:
+    image: rabbitmq:4.3.6-management
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: $RABBITMQ_ADMIN_USER
+      RABBITMQ_DEFAULT_PASS: $RABBITMQ_ADMIN_PASSWORD
+      RABBITMQ_DEFAULT_VHOST: /umc-care
+    volumes: [rabbitmq_data:/var/lib/rabbitmq]
+    networks: [private]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+    restart: unless-stopped
+  patient:
+    build: { context: ../.., dockerfile: services/patient/Dockerfile }
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      MONGODB_URI: $PATIENT_MONGO_URI
+    depends_on:
+      mongo-bootstrap: { condition: service_completed_successfully }
+    networks: [private]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  appointment:
+    build: { context: ../.., dockerfile: services/appointment/Dockerfile }
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      MONGODB_URI: $APPOINTMENT_MONGO_URI
+    depends_on:
+      mongo-bootstrap: { condition: service_completed_successfully }
+    networks: [private]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  pharmacy:
+    build: { context: ../.., dockerfile: services/pharmacy/Dockerfile }
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      MONGODB_URI: $PHARMACY_MONGO_URI
+    depends_on:
+      mongo-bootstrap: { condition: service_completed_successfully }
+    networks: [private]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+networks:
+  private:
+    internal: true
+volumes:
+  mongo_data:
+  rabbitmq_data:
+secrets:
+  mongo-keyfile:
+    file: ../../mongo/secrets/replica.key

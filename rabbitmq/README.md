@@ -1,5 +1,3 @@
-# rabbitmq
+# RabbitMQ
 
-- **Purpose:** RabbitMQ configuration.
-- **Owner:** Team
-- **Add or change:** Keep RabbitMQ configuration and related resources here.
+RabbitMQ is started on the private Compose network and has a health check. The current project contracts do not yet specify the exchange/queue routing and service-specific permissions needed for the cross-service events. The local management credential is not passed to application containers. Do not connect a service using the management account; add scoped service users only after the event topology is agreed by the owners.

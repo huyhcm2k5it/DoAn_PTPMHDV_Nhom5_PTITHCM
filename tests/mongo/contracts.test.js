@@ -4,9 +4,9 @@ const { after, before, beforeEach, test } = require('node:test');
 const { randomBytes } = require('node:crypto');
 const { MongoServerError } = mongoose.mongo;
 const { MongoMemoryReplSet } = require('mongodb-memory-server');
-const { ensurePatientStorage } = require('../../services/patient/src/db/indexes.js');
-const { ensureAppointmentStorage } = require('../../services/appointment/src/db/indexes.js');
-const { ensurePharmacyStorage } = require('../../services/pharmacy/src/db/indexes.js');
+const { ensurePatientStorage } = require('../../services/patient/src/dbs/indexes.js');
+const { ensureAppointmentStorage } = require('../../services/appointment/src/dbs/indexes.js');
+const { ensurePharmacyStorage } = require('../../services/pharmacy/src/dbs/indexes.js');
 const { withMongoTransaction } = require('../../mongo/transaction.js');
 const { ownerDatabases, provisionOwnerUser } = require('../../mongo/service-users.js');
 

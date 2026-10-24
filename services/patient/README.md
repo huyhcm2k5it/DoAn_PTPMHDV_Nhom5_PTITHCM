@@ -1,9 +1,15 @@
-# patient
+# Patient service
 
-- **Purpose:** Patient feature or service.
-- **Owner:** Quan
-- **Add or change:** Keep source code, configuration, migrations, and tests within this folder's scope.
+Owner: Quân. Runtime: Node.js 24, Express 5, Mongoose 9 and JavaScript CommonJS.
 
-## Node.js stack
+## Implemented
 
-Quan uses Express, Mongoose and JavaScript with CommonJS (`require` / `module.exports`). The day-19 storage bootstrap in `src/db/indexes.js` accepts this service’s open Mongoose connection. Runtime Express routes/controllers, schemas/models and the service’s own dependencies will be added during service scaffolding. The foundation test harness lives in `tests/mongo` at repository root.
+- GET /health/live and GET /health/ready.
+- GET /api/v1/patients?page=1&limit=20, scoped to the verified PATIENT subject.
+- GET /api/v1/patients/{patientId}, owner lookup plus an injected authorization policy for verified STAFF/DOCTOR scopes.
+- Owner-only Mongo URI guard and the patient_db storage/index bootstrap.
+- Generic auth middleware fails closed. The production entrypoint does not install a JWT verifier until the Identity/Gateway handoff arrives.
+
+## Local commands
+
+Run npm ci, npm run check, npm test and npm start from this directory. Set MONGODB_URI to a URI selecting patient_db. Health reports not-ready when the owner database is unavailable. The full owner/API integration tests are in tests/mongo.

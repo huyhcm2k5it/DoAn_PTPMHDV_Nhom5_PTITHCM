@@ -1,21 +1,20 @@
 # UMC Care
 
-UMC Care uses nine independently owned services. The first implementation adds MongoDB storage constraints, isolated service credentials, and transaction contract tests for Quan’s three services. HTTP endpoints and the full application runtime are subsequent tasks.
+UMC Care uses nine independently owned services. The current local branch adds Mongo storage contracts and Node.js CommonJS scaffolds for Quân’s Patient, Appointment and Pharmacy services.
 
 ## Structure and ownership
 
-- `apps/web/`: React + TypeScript. Quan owns the shell, routes, and shared UI; feature ownership follows the corresponding service.
-- `apps/android/`: Kotlin + Jetpack Compose; Hung owns Android PATIENT.
-- `services/`: Nine independent services: Quan - Patient, Appointment, Pharmacy; Huy - Catalog, Clinical, Diagnostic; Hung - Identity, Billing, Notification.
-- `contracts/`: HTTP and message contracts.
-- `infra/compose/`: Docker Compose configuration.
-- `envoy/`, `rabbitmq/`, `mongo/`, `postgres/`: Root-level configuration for the gateway and data services, as shown in the directory diagram.
-- `tests/`: E2E and performance tests.
-- `docs/`: Project documentation.
-- `.github/workflows/`: CI.
+- apps/web: React + TypeScript web application.
+- apps/android: Kotlin + Jetpack Compose; Hưng owns Android PATIENT.
+- services: nine services; Quân owns Patient, Appointment and Pharmacy.
+- contracts: HTTP and message contracts.
+- infra/compose: local Docker Compose configuration.
+- envoy, rabbitmq, mongo, postgres: gateway and data infrastructure.
+- tests: contract and integration tests.
+- docs: project source documentation.
 
-Each service owns its database, migrations, tests, and workers. A service must not access another service's database directly. Add or change files only within the appropriate owner's scope, and update the README if that scope changes.
+Each service owns its database. Patient, Appointment and Pharmacy use separate Mongo databases and credentials. Their containers are private to the Compose network; Envoy routing and JWT verification are still awaiting the gateway owner’s handoff.
 
-## MongoDB foundation tests
+## Mongo storage and HTTP tests
 
-The MongoDB test package, dependencies and TypeScript configuration live in [`tests/mongo`](tests/mongo/README.md). Follow its README to install dependencies and run the foundation suite.
+The isolated Mongo test package is in tests/mongo. It starts a temporary authenticated replica set for storage contracts and exercises the Patient read APIs and public AP-004 slot query. Each Node service has its own package, lockfile, syntax check and health test. See the README files beside each package for commands.

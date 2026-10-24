@@ -5,3 +5,4 @@ node_modules/
 !.env.example
 *.log
 .mongo-test-cache/
+mongo/secrets/
