@@ -1,0 +1,1306 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "UMC Care - Catalog",
+    "version": "0.1.0",
+    "description": "Week-one implementation contract from API86 v5.2 / ERD v5. Health endpoints are technical and documented separately. JWT/lease claims and event envelope require integration agreement with Identity/Gateway owners."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8081",
+      "description": "Huy local service, before Gateway integration"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Catalog"
+    }
+  ],
+  "paths": {
+    "/api/v1/departments": {
+      "get": {
+        "operationId": "CA_001",
+        "summary": "List active departments",
+        "description": "Public; stable ordering by name/id.",
+        "tags": [
+          "Catalog"
+        ],
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,100}$"
+            },
+            "description": "Optional. Missing/unsafe value is replaced by a server UUID."
+          }
+        ],
+        "security": [],
+        "responses": {
+          "400": {
+            "description": "Invalid input",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database or required Identity verification unavailable",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DepartmentsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/doctors": {
+      "get": {
+        "operationId": "CA_002",
+        "summary": "List active doctors",
+        "description": "Public. Uses Catalog doctorId; never returns Identity user IDs. No name search parameter in the baseline.",
+        "tags": [
+          "Catalog"
+        ],
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,100}$"
+            },
+            "description": "Optional. Missing/unsafe value is replaced by a server UUID."
+          },
+          {
+            "name": "departmentId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": ""
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            },
+            "description": ""
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "description": ""
+          }
+        ],
+        "security": [],
+        "responses": {
+          "400": {
+            "description": "Invalid input",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database or required Identity verification unavailable",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DoctorsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/medical-services": {
+      "get": {
+        "operationId": "CA_003",
+        "summary": "List medical services with price effective at a time",
+        "description": "Public. Default at is server now. Price is null when unavailable. Displayed price is not a Billing quote.",
+        "tags": [
+          "Catalog"
+        ],
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,100}$"
+            },
+            "description": "Optional. Missing/unsafe value is replaced by a server UUID."
+          },
+          {
+            "name": "departmentId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": ""
+          },
+          {
+            "name": "at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": ""
+          }
+        ],
+        "security": [],
+        "responses": {
+          "400": {
+            "description": "Invalid input",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database or required Identity verification unavailable",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServicesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/prices": {
+      "post": {
+        "operationId": "CA_004",
+        "summary": "Create an immutable future price version",
+        "description": "STAFF with ADMIN in verified JWT and current access projection; requires an RS256 authorization lease for action CA-004, at most 30 seconds. effectiveFrom >= server now + 5 minutes; periods are half-open [from,to), missing/null to is unbounded; no automatic closing of old prices. Price, idempotency response, sequence and outbox insert commit atomically. Same actor/key + canonical body replays original 201, including after effectiveFrom; changed body is 409. Int64 VND; browser form restricts writes to safe integers. Maximum body 64 KiB. Unknown JSON fields are rejected.",
+        "tags": [
+          "Catalog"
+        ],
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,100}$"
+            },
+            "description": "Optional. Missing/unsafe value is replaced by a server UUID."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": ""
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": [],
+            "authorizationLease": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Invalid input",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database or required Identity verification unavailable",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired bearer",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient current permission or authorization lease",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "OVERLAPPING_PRICE_PERIOD or IDEMPOTENCY_CONFLICT",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created (also on an idempotent replay)",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceInput"
+              },
+              "example": {
+                "itemType": "EXAM",
+                "itemId": "00000000-0000-4000-8000-000000000201",
+                "amountVnd": 150000,
+                "effectiveFrom": "2026-11-10T02:00:00Z",
+                "effectiveTo": "2026-11-11T02:00:00Z"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/catalog/medicines": {
+      "get": {
+        "operationId": "CA_005",
+        "summary": "List medicine catalog",
+        "description": "DOCTOR or STAFF with PHARMACY/ADMIN, verified against current local access projection. No inventory/stock fields. data is an array.",
+        "tags": [
+          "Catalog"
+        ],
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,100}$"
+            },
+            "description": "Optional. Missing/unsafe value is replaced by a server UUID."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Case-insensitive name or code search"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "INACTIVE"
+              ]
+            },
+            "description": "Defaults to ACTIVE"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Invalid input",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database or required Identity verification unavailable",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired bearer",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient current permission or authorization lease",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedicinesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/catalog/lab-tests": {
+      "get": {
+        "operationId": "CA_006",
+        "summary": "List laboratory test catalog",
+        "description": "DOCTOR or STAFF with LAB_TECH/LAB_REVIEW/ADMIN, verified against current local access projection. data is an array.",
+        "tags": [
+          "Catalog"
+        ],
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,100}$"
+            },
+            "description": "Optional. Missing/unsafe value is replaced by a server UUID."
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Case-insensitive name or code search"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "INACTIVE"
+              ]
+            },
+            "description": "Defaults to ACTIVE"
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Invalid input",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database or required Identity verification unavailable",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing, invalid or expired bearer",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient current permission or authorization lease",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabTestsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Department": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "Doctor": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "departmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "departmentId",
+          "displayName",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "PriceInput": {
+        "type": "object",
+        "properties": {
+          "itemType": {
+            "type": "string",
+            "enum": [
+              "EXAM",
+              "LAB",
+              "MEDICINE"
+            ]
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amountVnd": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 9223372036854775807
+          },
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "description": "At most 6 fractional-second digits (PostgreSQL microsecond precision)"
+          },
+          "effectiveTo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "pattern": "T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "description": "At most 6 fractional-second digits (PostgreSQL microsecond precision)"
+          }
+        },
+        "required": [
+          "itemType",
+          "itemId",
+          "amountVnd",
+          "effectiveFrom"
+        ],
+        "additionalProperties": false
+      },
+      "Price": {
+        "type": "object",
+        "properties": {
+          "priceVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "itemType": {
+            "type": "string",
+            "enum": [
+              "EXAM",
+              "LAB",
+              "MEDICINE"
+            ]
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amountVnd": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 9223372036854775807
+          },
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "description": "At most 6 fractional-second digits (PostgreSQL microsecond precision)"
+          },
+          "effectiveTo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "pattern": "T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "description": "At most 6 fractional-second digits (PostgreSQL microsecond precision)"
+          }
+        },
+        "required": [
+          "priceVersionId",
+          "revision",
+          "itemType",
+          "itemId",
+          "amountVnd",
+          "effectiveFrom"
+        ],
+        "additionalProperties": false
+      },
+      "PriceResult": {
+        "type": "object",
+        "properties": {
+          "priceVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "priceVersionId",
+          "revision",
+          "effectiveFrom"
+        ],
+        "additionalProperties": false
+      },
+      "MedicalService": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "departmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          },
+          "price": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Price"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "departmentId",
+          "code",
+          "name",
+          "status",
+          "price"
+        ],
+        "additionalProperties": false
+      },
+      "Medicine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "strength": {
+            "type": "string"
+          },
+          "form": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          },
+          "price": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Price"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "unit",
+          "status",
+          "price"
+        ],
+        "additionalProperties": false
+      },
+      "LabTest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "specimenType": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "referenceRange": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "INACTIVE"
+            ]
+          },
+          "price": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Price"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "specimenType",
+          "revision",
+          "status",
+          "price"
+        ],
+        "additionalProperties": false
+      },
+      "Meta": {
+        "type": "object",
+        "properties": {
+          "correlationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "correlationId"
+        ],
+        "additionalProperties": false
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "VALIDATION_ERROR",
+                  "UNAUTHENTICATED",
+                  "FORBIDDEN",
+                  "OVERLAPPING_PRICE_PERIOD",
+                  "IDEMPOTENCY_CONFLICT",
+                  "SERVICE_UNAVAILABLE",
+                  "NOT_FOUND",
+                  "METHOD_NOT_ALLOWED"
+                ]
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "error",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "DepartmentsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Department"
+                }
+              }
+            },
+            "required": [
+              "items"
+            ],
+            "additionalProperties": false
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "DoctorsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Doctor"
+                }
+              },
+              "total": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "items",
+              "total"
+            ],
+            "additionalProperties": false
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "ServicesResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/MedicalService"
+                }
+              }
+            },
+            "required": [
+              "items"
+            ],
+            "additionalProperties": false
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "MedicinesResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Medicine"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "LabTestsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabTest"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "PriceResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PriceResult"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT RS256"
+      },
+      "authorizationLease": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Authorization-Lease",
+        "description": "Short-lived signed JWT from Identity; never a caller-declared role"
+      }
+    }
+  }
+}
