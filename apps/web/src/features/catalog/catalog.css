@@ -1,0 +1,234 @@
+.umc-catalog {
+  --catalog-blue: #075d93;
+  --catalog-teal: #00857c;
+  --catalog-ink: #17394a;
+  color: var(--catalog-ink);
+  font-family: Inter, "Segoe UI", sans-serif;
+  max-width: 1160px;
+  margin: auto;
+  padding: 28px;
+  line-height: 1.6;
+}
+.umc-catalog * {
+  box-sizing: border-box;
+}
+.umc-catalog h1 {
+  font-size: clamp(30px, 5vw, 48px);
+  line-height: 1.2;
+  margin: 8px 0 18px;
+  letter-spacing: -1.5px;
+}
+.umc-catalog h2 {
+  font-size: 23px;
+}
+.umc-catalog h3 {
+  font-size: 18px;
+  margin: 0 0 8px;
+}
+.catalog-header {
+  background: linear-gradient(120deg, #e6f5f8, #effaf5);
+  border-radius: 24px;
+  padding: 36px 40px;
+  border: 1px solid #d6ecee;
+}
+.catalog-eyebrow {
+  color: var(--catalog-teal);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 2px;
+}
+.catalog-toolbar {
+  display: flex;
+  gap: 24px;
+  align-items: end;
+  justify-content: space-between;
+  padding: 28px 0;
+}
+.umc-catalog label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 650;
+}
+.umc-catalog input,
+.umc-catalog select {
+  border: 1px solid #b8cdd6;
+  border-radius: 9px;
+  padding: 11px 12px;
+  background: white;
+  color: var(--catalog-ink);
+  font: inherit;
+  max-width: 100%;
+}
+.umc-catalog button {
+  border: 1px solid #c5dce3;
+  border-radius: 9px;
+  padding: 10px 16px;
+  background: #fff;
+  color: var(--catalog-blue);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.umc-catalog button:hover {
+  background: #eaf5f8;
+}
+.umc-catalog button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.umc-catalog :focus-visible {
+  outline: 3px solid #00a68c;
+  outline-offset: 3px;
+}
+.umc-catalog [role="tablist"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.umc-catalog [aria-selected="true"],
+.catalog-price-form button[type="submit"] {
+  background: var(--catalog-blue);
+  color: white;
+  border-color: var(--catalog-blue);
+}
+.catalog-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 18px;
+}
+.catalog-section-title span,
+.catalog-note {
+  color: #597381;
+  font-size: 13px;
+}
+.catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.catalog-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid #d9e5ea;
+  border-radius: 16px;
+  padding: 22px;
+  background: #fff;
+  box-shadow: 0 5px 20px #183b4c05;
+}
+.catalog-card > div {
+  flex: 1;
+}
+.catalog-card p {
+  margin: 0;
+  color: #597381;
+  font-size: 14px;
+}
+.catalog-card strong {
+  color: var(--catalog-teal);
+}
+.catalog-card small {
+  color: #597381;
+}
+.catalog-avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #e5f2f7;
+  color: var(--catalog-blue);
+  font-weight: 750;
+}
+.catalog-empty {
+  background: #f4f8fa;
+  border-radius: 12px;
+  padding: 24px;
+  color: #597381;
+}
+.umc-catalog [role="alert"] {
+  background: #fff3ef;
+  color: #913a25;
+  border-left: 4px solid #d77959;
+  border-radius: 8px;
+  padding: 16px;
+}
+.catalog-search {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.catalog-price-form {
+  margin-top: 32px;
+  border: 1px solid #badbd9;
+  background: #f1faf7;
+  border-radius: 18px;
+  padding: 24px;
+}
+.catalog-price-form p {
+  font-size: 14px;
+}
+.catalog-price-form fieldset {
+  border: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.catalog-price-form button {
+  align-self: end;
+}
+.umc-catalog footer {
+  margin-top: 36px;
+  padding-top: 18px;
+  border-top: 1px solid #e1e9ed;
+}
+@media (max-width: 700px) {
+  .umc-catalog {
+    padding: 16px;
+  }
+  .catalog-header {
+    padding: 24px;
+  }
+  .catalog-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  .catalog-grid,
+  .catalog-price-form fieldset {
+    grid-template-columns: 1fr;
+  }
+  .catalog-card {
+    padding: 18px;
+    flex-wrap: wrap;
+  }
+  .catalog-toolbar select {
+    width: 100%;
+  }
+  .catalog-search {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .catalog-card {
+    animation: catalog-in 0.25s ease-out;
+  }
+  @keyframes catalog-in {
+    from {
+      opacity: 0;
+      transform: translateY(5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}

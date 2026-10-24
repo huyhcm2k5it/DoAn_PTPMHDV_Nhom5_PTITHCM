@@ -1,8 +1,19 @@
-node_modules/
+.runtime/
+.superpowers/
 .test-build/
+.mongo-test-cache/
+
+node_modules/
+dist/
+coverage/
+
+# Keep local environment values and secrets out of Git; commit only examples.
 .env
 .env.*
 !.env.example
+
+*.exe
+*.test
 *.log
-.mongo-test-cache/
+
 mongo/secrets/

@@ -2,6 +2,10 @@
 
 UMC Care uses nine independently owned services. The current local branch adds Mongo storage contracts and Node.js CommonJS scaffolds for Quân’s Patient, Appointment and Pharmacy services.
 
+## GitHub workflow
+
+Đọc [Quy định GitHub và phân quyền thư mục của Huy, Quân, Hưng](docs/QUY_DINH_GITHUB_NHOM5_HUY_QUAN_HUNG_20261024.md) trước khi sửa file chung hoặc đưa code vào `develop`. Tài liệu phân công người review/merge, owner từng thư mục và cách xử lý conflict; checklist thiết lập trên GitHub được theo dõi riêng trong tài liệu.
+
 ## Structure and ownership
 
 - apps/web: React + TypeScript web application.
