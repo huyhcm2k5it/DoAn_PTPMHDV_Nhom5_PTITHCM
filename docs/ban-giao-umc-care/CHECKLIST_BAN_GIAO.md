@@ -39,25 +39,7 @@ Trạng thái: TODO / DOING / BLOCKED / REVIEW / INTEGRATED / DONE
 - [ ] Người nhận chạy lại bằng source tích hợp, cập nhật commit/CI và xác nhận.
 - [ ] Phần chưa ghép có tên owner/nguyên nhân; chưa tự chuyển Done.
 
-## Checklist Huy cần gửi cho từng bên
-
-### Quân
-
-- [ ] CatalogChanged + price snapshot/version và test cũ không đổi khi giá mới.
-- [ ] Clinical đọc ticket đúng nguồn và phát VisitSigned/VisitReturnReady.
-- [ ] PrescriptionFinalized có revision/items snapshot; Pharmacy replay một lần.
-- [ ] W03/W08/W10/W12 export component/route rõ; Quân tích hợp shell/menu/callback.
-- [ ] E2E queue→visit; visit không LAB; LAB RETURN và cấp toa đã chạy trên Compose nhóm.
-
-### Hưng
-
-- [ ] API auth/lease claims/issuer/audience được dùng thống nhất và projection quyền có checkpoint.
-- [ ] RequestCharge LAB_ORDER, ChargePrepared, ChargePaid/SettlementDecision có fence/revision đúng.
-- [ ] UNKNOWN/timeout giữ khóa; FAILED, cancellationId, refundStatus được đối chiếu.
-- [ ] W08 lấy bản SIGNED/PUBLISHED qua shared API; Android cùng account thấy cùng trạng thái.
-- [ ] Notification chỉ nhận thông tin tối thiểu, dừng Notification không chặn Clinical/Billing.
-
-### Cả nhóm trước khi nộp
+## Cả nhóm trước khi nộp
 
 - [ ] `develop` có source đã review; CI của commit cuối xanh.
 - [ ] Compose dựng sạch, từng DB migrate/seed, health của chín service được xác nhận.
