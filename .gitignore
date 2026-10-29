@@ -17,3 +17,5 @@ coverage/
 *.log
 
 mongo/secrets/
+
+.agents
