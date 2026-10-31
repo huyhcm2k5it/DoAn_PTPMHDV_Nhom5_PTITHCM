@@ -9,6 +9,8 @@
   "scripts": {
     "start": "node src/main.js",
     "check": "node scripts/check-js.js",
+    "seed:demo": "node scripts/seed-demo.js",
+    "seed:dry-run": "node scripts/seed-demo.js --dry-run",
     "test": "node --test --test-concurrency=1 tests/*.test.js"
   },
   "dependencies": {

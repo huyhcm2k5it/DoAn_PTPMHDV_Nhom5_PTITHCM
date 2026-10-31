@@ -104,6 +104,9 @@ const appointmentStorage = [
       { name: "uq_command_result", key: { command_id: 1 }, unique: true },
     ],
   },
+  { name: "user_access_projection", indexes: [{ name: "uq_user_access_projection", key: { userId: 1 }, unique: true }] },
+  { name: "patient_access_projection", indexes: [{ name: "uq_patient_access_projection", key: { patientId: 1 }, unique: true }] },
+  { name: "projection_checkpoints", indexes: [{ name: "uq_projection_checkpoint", key: { projectionName: 1 }, unique: true }] },
   ...technicalStorage,
 ];
 

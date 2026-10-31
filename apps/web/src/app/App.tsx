@@ -7,6 +7,9 @@ import { ProfileDetail } from "../features/patient/pages/ProfileDetail";
 import { createAppointmentApi } from "../features/appointment/api";
 import type { AppointmentApi } from "../features/appointment/types";
 import { AvailableSlots } from "../features/appointment/pages/AvailableSlots";
+import { BookingReview } from "../features/appointment/pages/BookingReview";
+import { MyAppointments } from "../features/appointment/pages/MyAppointments";
+import { AppointmentDetail } from "../features/appointment/pages/AppointmentDetail";
 import { createCatalogApi } from "../features/catalog/api";
 import type { CatalogApi } from "../features/catalog/types";
 import { withAuthRedirect } from "./runtime";
@@ -18,7 +21,7 @@ const noAdapter = async (): Promise<Response> => {
 };
 
 function AppLayout() {
-  return <div className="app-shell"><header className="app-header"><Link className="brand" to="/patient/profiles"><span className="brand-mark" aria-hidden="true">U</span><span>UMC <strong>Care</strong></span></Link><span className="header-caption">CHĂM SÓC SỨC KHỎE</span></header><div className="app-body"><aside className="app-sidebar"><p className="nav-label">BỆNH NHÂN</p><nav aria-label="Điều hướng chính"><Link to="/patient/profiles">Hồ sơ của tôi</Link><Link to="/patient/appointments/new">Tra cứu lịch khám</Link></nav><div className="sidebar-help"><span className="help-icon" aria-hidden="true">i</span><p>Kết quả lịch trống chỉ để tra cứu. Bạn chưa đặt lịch.</p></div></aside><main className="app-main"><Outlet /></main></div><footer className="app-footer">UMC Care · Cổng chăm sóc sức khỏe</footer></div>;
+  return <div className="app-shell"><header className="app-header"><Link className="brand" to="/patient/profiles"><span className="brand-mark" aria-hidden="true">U</span><span>UMC <strong>Care</strong></span></Link><span className="header-caption">CHĂM SÓC SỨC KHỎE</span></header><div className="app-body"><aside className="app-sidebar"><p className="nav-label">BỆNH NHÂN</p><nav aria-label="Điều hướng chính"><Link to="/patient/profiles">Hồ sơ của tôi</Link><Link to="/patient/appointments/new">Tra cứu lịch khám</Link><Link to="/patient/appointments">Lịch hẹn</Link></nav><div className="sidebar-help"><span className="help-icon" aria-hidden="true">i</span><p>Thanh toán và trạng thái lịch được xác nhận từ máy chủ.</p></div></aside><main className="app-main"><Outlet /></main></div><footer className="app-footer">UMC Care · Cổng chăm sóc sức khỏe</footer></div>;
 }
 
 function ProfileDetailRoute({ api }: { api: PatientApi }) {
@@ -27,7 +30,7 @@ function ProfileDetailRoute({ api }: { api: PatientApi }) {
 }
 
 function AppRoutes({ patientApi, appointmentApi, catalogApi }: { patientApi: PatientApi; appointmentApi: AppointmentApi; catalogApi: Pick<CatalogApi, "departments" | "doctors" | "services"> }) {
-  return <Routes><Route element={<AppLayout />}><Route path="/" element={<Navigate to="/patient/profiles" replace />} /><Route path="/patient/profiles" element={<ProfileList api={patientApi} />} /><Route path="/patient/profiles/:patientId" element={<ProfileDetailRoute api={patientApi} />} /><Route path="/patient/appointments/new" element={<AvailableSlots api={appointmentApi} catalog={catalogApi} />} /><Route path="*" element={<section className="page-content"><h1>Không tìm thấy trang</h1><Link to="/patient/profiles">Về hồ sơ bệnh nhân</Link></section>} /></Route></Routes>;
+  return <Routes><Route element={<AppLayout />}><Route path="/" element={<Navigate to="/patient/profiles" replace />} /><Route path="/patient/profiles" element={<ProfileList api={patientApi} />} /><Route path="/patient/profiles/:patientId" element={<ProfileDetailRoute api={patientApi} />} /><Route path="/patient/appointments/new" element={<AvailableSlots api={appointmentApi} catalog={catalogApi} />} /><Route path="/patient/appointments/review" element={<BookingReview api={appointmentApi} />} /><Route path="/patient/appointments" element={<MyAppointments api={appointmentApi} />} /><Route path="/patient/appointments/:appointmentId" element={<AppointmentDetail api={appointmentApi} />} /><Route path="*" element={<section className="page-content"><h1>Không tìm thấy trang</h1><Link to="/patient/profiles">Về hồ sơ bệnh nhân</Link></section>} /></Route></Routes>;
 }
 
 export function App({ runtime }: { runtime?: WebRuntime }) {
