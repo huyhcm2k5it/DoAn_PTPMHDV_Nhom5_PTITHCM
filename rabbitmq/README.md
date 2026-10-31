@@ -1,3 +1,8 @@
 # RabbitMQ
 
-RabbitMQ is started on the private Compose network and has a health check. The current project contracts do not yet specify the exchange/queue routing and service-specific permissions needed for the cross-service events. The local management credential is not passed to application containers. Do not connect a service using the management account; add scoped service users only after the event topology is agreed by the owners.
+RabbitMQ is started on the private Compose network and has a health check. Appointment week 2 proposes the reviewed topology in `definitions.json`:
+
+- `umc.commands.appointment.v1` / `billing.request-charge.v1` -> `cmd.billing.v1`.
+- `umc.events.billing.v1` / explicit Billing event keys -> `evt.appointment.v1`.
+
+The definitions are a handoff proposal, not evidence that Billing has provisioned the exchanges in a shared environment. Hưng must review the names, ACLs, schema versions and service credentials before integration. The local management credential is not passed to application containers; use scoped service users only after the owners agree.
