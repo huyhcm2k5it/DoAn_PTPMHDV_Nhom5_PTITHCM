@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://umc-care.local/contracts/messages/appointment-booking.v1.schema.json",
+  "title": "Appointment booking message envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["messageId", "messageKind", "messageType", "schemaVersion", "producer", "aggregateId", "aggregateVersion", "correlationId", "occurredAt", "payload"],
+  "properties": {
+    "messageId": { "type": "string", "format": "uuid" },
+    "messageKind": { "type": "string", "enum": ["COMMAND", "EVENT"] },
+    "messageType": { "type": "string", "enum": ["RequestCharge", "ChargePrepared", "SettlementReserved", "SettlementDecision", "ChargePaid"] },
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "producer": { "type": "string", "enum": ["Appointment", "Billing"] },
+    "aggregateId": { "type": "string", "format": "uuid" },
+    "aggregateVersion": { "type": "integer", "minimum": 1 },
+    "correlationId": { "type": "string", "format": "uuid" },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "payload": { "$ref": "#/$defs/bookingPayload" }
+  },
+  "$defs": {
+    "bookingPayload": {
+      "type": "object",
+      "required": ["sourceType", "sourceId", "sourceRevision"],
+      "properties": {
+        "requestId": { "type": "string", "format": "uuid" },
+        "sourceType": { "const": "APPOINTMENT" },
+        "sourceId": { "type": "string", "format": "uuid" },
+        "sourceRevision": { "type": "integer", "minimum": 1 },
+        "patientId": { "type": "string", "format": "uuid" },
+        "amountVnd": { "type": ["integer", "null"], "minimum": 0 },
+        "snapshotHash": { "type": ["string", "null"] },
+        "linesSnapshot": { "type": "array" },
+        "state": { "type": "string", "enum": ["CREATED", "REJECTED", "ACCEPTED", "SUCCEEDED", "FAILED", "UNKNOWN"] },
+        "chargeId": { "type": ["string", "null"] },
+        "settlementId": { "type": ["string", "null"] },
+        "paymentId": { "type": ["string", "null"] },
+        "fence": { "type": ["integer", "null"], "minimum": 1 },
+        "decisionVersion": { "type": ["integer", "null"], "minimum": 1 }
+      },
+      "additionalProperties": true
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "openapi": "3.1.1",
+  "info": { "title": "UMC Care Appointment API", "version": "5.2" },
+  "paths": {
+    "/api/v1/appointment-holds": {
+      "post": {
+        "operationId": "AP-008", "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateHold" } } } },
+        "responses": { "201": { "description": "Hold created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HoldResponse" } } } }, "400": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/v1/appointment-holds/{holdId}": {
+      "delete": {
+        "operationId": "AP-009", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/HoldId" }, { "$ref": "#/components/parameters/IdempotencyKey" }, { "$ref": "#/components/parameters/ExpectedVersion" }],
+        "responses": { "200": { "$ref": "#/components/responses/HoldReleased" }, "400": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/v1/appointments": {
+      "post": {
+        "operationId": "AP-010", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateAppointment" } } } },
+        "responses": { "202": { "$ref": "#/components/responses/AppointmentAccepted" }, "400": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/v1/appointments/{appointmentId}": {
+      "get": {
+        "operationId": "AP-011", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/AppointmentId" }],
+        "responses": { "200": { "$ref": "#/components/responses/AppointmentDetail" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/v1/patients/{patientId}/appointments": {
+      "get": {
+        "operationId": "AP-012", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/PatientId" }, { "$ref": "#/components/parameters/Page" }, { "$ref": "#/components/parameters/Limit" }, { "name": "state", "in": "query", "schema": { "type": "string" } }, { "name": "from", "in": "query", "schema": { "type": "string", "format": "date" } }, { "name": "to", "in": "query", "schema": { "type": "string", "format": "date" } }],
+        "responses": { "200": { "$ref": "#/components/responses/AppointmentList" }, "400": { "$ref": "#/components/responses/Error" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": { "bearerAuth": { "type": "http", "scheme": "bearer" } },
+    "parameters": {
+      "IdempotencyKey": { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "format": "uuid" } },
+      "ExpectedVersion": { "name": "expectedVersion", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1 } },
+      "HoldId": { "name": "holdId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+      "AppointmentId": { "name": "appointmentId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+      "PatientId": { "name": "patientId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+      "Page": { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1, "default": 1 } },
+      "Limit": { "name": "limit", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } }
+    },
+    "schemas": {
+      "CreateHold": { "type": "object", "additionalProperties": false, "required": ["patientId", "slotId"], "properties": { "patientId": { "type": "string", "format": "uuid" }, "slotId": { "type": "string", "format": "uuid" } } },
+      "CreateAppointment": { "type": "object", "additionalProperties": false, "required": ["holdId", "patientId"], "properties": { "holdId": { "type": "string", "format": "uuid" }, "patientId": { "type": "string", "format": "uuid" } } },
+      "HoldResponse": { "type": "object", "required": ["data"], "properties": { "data": { "type": "object", "required": ["holdId", "expiresAt", "state"], "properties": { "holdId": { "type": "string", "format": "uuid" }, "expiresAt": { "type": "string", "format": "date-time" }, "state": { "type": "string", "enum": ["HELD", "RELEASED", "EXPIRED"] }, "slotId": { "type": "string" }, "priceSnapshot": {} } } } },
+      "AppointmentAccepted": { "type": "object", "required": ["data"], "properties": { "data": { "type": "object", "required": ["requestId", "appointmentId", "state", "statusUrl"], "properties": { "requestId": { "type": "string", "format": "uuid" }, "appointmentId": { "type": "string", "format": "uuid" }, "state": { "const": "PENDING_PAYMENT" }, "statusUrl": { "type": "string" } } } } },
+      "Error": { "type": "object", "required": ["error"], "properties": { "error": { "type": "object", "required": ["code", "message"], "properties": { "code": { "type": "string" }, "message": { "type": "string" } } }, "correlationId": { "type": "string" } } }
+    },
+    "responses": {
+      "Error": { "description": "Standard error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+      "HoldReleased": { "description": "Hold released", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HoldResponse" } } } },
+      "AppointmentAccepted": { "description": "Appointment request committed", "headers": { "Location": { "schema": { "type": "string" } } }, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AppointmentAccepted" } } } },
+      "AppointmentDetail": { "description": "Appointment detail", "content": { "application/json": { "schema": { "type": "object" } } } },
+      "AppointmentList": { "description": "Appointment list", "content": { "application/json": { "schema": { "type": "object" } } } }
+    }
+  }
+}
