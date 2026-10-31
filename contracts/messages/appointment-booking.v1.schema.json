@@ -4,11 +4,31 @@
   "title": "Appointment booking message envelope",
   "type": "object",
   "additionalProperties": false,
-  "required": ["messageId", "messageKind", "messageType", "schemaVersion", "producer", "aggregateId", "aggregateVersion", "correlationId", "occurredAt", "payload"],
+  "required": [
+    "messageId",
+    "messageKind",
+    "messageType",
+    "schemaVersion",
+    "producer",
+    "aggregateId",
+    "aggregateVersion",
+    "correlationId",
+    "occurredAt",
+    "payload"
+  ],
   "properties": {
     "messageId": { "type": "string", "format": "uuid" },
     "messageKind": { "type": "string", "enum": ["COMMAND", "EVENT"] },
-    "messageType": { "type": "string", "enum": ["RequestCharge", "ChargePrepared", "SettlementReserved", "SettlementDecision", "ChargePaid"] },
+    "messageType": {
+      "type": "string",
+      "enum": [
+        "RequestCharge",
+        "ChargePrepared",
+        "SettlementReserved",
+        "SettlementDecision",
+        "ChargePaid"
+      ]
+    },
     "schemaVersion": { "type": "integer", "const": 1 },
     "producer": { "type": "string", "enum": ["Appointment", "Billing"] },
     "aggregateId": { "type": "string", "format": "uuid" },
@@ -30,7 +50,10 @@
         "amountVnd": { "type": ["integer", "null"], "minimum": 0 },
         "snapshotHash": { "type": ["string", "null"] },
         "linesSnapshot": { "type": "array" },
-        "state": { "type": "string", "enum": ["CREATED", "REJECTED", "ACCEPTED", "SUCCEEDED", "FAILED", "UNKNOWN"] },
+        "state": {
+          "type": "string",
+          "enum": ["CREATED", "REJECTED", "ACCEPTED", "SUCCEEDED", "FAILED", "UNKNOWN"]
+        },
         "chargeId": { "type": ["string", "null"] },
         "settlementId": { "type": ["string", "null"] },
         "paymentId": { "type": ["string", "null"] },
