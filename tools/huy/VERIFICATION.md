@@ -1,4 +1,28 @@
-# Kiểm chứng bàn giao local — 22/10/2026
+# Kiểm chứng bàn giao Catalog và Clinical
+
+## Clinical tuần 2 — 31/10/2026
+
+Đã triển khai CL-001–004, migration PostgreSQL, xử lý ClaimQueueTicket/QueueTicketClaimed, projection quyền, outbox/inbox/retry/quarantine và feature bàn khám. [README Clinical](../../services/clinical/README.md) ghi lệnh chạy; [hợp đồng bàn giao](../../contracts/http/clinical-integration.md) ghi ranh giới cần ghép với Quân/Hưng.
+
+| Kiểm tra đã chạy | Kết quả |
+| --- | --- |
+| `go test -count=1 ./...`, `go vet ./...`, `go build ./...` trong Clinical | PASS |
+| `python tools/huy/test_clinical_postgres.py` | PASS 7 test với PostgreSQL 18 thật, database test riêng được dọn sau chạy |
+| HTTP dùng RSA JWT thật và PostgreSQL; kiểm phản hồi bằng OpenAPI | PASS cả 4 operation và error envelope |
+| `npm test`, `npm run build` trong `tools/clinical-preview` | PASS 8 test và build TypeScript/Vite |
+| Sinh lại contract và so hash; kiểm YAML workflow | PASS, không có contract drift |
+| Guard hướng import domain/application | PASS |
+| Compile test tag `brokerintegration` | PASS; không tính là đã chạy broker thật |
+
+Các ca quan trọng gồm: start PENDING chưa tạo visit; 8 delivery claim lặp chỉ một visit; RETURN dùng lại visit; claim REJECTED không tạo visit; 6 writer cùng version chỉ một bản nháp được ghi; rollback khi outbox lỗi; bệnh nhân không đọc nháp; thu hồi quyền; cùng UUID khác chữ hoa/thường nhập lại không xung đột; message đã RETRY_SCHEDULED không chạy lại từ delivery gốc.
+
+Review độc lập tìm 2 lỗi P2: giữ ý định nhận vé cũ sau lỗi 409 và delivery gốc vượt lịch retry. Đã có test tái hiện FAIL rồi PASS cho cả hai. Giao diện cũng giữ nguyên body/key khi lỗi mạng chưa xác định kết quả và giữ nháp khi nhận 409.
+
+**Giới hạn tích hợp:** Docker daemon local chưa sẵn sàng, nên chưa chạy RabbitMQ/Compose thật. CI đã có broker integration job nhưng chỉ được tính PASS khi có kết quả trên commit GitHub. Feed vé đáng tin cậy của Appointment, consumer claim, shared shell và Gateway/Identity live cần Quân/Hưng ghép và kiểm. Importer vé là đầu nối nội bộ tạm thời, thiếu dữ liệu thì API chặn; không tạo claim thành công giả. Clinical phân biệt doctorId của Catalog với doctorUserId của JWT qua projection đã xác thực.
+
+Log và response fixture local nằm trong `.runtime/clinical-postgres-integration.log` và `.runtime/clinical-http-responses.json`, không đưa vào Git. Phần dưới lưu bằng chứng Catalog trước đây theo đúng thời điểm chạy.
+
+## Catalog — kiểm chứng ngày 22/10/2026
 
 **Cập nhật 24/10/2026:** Huy đã yêu cầu commit, đẩy nhánh `huy` và gộp vào `develop`. Các ghi chú “chưa commit/push” bên dưới mô tả trạng thái tại lượt kiểm chứng ngày 22/10. Trước lần tích hợp này, đã chạy lại Go vet/test/build cả ba service, 13 test web + build và test PostgreSQL thật; trạng thái Git sau tích hợp xem trong lịch sử repository.
 

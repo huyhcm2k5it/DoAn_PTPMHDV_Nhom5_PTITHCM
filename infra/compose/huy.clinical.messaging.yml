@@ -1,0 +1,19 @@
+# Optional Huy overlay, combined with huy.catalog.yml after Quân provisions broker topology.
+services:
+  clinical:
+    environment:
+      JWT_ISSUER: ${CLINICAL_JWT_ISSUER:?set CLINICAL_JWT_ISSUER}
+      JWT_AUDIENCE: ${CLINICAL_JWT_AUDIENCE:?set CLINICAL_JWT_AUDIENCE}
+      JWT_PUBLIC_KEY_FILE: /keys/identity-public.pem
+    volumes:
+      - ../../.runtime/clinical-jwt-public.pem:/keys/identity-public.pem:ro
+  clinical-worker:
+    build: ../../services/clinical
+    image: umc-huy-clinical:local
+    entrypoint: ["/worker"]
+    environment:
+      DATABASE_URL: postgres://clinical_owner:${CLINICAL_DB_PASSWORD:?set CLINICAL_DB_PASSWORD}@postgres-huy:5432/clinical_db?sslmode=disable
+      RABBITMQ_URL: ${CLINICAL_RABBITMQ_URL:?set CLINICAL_RABBITMQ_URL}
+      CLINICAL_DECLARE_TOPOLOGY: ${CLINICAL_DECLARE_TOPOLOGY:-0}
+    depends_on:
+      clinical-migrate: {condition: service_completed_successfully}

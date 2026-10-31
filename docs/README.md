@@ -10,11 +10,4 @@
 
 ## Hồ sơ bàn giao nhóm
 
-- [Mở hồ sơ bàn giao UMC Care cho Huy, Quân, Hưng](ban-giao-umc-care/README.md): phạm vi từng người, quy định chung, trạng thái phần Huy có bằng chứng và checklist giao nhận.
-- [Hướng dẫn hoàn tất các task còn lại của Huy](HUY_HUONG_DAN_HOAN_THANH_TOAN_BO_TASK.md): các task chi tiết, phụ thuộc, kiểm tra và đầu ra nghiệm thu.
-- [Phụ lục API và message phần Huy](HUY_PHU_LUC_30_API_VA_MESSAGE.md): tra cứu hợp đồng v5.2 cho 30 HTTP operation cùng message liên quan.
-
-## Hướng dẫn hoàn thành phần Huy
-
-- [Checklist triển khai và nghiệm thu toàn bộ task của Huy](HUY_HUONG_DAN_HOAN_THANH_TOAN_BO_TASK.md): 18 task theo phụ thuộc, không chia theo ngày; gồm backend, web, messaging, tích hợp, test, CI và hồ sơ nộp.
-- [Phụ lục 30 API và message liên quan](HUY_PHU_LUC_30_API_VA_MESSAGE.md): method/path, quyền, tham số, response và mã lỗi trích từ CSV v5.2; các điểm contract chưa thống nhất được ghi trong task H00.
+- [Hồ sơ bàn giao chung UMC Care cho Huy, Quân, Hưng](ban-giao-umc-care/README.md): phạm vi, quy định chung và checklist giao nhận cho cả nhóm.

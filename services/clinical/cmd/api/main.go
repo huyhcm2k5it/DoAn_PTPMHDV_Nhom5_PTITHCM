@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/rsa"
 	"errors"
+	"github.com/golang-jwt/jwt/v5"
 	"log/slog"
 	"net/http"
 	"os"
@@ -12,6 +14,7 @@ import (
 	httpadapter "umccare/clinical/internal/adapters/inbound/http"
 	"umccare/clinical/internal/adapters/outbound/postgres"
 	"umccare/clinical/internal/application/health"
+	"umccare/clinical/internal/application/usecase"
 )
 
 func main() {
@@ -34,7 +37,22 @@ func run() error {
 	if addr == "" {
 		addr = "127.0.0.1:8082"
 	}
-	server := &http.Server{Addr: addr, Handler: httpadapter.New(health.New(db)), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second}
+	issuer, audience, keyPath := os.Getenv("JWT_ISSUER"), os.Getenv("JWT_AUDIENCE"), os.Getenv("JWT_PUBLIC_KEY_FILE")
+	var key *rsa.PublicKey
+	if issuer != "" || audience != "" || keyPath != "" {
+		if issuer == "" || audience == "" || keyPath == "" {
+			return errors.New("JWT issuer, audience and key must be configured together")
+		}
+		raw, err := os.ReadFile(keyPath)
+		if err != nil {
+			return errors.New("cannot load JWT public key")
+		}
+		key, err = jwt.ParseRSAPublicKeyFromPEM(raw)
+		if err != nil {
+			return errors.New("invalid RSA public key")
+		}
+	}
+	server := &http.Server{Addr: addr, Handler: httpadapter.New(health.New(db), httpadapter.Options{App: usecase.New(db, time.Now), Auth: httpadapter.NewJWT(key, issuer, audience), Ready: db.BusinessReady}), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	done := make(chan error, 1)

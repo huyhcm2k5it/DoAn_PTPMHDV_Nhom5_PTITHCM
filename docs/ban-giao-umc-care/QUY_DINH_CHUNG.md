@@ -39,4 +39,4 @@ Web/Android phải dùng dữ liệu qua Gateway, có loading/empty/401/403/409/
 
 ## Tài liệu nền thay đổi theo thời gian
 
-Lịch/phân công Word ngày 19/10 là nguồn về phạm vi và kế hoạch, nhưng quy trình Git trong đó đã cũ. Quy tắc hai nhánh, PR `develop → main` và review phải theo bản GitHub ngày 24/10. Trước release, nhóm cập nhật lại một nguồn chuẩn nếu quyết định mới khác hai bản này.
+Lịch/phân công Word ngày 19/10 là nguồn về phạm vi và kế hoạch, nhưng quy trình Git trong đó đã cũ. Quy tắc nhánh cá nhân, PR vào `develop`, PR `develop → main` và review phải theo bản GitHub ngày 24/10. Trước release, nhóm cập nhật lại một nguồn chuẩn nếu quyết định mới khác hai bản này.
