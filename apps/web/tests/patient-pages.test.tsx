@@ -45,17 +45,17 @@ describe("available slot screen", () => {
       services: vi.fn().mockResolvedValue([{ id: "svc-1", departmentId: "dep-1", code: "EXAM", name: "Khám tổng quát", status: "ACTIVE", price: null }]),
     } as unknown as CatalogApi;
     const listAvailable = vi.fn().mockResolvedValue([]);
-    const appointmentApi = { listAvailable };
+    const appointmentApi = { listAvailable, createHold: vi.fn(), releaseHold: vi.fn(), createAppointment: vi.fn(), getAppointment: vi.fn(), listAppointments: vi.fn() };
     render(<MemoryRouter><AvailableSlots api={appointmentApi} catalog={catalog} /></MemoryRouter>);
 
     fireEvent.change(await screen.findByLabelText("Chuyên khoa"), { target: { value: "dep-1" } });
     fireEvent.change(await screen.findByLabelText("Bác sĩ"), { target: { value: "doc-1" } });
     fireEvent.change(await screen.findByLabelText("Dịch vụ khám"), { target: { value: "svc-1" } });
-    fireEvent.change(screen.getByLabelText("Ngày khám"), { target: { value: "2026-10-25" } });
+    fireEvent.change(screen.getByLabelText("Ngày khám"), { target: { value: "2026-11-02" } });
     fireEvent.click(screen.getByRole("button", { name: "Tìm lịch trống" }));
 
     expect(await screen.findByText("Không có khung giờ phù hợp")).toBeTruthy();
-    expect(listAvailable).toHaveBeenCalledWith({ doctorId: "doc-1", serviceId: "svc-1", date: "2026-10-25" }, expect.any(AbortSignal));
+    expect(listAvailable).toHaveBeenCalledWith({ doctorId: "doc-1", serviceId: "svc-1", date: "2026-11-02" }, expect.any(AbortSignal));
   });
 });
 
