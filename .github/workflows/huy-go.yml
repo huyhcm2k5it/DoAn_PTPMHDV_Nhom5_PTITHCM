@@ -1,9 +1,9 @@
-name: Huy services and Catalog contract
+name: Huy services and contracts
 on:
   push:
-    paths: ['services/catalog/**', 'services/clinical/**', 'services/diagnostic/**', 'contracts/http/catalog*', 'tools/huy/**', 'tools/catalog-preview/**', 'apps/web/src/features/catalog/**', '.github/workflows/huy-go.yml']
+    paths: ['services/catalog/**', 'services/clinical/**', 'services/diagnostic/**', 'contracts/http/catalog*', 'contracts/http/clinical*', 'contracts/messages/clinical*', 'tools/huy/**', 'tools/catalog-preview/**', 'tools/clinical-preview/**', 'apps/web/src/features/catalog/**', 'apps/web/src/features/clinical/**', '.github/workflows/huy-go.yml']
   pull_request:
-    paths: ['services/catalog/**', 'services/clinical/**', 'services/diagnostic/**', 'contracts/http/catalog*', 'tools/huy/**', 'tools/catalog-preview/**', 'apps/web/src/features/catalog/**', '.github/workflows/huy-go.yml']
+    paths: ['services/catalog/**', 'services/clinical/**', 'services/diagnostic/**', 'contracts/http/catalog*', 'contracts/http/clinical*', 'contracts/messages/clinical*', 'tools/huy/**', 'tools/catalog-preview/**', 'tools/clinical-preview/**', 'apps/web/src/features/catalog/**', 'apps/web/src/features/clinical/**', '.github/workflows/huy-go.yml']
 permissions:
   contents: read
 jobs:
@@ -70,10 +70,12 @@ jobs:
           python-version: '3.12'
       - run: pip install -r tools/huy/contract-requirements.txt
       - run: python tools/huy/check_catalog_contract.py
+      - run: python tools/huy/check_clinical_contract.py
       - name: Generated contract stays reproducible
         run: |
           python tools/huy/generate_catalog_contract.py
-          git diff --exit-code -- contracts/http/catalog.openapi.json
+          python tools/huy/generate_clinical_contract.py
+          git diff --exit-code -- contracts/http/catalog.openapi.json contracts/http/clinical.openapi.json contracts/messages/clinical-queue.v1.schema.json contracts/messages/clinical-ticket-snapshot.v1.schema.json
   catalog-web:
     runs-on: ubuntu-latest
     defaults:
@@ -86,6 +88,60 @@ jobs:
           node-version: '24.14.0'
           cache: npm
           cache-dependency-path: tools/catalog-preview/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+  clinical-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-only-not-a-production-secret
+          POSTGRES_DB: umc_huy_test_clinical_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d umc_huy_test_clinical_ci"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+      rabbitmq:
+        image: rabbitmq:4.3.6-management
+        ports: ['5672:5672']
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.0'
+          cache-dependency-path: services/clinical/go.sum
+      - name: Clinical PostgreSQL HTTP/concurrency and real broker tests
+        working-directory: services/clinical
+        env:
+          TEST_DATABASE_URL: postgres://postgres:ci-only-not-a-production-secret@127.0.0.1:5432/umc_huy_test_clinical_ci?sslmode=disable
+          TEST_RABBITMQ_URL: amqp://guest:guest@127.0.0.1:5672/
+          CLINICAL_CONTRACT_RESPONSE_FILE: ${{ runner.temp }}/clinical-http-responses.json
+        run: go test -race -count=1 -tags=integration,brokerintegration -v ./internal/adapters/...
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r tools/huy/contract-requirements.txt
+      - name: Validate actual Clinical HTTP responses
+        run: python tools/huy/check_clinical_contract.py "${{ runner.temp }}/clinical-http-responses.json"
+  clinical-web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/clinical-preview
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.14.0'
+          cache: npm
+          cache-dependency-path: tools/clinical-preview/package-lock.json
       - run: npm ci
       - run: npm run typecheck
       - run: npm test

@@ -36,14 +36,23 @@ services:
       LISTEN_ADDR: :8081
     depends_on:
       catalog-migrate: {condition: service_completed_successfully}
+  clinical-migrate:
+    build: ../../services/clinical
+    image: umc-huy-clinical:local
+    entrypoint: ["/migrate"]
+    environment:
+      DATABASE_URL: postgres://clinical_owner:${CLINICAL_DB_PASSWORD:?set CLINICAL_DB_PASSWORD}@postgres-huy:5432/clinical_db?sslmode=disable
+    depends_on:
+      postgres-huy: {condition: service_healthy}
   clinical:
     build: ../../services/clinical
+    image: umc-huy-clinical:local
     ports: ["127.0.0.1:8082:8082"]
     environment:
       DATABASE_URL: postgres://clinical_owner:${CLINICAL_DB_PASSWORD:?set CLINICAL_DB_PASSWORD}@postgres-huy:5432/clinical_db?sslmode=disable
       LISTEN_ADDR: :8082
     depends_on:
-      postgres-huy: {condition: service_healthy}
+      clinical-migrate: {condition: service_completed_successfully}
   diagnostic:
     build: ../../services/diagnostic
     ports: ["127.0.0.1:8083:8083"]

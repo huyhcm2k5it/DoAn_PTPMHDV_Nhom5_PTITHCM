@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:umc-care:clinical-queue:v1",
+  "title": "ClaimQueueTicket and QueueTicketClaimed v1",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "messageKind": {
+          "const": "COMMAND"
+        },
+        "messageType": {
+          "const": "ClaimQueueTicket"
+        },
+        "schemaVersion": {
+          "const": 1
+        },
+        "producer": {
+          "const": "clinical"
+        },
+        "aggregateId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "aggregateVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "correlationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "causationId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "requestId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "ticketId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "expectedTicketVersion": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "doctorId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "patientId": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "requestId",
+            "ticketId",
+            "expectedTicketVersion",
+            "doctorId",
+            "patientId"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "messageId",
+        "messageKind",
+        "messageType",
+        "schemaVersion",
+        "producer",
+        "aggregateId",
+        "aggregateVersion",
+        "correlationId",
+        "causationId",
+        "requestId",
+        "occurredAt",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "messageKind": {
+          "const": "EVENT"
+        },
+        "messageType": {
+          "const": "QueueTicketClaimed"
+        },
+        "schemaVersion": {
+          "const": 1
+        },
+        "producer": {
+          "const": "appointment"
+        },
+        "aggregateId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "aggregateVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "correlationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "causationId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "requestId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "ticketId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "appointmentId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "patientId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "visitId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "claimId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "state": {
+              "enum": [
+                "ACCEPTED",
+                "REJECTED"
+              ]
+            },
+            "reasonCode": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          "required": [
+            "requestId",
+            "ticketId",
+            "appointmentId",
+            "patientId",
+            "state"
+          ],
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "state": {
+                    "const": "ACCEPTED"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "claimId"
+                ]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "state": {
+                    "const": "REJECTED"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "reasonCode"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "messageId",
+        "messageKind",
+        "messageType",
+        "schemaVersion",
+        "producer",
+        "aggregateId",
+        "aggregateVersion",
+        "correlationId",
+        "causationId",
+        "requestId",
+        "occurredAt",
+        "payload"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}
