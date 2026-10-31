@@ -1,0 +1,20 @@
+{
+  "rabbit_version": "3.13.0",
+  "exchanges": [
+    { "name": "umc.commands.appointment.v1", "vhost": "/", "type": "topic", "durable": true, "auto_delete": false },
+    { "name": "umc.events.billing.v1", "vhost": "/", "type": "topic", "durable": true, "auto_delete": false }
+  ],
+  "queues": [
+    { "name": "cmd.billing.v1", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
+    { "name": "evt.appointment.v1", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} }
+  ],
+  "bindings": [
+    { "source": "umc.commands.appointment.v1", "vhost": "/", "destination": "cmd.billing.v1", "destination_type": "queue", "routing_key": "billing.request-charge.v1", "arguments": {} },
+    { "source": "umc.events.billing.v1", "vhost": "/", "destination": "evt.appointment.v1", "destination_type": "queue", "routing_key": "billing.charge-prepared.v1", "arguments": {} },
+    { "source": "umc.events.billing.v1", "vhost": "/", "destination": "evt.appointment.v1", "destination_type": "queue", "routing_key": "billing.settlement-reserved.v1", "arguments": {} },
+    { "source": "umc.events.billing.v1", "vhost": "/", "destination": "evt.appointment.v1", "destination_type": "queue", "routing_key": "billing.settlement-decision.v1", "arguments": {} },
+    { "source": "umc.events.billing.v1", "vhost": "/", "destination": "evt.appointment.v1", "destination_type": "queue", "routing_key": "billing.charge-paid.v1", "arguments": {} }
+  ],
+  "policies": [],
+  "parameters": []
+}
