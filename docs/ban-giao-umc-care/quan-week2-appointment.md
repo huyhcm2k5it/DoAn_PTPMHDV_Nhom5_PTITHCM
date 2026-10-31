@@ -1,9 +1,12 @@
 # Phiếu bàn giao tuần 2 — Quân / Appointment booking
 
-Ngày lập: 31/10/2026  
-Nhánh làm việc: `quan`  
-Owner giao: Quân  
-Owner nhận/review: Hưng (auth, Gateway, Billing), Huy (Catalog projection, CI)  
+Ngày lập: 31/10/2026
+
+Nhánh làm việc: `quan`
+
+Owner giao: Quân
+
+Owner nhận/review: Hưng (auth, Gateway, Billing), Huy (Catalog projection, CI)
 Trạng thái: **REVIEW / BLOCKED ở Gate 2 tích hợp thật**
 
 ## Phạm vi
@@ -48,7 +51,8 @@ Các UUID trong fixture là dữ liệu giả, không chứa credential. Seed ch
 
 ## Bằng chứng kiểm thử
 
-Đã có test transaction Mongo cho: slot cuối, idempotency, release/expiry, price projection stale rollback, patient overlap, access projection version/message conflict, AP-010/AP-011/AP-012, pending-payment expiry, Billing source/fence/duplicate và outbox confirm.  
+Đã có test transaction Mongo cho: slot cuối, idempotency, release/expiry, price projection stale rollback, patient overlap, access projection version/message conflict, AP-010/AP-011/AP-012, pending-payment expiry, Billing source/fence/duplicate và outbox confirm.
+
 Đã có test web typecheck và Vitest cho flow slot hiện hữu + route API mock; chạy lại lệnh và ghi exit code/commit trước khi người nhận xác nhận.
 
 ## Giới hạn và blocker
