@@ -1,9 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
-import type { AppointmentApi, AppointmentSummary } from "../types";
+import { useCallback, useEffect, useState } from 'react';
+import type { AppointmentApi, AppointmentSummary } from '../types';
 
-const TERMINAL_STATES = new Set(["CONFIRMED", "EXPIRED", "CANCELLED", "COMPLETED"]);
+const TERMINAL_STATES = new Set(['CONFIRMED', 'EXPIRED', 'CANCELLED', 'COMPLETED']);
 
-export function useAppointmentPolling(api: AppointmentApi, appointmentId: string, options: { intervalMs?: number; maxIntervalMs?: number } = {}) {
+export function useAppointmentPolling(
+  api: AppointmentApi,
+  appointmentId: string,
+  options: { intervalMs?: number; maxIntervalMs?: number } = {},
+) {
   const [data, setData] = useState<AppointmentSummary>();
   const [error, setError] = useState<unknown>();
   const [loading, setLoading] = useState(true);
@@ -28,7 +32,10 @@ export function useAppointmentPolling(api: AppointmentApi, appointmentId: string
         setData(result);
         setLoading(false);
         const state = String(result.appointment?.state ?? result.state);
-        if (!TERMINAL_STATES.has(state)) { delay = intervalMs; schedule(); }
+        if (!TERMINAL_STATES.has(state)) {
+          delay = intervalMs;
+          schedule();
+        }
       } catch (caught) {
         if (disposed || controller.signal.aborted) return;
         setError(caught);
@@ -40,7 +47,11 @@ export function useAppointmentPolling(api: AppointmentApi, appointmentId: string
       }
     };
     void run();
-    return () => { disposed = true; controller.abort(); if (timeout) clearTimeout(timeout); };
+    return () => {
+      disposed = true;
+      controller.abort();
+      if (timeout) clearTimeout(timeout);
+    };
   }, [api, appointmentId, intervalMs, maxIntervalMs]);
 
   useEffect(() => load(), [load]);
