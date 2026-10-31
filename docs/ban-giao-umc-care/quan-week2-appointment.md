@@ -66,4 +66,16 @@ Các UUID trong fixture là dữ liệu giả, không chứa credential. Seed ch
 3. Chạy web `typecheck`, `test -- --run`, `build` trong `apps/web`.
 4. Dùng source tích hợp sau khi có D01–D06; cập nhật commit/CI, evidence và trạng thái `INTEGRATED` chỉ sau khi pass thật.
 
-Commit/PR: ghi sau khi commit cục bộ và tạo PR; chưa push/merge trong phiếu này.
+## Commit và kết quả kiểm tra cuối
+
+- `e40d1a7` — `chore(appointment): add repeatable booking demo fixtures`.
+- `4e20467` — `feat(appointment): add transactional booking workflow`.
+- `a5c0f84` — `feat(appointment): deliver booking messages reliably`.
+- `fe05402` — `feat(web): add booking and appointment tracking pages`.
+- `ae0c924`, `f5f88fb` — handoff/runbook/worker boundaries.
+- `services/appointment`: check 0, unit test 1/1, integration 9/9.
+- `services/patient`: check 0, test 1/1.
+- `tests/mongo`: check 0, test 42/42.
+- `apps/web`: typecheck 0, Vitest 8/8, build 0.
+
+PR: chưa tạo và chưa push/merge; người nhận tạo PR `quan` → `develop` sau khi review D01–D07.
