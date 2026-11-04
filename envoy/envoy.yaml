@@ -75,6 +75,14 @@ static_resources:
                         # 8. Billing Service (Hưng)
                         - match: { prefix: "/api/v1/billing" }
                           route: { cluster: billing_service, timeout: 15s }
+                        - match: { prefix: "/api/v1/charges" }
+                          route: { cluster: billing_service, timeout: 15s }
+                        - match: { prefix: "/api/v1/payments" }
+                          route: { cluster: billing_service, timeout: 15s }
+                        - match: { prefix: "/api/v1/receipts" }
+                          route: { cluster: billing_service, timeout: 15s }
+                        - match: { prefix: "/api/v1/refunds" }
+                          route: { cluster: billing_service, timeout: 15s }
 
                         # 9. Notification Service (Hưng)
                         - match: { prefix: "/api/v1/notifications" }
