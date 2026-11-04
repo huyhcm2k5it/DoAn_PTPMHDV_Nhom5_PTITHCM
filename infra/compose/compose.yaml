@@ -43,12 +43,10 @@ services:
   rabbitmq:
     image: rabbitmq:4.3.6-management
     hostname: rabbitmq
-    environment:
-      RABBITMQ_DEFAULT_USER: $RABBITMQ_ADMIN_USER
-      RABBITMQ_DEFAULT_PASS: $RABBITMQ_ADMIN_PASSWORD
-      RABBITMQ_DEFAULT_VHOST: /umc-care
+    env_file:
+      - ../../rabbitmq/.env
     volumes: [rabbitmq_data:/var/lib/rabbitmq]
-    networks: [private]
+    networks: [private, default]
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 5s
@@ -122,13 +120,8 @@ services:
     restart: unless-stopped
   identity:
     build: { context: ../../services/identity, dockerfile: Dockerfile }
-    environment:
-      PORT: "8000"
-      IDENTITY_DB_NAME: "identity_db"
-      IDENTITY_DB_USER: "identity_owner"
-      IDENTITY_DB_PASSWORD: "identity@123"
-      IDENTITY_DB_HOST: "postgres"
-      IDENTITY_DB_PORT: "5432"
+    env_file:
+      - ../../services/identity/.env
     depends_on:
       postgres: { condition: service_healthy }
     networks: [private]
@@ -140,13 +133,32 @@ services:
     restart: unless-stopped
   billing:
     build: { context: ../../services/billing, dockerfile: Dockerfile }
-    environment:
-      PORT: "8000"
-      BILLING_DB_NAME: "billing_db"
-      BILLING_DB_USER: "billing_owner"
-      BILLING_DB_PASSWORD: "billing@123"
-      BILLING_DB_HOST: "postgres"
-      BILLING_DB_PORT: "5432"
+    env_file:
+      - ../../services/billing/.env
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [private]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  billing-worker:
+    build: { context: ../../services/billing, dockerfile: Dockerfile }
+    command: ["python", "manage.py", "run_billing_worker"]
+    env_file:
+      - ../../services/billing/.env
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+      billing: { condition: service_healthy }
+    networks: [private]
+    restart: unless-stopped
+  notification:
+    build: { context: ../../services/notification, dockerfile: Dockerfile }
+    env_file:
+      - ../../services/notification/.env
     depends_on:
       postgres: { condition: service_healthy }
     networks: [private]
@@ -163,6 +175,8 @@ services:
       - "9901:9901"
     depends_on:
       identity: { condition: service_healthy }
+      billing: { condition: service_healthy }
+      notification: { condition: service_healthy }
     networks:
       - private
       - default

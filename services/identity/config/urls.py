@@ -9,6 +9,8 @@ from app.api.view_auth import (
     forgot_password_view,
     reset_password_view,
     change_password_view,
+    refresh_token_view,
+    logout_view,
 )
 urlpatterns = [
     # Health checks
@@ -28,4 +30,9 @@ urlpatterns = [
     path("api/v1/auth/password/forgot", forgot_password_view, name="auth_password_forgot"),
     path("api/v1/auth/password/reset", reset_password_view, name="auth_password_reset"),
     path("api/v1/auth/password", change_password_view, name="auth_password_change"),
+
+    # IA-005: Refresh Token & Token Rotation
+    path("api/v1/auth/token/refresh", refresh_token_view, name="auth_refresh"),
+    # IA-011: Đăng xuất
+    path("api/v1/auth/logout", logout_view, name="auth_logout"),
 ]
