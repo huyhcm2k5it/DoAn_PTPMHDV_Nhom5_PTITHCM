@@ -1,0 +1,231 @@
+static_resources:
+  listeners:
+    - name: ingress_listener
+      address:
+        socket_address:
+          address: 0.0.0.0
+          port_value: 8080
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: ingress_http
+                codec_type: AUTO
+                route_config:
+                  name: local_route
+                  virtual_hosts:
+                    - name: umc_care_backend
+                      domains: ["*"]
+                      cors:
+                        allow_origin_string_match:
+                          - safe_regex:
+                              regex: ".*"
+                        allow_methods: "GET, PUT, POST, PATCH, DELETE, OPTIONS"
+                        allow_headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,Idempotency-Key,X-Correlation-Id,X-Authorization-Lease"
+                        expose_headers: "Location,Content-Length,Content-Range,X-Correlation-Id"
+                        max_age: "1728000"
+                      routes:
+                        # 1. Identity Service (Hưng)
+                        - match: { prefix: "/api/v1/auth" }
+                          route: { cluster: identity_service, timeout: 15s }
+                        - match: { prefix: "/api/v1/admin/staff" }
+                          route: { cluster: identity_service, timeout: 15s }
+                        - match: { prefix: "/api/v1/admin/audit" }
+                          route: { cluster: identity_service, timeout: 15s }
+
+                        # 2. Patient Service (Quân)
+                        - match: { prefix: "/api/v1/patients" }
+                          route: { cluster: patient_service, timeout: 15s }
+
+                        # 3. Appointment Service (Quân)
+                        - match: { prefix: "/api/v1/appointments" }
+                          route: { cluster: appointment_service, timeout: 15s }
+                        - match: { prefix: "/api/v1/slots" }
+                          route: { cluster: appointment_service, timeout: 15s }
+                        - match: { prefix: "/api/v1/schedules" }
+                          route: { cluster: appointment_service, timeout: 15s }
+
+                        # 4. Catalog Service (Huy)
+                        - match: { prefix: "/api/v1/departments" }
+                          route: { cluster: catalog_service, timeout: 15s }
+                        - match: { prefix: "/api/v1/doctors" }
+                          route: { cluster: catalog_service, timeout: 15s }
+                        - match: { prefix: "/api/v1/medical-services" }
+                          route: { cluster: catalog_service, timeout: 15s }
+                        - match: { prefix: "/api/v1/prices" }
+                          route: { cluster: catalog_service, timeout: 15s }
+                        - match: { prefix: "/api/v1/catalog" }
+                          route: { cluster: catalog_service, timeout: 15s }
+
+                        # 5. Pharmacy Service (Quân)
+                        - match: { prefix: "/api/v1/pharmacy" }
+                          route: { cluster: pharmacy_service, timeout: 15s }
+                        - match: { prefix: "/api/v1/medicines" }
+                          route: { cluster: pharmacy_service, timeout: 15s }
+
+                        # 6. Clinical Service (Huy)
+                        - match: { prefix: "/api/v1/clinical" }
+                          route: { cluster: clinical_service, timeout: 15s }
+
+                        # 7. Diagnostic Service (Huy)
+                        - match: { prefix: "/api/v1/diagnostic" }
+                          route: { cluster: diagnostic_service, timeout: 15s }
+
+                        # 8. Billing Service (Hưng)
+                        - match: { prefix: "/api/v1/billing" }
+                          route: { cluster: billing_service, timeout: 15s }
+
+                        # 9. Notification Service (Hưng)
+                        - match: { prefix: "/api/v1/notifications" }
+                          route: { cluster: notification_service, timeout: 15s }
+
+                http_filters:
+                  - name: envoy.filters.http.cors
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  clusters:
+    # 1. Identity Service
+    - name: identity_service
+      connect_timeout: 2s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: identity_service
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: identity
+                      port_value: 8000
+
+    # 2. Patient Service
+    - name: patient_service
+      connect_timeout: 2s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: patient_service
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: patient
+                      port_value: 3000
+
+    # 3. Appointment Service
+    - name: appointment_service
+      connect_timeout: 2s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: appointment_service
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: appointment
+                      port_value: 3000
+
+    # 4. Catalog Service
+    - name: catalog_service
+      connect_timeout: 2s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: catalog_service
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: catalog
+                      port_value: 8081
+
+    # 5. Pharmacy Service
+    - name: pharmacy_service
+      connect_timeout: 2s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: pharmacy_service
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: pharmacy
+                      port_value: 3000
+
+    # 6. Clinical Service
+    - name: clinical_service
+      connect_timeout: 2s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: clinical_service
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: clinical
+                      port_value: 8082
+
+    # 7. Diagnostic Service
+    - name: diagnostic_service
+      connect_timeout: 2s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: diagnostic_service
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: diagnostic
+                      port_value: 8083
+
+    # 8. Billing Service
+    - name: billing_service
+      connect_timeout: 2s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: billing_service
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: billing
+                      port_value: 8000
+
+    # 9. Notification Service
+    - name: notification_service
+      connect_timeout: 2s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: notification_service
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: notification
+                      port_value: 8000
+
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9901
