@@ -158,6 +158,26 @@ func (s *Service) Detail(ctx context.Context, p domain.Principal, id string) (re
 			notes = notes[len(notes)-1:]
 		}
 		result = domain.VisitDetail{Visit: visit, Notes: notes, Prescriptions: []any{}, LabRequests: []any{}}
+		if tx2, ok := tx.(ports.TreatmentTx); ok {
+			prescriptions, e := tx2.Prescriptions(ctx, visit.ID)
+			if e != nil {
+				return e
+			}
+			for _, rx := range prescriptions {
+				if (p.ActorType == "DOCTOR" && rx.State != "DELETED") || (p.ActorType == "PATIENT" && rx.State == "FINAL") {
+					result.Prescriptions = append(result.Prescriptions, rx)
+				}
+			}
+			if p.ActorType == "DOCTOR" {
+				requests, e := tx2.LabRequests(ctx, visit.ID)
+				if e != nil {
+					return e
+				}
+				for _, request := range requests {
+					result.LabRequests = append(result.LabRequests, request)
+				}
+			}
+		}
 		return nil
 	})
 	return

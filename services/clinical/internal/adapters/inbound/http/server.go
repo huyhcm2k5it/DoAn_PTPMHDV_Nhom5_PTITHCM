@@ -36,13 +36,13 @@ func New(p ports.Readiness, options ...Options) *echo.Echo {
 		switch code {
 		case "VALIDATION_ERROR":
 			status = 400
-		case "UNAUTHENTICATED":
+		case "UNAUTHENTICATED", "AUTHZ_LEASE_EXPIRED":
 			status = 401
 		case "FORBIDDEN":
 			status = 403
 		case "NOT_FOUND", "START_REQUEST_NOT_FOUND":
 			status = 404
-		case "IDEMPOTENCY_CONFLICT", "TICKET_VERSION_CONFLICT", "TICKET_ALREADY_CLAIMED", "VISIT_VERSION_CONFLICT", "VISIT_ALREADY_SIGNED":
+		case "STATE_CONFLICT", "VISIT_NOT_ACTIVE", "LAB_REQUEST_DUPLICATE", "LAB_PENDING", "IDEMPOTENCY_CONFLICT", "TICKET_VERSION_CONFLICT", "TICKET_ALREADY_CLAIMED", "VISIT_VERSION_CONFLICT", "VISIT_ALREADY_SIGNED":
 			status = 409
 		}
 		var de *domain.Error
@@ -105,6 +105,7 @@ func New(p ports.Readiness, options ...Options) *echo.Echo {
 	})
 	if opts.App != nil {
 		registerClinical(e, opts)
+		registerTreatment(e, opts)
 	}
 	return e
 }

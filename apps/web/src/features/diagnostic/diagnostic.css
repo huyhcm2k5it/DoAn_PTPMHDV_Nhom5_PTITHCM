@@ -1,0 +1,84 @@
+.diagnostic-feature {
+  max-width: 1280px;
+  margin: auto;
+  padding: 1.5rem;
+  color: #19384a;
+  font:
+    15px/1.5 system-ui,
+    sans-serif;
+}
+.diagnostic-feature header,
+.diagnostic-feature nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+.diagnostic-columns {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr);
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+.diagnostic-feature label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.8rem 0;
+}
+.diagnostic-feature input,
+.diagnostic-feature select,
+.diagnostic-feature button {
+  font: inherit;
+  padding: 0.65rem;
+  border: 1px solid #a9bdca;
+  border-radius: 7px;
+}
+.diagnostic-feature button {
+  background: #e8f3f7;
+  color: #174e68;
+  cursor: pointer;
+}
+.diagnostic-feature button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.diagnostic-feature ul {
+  list-style: none;
+  padding: 0;
+}
+.diagnostic-feature li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 1rem;
+  margin: 0.7rem 0;
+  border: 1px solid #dbe5ec;
+  border-radius: 9px;
+}
+.diagnostic-order {
+  padding: 1rem;
+  background: #f5f9fb;
+  border-radius: 12px;
+  overflow-wrap: anywhere;
+}
+.diagnostic-feature [role='alert'] {
+  padding: 0.8rem;
+  background: #fff1ed;
+  color: #843120;
+  border-radius: 7px;
+}
+.diagnostic-feature [role='status'] {
+  padding: 0.6rem;
+  background: #eaf5fa;
+  border-radius: 6px;
+}
+@media (max-width: 750px) {
+  .diagnostic-columns {
+    grid-template-columns: 1fr;
+  }
+  .diagnostic-feature header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

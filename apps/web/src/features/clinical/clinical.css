@@ -153,18 +153,18 @@
   font-size: 0.82rem;
   padding: 7px 9px;
 }
-.clinical-feature [role="alert"] {
+.clinical-feature [role='alert'] {
   color: #8b2633;
   background: #fff4f4;
   border-left: 3px solid #a83947;
   padding: 12px;
   margin: 12px 0;
 }
-.clinical-feature [role="alert"] button {
+.clinical-feature [role='alert'] button {
   display: block;
   margin-top: 12px;
 }
-.clinical-feature [role="status"] {
+.clinical-feature [role='status'] {
   color: #185d55;
   padding: 8px 0;
 }
@@ -203,4 +203,43 @@
   .clinical-detail {
     padding: 16px;
   }
+}
+.clinical-treatment {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #dce5ec;
+}
+.clinical-treatment fieldset {
+  border: 1px solid #dce5ec;
+  border-radius: 8px;
+  margin: 0.7rem 0;
+  padding: 1rem;
+}
+.clinical-treatment input,
+.clinical-treatment select {
+  padding: 0.65rem;
+  border: 1px solid #a9b9c6;
+  border-radius: 6px;
+  max-width: 100%;
+}
+.clinical-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.8rem 0;
+}
+.clinical-check {
+  display: flex !important;
+  align-items: center;
+  gap: 0.6rem;
+}
+.clinical-prescriptions {
+  list-style: none;
+  padding: 0;
+}
+.clinical-prescriptions > li {
+  background: #f4f8fb;
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 0.8rem 0;
 }
