@@ -1,11 +1,19 @@
-# diagnostic
+# Diagnostic
 
-Owner: Huy. Go + Echo + Hexagonal + pgx.
+Owner: Huy. Go/Echo/pgx with domain/application independent of infrastructure.
 
-Week 1 foundation only: module, HTTP process, PostgreSQL readiness and shutdown. No visit/LAB business endpoints are implemented yet.
+Implemented week 3: DI-002 queue, DI-003 detail, DI-004 collect, DI-005 reject, DI-006 recollect. HTTP writes require UUID Idempotency-Key; retry the same key and body. Staff need LAB_TECH for mutation; LAB_TECH/LAB_REVIEW may read the queue. Assigned doctors may read detail via the local DOCTOR identity mapping. Patient medical draft reads are denied. DI-001 recovery POST is not registered.
 
-Set DATABASE_URL and optionally LISTEN_ADDR (default 127.0.0.1:8083). Run go run ./cmd/api, go test ./..., go vet ./... and go build ./....
+Run `go run ./cmd/migrate` before `go run ./cmd/api`. Configure DATABASE_URL, LISTEN_ADDR (default127.0.0.1:8083), JWT_ISSUER, JWT_AUDIENCE, JWT_PUBLIC_KEY_FILE. JWT verification uses RS256 and the local access projection; missing Identity configuration fails closed. Health readiness confirms schema, not external integration readiness.
 
-GET /health/live checks the process. GET /health/ready checks the service own database connection; this does not certify future business migrations or message projections.
+Run `go run ./cmd/worker` with DATABASE_URL and RABBITMQ_URL. DIAGNOSTIC_DECLARE_TOPOLOGY=1 declares only Diagnostic-owned exchanges/queues and binds to already provisioned source exchanges. Shared topology remains the infrastructure owner's responsibility. Worker uses manual ACK, durable retry/dead-letter storage, mandatory publisher confirmations and local outbox. A process crash after publish may redeliver; the transaction inbox and requestId guard prevent repeated business effects.
 
-Core: internal/application/ports + health. Echo and pgx are adapters. Composition lives in cmd/api. No code/DB import from another service. Integration via Envoy belongs to Hung and comes later.
+CreateLabOrder is accepted only from Clinical command exchange and expected routing key. Canonical requestHash is SHA256 of the Go JSON map containing requestId,visitId,patientId,doctorId,testSnapshot,authorizedAt (sorted map keys). Unit/referenceRange are included even when empty. One clinical request creates one order, one charge request and LabOrderResolved atomically. Price data comes from the local Catalog projection at authorizedAt. Catalog sequence gaps or checkpoints older than30seconds block new charges. Unavailable projections remain retryable; they do not fabricate payment or an accepted order.
+
+The trusted bootstrap command `go run ./cmd/import-projections` reads JSON array from stdin. Each entry has kind,key,value,version. Kinds: access,patient,TEST,DOCTOR,LAB_PRICE,catalog. Entity keys are UUIDs; catalog key is checkpoint. Access value is `{userId,actorType,status,tokenVersion,capabilities}`. Patient value is `{ownerUserId,active}`. DOCTOR value is `{identityUserId}`. TEST value contains id,code,name,unit,referenceRange,revision,status. LAB_PRICE value contains itemId,itemType=LAB,priceVersionId,revision,amountVnd,effectiveFrom,effectiveTo?. Catalog checkpoint contains sequence,at. This operator tool is not exposed as an HTTP endpoint; imports require increasing versions and reject conflicting same-version content. CatalogChanged and access messages subsequently update the normal projections.
+
+Collection requires local ChargePrepared and a matching successful settlement fence from trusted Billing messages. FAILED decisions leave a tombstone even before reserve. UNKNOWN and timeouts keep the lock. The worker emits QuerySettlement every30seconds for locked orders. Reject keeps specimen history and audit identity; recollect creates a new specimen/sequence/barcode on the same order and never requests a new charge. Barcodes remain unique after rejection. Results/review/publish and order cancellation are week4 scope.
+
+Verification: `go test ./...`, `go vet ./...`, `go build ./...`; real database tests `go test -count=1 -tags=integration -v ./internal/adapters/outbound/postgres` with isolated TEST_DATABASE_URL. Broker tests use `-tags=brokerintegration` and isolated TEST_RABBITMQ_URL. Optional DIAGNOSTIC_CONTRACT_RESPONSE_FILE captures real HTTP fixtures for OpenAPI validation.
+
+Integration boundary: current repository's Catalog full entity/checkpoint publisher and live Identity/Billing handoffs must be available for a full team journey. Trusted bootstrap supports local verification but is not evidence of the complete group Gate3. No HTTP calls to Billing or cross-service database access are used.

@@ -9,7 +9,7 @@ from openapi_spec_validator import validate
 root=Path(__file__).resolve().parents[2]
 doc=json.loads((root/'contracts/http/clinical.openapi.json').read_text(encoding='utf-8'))
 validate(doc)
-assert sorted(v['operationId'] for p in doc['paths'].values() for v in p.values())==['CL_001','CL_002','CL_003','CL_004']
+assert sorted(v['operationId'] for p in doc['paths'].values() for v in p.values())==['CL_%03d'%n for n in range(1,11)]
 def validator(name):
     return Draft202012Validator({'$ref':'#/components/schemas/'+name,'components':doc['components']},format_checker=FormatChecker())
 draft={'symptoms':'','findings':'','assessment':'','diagnosis':'','expectedVersion':1}
@@ -28,9 +28,21 @@ for name in ['producer','schemaVersion','payload']:
     assert list(check.iter_errors(bad)),bad
 snapshot=json.loads((root/'contracts/messages/clinical-ticket-snapshot.v1.schema.json').read_text())
 Draft202012Validator.check_schema(snapshot)
-if len(sys.argv)>1:
-    fixtures=json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
-    assert set(fixtures)=={'StartResponse','WorklistResponse','VisitDetailResponse','DraftResponse','Error'}
+week3=json.loads((root/'contracts/messages/clinical-diagnostic.v1.schema.json').read_text())
+Draft202012Validator.check_schema(week3)
+message_check=Draft202012Validator(week3,format_checker=FormatChecker())
+lab=copy.deepcopy(sample)
+lab.update(messageKind='COMMAND',messageType='CreateLabOrder',producer='clinical')
+lab['payload']={'requestId':uuid,'visitId':uuid,'patientId':uuid,'doctorId':uuid,
+    'testSnapshot':[{'testId':uuid,'revision':1,'code':'CBC','name':'CBC','unit':'','referenceRange':''}],
+    'requestHash':'a'*64,'authorizedAt':'2026-11-04T01:00:00Z'}
+message_check.validate(lab)
+for field,value in [('producer','patient'),('schemaVersion',2)]:
+    invalid=copy.deepcopy(lab);invalid[field]=value
+    assert list(message_check.iter_errors(invalid))
+for path in sys.argv[1:]:
+    fixtures=json.loads(Path(path).read_text(encoding='utf-8'))
+    assert fixtures, 'No HTTP fixtures captured'
     for name,body in fixtures.items():validator(name).validate(body)
-    print('PASS: actual PostgreSQL/HTTP response fixtures match all 4 operations + error envelope')
+    print('PASS: actual PostgreSQL/HTTP response fixtures: '+', '.join(sorted(fixtures)))
 print('PASS: Clinical OpenAPI, required draft fields, queue producer/version/claim constraints and snapshot schema')

@@ -17,3 +17,20 @@ services:
       CLINICAL_DECLARE_TOPOLOGY: ${CLINICAL_DECLARE_TOPOLOGY:-0}
     depends_on:
       clinical-migrate: {condition: service_completed_successfully}
+  diagnostic:
+    environment:
+      JWT_ISSUER: ${DIAGNOSTIC_JWT_ISSUER:-umc-care-identity}
+      JWT_AUDIENCE: ${DIAGNOSTIC_JWT_AUDIENCE:-umc-care-services}
+      JWT_PUBLIC_KEY_FILE: /keys/identity-public.pem
+    volumes:
+      - ../certs/jwt_public.pem:/keys/identity-public.pem:ro
+  diagnostic-worker:
+    build: ../../services/diagnostic
+    image: umc-huy-diagnostic:local
+    entrypoint: ["/worker"]
+    environment:
+      DATABASE_URL: postgres://diagnostic_owner:${DIAGNOSTIC_DB_PASSWORD:?set DIAGNOSTIC_DB_PASSWORD}@postgres-huy:5432/diagnostic_db?sslmode=disable
+      RABBITMQ_URL: ${DIAGNOSTIC_RABBITMQ_URL:?set DIAGNOSTIC_RABBITMQ_URL}
+      DIAGNOSTIC_DECLARE_TOPOLOGY: ${DIAGNOSTIC_DECLARE_TOPOLOGY:-0}
+    depends_on:
+      diagnostic-migrate: {condition: service_completed_successfully}

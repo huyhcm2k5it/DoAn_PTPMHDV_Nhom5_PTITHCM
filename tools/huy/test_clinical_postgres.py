@@ -35,7 +35,9 @@ try:
     created = True
     env['TEST_DATABASE_URL'] = f'postgres://huy_test@127.0.0.1:{port}/{database}?sslmode=disable'
     env['CLINICAL_CONTRACT_RESPONSE_FILE'] = str(runtime/'clinical-http-responses.json')
-    result = subprocess.run([os.environ.get('GO_BIN',r'C:\Program Files\Go\bin\go.exe'),'test','-count=1','-tags=integration','-v','./internal/adapters/outbound/postgres'], cwd=repo/'services/clinical', env=env, creationflags=hidden, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    env['CLINICAL_WEEK3_CONTRACT_RESPONSE_FILE'] = str(runtime/'clinical-week3-http-responses.json')
+    env['CLINICAL_CREATE_LAB_WIRE_FILE'] = str(runtime/'clinical-create-lab-wire.json')
+    result = subprocess.run([os.environ.get('GO_BIN',r'C:\Program Files\Go\bin\go.exe'),'test','-count=1','-tags=integration','-run',os.environ.get('HUY_CLINICAL_TEST_RUN','.'),'-v','./internal/adapters/outbound/postgres'], cwd=repo/'services/clinical', env=env, creationflags=hidden, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     output = result.stdout.decode('utf-8', errors='replace')
     (runtime/'clinical-postgres-integration.log').write_text(output,encoding='utf-8')
     sys.stdout.reconfigure(encoding='utf-8')

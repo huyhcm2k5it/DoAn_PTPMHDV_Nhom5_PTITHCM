@@ -83,7 +83,7 @@ type Receiver interface {
 // DeclareOwned is opt-in for local setup. Quân owns the shared topology; foreign
 // producer exchanges must already exist and are never declared here.
 func DeclareOwned(ch *amqp.Channel) error {
-	for _, exchange := range []string{"umc.commands.clinical.v1", "umc.deadletters.clinical.v1"} {
+	for _, exchange := range []string{"umc.commands.clinical.v1", "umc.events.clinical.v1", "umc.deadletters.clinical.v1"} {
 		if e := ch.ExchangeDeclare(exchange, "topic", true, false, false, false, nil); e != nil {
 			return e
 		}
@@ -91,7 +91,7 @@ func DeclareOwned(ch *amqp.Channel) error {
 	if _, e := ch.QueueDeclare("evt.clinical.v1", true, false, false, false, nil); e != nil {
 		return e
 	}
-	for _, binding := range [][2]string{{"umc.events.appointment.v1", "appointment.queue-ticket-claimed.v1"}, {"umc.events.identity.v1", "identity.identity-access-changed.v1"}, {"umc.events.patient.v1", "patient.patient-access-changed.v1"}} {
+	for _, binding := range [][2]string{{"umc.events.catalog.v1", "catalog.catalog-changed.v1"}, {"umc.events.diagnostic.v1", "lab.order-resolved.v1"}, {"umc.events.appointment.v1", "appointment.queue-ticket-claimed.v1"}, {"umc.events.identity.v1", "identity.identity-access-changed.v1"}, {"umc.events.patient.v1", "patient.patient-access-changed.v1"}} {
 		if e := ch.QueueBind("evt.clinical.v1", binding[1], binding[0], false, nil); e != nil {
 			return e
 		}

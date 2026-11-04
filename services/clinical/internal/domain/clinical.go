@@ -48,8 +48,9 @@ func Hash(value any) string {
 }
 
 type Principal struct {
-	UserID, ActorType string
-	TokenVersion      int
+	UserID, ActorType, LeaseAction string
+	LeaseExpiresAt                 time.Time
+	TokenVersion                   int
 }
 type Access struct {
 	UserID, ActorType, Status string

@@ -19,6 +19,7 @@
     "src",
     "tests",
     "vite.config.ts",
-    "../../apps/web/src/features/clinical"
+    "../../apps/web/src/features/clinical",
+    "../../apps/web/src/features/diagnostic"
   ]
 }

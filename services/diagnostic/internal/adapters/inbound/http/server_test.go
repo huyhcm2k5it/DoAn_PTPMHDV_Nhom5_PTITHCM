@@ -34,7 +34,7 @@ func TestHealthIsNotBusinessImplementation(t *testing.T) {
 		}
 		w = httptest.NewRecorder()
 		e.ServeHTTP(w, httptest.NewRequest("POST", "/api/v1/diagnostic-orders", nil))
-		if w.Code != 404 {
+		if w.Code != 404 && w.Code != 405 {
 			t.Fatal("unfinished business endpoint exposed")
 		}
 	}
