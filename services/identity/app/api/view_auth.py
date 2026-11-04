@@ -1,11 +1,13 @@
 import uuid
 import random
+import hashlib
+import secrets
 from datetime import timedelta
 from django.utils import timezone
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from app.application.token_service import generate_access_token, generate_authorization_lease
-from app.domain.models import User, OtpRequest, Session
+from app.domain.models import User, OtpRequest, Session, StaffCapability
 
 # Danh sách tài khoản mẫu (Demo Seed Users) theo đúng mã định danh trong contract
 DEMO_USERS = {
@@ -405,6 +407,92 @@ def session_view(request):
             "capabilities": [{"capability": "ADMIN", "scope": "*"}],
             "expiresAt": "2026-11-04T19:45:00Z",
             "authorizationLease": lease_token
+        },
+        "meta": {"correlationId": correlation_id}
+    }, status=200)
+
+# ==============================================================================
+# IA-005: REFRESH TOKEN & TOKEN ROTATION
+# ==============================================================================
+@api_view(["POST"])
+def refresh_token_view(request):
+    """IA-005: Refresh Access Token & Xoay vòng Refresh Token (Token Rotation)"""
+    correlation_id = get_correlation_id(request)
+    refresh_token = str(request.data.get("refreshToken", "")).strip()
+    if not refresh_token:
+        return Response({
+            "error": {"code": "VALIDATION_ERROR", "message": "refreshToken là bắt buộc."},
+            "meta": {"correlationId": correlation_id}
+        }, status=400)
+
+    # Hash refresh token để tra cứu trong DB
+    token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+    
+    session = Session.objects.filter(refresh_hash=token_hash).first()
+    if not session or session.revoked_at or session.expires_at < timezone.now():
+        return Response({
+            "error": {"code": "AUTH_INVALID_TOKEN", "message": "Refresh token không hợp lệ, đã hết hạn hoặc bị thu hồi."},
+            "meta": {"correlationId": correlation_id}
+        }, status=401)
+
+    user = session.user
+    if user.status != "ACTIVE":
+        return Response({
+            "error": {"code": "AUTH_USER_BLOCKED", "message": "Tài khoản không hoạt động hoặc đã bị khóa."},
+            "meta": {"correlationId": correlation_id}
+        }, status=403)
+
+    # Thu hồi token cũ và sinh token mới (Token Rotation an toàn)
+    session.revoked_at = timezone.now()
+    session.save(update_fields=["revoked_at"])
+
+    new_refresh_token = secrets.token_urlsafe(48)
+    new_token_hash = hashlib.sha256(new_refresh_token.encode()).hexdigest()
+    expires_at = timezone.now() + timedelta(days=7)
+
+    Session.objects.create(
+        user=user,
+        refresh_hash=new_token_hash,
+        expires_at=expires_at
+    )
+
+    capabilities = list(StaffCapability.objects.filter(user=user, enabled=True).values_list("capability", flat=True))
+    access_token = generate_access_token(
+        user_id=str(user.id),
+        actor_type=user.actor_type,
+        capabilities=capabilities,
+        token_version=user.token_version
+    )
+
+    return Response({
+        "data": {
+            "accessToken": access_token,
+            "refreshToken": new_refresh_token,
+            "expiresInSeconds": 900
+        },
+        "meta": {"correlationId": correlation_id}
+    }, status=200)
+
+
+# ==============================================================================
+# IA-006: LOGOUT - THU HỒI PHIÊN
+# ==============================================================================
+@api_view(["POST"])
+def logout_view(request):
+    """IA-006: Logout - Thu hồi phiên refresh token"""
+    correlation_id = get_correlation_id(request)
+    refresh_token = str(request.data.get("refreshToken", "")).strip()
+    
+    if refresh_token:
+        token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+        session = Session.objects.filter(refresh_hash=token_hash, revoked_at__isnull=True).first()
+        if session:
+            session.revoked_at = timezone.now()
+            session.save(update_fields=["revoked_at"])
+
+    return Response({
+        "data": {
+            "revoked": True
         },
         "meta": {"correlationId": correlation_id}
     }, status=200)
