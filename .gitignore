@@ -22,3 +22,5 @@ mongo/secrets/
 
 # Chặn lộ khóa bí mật
 *private.pem
+__pycache__/
+*.pyc

@@ -1,0 +1,6 @@
+Django>=5.2
+djangorestframework>=3.15
+PyJWT[crypto]>=2.10
+psycopg[binary]>=3.2
+gunicorn>=23.0
+python-dotenv>=1.0
