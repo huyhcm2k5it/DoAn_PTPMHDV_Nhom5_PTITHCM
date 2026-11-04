@@ -160,11 +160,11 @@ jobs:
           go-version: '1.27.0'
           cache-dependency-path: services/diagnostic/go.sum
       - name: Create isolated Clinical wire-test database
-        run: docker exec ${{ job.services.postgres.id }} createdb -U postgres umc_huy_wire_clinical_ci
+        run: docker exec ${{ job.services.postgres.id }} createdb -U postgres umc_huy_test_wire_clinical_ci
       - name: Capture the actual Clinical LAB command
         working-directory: services/clinical
         env:
-          TEST_DATABASE_URL: postgres://postgres:ci-only-not-a-production-secret@127.0.0.1:5432/umc_huy_wire_clinical_ci?sslmode=disable
+          TEST_DATABASE_URL: postgres://postgres:ci-only-not-a-production-secret@127.0.0.1:5432/umc_huy_test_wire_clinical_ci?sslmode=disable
           CLINICAL_CREATE_LAB_WIRE_FILE: ${{ runner.temp }}/clinical-create-lab-wire.json
         run: go test -race -count=1 -tags=integration -run TestTreatmentRealHTTP -v ./internal/adapters/outbound/postgres
       - name: Diagnostic PostgreSQL HTTP/settlement and real broker tests
