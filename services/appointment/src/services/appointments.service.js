@@ -308,8 +308,9 @@ async function rescheduleAppointment({
       )
         throw new ApiError(409, 'SLOT_DOCTOR_OR_SERVICE_MISMATCH', 'New slot must keep doctor and service.');
       const priceSnapshot = await resolvePriceSnapshot({ slot, schedule, now, session });
+      if (!priceSnapshot)
+        throw new ApiError(503, 'PRICE_PROJECTION_STALE', 'New slot price projection is unavailable.');
       if (
-        !priceSnapshot ||
         priceSnapshot.snapshotHash !== appointment.priceSnapshot?.snapshotHash ||
         Number(priceSnapshot.amountVnd) !== Number(appointment.priceSnapshot?.amountVnd)
       )
