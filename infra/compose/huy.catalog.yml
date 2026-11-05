@@ -53,13 +53,22 @@ services:
       LISTEN_ADDR: :8082
     depends_on:
       clinical-migrate: {condition: service_completed_successfully}
+  diagnostic-migrate:
+    build: ../../services/diagnostic
+    image: umc-huy-diagnostic:local
+    entrypoint: ["/migrate"]
+    environment:
+      DATABASE_URL: postgres://diagnostic_owner:${DIAGNOSTIC_DB_PASSWORD:?set DIAGNOSTIC_DB_PASSWORD}@postgres-huy:5432/diagnostic_db?sslmode=disable
+    depends_on:
+      postgres-huy: {condition: service_healthy}
   diagnostic:
     build: ../../services/diagnostic
+    image: umc-huy-diagnostic:local
     ports: ["127.0.0.1:8083:8083"]
     environment:
       DATABASE_URL: postgres://diagnostic_owner:${DIAGNOSTIC_DB_PASSWORD:?set DIAGNOSTIC_DB_PASSWORD}@postgres-huy:5432/diagnostic_db?sslmode=disable
       LISTEN_ADDR: :8083
     depends_on:
-      postgres-huy: {condition: service_healthy}
+      diagnostic-migrate: {condition: service_completed_successfully}
 volumes:
   huy-pg:

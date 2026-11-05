@@ -6,6 +6,9 @@ function patientsRoutes(dependencies) {
   const authenticate = createAuthContext({ verifyBearerToken: dependencies.verifyBearerToken });
   const controller = createPatientsController(dependencies);
   router.get('/', authenticate, controller.list);
+  router.get('/search', authenticate, controller.search);
+  router.post('/', authenticate, controller.create);
+  router.patch('/:patientId', authenticate, controller.update);
   router.get('/:patientId', authenticate, controller.getById);
   return router;
 }

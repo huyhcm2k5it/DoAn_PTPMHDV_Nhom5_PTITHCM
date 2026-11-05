@@ -1,3 +1,20 @@
+# Week 3 verification (2026-11-04)
+
+Scope: CL-005–010, DI-002–006 and doctor/LAB technical features. Baseline synced to develop8259293; other owners files are unchanged by this increment.
+
+- Clinical native PostgreSQL:13/13 PASS, including real RSA HTTP, immutable prescriptions, signing versus LAB creation, multiple registry requests, envelope binding, actualoutbox command, and lease expiry while blocked on a DB lock.
+- Diagnostic native PostgreSQL:6/6 PASS, zero skipped. Includes real Clinical command consumption, five HTTP operations, dedupe/sample concurrency, monotonic bootstrap/live projections, Catalog gap/catchup, persistent reserve replay and withdrawn prices.
+- Clinical and Diagnostic unit tests, go vet and go build PASS. Hexagonal dependency guard PASS.
+- Web20/20 interaction tests, TypeScript and Vite production build PASS. Run the standalone runner with vitest threads/maxWorkers1 on this Windows machine.
+- Actual PostgreSQL/RSA HTTP fixtures validated against OpenAPI; real Clinical command validated against shared message schema. Generated schemas reproduce exactly; workflow and own Compose YAML parse successfully.
+- Review regressions observed RED then GREEN: wrong aggregate IDs, mismatched lab resolution context, expired signing lease after locking, stale bootstrap overriding live rights, withdrawn prices, unstable reserve replies, and Catalog sequence gap permitting stale quotes.
+
+Commands: tools/huy/test_clinical_postgres.py; tools/huy/test_diagnostic_postgres.py; tools/huy/go.ps1 <clinical|diagnostic> test -count=1 ./... / vet ./... / build ./...; tools/huy/check_clinical_contract.py and check_diagnostic_contract.py with captured fixtures; tools/huy/check_architecture.py. Local logs/fixtures are ignored under .runtime.
+
+Local Docker daemon was unavailable: real RabbitMQ execution is a CI gate, not a locally verified result. CI captures a Clinical command from a separate database and requires Diagnostic to consume it. The shared Gate3 additionally needs live Identity/Appointment/Billing/Gateway and full Catalog entity/checkpoint feeds; trusted operator bootstrap is provisional and must not be mistaken for live production integration. No payment or acceptedclaim is fabricated by production code.
+
+---
+
 # Kiểm chứng bàn giao Catalog và Clinical
 
 ## Clinical tuần 2 — 31/10/2026

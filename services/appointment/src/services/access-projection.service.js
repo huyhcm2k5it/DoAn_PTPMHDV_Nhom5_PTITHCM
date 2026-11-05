@@ -6,6 +6,19 @@ function messageHash(message) {
   return createHash('sha256').update(JSON.stringify(message.payload)).digest('hex');
 }
 
+function projectionHash(projection) {
+  return messageHash({
+    payload: {
+      userId: projection.userId,
+      actorType: projection.actorType,
+      capabilities: projection.capabilities || [],
+      status: projection.status,
+      tokenVersion: projection.tokenVersion,
+      policyVersion: projection.policyVersion,
+    },
+  });
+}
+
 async function applyAccessProjection({
   connection,
   message,
@@ -38,12 +51,24 @@ async function applyAccessProjection({
       );
       const payload = message.payload;
       if (message.messageType === 'IdentityAccessChanged') {
-        if (!payload.userId || !Number.isInteger(payload.policyVersion))
+        const version = Number.isInteger(payload.version) ? payload.version : payload.policyVersion;
+        if (!payload.userId || !Number.isInteger(version))
           throw new ApiError(400, 'INVALID_MESSAGE', 'Identity projection payload is incomplete.');
         const current = await connection
           .collection('user_access_projection')
           .findOne({ userId: payload.userId }, { session });
-        if (!current || payload.policyVersion > current.policyVersion)
+        if (current && version === current.policyVersion) {
+          const incoming = {
+            userId: payload.userId,
+            actorType: payload.actorType,
+            capabilities: payload.capabilities || [],
+            status: payload.status,
+            tokenVersion: payload.tokenVersion,
+            policyVersion: version,
+          };
+          if (projectionHash(incoming) !== projectionHash(current))
+            throw new ApiError(409, 'PROJECTION_CONFLICT', 'Same-version Identity projection differs.');
+        } else if (!current || version > current.policyVersion)
           await connection.collection('user_access_projection').replaceOne(
             { userId: payload.userId },
             {
@@ -52,7 +77,7 @@ async function applyAccessProjection({
               capabilities: payload.capabilities || [],
               status: payload.status,
               tokenVersion: payload.tokenVersion,
-              policyVersion: payload.policyVersion,
+              policyVersion: version,
               updatedAt: now,
             },
             { upsert: true, session },
@@ -63,7 +88,19 @@ async function applyAccessProjection({
         const current = await connection
           .collection('patient_access_projection')
           .findOne({ patientId: payload.patientId }, { session });
-        if (!current || payload.policyVersion > current.policyVersion)
+        if (current && payload.policyVersion === current.policyVersion) {
+          const incoming = {
+            patientId: payload.patientId,
+            ownerUserId: payload.ownerUserId,
+            active: payload.active !== false,
+            policyVersion: payload.policyVersion,
+          };
+          if (
+            current.ownerUserId !== incoming.ownerUserId ||
+            current.active !== incoming.active
+          )
+            throw new ApiError(409, 'PROJECTION_CONFLICT', 'Same-version Patient projection differs.');
+        } else if (!current || payload.policyVersion > current.policyVersion)
           await connection.collection('patient_access_projection').replaceOne(
             { patientId: payload.patientId },
             {
@@ -107,15 +144,18 @@ async function applyAccessProjection({
 
 async function authorizePatientAccess({ connection, authContext, patientId }) {
   if (!connection || !authContext?.userId) return false;
+  const user = await connection.collection('user_access_projection').findOne({
+    userId: authContext.userId,
+    status: 'ACTIVE',
+  });
+  if (!user || (Number.isInteger(authContext.tokenVersion) && user.tokenVersion !== authContext.tokenVersion))
+    return false;
   const patient = await connection
     .collection('patient_access_projection')
     .findOne({ patientId, active: true });
   if (!patient) return false;
   if (authContext.actorType === 'PATIENT') return patient.ownerUserId === authContext.userId;
   if (authContext.actorType === 'STAFF' && authContext.capabilities.includes('RECEPTION')) {
-    const user = await connection
-      .collection('user_access_projection')
-      .findOne({ userId: authContext.userId, status: 'ACTIVE' });
     return Boolean(user?.capabilities?.includes('RECEPTION'));
   }
   return false;

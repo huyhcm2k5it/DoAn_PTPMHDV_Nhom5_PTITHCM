@@ -28,6 +28,7 @@ function entity(name, indexes = [], extraRequired = []) {
 const technicalStorage = [
   { name: 'outbox', validator: requiredFields(['message_id']), indexes: [
     { name: 'uq_outbox_message', key: { message_id: 1 }, unique: true },
+    { name: 'ix_outbox_pending_lease', key: { published_at: 1, next_attempt_at: 1, claim_lease_until: 1, occurred_at: 1 } },
   ] },
   { name: 'inbox', validator: requiredFields(['message_id', 'consumer_name']), indexes: [
     { name: 'uq_inbox_message_consumer', key: { message_id: 1, consumer_name: 1 }, unique: true },

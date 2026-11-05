@@ -30,6 +30,7 @@ before(async () => {
   connection = await mongoose.createConnection(server.getUri(), {
     dbName: 'admin', autoCreate: false, autoIndex: false,
     auth: { username: 'umc-test-root', password }, authSource: 'admin',
+    runtimeAdapters: { os: require('node:os') },
     serverSelectionTimeoutMS: 10000,
   }).asPromise();
   patientConnection = connection.useDb('patient_db', { useCache: true });
@@ -254,7 +255,14 @@ test(`${owner} service user writes only its owner database`, async () => {
   const pwd = randomBytes(16).toString('hex');
   await provisionOwnerUser(connection, owner, pwd);
   const dbName = ownerDatabases[owner];
-  const serviceClient = await mongoose.createConnection(server.getUri(), { dbName, auth: { username: `${owner}-service`, password: pwd }, authSource: dbName, autoCreate: false, autoIndex: false }).asPromise();
+  const serviceClient = await mongoose.createConnection(server.getUri(), {
+    dbName,
+    auth: { username: `${owner}-service`, password: pwd },
+    authSource: dbName,
+    autoCreate: false,
+    autoIndex: false,
+    runtimeAdapters: { os: require('node:os') },
+  }).asPromise();
   try {
     await serviceClient.db.collection('owner_permission_probe').insertOne({ value: 'own-write' });
     const denied = (e) => e instanceof MongoServerError && e.code === 13;
@@ -271,6 +279,7 @@ test(`${owner} service user writes only its owner database`, async () => {
 test('Transaction abort restores Mongoose document state so a failed create can be retried', async () => {
   const mongooseConnection = await mongoose.createConnection(server.getUri(), {
     dbName: 'patient_db', auth: { username: 'umc-test-root', password }, authSource: 'admin',
+    runtimeAdapters: { os: require('node:os') },
     autoCreate: false, autoIndex: false,
   }).asPromise();
   try {

@@ -20,6 +20,21 @@ const {
   publishOutboxBatch,
 } = require('../../services/appointment/src/workers/outbox-publisher.worker.js');
 const {
+  checkInAppointment,
+  listTodayQueue,
+  callNextQueueTicket,
+  markNoShow,
+} = require('../../services/appointment/src/services/queue.service.js');
+const {
+  createAppointment,
+  rescheduleAppointment,
+  cancelAppointment,
+} = require('../../services/appointment/src/services/appointments.service.js');
+const {
+  getAppointmentModel,
+  getQueueTicketModel,
+} = require('../../services/appointment/src/models/appointment.model.js');
+const {
   expirePendingAppointments,
 } = require('../../services/appointment/src/workers/appointment-expiry.worker.js');
 
@@ -51,6 +66,7 @@ async function setup(t) {
       dbName: 'appointment_db',
       autoCreate: false,
       autoIndex: false,
+      runtimeAdapters: { os: require('node:os') },
     })
     .asPromise();
   t.after(async () => {
@@ -330,7 +346,7 @@ test('patient overlap lock rejects a second overlapping slot but allows adjacent
 });
 
 test('Billing messages require matching source and fence before CONFIRMED', async (t) => {
-  const { connection, base } = await setup(t);
+  const { connection, base, Slot } = await setup(t);
   const created = await createHold({
     connection,
     patientId: patientA,
@@ -431,6 +447,246 @@ test('Billing messages require matching source and fence before CONFIRMED', asyn
   );
   const row = await connection.collection('appointments').findOne({ id: appointmentId });
   assert.equal(row.state, 'CONFIRMED');
+  const slot = await Slot.findOne({ id: 'slot-1' }).lean();
+  assert.equal(slot.heldCount, 0);
+  assert.equal(slot.confirmedCount, 1);
+});
+
+test('AP-015 check-in is date/payment guarded and creates one FIRST ticket', async (t) => {
+  const { connection, base } = await setup(t);
+  const created = await createHold({
+    connection,
+    patientId: patientA,
+    slotId: 'slot-1',
+    principalId: ownerA,
+    idempotencyKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa01',
+    now: new Date('2026-10-31T00:00:00Z'),
+    resolvePriceSnapshot: async () => ({
+      priceVersionId: 'price-1', amountVnd: 100000, currency: 'VND', snapshotHash: 'hash-1',
+    }),
+  });
+  const response = await fetch(base + '/api/v1/appointments', {
+    method: 'POST',
+    headers: {
+      authorization: 'Bearer a',
+      'content-type': 'application/json',
+      'idempotency-key': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa02',
+    },
+    body: JSON.stringify({ holdId: created.holdId, patientId: patientA }),
+  });
+  const appointmentId = (await response.json()).data.appointmentId;
+  const Appointment = getAppointmentModel(connection);
+  await Appointment.updateOne(
+    { id: appointmentId },
+    { $set: { state: 'CONFIRMED', chargeStatus: 'PAID', chargeSync: 'CREATED' } },
+  );
+  const first = await checkInAppointment({
+    connection,
+    appointmentId,
+    staffId: 'reception-1',
+    idempotencyKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa03',
+    now: new Date('2026-10-31T00:30:00Z'),
+    createId: () => 'ticket-first-1',
+  });
+  const replay = await checkInAppointment({
+    connection,
+    appointmentId,
+    staffId: 'reception-1',
+    idempotencyKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa04',
+    now: new Date('2026-10-31T00:31:00Z'),
+    createId: () => 'ticket-first-2',
+  });
+  assert.equal(first.ticketType, 'FIRST');
+  assert.equal(first.state, 'WAITING');
+  assert.equal(replay.ticketId, first.ticketId);
+  assert.equal(await connection.collection('queue_tickets').countDocuments({ appointmentId }), 1);
+  await assert.rejects(
+    checkInAppointment({
+      connection,
+      appointmentId,
+      staffId: 'reception-1',
+      idempotencyKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa05',
+      now: new Date('2026-11-01T00:30:00Z'),
+    }),
+    (error) => error.code === 'CHECKIN_DATE_MISMATCH',
+  );
+});
+
+test('AP-016/AP-017/AP-018 list, call and no-show use a compare-and-set version', async (t) => {
+  const { connection, base } = await setup(t);
+  const created = await createHold({
+    connection,
+    patientId: patientA,
+    slotId: 'slot-1',
+    principalId: ownerA,
+    idempotencyKey: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb01',
+    now: new Date('2026-10-31T00:00:00Z'),
+    resolvePriceSnapshot: async () => ({
+      priceVersionId: 'price-1', amountVnd: 100000, currency: 'VND', snapshotHash: 'hash-1',
+    }),
+  });
+  const response = await fetch(base + '/api/v1/appointments', {
+    method: 'POST',
+    headers: {
+      authorization: 'Bearer a',
+      'content-type': 'application/json',
+      'idempotency-key': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb02',
+    },
+    body: JSON.stringify({ holdId: created.holdId, patientId: patientA }),
+  });
+  const appointmentId = (await response.json()).data.appointmentId;
+  const Appointment = getAppointmentModel(connection);
+  await Appointment.updateOne(
+    { id: appointmentId },
+    { $set: { state: 'CONFIRMED', chargeStatus: 'PAID', chargeSync: 'CREATED' } },
+  );
+  const ticket = await checkInAppointment({
+    connection,
+    appointmentId,
+    staffId: 'reception-2',
+    idempotencyKey: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb03',
+    now: new Date('2026-10-31T00:30:00Z'),
+    createId: () => 'ticket-first-2',
+  });
+  const queue = await listTodayQueue({
+    connection,
+    actorType: 'STAFF',
+    capabilities: ['RECEPTION'],
+    date: '2026-10-31',
+    now: new Date('2026-10-31T00:30:00Z'),
+  });
+  assert.equal(queue.total, 1);
+  await assert.rejects(
+    listTodayQueue({
+      connection,
+      actorType: 'DOCTOR',
+      doctorId: doctor,
+      scopes: [],
+      date: '2026-10-31',
+      now: new Date('2026-10-31T00:30:00Z'),
+    }),
+    (error) => error.code === 'FORBIDDEN',
+  );
+  const called = await callNextQueueTicket({
+    connection,
+    actorType: 'STAFF',
+    capabilities: ['RECEPTION'],
+    ticketType: 'FIRST',
+    calledBy: 'reception-2',
+    idempotencyKey: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb04',
+    now: new Date('2026-10-31T00:35:00Z'),
+  });
+  assert.equal(called.state, 'CALLED');
+  await assert.rejects(
+    markNoShow({
+      connection,
+      ticketId: ticket.ticketId,
+      staffId: 'reception-2',
+      reasonCode: 'PATIENT_ABSENT',
+      expectedVersion: 1,
+      idempotencyKey: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb05',
+      now: new Date('2026-10-31T00:40:00Z'),
+    }),
+    (error) => error.code === 'VERSION_CONFLICT',
+  );
+  const noShow = await markNoShow({
+    connection,
+    ticketId: ticket.ticketId,
+    staffId: 'reception-2',
+    reasonCode: 'PATIENT_ABSENT',
+    expectedVersion: 2,
+    idempotencyKey: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb06',
+    now: new Date('2026-10-31T00:40:00Z'),
+  });
+  assert.equal(noShow.state, 'NO_SHOW');
+  assert.equal((await Appointment.findOne({ id: appointmentId })).state, 'NO_SHOW');
+  assert.equal(await getQueueTicketModel(connection).countDocuments({ appointmentId, state: 'NO_SHOW' }), 1);
+});
+
+test('AP-013 reschedules atomically and AP-014 cancels with one refund request', async (t) => {
+  const { connection, Schedule, Slot } = await setup(t);
+  await Schedule.create({
+    id: 'schedule-2',
+    doctorId: doctor,
+    serviceId: service,
+    startAt: new Date('2026-10-31T03:00:00Z'),
+    endAt: new Date('2026-10-31T04:00:00Z'),
+    status: 'OPEN',
+  });
+  await Slot.create({
+    id: 'slot-2',
+    scheduleId: 'schedule-2',
+    startAt: new Date('2026-10-31T03:00:00Z'),
+    endAt: new Date('2026-10-31T03:30:00Z'),
+    capacity: 1,
+    heldCount: 0,
+    confirmedCount: 0,
+  });
+  const created = await createHold({
+    connection,
+    patientId: patientA,
+    slotId: 'slot-1',
+    principalId: ownerA,
+    idempotencyKey: 'cccccccc-cccc-4ccc-8ccc-cccccccccc01',
+    now: new Date('2026-10-31T00:00:00Z'),
+    resolvePriceSnapshot: async () => ({
+      priceVersionId: 'price-1', amountVnd: 100000, currency: 'VND', snapshotHash: 'hash-1',
+    }),
+  });
+  const committed = await createAppointment({
+    connection,
+    principalId: ownerA,
+    patientId: patientA,
+    holdId: created.holdId,
+    idempotencyKey: 'cccccccc-cccc-4ccc-8ccc-cccccccccc02',
+    now: new Date('2026-10-31T00:00:00Z'),
+  });
+  const Appointment = getAppointmentModel(connection);
+  const appointmentId = committed.appointmentId;
+  await Appointment.updateOne(
+    { id: appointmentId },
+    {
+      $set: { state: 'CONFIRMED', chargeStatus: 'PAID', chargeSync: 'CREATED' },
+    },
+  );
+  await Slot.updateOne({ id: 'slot-1' }, { $inc: { heldCount: -1, confirmedCount: 1 } });
+  const moved = await rescheduleAppointment({
+    connection,
+    appointmentId,
+    principalId: ownerA,
+    patientId: patientA,
+    newSlotId: 'slot-2',
+    expectedVersion: 1,
+    idempotencyKey: 'cccccccc-cccc-4ccc-8ccc-cccccccccc03',
+    now: new Date('2026-10-30T00:00:00Z'),
+    resolvePriceSnapshot: async () => ({
+      priceVersionId: 'price-1', amountVnd: 100000, currency: 'VND', snapshotHash: 'hash-1',
+    }),
+    createId: () => 'reschedule-event-1',
+  });
+  assert.equal(moved.state, 'CONFIRMED');
+  assert.equal(moved.slotHistory.length, 1);
+  assert.equal((await Slot.findOne({ id: 'slot-1' })).confirmedCount, 0);
+  assert.equal((await Slot.findOne({ id: 'slot-2' })).confirmedCount, 1);
+  const cancelled = await cancelAppointment({
+    connection,
+    appointmentId,
+    principalId: ownerA,
+    patientId: patientA,
+    reasonCode: 'PATIENT_REQUEST',
+    expectedVersion: moved.version,
+    idempotencyKey: 'cccccccc-cccc-4ccc-8ccc-cccccccccc04',
+    now: new Date('2026-10-30T00:30:00Z'),
+    createId: () => 'cancel-event-1',
+  });
+  assert.equal(cancelled.state, 'CANCELLED');
+  assert.equal(cancelled.refundStatus, 'REQUESTED');
+  assert.equal((await Slot.findOne({ id: 'slot-2' })).confirmedCount, 0);
+  assert.equal((await Appointment.findOne({ id: appointmentId })).state, 'CANCELLED');
+  assert.equal(
+    await connection.collection('outbox').countDocuments({ message_type: 'AppointmentChanged' }),
+    2,
+  );
 });
 
 test('pending payment expiry releases capacity once and emits AppointmentChanged', async (t) => {

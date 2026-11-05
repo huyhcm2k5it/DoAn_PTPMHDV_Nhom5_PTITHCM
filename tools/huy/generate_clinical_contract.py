@@ -1,4 +1,4 @@
-"""Generate the week-2 Clinical contract from its implemented API boundary."""
+"""Generate the Clinical contract from its implemented API boundary."""
 import copy
 import json
 from pathlib import Path
@@ -54,6 +54,8 @@ doc={'openapi':'3.1.1','info':{'title':'UMC Care Clinical week 2','version':'1.0
     '/api/v1/visits/{visitId}':{'get':operation('CL_003','VisitDetailResponse',parameters=[visit_id])},
     '/api/v1/visits/{visitId}/draft':{'put':operation('CL_004','DraftResponse',parameters=[visit_id,key],body='DraftInput',errors=[400,401,403,404,409,503])},
 },'components':{'securitySchemes':{'bearerAuth':{'type':'http','scheme':'bearer','bearerFormat':'JWT (RS256)'}},'schemas':schemas}}
+from clinical_week3_contract import extend
+extend(doc,obj,ref,uuid,version,date_time,operation,parameter,key,visit_id)
 (root/'contracts/http/clinical.openapi.json').write_text(json.dumps(doc,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 
 base={'messageId':uuid,'messageKind':{'type':'string'},'messageType':{'type':'string'},'schemaVersion':{'const':1},'producer':{'type':'string'},'aggregateId':uuid,'aggregateVersion':version,'correlationId':{'type':'string','minLength':1,'maxLength':128},'causationId':uuid,'requestId':uuid,'occurredAt':date_time}
@@ -69,4 +71,4 @@ ticket=obj({'ticketId':uuid,'appointmentId':uuid,'patientId':uuid,'doctorId':uui
 ticket['allOf']=[{'if':{'properties':{'ticketType':{'const':'RETURN'}}},'then':{'required':['visitId']}},{'if':{'properties':{'ticketType':{'const':'FIRST'}}},'then':{'not':{'required':['visitId']}}}]
 snapshot={'$schema':'https://json-schema.org/draft/2020-12/schema','$id':'urn:umc-care:clinical-ticket-import:v1','title':'Trusted Appointment snapshot import (provisional handoff, not a public event)','type':'array','maxItems':1000,'items':ticket}
 (root/'contracts/messages/clinical-ticket-snapshot.v1.schema.json').write_text(json.dumps(snapshot,indent=2)+'\n',encoding='utf-8')
-print('Generated Clinical HTTP (4 operations), queue and trusted snapshot schemas')
+print('Generated Clinical HTTP (10 operations), queue and trusted snapshot schemas')

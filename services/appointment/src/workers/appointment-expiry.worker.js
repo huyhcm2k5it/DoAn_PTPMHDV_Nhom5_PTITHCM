@@ -27,6 +27,7 @@ async function expirePendingAppointments({
         { id: candidate.id, state: 'PENDING_PAYMENT', version: candidate.version },
         {
           $set: { state: 'EXPIRED', updatedAt: now, chargeStatus: 'EXPIRED' },
+          $push: { stateHistory: { state: 'EXPIRED', at: now, reasonCode: 'PAYMENT_TIMEOUT' } },
           $inc: { version: 1 },
         },
         { session },

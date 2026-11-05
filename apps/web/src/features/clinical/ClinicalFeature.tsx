@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
-import { ApiError, errorMessage } from "./api";
+import React, { useEffect, useRef, useState } from 'react';
+import { ApiError, errorMessage } from './api';
 import type {
   ClinicalApi,
   ClinicalSession,
@@ -8,8 +8,9 @@ import type {
   StartResult,
   VisitDetail,
   Worklist,
-} from "./types";
-import "./clinical.css";
+} from './types';
+import './clinical.css';
+import { TreatmentPanel } from './TreatmentPanel';
 
 export type ClinicalFeatureProps = {
   api: ClinicalApi;
@@ -17,41 +18,29 @@ export type ClinicalFeatureProps = {
   selectedTicket?: StartInput;
 };
 const labels: Record<string, string> = {
-  IN_PROGRESS: "Đang khám",
-  LAB_REQUEST_PENDING: "Đang tạo chỉ định",
-  WAITING_LAB: "Chờ xét nghiệm",
-  RETURN_READY: "Sẵn sàng quay lại",
-  WAITING_RETURN: "Chờ quay lại",
-  SIGNED: "Đã ký",
+  IN_PROGRESS: 'Đang khám',
+  LAB_REQUEST_PENDING: 'Đang tạo chỉ định',
+  WAITING_LAB: 'Chờ xét nghiệm',
+  RETURN_READY: 'Sẵn sàng quay lại',
+  WAITING_RETURN: 'Chờ quay lại',
+  SIGNED: 'Đã ký',
 };
 
-export function ClinicalFeature({
-  api,
-  session,
-  selectedTicket,
-}: ClinicalFeatureProps) {
-  if (!session || session.actorType !== "DOCTOR")
+export function ClinicalFeature({ api, session, selectedTicket }: ClinicalFeatureProps) {
+  if (!session || session.actorType !== 'DOCTOR')
     return (
       <section className="clinical-feature">
         <h1>Bàn khám</h1>
         <p role="alert">Màn hình này chỉ dành cho bác sĩ đã đăng nhập.</p>
       </section>
     );
-  return (
-    <Workbench key={session.userId} api={api} selectedTicket={selectedTicket} />
-  );
+  return <Workbench key={session.userId} api={api} selectedTicket={selectedTicket} />;
 }
-function Workbench({
-  api,
-  selectedTicket,
-}: {
-  api: ClinicalApi;
-  selectedTicket?: StartInput;
-}) {
+function Workbench({ api, selectedTicket }: { api: ClinicalApi; selectedTicket?: StartInput }) {
   const apiRef = useRef(api);
   apiRef.current = api;
-  const [date, setDate] = useState("");
-  const [state, setState] = useState("");
+  const [date, setDate] = useState('');
+  const [state, setState] = useState('');
   const [page, setPage] = useState(1);
   const [reload, setReload] = useState(0);
   const [list, setList] = useState<Worklist>({
@@ -61,7 +50,7 @@ function Workbench({
   });
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState<unknown>();
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useState('');
   const [detail, setDetail] = useState<VisitDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<unknown>();
@@ -125,50 +114,63 @@ function Workbench({
       controller.abort();
     };
   }, [selected, detailReload]);
+  const hasPendingLab = detail?.labRequests.some((request) => request.state === 'PENDING') ?? false;
   useEffect(() => {
-    if (!operation?.operationId || operation.state !== "PENDING") return;
+    if (!selected || !hasPendingLab || detailLoading) return;
+    const controller = new AbortController();
+    let active = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const next = await apiRef.current.detail(selected, controller.signal);
+        if (active) {
+          setDetail(next);
+          setDetailError(undefined);
+        }
+      } catch (error) {
+        // Keep the last confirmed state and all text while the status is unknown.
+        if (active) setListError(error);
+      } finally {
+        if (active) timer = setTimeout(poll, 2000);
+      }
+    };
+    timer = setTimeout(poll, 2000);
+    return () => {
+      active = false;
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [selected, hasPendingLab, detailLoading, detailReload]);
+  useEffect(() => {
+    if (!operation?.operationId || operation.state !== 'PENDING') return;
     const controller = new AbortController();
     let active = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const id = operation.operationId;
     const poll = async () => {
       try {
-        const data = await apiRef.current.worklist(
-          { operationId: id },
-          controller.signal,
-        );
+        const data = await apiRef.current.worklist({ operationId: id }, controller.signal);
         if (!active) return;
         const result = data.startRequest;
         if (!result || result.operationId !== id)
-          throw new ApiError(
-            502,
-            "INVALID_RESPONSE",
-            "Chưa đọc được trạng thái nhận lượt",
-          );
+          throw new ApiError(502, 'INVALID_RESPONSE', 'Chưa đọc được trạng thái nhận lượt');
         setStartError(undefined);
-        if (result.state === "PENDING") {
+        if (result.state === 'PENDING') {
           timer = setTimeout(poll, 1000);
           return;
         }
-        if (result.state === "ACCEPTED" && !result.visitId)
-          throw new ApiError(
-            502,
-            "INVALID_RESPONSE",
-            "Lượt khám chưa có mã hợp lệ",
-          );
+        if (result.state === 'ACCEPTED' && !result.visitId)
+          throw new ApiError(502, 'INVALID_RESPONSE', 'Lượt khám chưa có mã hợp lệ');
         setOperation(result);
         intent.current = null;
-        if (result.state === "ACCEPTED" && result.visitId) {
+        if (result.state === 'ACCEPTED' && result.visitId) {
           setSelected(result.visitId);
           setReload((n) => n + 1);
         }
       } catch (error) {
         if (!active) return;
         setStartError(error);
-        if (
-          !(error instanceof ApiError) ||
-          ![401, 403, 404].includes(error.status)
-        )
+        if (!(error instanceof ApiError) || ![401, 403, 404].includes(error.status))
           timer = setTimeout(poll, 2000);
       }
     };
@@ -180,7 +182,7 @@ function Workbench({
     };
   }, [operation?.operationId, operation?.state, pollReload]);
   async function start() {
-    if (starting || operation?.state === "PENDING") return;
+    if (starting || operation?.state === 'PENDING') return;
     if (!intent.current && selectedTicket)
       intent.current = {
         input: { ...selectedTicket },
@@ -190,20 +192,14 @@ function Workbench({
     setStarting(true);
     setStartError(undefined);
     try {
-      const result = await apiRef.current.start(
-        intent.current.input,
-        intent.current.key,
-      );
+      const result = await apiRef.current.start(intent.current.input, intent.current.key);
       if (alive.current) setOperation(result);
     } catch (error) {
       if (alive.current) {
         // These responses definitively rejected the request before 202. A
         // corrected queue selection starts a new intention; ambiguous failures
         // preserve the original body/key so a committed start can be replayed.
-        if (
-          error instanceof ApiError &&
-          [400, 401, 403, 404, 409, 422].includes(error.status)
-        ) {
+        if (error instanceof ApiError && [400, 401, 403, 404, 409, 422].includes(error.status)) {
           intent.current = null;
         }
         setStartError(error);
@@ -229,42 +225,37 @@ function Workbench({
           <h2>Nhận bệnh nhân</h2>
           <p>
             {selectedTicket
-              ? "Vé hàng chờ đã được chọn. Xác nhận để bắt đầu nhận lượt."
-              : "Chọn một vé từ hàng chờ để nhận lượt khám."}
+              ? 'Vé hàng chờ đã được chọn. Xác nhận để bắt đầu nhận lượt.'
+              : 'Chọn một vé từ hàng chờ để nhận lượt khám.'}
           </p>
         </div>
         <button
           type="button"
           disabled={
-            starting ||
-            operation?.state === "PENDING" ||
-            (!selectedTicket && !intent.current)
+            starting || operation?.state === 'PENDING' || (!selectedTicket && !intent.current)
           }
           onClick={() => void start()}
         >
           {starting
-            ? "Đang gửi…"
+            ? 'Đang gửi…'
             : intent.current && startError && !operation
-              ? "Thử lại yêu cầu nhận lượt"
-              : "Nhận lượt khám"}
+              ? 'Thử lại yêu cầu nhận lượt'
+              : 'Nhận lượt khám'}
         </button>
       </div>
-      {operation?.state === "PENDING" && (
-        <p role="status">
-          Đang chờ xác nhận vé. Lượt khám sẽ mở khi hàng chờ xác nhận thành
-          công.
-        </p>
+      {operation?.state === 'PENDING' && (
+        <p role="status">Đang chờ xác nhận vé. Lượt khám sẽ mở khi hàng chờ xác nhận thành công.</p>
       )}
-      {operation?.state === "REJECTED" && (
+      {operation?.state === 'REJECTED' && (
         <p role="alert">
-          Không nhận được lượt: {operation.reasonCode ?? "CLAIM_REJECTED"}. Hãy
-          kiểm tra lại vé hàng chờ.
+          Không nhận được lượt: {operation.reasonCode ?? 'CLAIM_REJECTED'}. Hãy kiểm tra lại vé hàng
+          chờ.
         </p>
       )}
       {startError !== undefined && (
         <div role="alert">
           {errorMessage(startError)}
-          {operation?.state === "PENDING" && (
+          {operation?.state === 'PENDING' && (
             <button type="button" onClick={() => setPollReload((n) => n + 1)}>
               Kiểm tra lại trạng thái
             </button>
@@ -316,13 +307,11 @@ function Workbench({
             <ul>
               {list.items.map((v) => (
                 <li key={v.id}>
-                  <span className="clinical-state">
-                    {labels[v.state] ?? v.state}
-                  </span>
+                  <span className="clinical-state">{labels[v.state] ?? v.state}</span>
                   <strong>Lượt {v.id.slice(0, 8)}</strong>
                   <span>Hồ sơ {v.patientId}</span>
                   <time dateTime={v.startedAt}>
-                    {new Date(v.startedAt).toLocaleString("vi-VN")}
+                    {new Date(v.startedAt).toLocaleString('vi-VN')}
                   </time>
                   <button type="button" onClick={() => setSelected(v.id)}>
                     Mở lượt {v.id.slice(0, 8)}
@@ -355,13 +344,29 @@ function Workbench({
           ) : detailError ? (
             <p role="alert">{errorMessage(detailError)}</p>
           ) : detail ? (
-            <DraftEditor
-              key={`${detail.visit.id}:${detailReload}`}
-              api={api}
-              detail={detail}
-              onReload={() => setDetailReload((n) => n + 1)}
-              onSaved={() => setReload((n) => n + 1)}
-            />
+            <>
+              <DraftEditor
+                key={`${detail.visit.id}:${detailReload}`}
+                api={api}
+                detail={detail}
+                onReload={() => setDetailReload((n) => n + 1)}
+                onSaved={() => {
+                  setReload((n) => n + 1);
+                  setDetailReload((n) => n + 1);
+                }}
+              />
+              {api.treatment && (
+                <TreatmentPanel
+                  key={`treatment:${detail.visit.id}:${detailReload}`}
+                  api={api.treatment}
+                  detail={detail}
+                  onChanged={() => {
+                    setDetailReload((n) => n + 1);
+                    setReload((n) => n + 1);
+                  }}
+                />
+              )}
+            </>
           ) : (
             <p>Chọn một lượt khám để xem và ghi nháp.</p>
           )}
@@ -384,10 +389,10 @@ function DraftEditor({
 }) {
   const last = detail.notes.at(-1);
   const [fields, setFields] = useState({
-    symptoms: last?.symptoms ?? "",
-    findings: last?.findings ?? "",
-    assessment: last?.assessment ?? "",
-    diagnosis: last?.diagnosis ?? "",
+    symptoms: last?.symptoms ?? '',
+    findings: last?.findings ?? '',
+    assessment: last?.assessment ?? '',
+    diagnosis: last?.diagnosis ?? '',
   });
   const [version, setVersion] = useState(detail.visit.version);
   const [saving, setSaving] = useState(false);
@@ -403,7 +408,7 @@ function DraftEditor({
   }, []);
   async function save(event: React.FormEvent) {
     event.preventDefault();
-    if (saving || detail.visit.state === "SIGNED") return;
+    if (saving || detail.visit.state === 'SIGNED') return;
     const input: DraftInput = { ...fields, expectedVersion: version };
     const fingerprint = JSON.stringify({ visitId: detail.visit.id, input });
     if (attempt.current?.fingerprint !== fingerprint)
@@ -426,7 +431,7 @@ function DraftEditor({
       if (alive.current) setSaving(false);
     }
   }
-  const locked = detail.visit.state === "SIGNED";
+  const locked = detail.visit.state === 'SIGNED';
   return (
     <form onSubmit={(event) => void save(event)}>
       <header>
@@ -438,10 +443,10 @@ function DraftEditor({
       {locked && <p>Lượt khám đã ký. Nội dung được giữ nguyên.</p>}
       {(
         [
-          ["symptoms", "Triệu chứng"],
-          ["findings", "Dấu hiệu khám"],
-          ["assessment", "Nhận định"],
-          ["diagnosis", "Chẩn đoán"],
+          ['symptoms', 'Triệu chứng'],
+          ['findings', 'Dấu hiệu khám'],
+          ['assessment', 'Nhận định'],
+          ['diagnosis', 'Chẩn đoán'],
         ] as const
       ).map(([key, label]) => (
         <label key={key}>
@@ -449,7 +454,7 @@ function DraftEditor({
           <textarea
             value={fields[key]}
             maxLength={10000}
-            rows={key === "symptoms" ? 4 : 3}
+            rows={key === 'symptoms' ? 4 : 3}
             disabled={saving || locked}
             onChange={(event) => {
               setFields({ ...fields, [key]: event.target.value });
@@ -471,7 +476,7 @@ function DraftEditor({
       {saved && <p role="status">Đã lưu bản nháp thành công.</p>}
       {!locked && (
         <button type="submit" disabled={saving}>
-          {saving ? "Đang lưu…" : "Lưu bản nháp"}
+          {saving ? 'Đang lưu…' : 'Lưu bản nháp'}
         </button>
       )}
     </form>

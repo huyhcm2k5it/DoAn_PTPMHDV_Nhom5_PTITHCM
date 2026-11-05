@@ -1,0 +1,373 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:umc-care:clinical-diagnostic:v1",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "messageKind": {
+          "const": "COMMAND"
+        },
+        "messageType": {
+          "const": "CreateLabOrder"
+        },
+        "schemaVersion": {
+          "const": 1
+        },
+        "producer": {
+          "const": "clinical"
+        },
+        "aggregateId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "aggregateVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "correlationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "causationId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "requestId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "visitId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "patientId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "doctorId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "testSnapshot": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 100,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "testId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2147483647
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "unit": {
+                    "type": "string"
+                  },
+                  "referenceRange": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "testId",
+                  "revision",
+                  "code",
+                  "name",
+                  "unit",
+                  "referenceRange"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "requestHash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "authorizedAt": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "required": [
+            "requestId",
+            "visitId",
+            "patientId",
+            "doctorId",
+            "testSnapshot",
+            "requestHash",
+            "authorizedAt"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "messageId",
+        "messageKind",
+        "messageType",
+        "schemaVersion",
+        "producer",
+        "aggregateId",
+        "aggregateVersion",
+        "correlationId",
+        "causationId",
+        "requestId",
+        "occurredAt",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "messageKind": {
+          "const": "EVENT"
+        },
+        "messageType": {
+          "const": "LabOrderResolved"
+        },
+        "schemaVersion": {
+          "const": 1
+        },
+        "producer": {
+          "const": "diagnostic"
+        },
+        "aggregateId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "aggregateVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "correlationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "causationId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "requestId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "visitId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "state": {
+              "enum": [
+                "CREATED",
+                "REJECTED"
+              ]
+            },
+            "orderId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "reasonCode": {
+              "type": "string"
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          "required": [
+            "requestId",
+            "visitId",
+            "state",
+            "version"
+          ],
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "state": {
+                    "const": "CREATED"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "orderId"
+                ]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "state": {
+                    "const": "REJECTED"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "reasonCode"
+                ],
+                "properties": {
+                  "reasonCode": {
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "messageId",
+        "messageKind",
+        "messageType",
+        "schemaVersion",
+        "producer",
+        "aggregateId",
+        "aggregateVersion",
+        "correlationId",
+        "causationId",
+        "requestId",
+        "occurredAt",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "messageKind": {
+          "const": "EVENT"
+        },
+        "messageType": {
+          "const": "VisitSigned"
+        },
+        "schemaVersion": {
+          "const": 1
+        },
+        "producer": {
+          "const": "clinical"
+        },
+        "aggregateId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "aggregateVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "correlationId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "causationId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "payload": {
+          "type": "object",
+          "properties": {
+            "visitId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "appointmentId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "signedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          "required": [
+            "visitId",
+            "appointmentId",
+            "signedAt",
+            "version"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "messageId",
+        "messageKind",
+        "messageType",
+        "schemaVersion",
+        "producer",
+        "aggregateId",
+        "aggregateVersion",
+        "correlationId",
+        "causationId",
+        "requestId",
+        "occurredAt",
+        "payload"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

@@ -35,11 +35,14 @@ func (p *Probe) Migrate(ctx context.Context) error {
 			return e
 		}
 	}
+	if err := migrateTreatment(ctx, tx); err != nil {
+		return err
+	}
 	return tx.Commit(ctx)
 }
 func (p *Probe) BusinessReady(ctx context.Context) error {
 	var ok bool
-	if e := p.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version='000001_clinical')`).Scan(&ok); e != nil || !ok {
+	if e := p.pool.QueryRow(ctx, `SELECT count(*)=2 FROM schema_migrations WHERE version IN ('000001_clinical','000002_treatment')`).Scan(&ok); e != nil || !ok {
 		return domain.Fail("SERVICE_UNAVAILABLE", "Clinical migrations are required")
 	}
 	return nil
@@ -169,7 +172,7 @@ func (t clinicalTx) InsertVisit(ctx context.Context, v domain.Visit) error {
 	return e
 }
 func (t clinicalTx) UpdateVisit(ctx context.Context, v domain.Visit) error {
-	_, e := t.tx.Exec(ctx, `UPDATE visits SET claim_id=$2,state=$3,version=$4,return_round=$5,signed_at=$6 WHERE id=$1`, v.ID, v.ClaimID, v.State, v.Version, v.ReturnRound, v.SignedAt)
+	_, e := t.tx.Exec(ctx, `UPDATE visits SET claim_id=$2,state=$3,version=$4,return_round=$5,signed_at=$6,signed_by=CASE WHEN $3='SIGNED' THEN doctor_user_id ELSE signed_by END WHERE id=$1`, v.ID, v.ClaimID, v.State, v.Version, v.ReturnRound, v.SignedAt)
 	return e
 }
 func (t clinicalTx) AppendNote(ctx context.Context, n domain.VisitNote) error {
