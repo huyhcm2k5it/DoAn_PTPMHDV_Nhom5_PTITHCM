@@ -101,4 +101,5 @@ Content-Type: application/json
 ## Git handoff
 
 - No push or merge was performed.
-- Commit/PR is intentionally left for the next review step after the receiver checks the contract and scope.
+- Local commit: `59bed56 feat(appointment): deliver check-in and queue slice`.
+- No PR was created; open `quan` -> `develop` only after the receiver checks the contract and scope.
