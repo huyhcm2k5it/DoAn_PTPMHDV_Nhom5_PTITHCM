@@ -4,6 +4,12 @@
     "name": "UMC Care Test Thunder",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "variable": [
+    {
+      "key": "accessToken",
+      "value": ""
+    }
+  ],
   "item": [
     {
       "name": "1. Identity & Auth",
@@ -73,14 +79,28 @@
             "url": {
               "raw": "http://localhost:8080/api/v1/auth/login"
             }
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.accessToken) {",
+                  "    pm.collectionVariables.set(\"accessToken\", jsonData.data.accessToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         },
         {
           "name": "IA-010: Tra cứu phiên & Lease",
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer YOUR_ACCESS_TOKEN_HERE" }
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
             ],
             "url": {
               "raw": "http://localhost:8080/api/v1/auth/session?action=CA-004"
@@ -127,7 +147,7 @@
             "method": "PUT",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer YOUR_ACCESS_TOKEN_HERE" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
               { "key": "Idempotency-Key", "value": "66666666-aaaa-4666-8666-666666666666" }
             ],
             "body": {

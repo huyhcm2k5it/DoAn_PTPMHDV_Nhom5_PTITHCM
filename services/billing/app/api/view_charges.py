@@ -11,8 +11,21 @@ def charges_list_view(request):
     """BI-013: CASHIER xem danh sách khoản thu theo trạng thái và thời gian."""
     correlation_id = get_correlation_id(request)
     state = request.query_params.get("state")
-    page = int(request.query_params.get("page", 1))
-    limit = min(int(request.query_params.get("limit", 20)), 100)
+    try:
+        page = int(request.query_params.get("page", 1))
+        limit = int(request.query_params.get("limit", 20))
+        if page < 1 or limit < 1 or limit > 100:
+            raise ValueError()
+    except (ValueError, TypeError):
+        return Response({
+            "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "Tham số phân trang page phải >= 1 và limit nằm trong khoảng 1-100."
+            },
+            "meta": {"correlationId": correlation_id}
+        }, status=400)
+
+
 
     queryset = Charge.objects.all().order_by("-created_at")
     if state:

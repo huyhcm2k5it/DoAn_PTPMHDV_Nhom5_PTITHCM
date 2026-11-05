@@ -1,38 +1,13 @@
 import uuid
-import random
 import hashlib
 import secrets
-from datetime import timedelta
+from datetime import datetime, timezone as dt_tz, timedelta
 from django.utils import timezone
+from django.db import transaction
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from app.application.token_service import generate_access_token, generate_authorization_lease
+from app.application.token_service import generate_access_token, verify_access_token, generate_authorization_lease
 from app.domain.models import User, OtpRequest, Session, StaffCapability
-
-# Danh sách tài khoản mẫu (Demo Seed Users) theo đúng mã định danh trong contract
-DEMO_USERS = {
-    # 1. Bệnh nhân PATIENT
-    "0901234567": {
-        "password": "password123",
-        "userId": "00000000-0000-4000-8000-000000000801",
-        "actorType": "PATIENT",
-        "capabilities": [],
-    },
-    # 2. Bác sĩ DOCTOR (Khớp sub 911 trong Catalog của Huy)
-    "0909999911": {
-        "password": "password123",
-        "userId": "00000000-0000-4000-8000-000000000911",
-        "actorType": "DOCTOR",
-        "capabilities": [],
-    },
-    # 3. Nhân viên quản trị STAFF ADMIN
-    "0909999901": {
-        "password": "password123",
-        "userId": "00000000-0000-4000-8000-000000000901",
-        "actorType": "STAFF",
-        "capabilities": ["ADMIN", "RECEPTION", "CASHIER"],
-    },
-}
 
 def get_correlation_id(request):
     """Lấy correlationId từ header hoặc tự sinh nếu thiếu."""
@@ -52,14 +27,16 @@ def register_view(request):
             "error": {"code": "VALIDATION_ERROR", "message": "Số điện thoại và mật khẩu là bắt buộc."},
             "meta": {"correlationId": correlation_id}
         }, status=400)
-    # Kiểm tra SĐT đã tồn tại và ACTIVE chưa
+
+    # Kiểm tra SĐT đã tồn tại chưa
     existing_user = User.objects.filter(phone=phone).first()
     if existing_user and existing_user.status == "ACTIVE":
         return Response({
             "error": {"code": "PHONE_ALREADY_REGISTERED", "message": "Số điện thoại này đã được đăng ký."},
             "meta": {"correlationId": correlation_id}
         }, status=409)
-    # Nếu chưa có thì tạo mới, nếu có ở dạng PENDING thì cập nhật lại mật khẩu
+
+    # Nếu chưa có thì tạo mới, nếu có ở dạng PENDING thì chỉ cập nhật lại mật khẩu
     if not existing_user:
         user = User(phone=phone, actor_type="PATIENT", status="PENDING_VERIFICATION")
         user.set_password(password)
@@ -68,8 +45,9 @@ def register_view(request):
         user = existing_user
         user.set_password(password)
         user.save(update_fields=["password_hash"])
-    # Sinh mã OTP 6 số (mặc định 123456 trong môi trường dev/demo hoặc random)
-    otp_code = "123456"
+
+    # Sinh mã OTP 6 số ngẫu nhiên an toàn
+    otp_code = f"{secrets.randbelow(900000) + 100000:06d}"
     expires_at = timezone.now() + timedelta(minutes=5)
     otp_request = OtpRequest(
         user=user,
@@ -80,6 +58,7 @@ def register_view(request):
     )
     otp_request.set_code(otp_code)
     otp_request.save()
+
     return Response({
         "data": {
             "userId": str(user.id),
@@ -88,6 +67,7 @@ def register_view(request):
         },
         "meta": {"correlationId": correlation_id}
     }, status=201)
+
 # ==============================================================================
 # IA-002: XÁC THỰC OTP
 # ==============================================================================
@@ -98,43 +78,51 @@ def otp_verify_view(request):
     phone = str(request.data.get("phone", "")).strip()
     purpose = str(request.data.get("purpose", "")).strip().upper()
     otp_code = str(request.data.get("otpCode", "")).strip()
+
     if not phone or not purpose or not otp_code:
         return Response({
             "error": {"code": "VALIDATION_ERROR", "message": "phone, purpose và otpCode là bắt buộc."},
             "meta": {"correlationId": correlation_id}
         }, status=400)
+
     otp_req = OtpRequest.objects.filter(phone=phone, purpose=purpose).order_by("-created_at").first()
     if not otp_req:
         return Response({
             "error": {"code": "VALIDATION_ERROR", "message": "Không tìm thấy yêu cầu OTP cho số điện thoại này."},
             "meta": {"correlationId": correlation_id}
         }, status=400)
+
     if otp_req.used_at is not None:
         return Response({
             "error": {"code": "OTP_ALREADY_USED", "message": "Mã OTP này đã được sử dụng."},
             "meta": {"correlationId": correlation_id}
         }, status=409)
+
     if otp_req.expires_at < timezone.now():
         return Response({
             "error": {"code": "OTP_EXPIRED", "message": "Mã OTP đã hết hạn."},
             "meta": {"correlationId": correlation_id}
         }, status=409)
+
     if otp_req.attempts >= 5:
         return Response({
             "error": {"code": "RATE_LIMITED", "message": "Đã vượt quá số lần thử OTP cho phép (tối đa 5 lần)."},
             "meta": {"correlationId": correlation_id}
         }, status=429)
-    # Kiểm tra mã OTP
-    if not otp_req.check_code(otp_code) and otp_code != "123456":
+
+    # Kiểm tra mã OTP chặt chẽ theo hash trong DB
+    if not otp_req.check_code(otp_code):
         otp_req.attempts += 1
         otp_req.save(update_fields=["attempts"])
         return Response({
             "error": {"code": "VALIDATION_ERROR", "message": "Mã OTP không chính xác."},
             "meta": {"correlationId": correlation_id}
         }, status=400)
+
     # Đánh dấu đã dùng
     otp_req.used_at = timezone.now()
     otp_req.save(update_fields=["used_at"])
+
     status_result = "VERIFIED"
     if purpose == "REGISTER":
         user = User.objects.filter(phone=phone).first()
@@ -143,6 +131,7 @@ def otp_verify_view(request):
             user.phone_verified_at = timezone.now()
             user.save(update_fields=["status", "phone_verified_at"])
             status_result = user.status
+
     return Response({
         "data": {
             "verified": True,
@@ -150,6 +139,7 @@ def otp_verify_view(request):
         },
         "meta": {"correlationId": correlation_id}
     }, status=200)
+
 # ==============================================================================
 # IA-003: GỬI LẠI OTP
 # ==============================================================================
@@ -159,11 +149,13 @@ def otp_resend_view(request):
     correlation_id = get_correlation_id(request)
     phone = str(request.data.get("phone", "")).strip()
     purpose = str(request.data.get("purpose", "")).strip().upper()
+
     if not phone or not purpose:
         return Response({
             "error": {"code": "VALIDATION_ERROR", "message": "phone và purpose là bắt buộc."},
             "meta": {"correlationId": correlation_id}
         }, status=400)
+
     latest_otp = OtpRequest.objects.filter(phone=phone, purpose=purpose).order_by("-created_at").first()
     if latest_otp:
         time_elapsed = (timezone.now() - latest_otp.created_at).total_seconds()
@@ -172,7 +164,9 @@ def otp_resend_view(request):
                 "error": {"code": "OTP_NOT_RESENDABLE_YET", "message": f"Chưa hết thời gian chờ ({int(60 - time_elapsed)}s)."},
                 "meta": {"correlationId": correlation_id}
             }, status=409)
+
     user = User.objects.filter(phone=phone).first()
+    otp_code = f"{secrets.randbelow(900000) + 100000:06d}"
     expires_at = timezone.now() + timedelta(minutes=5)
     otp_request = OtpRequest(
         user=user,
@@ -181,8 +175,9 @@ def otp_resend_view(request):
         expires_at=expires_at,
         attempts=0
     )
-    otp_request.set_code("123456")
+    otp_request.set_code(otp_code)
     otp_request.save()
+
     return Response({
         "data": {
             "accepted": True,
@@ -190,6 +185,7 @@ def otp_resend_view(request):
         },
         "meta": {"correlationId": correlation_id}
     }, status=200)
+
 # ==============================================================================
 # IA-007: YÊU CẦU QUÊN MẬT KHẨU
 # ==============================================================================
@@ -203,8 +199,10 @@ def forgot_password_view(request):
             "error": {"code": "VALIDATION_ERROR", "message": "Số điện thoại là bắt buộc."},
             "meta": {"correlationId": correlation_id}
         }, status=400)
+
     user = User.objects.filter(phone=phone).first()
     if user and user.status == "ACTIVE":
+        otp_code = f"{secrets.randbelow(900000) + 100000:06d}"
         expires_at = timezone.now() + timedelta(minutes=5)
         otp_request = OtpRequest(
             user=user,
@@ -213,8 +211,9 @@ def forgot_password_view(request):
             expires_at=expires_at,
             attempts=0
         )
-        otp_request.set_code("123456")
+        otp_request.set_code(otp_code)
         otp_request.save()
+
     # Luôn trả về 200 accepted theo chuẩn bảo mật chống enumeration
     return Response({
         "data": {
@@ -223,6 +222,7 @@ def forgot_password_view(request):
         },
         "meta": {"correlationId": correlation_id}
     }, status=200)
+
 # ==============================================================================
 # IA-008: ĐẶT LẠI MẬT KHẨU BẰNG OTP
 # ==============================================================================
@@ -233,48 +233,63 @@ def reset_password_view(request):
     phone = str(request.data.get("phone", "")).strip()
     otp_code = str(request.data.get("otpCode", "")).strip()
     new_password = str(request.data.get("newPassword", ""))
+
     if not phone or not otp_code or not new_password:
         return Response({
             "error": {"code": "VALIDATION_ERROR", "message": "phone, otpCode và newPassword là bắt buộc."},
             "meta": {"correlationId": correlation_id}
         }, status=400)
+
     otp_req = OtpRequest.objects.filter(phone=phone, purpose="RESET").order_by("-created_at").first()
     if not otp_req:
         return Response({
             "error": {"code": "VALIDATION_ERROR", "message": "Không tìm thấy yêu cầu đặt lại mật khẩu."},
             "meta": {"correlationId": correlation_id}
         }, status=400)
+
     if otp_req.used_at is not None:
         return Response({
-            "error": {"code": "OTP_ALREADY_USED", "message": "Mã OTP đã được sử dụng."},
+            "error": {"code": "OTP_ALREADY_USED", "message": "Mã OTP này đã được sử dụng."},
             "meta": {"correlationId": correlation_id}
         }, status=409)
+
     if otp_req.expires_at < timezone.now():
         return Response({
             "error": {"code": "OTP_EXPIRED", "message": "Mã OTP đã hết hạn."},
             "meta": {"correlationId": correlation_id}
         }, status=409)
-    if not otp_req.check_code(otp_code) and otp_code != "123456":
+
+    if otp_req.attempts >= 5:
+        return Response({
+            "error": {"code": "RATE_LIMITED", "message": "Đã vượt quá số lần thử OTP cho phép (tối đa 5 lần)."},
+            "meta": {"correlationId": correlation_id}
+        }, status=429)
+
+    if not otp_req.check_code(otp_code):
         otp_req.attempts += 1
         otp_req.save(update_fields=["attempts"])
         return Response({
             "error": {"code": "VALIDATION_ERROR", "message": "Mã OTP không chính xác."},
             "meta": {"correlationId": correlation_id}
         }, status=400)
+
     otp_req.used_at = timezone.now()
     otp_req.save(update_fields=["used_at"])
+
     user = User.objects.filter(phone=phone).first()
     if user:
         user.set_password(new_password)
         user.token_version += 1  # Thu hồi toàn bộ JWT cũ
         user.save(update_fields=["password_hash", "token_version"])
         Session.objects.filter(user=user, revoked_at__isnull=True).update(revoked_at=timezone.now())
+
     return Response({
         "data": {
             "changed": True
         },
         "meta": {"correlationId": correlation_id}
     }, status=200)
+
 # ==============================================================================
 # IA-009: ĐỔI MẬT KHẨU KHI ĐÃ ĐĂNG NHẬP
 # ==============================================================================
@@ -288,6 +303,19 @@ def change_password_view(request):
             "error": {"code": "UNAUTHENTICATED", "message": "Thiếu Authorization header."},
             "meta": {"correlationId": correlation_id}
         }, status=401)
+
+    token = auth_header[7:].strip()
+    try:
+        payload = verify_access_token(token)
+    except Exception as e:
+        return Response({
+            "error": {"code": "UNAUTHENTICATED", "message": f"Token không hợp lệ hoặc đã hết hạn: {str(e)}"},
+            "meta": {"correlationId": correlation_id}
+        }, status=401)
+
+    sub = payload.get("sub")
+    token_version = payload.get("tokenVersion", 1)
+
     current_password = str(request.data.get("currentPassword", ""))
     new_password = str(request.data.get("newPassword", ""))
     if not current_password or not new_password:
@@ -295,97 +323,105 @@ def change_password_view(request):
             "error": {"code": "VALIDATION_ERROR", "message": "currentPassword và newPassword là bắt buộc."},
             "meta": {"correlationId": correlation_id}
         }, status=400)
-    phone = request.data.get("phone", "0901234567")
-    user = User.objects.filter(phone=phone).first()
-    if user:
-        if not user.check_password(current_password):
-            return Response({
-                "error": {"code": "CURRENT_PASSWORD_MISMATCH", "message": "Mật khẩu hiện tại không khớp."},
-                "meta": {"correlationId": correlation_id}
-            }, status=409)
-        user.set_password(new_password)
-        user.token_version += 1
-        user.save(update_fields=["password_hash", "token_version"])
-        Session.objects.filter(user=user, revoked_at__isnull=True).update(revoked_at=timezone.now())
-    else:
-        # Fallback tài khoản demo
-        demo_user = DEMO_USERS.get(phone)
-        if not demo_user or demo_user["password"] != current_password:
-            return Response({
-                "error": {"code": "CURRENT_PASSWORD_MISMATCH", "message": "Mật khẩu hiện tại không khớp."},
-                "meta": {"correlationId": correlation_id}
-            }, status=409)
-        demo_user["password"] = new_password
+
+    user = User.objects.filter(id=sub).first()
+    if not user or user.status != "ACTIVE":
+        return Response({
+            "error": {"code": "FORBIDDEN", "message": "Tài khoản không tồn tại hoặc đã bị khóa."},
+            "meta": {"correlationId": correlation_id}
+        }, status=403)
+
+    if user.token_version != token_version:
+        return Response({
+            "error": {"code": "UNAUTHENTICATED", "message": "Phiên làm việc đã bị thu hồi do thay đổi trước đó."},
+            "meta": {"correlationId": correlation_id}
+        }, status=401)
+
+    if not user.check_password(current_password):
+        return Response({
+            "error": {"code": "CURRENT_PASSWORD_MISMATCH", "message": "Mật khẩu hiện tại không khớp."},
+            "meta": {"correlationId": correlation_id}
+        }, status=409)
+
+    user.set_password(new_password)
+    user.token_version += 1
+    user.save(update_fields=["password_hash", "token_version"])
+    Session.objects.filter(user=user, revoked_at__isnull=True).update(revoked_at=timezone.now())
+
     return Response({
         "data": {
             "changed": True
         },
         "meta": {"correlationId": correlation_id}
     }, status=200)
+
 # ==============================================================================
-# IA-004 & IA-010: LOGIN & SESSION
+# IA-004: LOGIN
 # ==============================================================================
 @api_view(["POST"])
 def login_view(request):
-    """IA-004: Đăng nhập cho cả 3 actor, trả access token RS256 và refresh token."""
+    """IA-004: Đăng nhập cho cả 3 actor, trả access token RS256 và refresh token hợp lệ lưu DB."""
     correlation_id = get_correlation_id(request)
     phone = str(request.data.get("phone", "")).strip()
     password = str(request.data.get("password", ""))
+
     if not phone or not password:
         return Response({
             "error": {"code": "VALIDATION_ERROR", "message": "Số điện thoại và mật khẩu không được để trống."},
             "meta": {"correlationId": correlation_id}
         }, status=400)
-    # 1. Kiểm tra tài khoản trong database
+
     user = User.objects.filter(phone=phone).first()
-    if user:
-        if user.status != "ACTIVE":
-            return Response({
-                "error": {"code": "UNAUTHENTICATED", "message": "Tài khoản chưa được kích hoạt hoặc bị khóa."},
-                "meta": {"correlationId": correlation_id}
-            }, status=401)
-        if not user.check_password(password):
-            return Response({
-                "error": {"code": "UNAUTHENTICATED", "message": "Số điện thoại hoặc mật khẩu không chính xác."},
-                "meta": {"correlationId": correlation_id}
-            }, status=401)
-        token = generate_access_token(
-            user_id=str(user.id),
-            actor_type=user.actor_type,
-            capabilities=[],
-            token_version=user.token_version
-        )
-        return Response({
-            "data": {
-                "accessToken": token,
-                "refreshToken": str(uuid.uuid4()),
-                "actorType": user.actor_type,
-                "expiresInSeconds": 900
-            },
-            "meta": {"correlationId": correlation_id}
-        }, status=200)
-    # 2. Fallback tài khoản demo
-    demo_user = DEMO_USERS.get(phone)
-    if not demo_user or demo_user["password"] != password:
+    if not user:
         return Response({
             "error": {"code": "UNAUTHENTICATED", "message": "Số điện thoại hoặc mật khẩu không chính xác."},
             "meta": {"correlationId": correlation_id}
         }, status=401)
+
+    if user.status != "ACTIVE":
+        return Response({
+            "error": {"code": "UNAUTHENTICATED", "message": "Tài khoản chưa được kích hoạt hoặc bị khóa."},
+            "meta": {"correlationId": correlation_id}
+        }, status=401)
+
+    if not user.check_password(password):
+        return Response({
+            "error": {"code": "UNAUTHENTICATED", "message": "Số điện thoại hoặc mật khẩu không chính xác."},
+            "meta": {"correlationId": correlation_id}
+        }, status=401)
+
+    # Lấy capabilities thực tế từ DB
+    capabilities = list(StaffCapability.objects.filter(user=user, enabled=True).values_list("capability", flat=True))
+
     token = generate_access_token(
-        user_id=demo_user["userId"],
-        actor_type=demo_user["actorType"],
-        capabilities=demo_user["capabilities"],
-        token_version=1
+        user_id=str(user.id),
+        actor_type=user.actor_type,
+        capabilities=capabilities,
+        token_version=user.token_version
     )
+
+    # Sinh và lưu Session thực tế vào DB để có thể rotate được
+    raw_refresh_token = secrets.token_urlsafe(48)
+    refresh_hash = hashlib.sha256(raw_refresh_token.encode("utf-8")).hexdigest()
+    Session.objects.create(
+        user=user,
+        refresh_hash=refresh_hash,
+        expires_at=timezone.now() + timedelta(days=7)
+    )
+
     return Response({
         "data": {
             "accessToken": token,
-            "refreshToken": str(uuid.uuid4()),
-            "actorType": demo_user["actorType"],
+            "refreshToken": raw_refresh_token,
+            "actorType": user.actor_type,
             "expiresInSeconds": 900
         },
         "meta": {"correlationId": correlation_id}
     }, status=200)
+
+# ==============================================================================
+# IA-010: SESSION & AUTHORIZATION LEASE
+# ==============================================================================
 @api_view(["GET"])
 def session_view(request):
     """IA-010: Tra cứu phiên, quyền và cấp authorization lease tối đa 30s."""
@@ -396,16 +432,52 @@ def session_view(request):
             "error": {"code": "UNAUTHENTICATED", "message": "Thiếu Authorization header."},
             "meta": {"correlationId": correlation_id}
         }, status=401)
+
+    token = auth_header[7:].strip()
+    try:
+        payload = verify_access_token(token)
+    except Exception as e:
+        return Response({
+            "error": {"code": "UNAUTHENTICATED", "message": f"Token không hợp lệ hoặc đã hết hạn: {str(e)}"},
+            "meta": {"correlationId": correlation_id}
+        }, status=401)
+
+    sub = payload.get("sub")
+    token_version = payload.get("tokenVersion", 1)
+
+    user = User.objects.filter(id=sub).first()
+    if not user or user.status != "ACTIVE":
+        return Response({
+            "error": {"code": "FORBIDDEN", "message": "Tài khoản không tồn tại hoặc đã bị khóa."},
+            "meta": {"correlationId": correlation_id}
+        }, status=403)
+
+    if user.token_version != token_version:
+        return Response({
+            "error": {"code": "UNAUTHENTICATED", "message": "Phiên làm việc đã bị thu hồi do đổi mật khẩu."},
+            "meta": {"correlationId": correlation_id}
+        }, status=401)
+
+    capabilities_qs = StaffCapability.objects.filter(user=user, enabled=True)
+    capabilities_data = [
+        {"capability": cap.capability, "scope": cap.scope_key}
+        for cap in capabilities_qs
+    ]
+
     action = request.query_params.get("action", "")
     lease_token = None
     if action:
-        lease_token = generate_authorization_lease("00000000-0000-4000-8000-000000000901", action)
+        lease_token = generate_authorization_lease(str(user.id), action, user.token_version)
+
+    exp = payload.get("exp")
+    expires_at_iso = datetime.fromtimestamp(exp, tz=dt_tz.utc).isoformat() if exp else None
+
     return Response({
         "data": {
-            "userId": "00000000-0000-4000-8000-000000000901",
-            "actorType": "STAFF",
-            "capabilities": [{"capability": "ADMIN", "scope": "*"}],
-            "expiresAt": "2026-11-04T19:45:00Z",
+            "userId": str(user.id),
+            "actorType": user.actor_type,
+            "capabilities": capabilities_data,
+            "expiresAt": expires_at_iso,
             "authorizationLease": lease_token
         },
         "meta": {"correlationId": correlation_id}
@@ -416,7 +488,7 @@ def session_view(request):
 # ==============================================================================
 @api_view(["POST"])
 def refresh_token_view(request):
-    """IA-005: Refresh Access Token & Xoay vòng Refresh Token (Token Rotation)"""
+    """IA-005: Refresh Access Token & Xoay vòng Refresh Token (Token Rotation) nguyên tử"""
     correlation_id = get_correlation_id(request)
     refresh_token = str(request.data.get("refreshToken", "")).strip()
     if not refresh_token:
@@ -425,44 +497,44 @@ def refresh_token_view(request):
             "meta": {"correlationId": correlation_id}
         }, status=400)
 
-    # Hash refresh token để tra cứu trong DB
     token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
-    
-    session = Session.objects.filter(refresh_hash=token_hash).first()
-    if not session or session.revoked_at or session.expires_at < timezone.now():
-        return Response({
-            "error": {"code": "AUTH_INVALID_TOKEN", "message": "Refresh token không hợp lệ, đã hết hạn hoặc bị thu hồi."},
-            "meta": {"correlationId": correlation_id}
-        }, status=401)
 
-    user = session.user
-    if user.status != "ACTIVE":
-        return Response({
-            "error": {"code": "AUTH_USER_BLOCKED", "message": "Tài khoản không hoạt động hoặc đã bị khóa."},
-            "meta": {"correlationId": correlation_id}
-        }, status=403)
+    with transaction.atomic():
+        session = Session.objects.select_for_update().filter(refresh_hash=token_hash).first()
+        if not session or session.revoked_at or session.expires_at < timezone.now():
+            return Response({
+                "error": {"code": "AUTH_INVALID_TOKEN", "message": "Refresh token không hợp lệ, đã hết hạn hoặc bị thu hồi."},
+                "meta": {"correlationId": correlation_id}
+            }, status=401)
 
-    # Thu hồi token cũ và sinh token mới (Token Rotation an toàn)
-    session.revoked_at = timezone.now()
-    session.save(update_fields=["revoked_at"])
+        user = session.user
+        if user.status != "ACTIVE":
+            return Response({
+                "error": {"code": "AUTH_USER_BLOCKED", "message": "Tài khoản không hoạt động hoặc đã bị khóa."},
+                "meta": {"correlationId": correlation_id}
+            }, status=403)
 
-    new_refresh_token = secrets.token_urlsafe(48)
-    new_token_hash = hashlib.sha256(new_refresh_token.encode()).hexdigest()
-    expires_at = timezone.now() + timedelta(days=7)
+        # Thu hồi token cũ và sinh token mới
+        session.revoked_at = timezone.now()
+        session.save(update_fields=["revoked_at"])
 
-    Session.objects.create(
-        user=user,
-        refresh_hash=new_token_hash,
-        expires_at=expires_at
-    )
+        new_refresh_token = secrets.token_urlsafe(48)
+        new_token_hash = hashlib.sha256(new_refresh_token.encode()).hexdigest()
+        expires_at = timezone.now() + timedelta(days=7)
 
-    capabilities = list(StaffCapability.objects.filter(user=user, enabled=True).values_list("capability", flat=True))
-    access_token = generate_access_token(
-        user_id=str(user.id),
-        actor_type=user.actor_type,
-        capabilities=capabilities,
-        token_version=user.token_version
-    )
+        Session.objects.create(
+            user=user,
+            refresh_hash=new_token_hash,
+            expires_at=expires_at
+        )
+
+        capabilities = list(StaffCapability.objects.filter(user=user, enabled=True).values_list("capability", flat=True))
+        access_token = generate_access_token(
+            user_id=str(user.id),
+            actor_type=user.actor_type,
+            capabilities=capabilities,
+            token_version=user.token_version
+        )
 
     return Response({
         "data": {
@@ -473,7 +545,6 @@ def refresh_token_view(request):
         "meta": {"correlationId": correlation_id}
     }, status=200)
 
-
 # ==============================================================================
 # IA-006: LOGOUT - THU HỒI PHIÊN
 # ==============================================================================
@@ -482,7 +553,7 @@ def logout_view(request):
     """IA-006: Logout - Thu hồi phiên refresh token"""
     correlation_id = get_correlation_id(request)
     refresh_token = str(request.data.get("refreshToken", "")).strip()
-    
+
     if refresh_token:
         token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
         session = Session.objects.filter(refresh_hash=token_hash, revoked_at__isnull=True).first()

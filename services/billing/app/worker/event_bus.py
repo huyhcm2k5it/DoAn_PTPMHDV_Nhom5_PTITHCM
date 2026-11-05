@@ -8,8 +8,10 @@ logger = logging.getLogger(__name__)
 
 RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "rabbitmq")
 RABBITMQ_PORT = int(os.getenv("RABBITMQ_PORT", "5672"))
-RABBITMQ_USER = os.getenv("RABBITMQ_USER", "admin")
-RABBITMQ_PASSWORD = os.getenv("RABBITMQ_PASSWORD", "admin123")
+RABBITMQ_USER = os.getenv("RABBITMQ_USER")
+RABBITMQ_PASSWORD = os.getenv("RABBITMQ_PASSWORD")
+if not RABBITMQ_USER or not RABBITMQ_PASSWORD:
+    raise RuntimeError("Biến môi trường RABBITMQ_USER và RABBITMQ_PASSWORD là bắt buộc và không được để trống.")
 RABBITMQ_VHOST = os.getenv("RABBITMQ_VHOST", "/umc-care")
 
 BILLING_EVENTS_EXCHANGE = "umc.events.billing.v1"

@@ -121,3 +121,24 @@ class Refund(models.Model):
 
     def __str__(self):
         return f"Refund {self.id} for Charge {self.charge.id} ({self.state})"
+
+
+class BillingEventOutbox(models.Model):
+    """Bảng billing_event_outbox: Lưu trữ sự kiện nghiệp vụ trước khi phát qua broker theo Transactional Outbox Pattern."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    event_type = models.CharField(max_length=100)
+    exchange = models.CharField(max_length=200)
+    routing_key = models.CharField(max_length=200)
+    payload = models.JSONField()
+    attempts = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "billing_event_outbox"
+        indexes = [
+            models.Index(fields=["published_at", "created_at"], name="billing_ev_publis_54e247_idx"),
+        ]
+
+    def __str__(self):
+        return f"OutboxEvent {self.id} ({self.event_type}) - Published: {self.published_at is not None}"
