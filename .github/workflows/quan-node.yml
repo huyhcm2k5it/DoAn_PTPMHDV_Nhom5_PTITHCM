@@ -63,6 +63,15 @@ jobs:
           cache-dependency-path: tests/mongo/package-lock.json
       - run: npm ci
       - run: npm run check
+      - name: Install patient service dependencies used by Mongo tests
+        working-directory: services/patient
+        run: npm ci --ignore-scripts
+      - name: Install appointment service dependencies used by Mongo tests
+        working-directory: services/appointment
+        run: npm ci --ignore-scripts
+      - name: Install pharmacy service dependencies used by Mongo tests
+        working-directory: services/pharmacy
+        run: npm ci --ignore-scripts
       - run: npm test
 
   web:
