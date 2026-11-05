@@ -48,7 +48,9 @@ jobs:
       - run: npm test
 
   mongo-contracts:
-    runs-on: ubuntu-latest
+    # mongodb-memory-server downloads a MongoDB 8.0.16 Ubuntu 24.04 binary.
+    # Keep this runner pinned because ubuntu-latest moved to Ubuntu 26 on 2026-10-19.
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: tests/mongo
