@@ -38,12 +38,13 @@ async function applyAccessProjection({
       );
       const payload = message.payload;
       if (message.messageType === 'IdentityAccessChanged') {
-        if (!payload.userId || !Number.isInteger(payload.policyVersion))
+        const version = Number.isInteger(payload.version) ? payload.version : payload.policyVersion;
+        if (!payload.userId || !Number.isInteger(version))
           throw new ApiError(400, 'INVALID_MESSAGE', 'Identity projection payload is incomplete.');
         const current = await connection
           .collection('user_access_projection')
           .findOne({ userId: payload.userId }, { session });
-        if (!current || payload.policyVersion > current.policyVersion)
+        if (!current || version > current.policyVersion)
           await connection.collection('user_access_projection').replaceOne(
             { userId: payload.userId },
             {
@@ -52,7 +53,7 @@ async function applyAccessProjection({
               capabilities: payload.capabilities || [],
               status: payload.status,
               tokenVersion: payload.tokenVersion,
-              policyVersion: payload.policyVersion,
+              policyVersion: version,
               updatedAt: now,
             },
             { upsert: true, session },

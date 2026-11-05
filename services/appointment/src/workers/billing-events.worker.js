@@ -1,6 +1,7 @@
 const { withMongoTransaction } = require('../../../../mongo/transaction.js');
 const {
   getAppointmentModel,
+  getSlotModel,
   getInboxModel,
   getSettlementDecisionModel,
 } = require('../models/appointment.model.js');
@@ -65,7 +66,9 @@ async function handleBillingMessage({
           .session(session)
           .lean();
         assertSource(appointment, payload);
-        if (payload.state === 'ACCEPTED')
+        if (payload.state === 'ACCEPTED') {
+          if (!Number.isInteger(payload.fence) || payload.fence < 1)
+            throw new ApiError(400, 'INVALID_MESSAGE', 'Settlement fence must be a positive integer.');
           await Appointment.updateOne(
             { id: appointment.id, state: 'PENDING_PAYMENT' },
             {
@@ -78,7 +81,7 @@ async function handleBillingMessage({
             },
             { session },
           );
-        else if (payload.state !== 'REJECTED')
+        } else if (payload.state !== 'REJECTED')
           throw new ApiError(400, 'INVALID_MESSAGE', 'Unsupported SettlementReserved state.');
       } else if (message.messageType === 'SettlementDecision') {
         const appointment = await Appointment.findOne({ id: payload.sourceId })
@@ -131,6 +134,8 @@ async function handleBillingMessage({
             'SETTLEMENT_MISMATCH',
             'Payment evidence does not match the locked appointment.',
           );
+        if (!Number.isInteger(payload.fence) || payload.fence < 1)
+          throw new ApiError(400, 'INVALID_MESSAGE', 'Payment fence must be a positive integer.');
         if (
           appointment.priceSnapshot?.amountVnd != null &&
           Number(appointment.priceSnapshot.amountVnd) !== Number(payload.amountVnd)
@@ -140,16 +145,35 @@ async function handleBillingMessage({
             'AMOUNT_MISMATCH',
             'Payment amount does not match the accepted snapshot.',
           );
-        await Appointment.updateOne(
+        const changed = await Appointment.updateOne(
           { id: appointment.id, state: 'SETTLEMENT_LOCKED', fence: payload.fence },
           { $set: { state: 'CONFIRMED', chargeStatus: 'PAID' }, $inc: { version: 1 } },
           { session },
         );
+        if (!changed.modifiedCount) return { duplicate: false };
+        const Slot = getSlotModel(connection);
+        const slotChanged = await Slot.updateOne(
+          { id: appointment.slotId, heldCount: { $gt: 0 } },
+          { $inc: { heldCount: -1, confirmedCount: 1 } },
+          { session },
+        );
+        if (!slotChanged.modifiedCount)
+          throw new ApiError(
+            500,
+            'CAPACITY_INVARIANT_BROKEN',
+            'Slot counters cannot confirm the appointment.',
+          );
       } else throw new ApiError(400, 'INVALID_MESSAGE', 'Unsupported Billing message.');
       return { duplicate: false };
     });
   } catch (error) {
-    if (error?.code === 11000) return { duplicate: true };
+    if (error?.code === 11000) {
+      const raced = await Inbox.findOne({
+        message_id: message.messageId,
+        consumer_name: consumerName,
+      }).lean();
+      if (raced) return { duplicate: true };
+    }
     throw error;
   }
 }

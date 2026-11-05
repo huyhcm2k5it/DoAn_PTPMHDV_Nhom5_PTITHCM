@@ -8,6 +8,7 @@ const {
   patientAppointmentsRoutes,
 } = require('./routes/appointments.routes.js');
 const { errorHandler, notFound } = require('./core/errors.js');
+const { queueRoutes } = require('./routes/queue.routes.js');
 const { getScheduleModel, getSlotModel } = require('./models/appointment.model.js');
 const {
   authorizePatientAccess: defaultAuthorizePatientAccess,
@@ -43,6 +44,7 @@ function createApp({
     app.use('/api/v1/appointment-holds', holdsRoutes(dependencies));
     app.use('/api/v1/appointments', appointmentsRoutes(dependencies));
     app.use('/api/v1/patients', patientAppointmentsRoutes(dependencies));
+    app.use('/api/v1/queues', queueRoutes(dependencies));
   }
   app.use(notFound);
   app.use(errorHandler);

@@ -6,10 +6,17 @@ function routingKeyFor(message) {
   if (message.message_type === 'AppointmentChanged') return 'appointment.appointment-changed.v1';
   return null;
 }
+function exchangeFor(message, commandExchange, eventExchange) {
+  if (message.message_kind === 'COMMAND') return commandExchange;
+  if (message.message_kind === 'EVENT') return eventExchange;
+  return null;
+}
 async function publishOutboxBatch({
   connection,
   channel,
-  exchange = 'umc.commands.appointment.v1',
+  exchange,
+  commandExchange = 'umc.commands.appointment.v1',
+  eventExchange = 'umc.events.appointment.v1',
   limit = 100,
   now = new Date(),
   workerId = randomUUID(),
@@ -25,7 +32,9 @@ async function publishOutboxBatch({
   for (const record of records) {
     const routingKey = routingKeyFor(record);
     if (!routingKey) continue;
-    await channel.assertExchange(exchange, 'topic', { durable: true });
+    const destinationExchange = exchange || exchangeFor(record, commandExchange, eventExchange);
+    if (!destinationExchange) continue;
+    await channel.assertExchange(destinationExchange, 'topic', { durable: true });
     const body = Buffer.from(
       JSON.stringify({
         messageId: record.message_id,
@@ -46,7 +55,7 @@ async function publishOutboxBatch({
     };
     channel.on?.('return', onReturn);
     try {
-      channel.publish(exchange, routingKey, body, {
+      channel.publish(destinationExchange, routingKey, body, {
         persistent: true,
         mandatory: true,
         messageId: record.message_id,
@@ -67,4 +76,4 @@ async function publishOutboxBatch({
   }
   return published;
 }
-module.exports = { publishOutboxBatch, routingKeyFor };
+module.exports = { publishOutboxBatch, routingKeyFor, exchangeFor };
