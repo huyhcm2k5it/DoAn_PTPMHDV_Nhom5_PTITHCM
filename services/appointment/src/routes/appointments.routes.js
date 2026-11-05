@@ -9,6 +9,8 @@ function appointmentsRoutes(dependencies) {
   const queueController = createQueueController(dependencies);
   router.post('/', authenticate, controller.create);
   router.post('/:appointmentId/check-in', authenticate, queueController.checkIn);
+  router.post('/:appointmentId/reschedule', authenticate, controller.reschedule);
+  router.post('/:appointmentId/cancel', authenticate, controller.cancel);
   router.get('/:appointmentId', authenticate, controller.getById);
   return router;
 }

@@ -84,6 +84,138 @@
         }
       }
     },
+    "/api/v1/appointments/{appointmentId}/reschedule": {
+      "post": {
+        "operationId": "AP-013",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/AppointmentId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/RescheduleAppointment" } }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/AppointmentChanged" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/v1/appointments/{appointmentId}/cancel": {
+      "post": {
+        "operationId": "AP-014",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/AppointmentId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CancelAppointment" } }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/AppointmentChanged" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/v1/appointments/{appointmentId}/check-in": {
+      "post": {
+        "operationId": "AP-015",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/AppointmentId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/QueueTicket" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/v1/queues/today": {
+      "get": {
+        "operationId": "AP-016",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "date", "in": "query", "schema": { "type": "string", "format": "date" } },
+          {
+            "name": "ticketType",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["FIRST", "RETURN"] }
+          },
+          { "name": "doctorId", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "$ref": "#/components/parameters/Page" },
+          { "$ref": "#/components/parameters/Limit" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/QueueList" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/v1/queues/call-next": {
+      "post": {
+        "operationId": "AP-017",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CallNext" } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/QueueTicket" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/v1/queues/{ticketId}/no-show": {
+      "post": {
+        "operationId": "AP-018",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/TicketId" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NoShow" } } }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/QueueTicket" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "401": { "$ref": "#/components/responses/Error" },
+          "403": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" },
+          "409": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
     "/api/v1/patients/{patientId}/appointments": {
       "get": {
         "operationId": "AP-012",
@@ -134,6 +266,12 @@
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
       },
+      "TicketId": {
+        "name": "ticketId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
       "PatientId": {
         "name": "patientId",
         "in": "path",
@@ -168,6 +306,58 @@
         "properties": {
           "holdId": { "type": "string", "format": "uuid" },
           "patientId": { "type": "string", "format": "uuid" }
+        }
+      },
+      "RescheduleAppointment": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["newSlotId", "expectedVersion"],
+        "properties": {
+          "newSlotId": { "type": "string", "format": "uuid" },
+          "expectedVersion": { "type": "integer", "minimum": 1 }
+        }
+      },
+      "CancelAppointment": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["reasonCode", "expectedVersion"],
+        "properties": {
+          "reasonCode": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "expectedVersion": { "type": "integer", "minimum": 1 }
+        }
+      },
+      "CallNext": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ticketType"],
+        "properties": {
+          "ticketType": { "type": "string", "enum": ["FIRST", "RETURN"] },
+          "doctorId": { "type": "string", "format": "uuid" }
+        }
+      },
+      "NoShow": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["reasonCode", "expectedVersion"],
+        "properties": {
+          "reasonCode": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "expectedVersion": { "type": "integer", "minimum": 1 }
+        }
+      },
+      "QueueTicketData": {
+        "type": "object",
+        "required": ["ticketId", "appointmentId", "ticketType", "state", "version"],
+        "properties": {
+          "ticketId": { "type": "string", "format": "uuid" },
+          "appointmentId": { "type": "string", "format": "uuid" },
+          "patientId": { "type": "string", "format": "uuid" },
+          "doctorId": { "type": "string", "format": "uuid" },
+          "ticketType": { "type": "string", "enum": ["FIRST", "RETURN"] },
+          "returnRound": { "type": "integer", "minimum": 0 },
+          "state": { "type": "string", "enum": ["WAITING", "CALLED", "CLAIMED", "NO_SHOW", "DONE"] },
+          "version": { "type": "integer", "minimum": 1 },
+          "calledAt": { "type": ["string", "null"], "format": "date-time" },
+          "noShowReason": { "type": ["string", "null"] }
         }
       },
       "HoldResponse": {
@@ -240,6 +430,26 @@
       },
       "AppointmentList": {
         "description": "Appointment list",
+        "content": { "application/json": { "schema": { "type": "object" } } }
+      },
+      "AppointmentChanged": {
+        "description": "Appointment rescheduled or cancelled",
+        "content": { "application/json": { "schema": { "type": "object" } } }
+      },
+      "QueueTicket": {
+        "description": "Queue ticket",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": ["data"],
+              "properties": { "data": { "$ref": "#/components/schemas/QueueTicketData" } }
+            }
+          }
+        }
+      },
+      "QueueList": {
+        "description": "Today's queue",
         "content": { "application/json": { "schema": { "type": "object" } } }
       }
     }

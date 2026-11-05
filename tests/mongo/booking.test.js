@@ -26,6 +26,11 @@ const {
   markNoShow,
 } = require('../../services/appointment/src/services/queue.service.js');
 const {
+  createAppointment,
+  rescheduleAppointment,
+  cancelAppointment,
+} = require('../../services/appointment/src/services/appointments.service.js');
+const {
   getAppointmentModel,
   getQueueTicketModel,
 } = require('../../services/appointment/src/models/appointment.model.js');
@@ -595,6 +600,92 @@ test('AP-016/AP-017/AP-018 list, call and no-show use a compare-and-set version'
   assert.equal(noShow.state, 'NO_SHOW');
   assert.equal((await Appointment.findOne({ id: appointmentId })).state, 'NO_SHOW');
   assert.equal(await getQueueTicketModel(connection).countDocuments({ appointmentId, state: 'NO_SHOW' }), 1);
+});
+
+test('AP-013 reschedules atomically and AP-014 cancels with one refund request', async (t) => {
+  const { connection, Schedule, Slot } = await setup(t);
+  await Schedule.create({
+    id: 'schedule-2',
+    doctorId: doctor,
+    serviceId: service,
+    startAt: new Date('2026-10-31T03:00:00Z'),
+    endAt: new Date('2026-10-31T04:00:00Z'),
+    status: 'OPEN',
+  });
+  await Slot.create({
+    id: 'slot-2',
+    scheduleId: 'schedule-2',
+    startAt: new Date('2026-10-31T03:00:00Z'),
+    endAt: new Date('2026-10-31T03:30:00Z'),
+    capacity: 1,
+    heldCount: 0,
+    confirmedCount: 0,
+  });
+  const created = await createHold({
+    connection,
+    patientId: patientA,
+    slotId: 'slot-1',
+    principalId: ownerA,
+    idempotencyKey: 'cccccccc-cccc-4ccc-8ccc-cccccccccc01',
+    now: new Date('2026-10-31T00:00:00Z'),
+    resolvePriceSnapshot: async () => ({
+      priceVersionId: 'price-1', amountVnd: 100000, currency: 'VND', snapshotHash: 'hash-1',
+    }),
+  });
+  const committed = await createAppointment({
+    connection,
+    principalId: ownerA,
+    patientId: patientA,
+    holdId: created.holdId,
+    idempotencyKey: 'cccccccc-cccc-4ccc-8ccc-cccccccccc02',
+    now: new Date('2026-10-31T00:00:00Z'),
+  });
+  const Appointment = getAppointmentModel(connection);
+  const appointmentId = committed.appointmentId;
+  await Appointment.updateOne(
+    { id: appointmentId },
+    {
+      $set: { state: 'CONFIRMED', chargeStatus: 'PAID', chargeSync: 'CREATED' },
+    },
+  );
+  await Slot.updateOne({ id: 'slot-1' }, { $inc: { heldCount: -1, confirmedCount: 1 } });
+  const moved = await rescheduleAppointment({
+    connection,
+    appointmentId,
+    principalId: ownerA,
+    patientId: patientA,
+    newSlotId: 'slot-2',
+    expectedVersion: 1,
+    idempotencyKey: 'cccccccc-cccc-4ccc-8ccc-cccccccccc03',
+    now: new Date('2026-10-30T00:00:00Z'),
+    resolvePriceSnapshot: async () => ({
+      priceVersionId: 'price-1', amountVnd: 100000, currency: 'VND', snapshotHash: 'hash-1',
+    }),
+    createId: () => 'reschedule-event-1',
+  });
+  assert.equal(moved.state, 'CONFIRMED');
+  assert.equal(moved.slotHistory.length, 1);
+  assert.equal((await Slot.findOne({ id: 'slot-1' })).confirmedCount, 0);
+  assert.equal((await Slot.findOne({ id: 'slot-2' })).confirmedCount, 1);
+  const cancelled = await cancelAppointment({
+    connection,
+    appointmentId,
+    principalId: ownerA,
+    patientId: patientA,
+    reasonCode: 'PATIENT_REQUEST',
+    expectedVersion: moved.version,
+    idempotencyKey: 'cccccccc-cccc-4ccc-8ccc-cccccccccc04',
+    now: new Date('2026-10-30T00:30:00Z'),
+    createId: () => 'cancel-event-1',
+  });
+  assert.equal(cancelled.state, 'CANCELLED');
+  assert.equal(cancelled.refundStatus, 'REQUESTED');
+  assert.equal((await Slot.findOne({ id: 'slot-2' })).confirmedCount, 0);
+  assert.equal((await Appointment.findOne({ id: appointmentId })).state, 'CANCELLED');
+  assert.equal(
+    await connection.collection('outbox').countDocuments({ message_type: 'AppointmentChanged' }),
+    2,
+  );
 });
 
 test('pending payment expiry releases capacity once and emits AppointmentChanged', async (t) => {

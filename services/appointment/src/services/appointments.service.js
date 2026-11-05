@@ -2,6 +2,7 @@ const { createHash, randomUUID } = require('node:crypto');
 const { withMongoTransaction } = require('../../../../mongo/transaction.js');
 const {
   getHoldModel,
+  getScheduleModel,
   getSlotModel,
   getAppointmentModel,
   getIdempotencyModel,
@@ -226,4 +227,342 @@ async function listPatientAppointments({
   return { items, total, page: parsedPage, limit: parsedLimit };
 }
 
-module.exports = { createAppointment, getAppointment, listPatientAppointments };
+function assertExpectedVersion(value) {
+  const version = Number(value);
+  if (!Number.isInteger(version) || version < 1)
+    throw new ApiError(400, 'VALIDATION_ERROR', 'expectedVersion must be a positive integer.');
+  return version;
+}
+
+function responseForChange(appointment) {
+  return {
+    appointmentId: appointment.id,
+    state: appointment.state,
+    version: appointment.version,
+    slotHistory: appointment.slotHistory || [],
+    refundStatus: appointment.refundStatus || 'NONE',
+    cancellationId: appointment.cancellationId || null,
+  };
+}
+
+async function rescheduleAppointment({
+  connection,
+  appointmentId,
+  principalId,
+  patientId,
+  newSlotId,
+  expectedVersion,
+  idempotencyKey,
+  correlationId = randomUUID(),
+  now = new Date(),
+  resolvePriceSnapshot = async () => null,
+  createId = randomUUID,
+}) {
+  if (!appointmentId || !principalId || !patientId || !newSlotId || !idempotencyKey)
+    throw new ApiError(
+      400,
+      'VALIDATION_ERROR',
+      'newSlotId, expectedVersion and Idempotency-Key are required.',
+    );
+  const version = assertExpectedVersion(expectedVersion);
+  const route = `POST /api/v1/appointments/${appointmentId}/reschedule`;
+  const hash = requestHash({ newSlotId, expectedVersion: version });
+  const Appointment = getAppointmentModel(connection);
+  const Schedule = getScheduleModel(connection);
+  const Slot = getSlotModel(connection);
+  const Idempotency = getIdempotencyModel(connection);
+  const Outbox = getOutboxModel(connection);
+  const replay = await existingIdempotency(Idempotency, principalId, route, idempotencyKey, hash);
+  if (replay) return replay;
+  try {
+    return await withMongoTransaction(connection, async (session) => {
+      const appointment = await Appointment.findOne({ id: appointmentId, patientId })
+        .session(session)
+        .lean();
+      if (!appointment) throw new ApiError(404, 'NOT_FOUND', 'Appointment not found.');
+      if (appointment.version !== version)
+        throw new ApiError(409, 'VERSION_CONFLICT', 'Appointment changed.');
+      if (appointment.state !== 'CONFIRMED')
+        throw new ApiError(
+          409,
+          'APPOINTMENT_STATE_CONFLICT',
+          'Only confirmed appointments can be rescheduled.',
+        );
+      if (appointment.startAt.getTime() - now.getTime() < 2 * 60 * 60 * 1000)
+        throw new ApiError(
+          409,
+          'RESCHEDULE_WINDOW_CLOSED',
+          'Rescheduling closes two hours before the appointment.',
+        );
+      if (newSlotId === appointment.slotId)
+        throw new ApiError(409, 'SLOT_UNAVAILABLE', 'The new slot must differ from the current slot.');
+      const slot = await Slot.findOne({ id: newSlotId }).session(session).lean();
+      if (!slot) throw new ApiError(404, 'SLOT_NOT_FOUND', 'New slot not found.');
+      const schedule = await Schedule.findOne({ id: slot.scheduleId, status: 'OPEN' })
+        .session(session)
+        .lean();
+      if (
+        !schedule ||
+        schedule.doctorId !== appointment.doctorId ||
+        schedule.serviceId !== appointment.serviceId
+      )
+        throw new ApiError(409, 'SLOT_DOCTOR_OR_SERVICE_MISMATCH', 'New slot must keep doctor and service.');
+      const priceSnapshot = await resolvePriceSnapshot({ slot, schedule, now, session });
+      if (
+        !priceSnapshot ||
+        priceSnapshot.snapshotHash !== appointment.priceSnapshot?.snapshotHash ||
+        Number(priceSnapshot.amountVnd) !== Number(appointment.priceSnapshot?.amountVnd)
+      )
+        throw new ApiError(409, 'PRICE_CHANGED', 'New slot does not have the accepted price snapshot.');
+      if (slot.startAt <= now)
+        throw new ApiError(409, 'SLOT_UNAVAILABLE', 'New slot is in the past.');
+      const reserved = await Slot.updateOne(
+        { id: newSlotId, $expr: { $lt: [{ $add: ['$heldCount', '$confirmedCount'] }, '$capacity'] } },
+        { $inc: { confirmedCount: 1 } },
+        { session },
+      );
+      if (!reserved.modifiedCount) throw new ApiError(409, 'SLOT_FULL', 'New slot is full.');
+      const nextVersion = version + 1;
+      const slotHistory = [
+        ...(appointment.slotHistory || []),
+        {
+          fromSlotId: appointment.slotId,
+          toSlotId: newSlotId,
+          changedAt: now,
+          reason: 'RESCHEDULED',
+          version: nextVersion,
+        },
+      ];
+      const changed = await Appointment.updateOne(
+        { id: appointmentId, state: 'CONFIRMED', version },
+        {
+          $set: {
+            slotId: newSlotId,
+            scheduleId: slot.scheduleId,
+            startAt: slot.startAt,
+            endAt: slot.endAt,
+            slotHistory,
+            updatedAt: now,
+          },
+          $inc: { version: 1, sourceRevision: 1 },
+        },
+        { session },
+      );
+      if (!changed.modifiedCount) throw new ApiError(409, 'VERSION_CONFLICT', 'Appointment changed.');
+      const released = await Slot.updateOne(
+        { id: appointment.slotId, confirmedCount: { $gt: 0 } },
+        { $inc: { confirmedCount: -1 } },
+        { session },
+      );
+      if (!released.modifiedCount)
+        throw new ApiError(500, 'CAPACITY_INVARIANT_BROKEN', 'Old slot cannot be released.');
+      const updated = {
+        ...appointment,
+        slotId: newSlotId,
+        scheduleId: slot.scheduleId,
+        startAt: slot.startAt,
+        endAt: slot.endAt,
+        slotHistory,
+        version: nextVersion,
+        sourceRevision: appointment.sourceRevision + 1,
+      };
+      const response = responseForChange(updated);
+      await Outbox.create(
+        [
+          {
+            message_id: createId(),
+            message_kind: 'EVENT',
+            message_type: 'AppointmentChanged',
+            schema_version: 1,
+            producer: 'Appointment',
+            aggregate_id: appointmentId,
+            aggregate_version: nextVersion,
+            correlation_id: correlationId,
+            occurred_at: now,
+            payload: {
+              sourceType: 'APPOINTMENT',
+              sourceId: appointmentId,
+              sourceRevision: updated.sourceRevision,
+              state: 'CONFIRMED',
+              changeType: 'RESCHEDULED',
+              oldSlotId: appointment.slotId,
+              newSlotId,
+            },
+          },
+        ],
+        { session },
+      );
+      await Idempotency.create(
+        [
+          {
+            principal_id: principalId,
+            route,
+            key: idempotencyKey,
+            request_hash: hash,
+            response,
+            created_at: now,
+          },
+        ],
+        { session },
+      );
+      return response;
+    });
+  } catch (error) {
+    if (error?.code === 11000) {
+      const replayAfterRace = await existingIdempotency(
+        Idempotency,
+        principalId,
+        route,
+        idempotencyKey,
+        hash,
+      );
+      if (replayAfterRace) return replayAfterRace;
+    }
+    throw error;
+  }
+}
+
+async function cancelAppointment({
+  connection,
+  appointmentId,
+  principalId,
+  patientId,
+  reasonCode,
+  expectedVersion,
+  idempotencyKey,
+  correlationId = randomUUID(),
+  now = new Date(),
+  createId = randomUUID,
+}) {
+  if (!appointmentId || !principalId || !patientId || !reasonCode || !idempotencyKey)
+    throw new ApiError(
+      400,
+      'VALIDATION_ERROR',
+      'reasonCode, expectedVersion and Idempotency-Key are required.',
+    );
+  const version = assertExpectedVersion(expectedVersion);
+  const route = `POST /api/v1/appointments/${appointmentId}/cancel`;
+  const hash = requestHash({ reasonCode, expectedVersion: version });
+  const Appointment = getAppointmentModel(connection);
+  const Slot = getSlotModel(connection);
+  const Idempotency = getIdempotencyModel(connection);
+  const Outbox = getOutboxModel(connection);
+  const replay = await existingIdempotency(Idempotency, principalId, route, idempotencyKey, hash);
+  if (replay) return replay;
+  try {
+    return await withMongoTransaction(connection, async (session) => {
+      const appointment = await Appointment.findOne({ id: appointmentId, patientId })
+        .session(session)
+        .lean();
+      if (!appointment) throw new ApiError(404, 'NOT_FOUND', 'Appointment not found.');
+      if (appointment.version !== version)
+        throw new ApiError(409, 'VERSION_CONFLICT', 'Appointment changed.');
+      if (!['PENDING_PAYMENT', 'CONFIRMED'].includes(appointment.state))
+        throw new ApiError(
+          409,
+          'APPOINTMENT_STATE_CONFLICT',
+          'Appointment cannot be cancelled in its current state.',
+        );
+      if (appointment.startAt.getTime() - now.getTime() < 2 * 60 * 60 * 1000)
+        throw new ApiError(
+          409,
+          'CANCELLATION_WINDOW_CLOSED',
+          'Cancellation closes two hours before the appointment.',
+        );
+      const cancellationId = createId();
+      const refundStatus = appointment.chargeStatus === 'PAID' ? 'REQUESTED' : 'NONE';
+      const released = await Slot.updateOne(
+        {
+          id: appointment.slotId,
+          [appointment.state === 'CONFIRMED' ? 'confirmedCount' : 'heldCount']: { $gt: 0 },
+        },
+        { $inc: { [appointment.state === 'CONFIRMED' ? 'confirmedCount' : 'heldCount']: -1 } },
+        { session },
+      );
+      if (!released.modifiedCount)
+        throw new ApiError(500, 'CAPACITY_INVARIANT_BROKEN', 'Slot cannot be released.');
+      const nextVersion = version + 1;
+      const changed = await Appointment.updateOne(
+        { id: appointmentId, state: appointment.state, version },
+        {
+          $set: {
+            state: 'CANCELLED',
+            refundStatus,
+            cancellationId,
+            updatedAt: now,
+          },
+          $inc: { version: 1, sourceRevision: 1 },
+        },
+        { session },
+      );
+      if (!changed.modifiedCount) throw new ApiError(409, 'VERSION_CONFLICT', 'Appointment changed.');
+      const response = responseForChange({
+        ...appointment,
+        state: 'CANCELLED',
+        version: nextVersion,
+        refundStatus,
+        cancellationId,
+      });
+      await Outbox.create(
+        [
+          {
+            message_id: createId(),
+            message_kind: 'EVENT',
+            message_type: 'AppointmentChanged',
+            schema_version: 1,
+            producer: 'Appointment',
+            aggregate_id: appointmentId,
+            aggregate_version: nextVersion,
+            correlation_id: correlationId,
+            occurred_at: now,
+            payload: {
+              sourceType: 'APPOINTMENT',
+              sourceId: appointmentId,
+              sourceRevision: appointment.sourceRevision + 1,
+              state: 'CANCELLED',
+              changeType: 'CANCELLED',
+              reasonCode,
+              cancellationId,
+              refundStatus,
+            },
+          },
+        ],
+        { session },
+      );
+      await Idempotency.create(
+        [
+          {
+            principal_id: principalId,
+            route,
+            key: idempotencyKey,
+            request_hash: hash,
+            response,
+            created_at: now,
+          },
+        ],
+        { session },
+      );
+      return response;
+    });
+  } catch (error) {
+    if (error?.code === 11000) {
+      const replayAfterRace = await existingIdempotency(
+        Idempotency,
+        principalId,
+        route,
+        idempotencyKey,
+        hash,
+      );
+      if (replayAfterRace) return replayAfterRace;
+    }
+    throw error;
+  }
+}
+
+module.exports = {
+  createAppointment,
+  getAppointment,
+  listPatientAppointments,
+  rescheduleAppointment,
+  cancelAppointment,
+};
