@@ -57,10 +57,10 @@ services:
   postgres:
     image: postgres:18
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres_root_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_root_password}
     volumes:
       - postgres_data:/var/lib/postgresql
       - ./postgres/hung/init.sql:/docker-entrypoint-initdb.d/20-hung.sql:ro
@@ -172,7 +172,7 @@ services:
     build: { context: ../../envoy, dockerfile: Dockerfile }
     ports:
       - "8080:8080"
-      - "9901:9901"
+
     depends_on:
       identity: { condition: service_healthy }
       billing: { condition: service_healthy }
