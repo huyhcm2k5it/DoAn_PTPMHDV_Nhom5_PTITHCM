@@ -24,3 +24,12 @@ mongo/secrets/
 *private.pem
 __pycache__/
 *.pyc
+
+# Android build & IDE artifacts
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.cxx/
+captures/
