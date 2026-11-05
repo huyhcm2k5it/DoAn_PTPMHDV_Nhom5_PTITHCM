@@ -1,5 +1,6 @@
 package com.umccare.core.network
 
+import com.umccare.BuildConfig
 import com.umccare.core.session.SessionManager
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
@@ -9,12 +10,17 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object ApiClient {
-    // 10.0.2.2 là địa chỉ IP đặc biệt của Android Emulator để truy cập vào localhost của máy tính host
-    private const val GATEWAY_URL = "http://10.0.2.2:8080/"
+    private val GATEWAY_URL: String
+        get() = if (BuildConfig.GATEWAY_URL.endsWith("/")) BuildConfig.GATEWAY_URL else "${BuildConfig.GATEWAY_URL}/"
 
     private fun createOkHttpClient(sessionManager: SessionManager): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            level = if (BuildConfig.DEBUG) {
+                HttpLoggingInterceptor.Level.HEADERS
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
+            redactHeader("Authorization")
         }
 
         val authInterceptor = Interceptor { chain ->
