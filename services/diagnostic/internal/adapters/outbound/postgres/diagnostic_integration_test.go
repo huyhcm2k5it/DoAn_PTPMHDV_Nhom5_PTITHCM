@@ -6,6 +6,8 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"github.com/golang-jwt/jwt/v5"
 	"net/http/httptest"
@@ -20,6 +22,45 @@ import (
 	"umccare/diagnostic/internal/application/usecase"
 	"umccare/diagnostic/internal/domain"
 )
+
+func TestDiagnosticCatalogSnapshotImport(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	testID, priceID := domain.NewID(), domain.NewID()
+	testRaw, _ := json.Marshal(map[string]any{"id": testID, "code": "SNAP-LAB", "name": "Snapshot LAB", "unit": "U", "referenceRange": "1-2", "revision": 4, "status": "ACTIVE"})
+	priceRaw, _ := json.Marshal(map[string]any{"priceVersionId": priceID, "itemId": testID, "itemType": "LAB", "amountVnd": 75000, "revision": 4, "effectiveFrom": time.Now().UTC().Add(-time.Hour)})
+	entries := []CatalogSnapshotEntry{{EntityType: "LAB_TEST", EntityID: testID, EntityVersion: 4, Mode: "UPSERT", FullSnapshot: testRaw}, {EntityType: "PRICE_VERSION", EntityID: priceID, EntityVersion: 4, Mode: "UPSERT", FullSnapshot: priceRaw}}
+	canonical, _ := json.Marshal(entries)
+	sum := sha256.Sum256(canonical)
+	snapshot := CatalogSnapshotImport{SchemaVersion: 1, Watermark: 17, GeneratedAt: time.Now().UTC(), Checksum: hex.EncodeToString(sum[:]), Entities: entries}
+	if err := db.ImportCatalogSnapshot(ctx, snapshot); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Within(ctx, "", func(tx ports.Tx) error {
+		var checkpoint struct {
+			Sequence int64
+			At       time.Time
+		}
+		raw, err := tx.Get(ctx, "catalog", "checkpoint")
+		if err != nil {
+			return err
+		}
+		if json.Unmarshal(raw, &checkpoint) != nil || checkpoint.Sequence != 17 || checkpoint.At.IsZero() {
+			t.Fatalf("checkpoint %+v", checkpoint)
+		}
+		var prices []usecase.PriceProjection
+		raw, err = tx.Get(ctx, "LAB_PRICES", testID)
+		if err != nil {
+			return err
+		}
+		if json.Unmarshal(raw, &prices) != nil || len(prices) != 1 || prices[0].PriceVersionID != priceID {
+			t.Fatalf("prices %+v", prices)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func testDB(t *testing.T) *Probe {
 	t.Helper()
@@ -371,7 +412,9 @@ func TestCatalogGapBlocksQuotes(t *testing.T) {
 	s, in, _ := setup(t, db)
 	ctx := context.Background()
 	checkpoint := func() domain.Envelope {
-		return msg("CatalogChanged", "EVENT", "catalog", domain.NewID(), domain.NewID(), map[string]any{"entityType": "STREAM", "entityId": domain.NewID(), "entityVersion": 1, "fullSnapshot": map[string]any{}, "effectiveAt": time.Now().UTC(), "streamSequence": 3, "mode": "CHECKPOINT"})
+		id := "00000000-0000-4000-8000-000000000000"
+		at := time.Now().UTC()
+		return msg("CatalogChanged", "EVENT", "catalog", id, domain.NewID(), map[string]any{"entityType": "STREAM", "entityId": id, "entityVersion": 1, "fullSnapshot": map[string]any{"sequence": 2, "at": at}, "effectiveAt": at, "streamSequence": 2, "mode": "CHECKPOINT"})
 	}
 	m := checkpoint()
 	if e := s.Handle(ctx, "umc.events.catalog.v1", "catalog.changed.v1", m); domain.Code(e) != "SERVICE_UNAVAILABLE" {

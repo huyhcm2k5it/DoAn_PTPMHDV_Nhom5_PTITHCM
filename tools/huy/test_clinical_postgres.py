@@ -15,8 +15,8 @@ port = os.environ.get('HUY_TEST_PG_PORT', '55439')
 hidden = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
 env = os.environ.copy()
 for key, folder in [('GOCACHE','gocache'),('GOMODCACHE','gomodcache'),('GOPATH','gopath'),('GOTMPDIR','go-temp')]:
-    path = runtime / folder
-    path.mkdir(exist_ok=True)
+    path = Path(env[key]) if env.get(key) else runtime / folder
+    path.mkdir(parents=True, exist_ok=True)
     env[key] = str(path)
 
 def run(args, **kwargs):

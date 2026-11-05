@@ -35,6 +35,15 @@ type Changed struct {
 	Price         domain.Price
 	Sequence      int64
 }
+type Outgoing struct {
+	MessageID  string
+	Exchange   string
+	RoutingKey string
+	Body       []byte
+}
+type PublisherStore interface {
+	PublishPending(context.Context, func(context.Context, Outgoing) error) (bool, error)
+}
 type Reader interface {
 	Departments(context.Context) ([]domain.Department, error)
 	Doctors(context.Context, DoctorQuery) (Doctors, error)

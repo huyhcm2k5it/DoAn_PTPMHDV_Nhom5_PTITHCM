@@ -9,6 +9,7 @@ EXAMPLES = OUT / "examples"
 EXAMPLES.mkdir(parents=True, exist_ok=True)
 UUID = {"type": "string", "format": "uuid"}
 VERSION = {"type": "integer", "minimum": 1, "maximum": 2147483647}
+STREAM_SEQUENCE = {"type": "integer", "minimum": 0, "maximum": 9223372036854775807}
 DATE_TIME = {"type": "string", "format": "date-time"}
 
 def obj(properties, required=None):
@@ -38,12 +39,15 @@ catalog_payload = obj({
     "entityVersion": VERSION,
     "fullSnapshot": {"type": "object"},
     "effectiveAt": DATE_TIME,
-    "streamSequence": VERSION,
+    "streamSequence": STREAM_SEQUENCE,
     "mode": {"enum": ["UPSERT", "TOMBSTONE", "CHECKPOINT"]},
 })
 catalog_payload["allOf"] = [{
     "if": {"properties": {"mode": {"const": "CHECKPOINT"}}},
     "then": {"properties": {"entityType": {"const": "STREAM"}}},
+}, {
+    "if": {"properties": {"mode": {"enum": ["UPSERT", "TOMBSTONE"]}}},
+    "then": {"properties": {"streamSequence": {"minimum": 1}}},
 }]
 catalog = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",

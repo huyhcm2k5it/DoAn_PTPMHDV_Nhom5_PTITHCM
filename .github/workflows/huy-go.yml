@@ -1,9 +1,9 @@
 name: Huy services and contracts
 on:
   push:
-    paths: ['services/catalog/**', 'services/clinical/**', 'services/diagnostic/**', 'contracts/http/catalog*', 'contracts/http/clinical*', 'contracts/http/diagnostic*', 'contracts/messages/clinical*', 'tools/huy/**', 'tools/catalog-preview/**', 'tools/clinical-preview/**', 'apps/web/src/features/catalog/**', 'apps/web/src/features/clinical/**', 'apps/web/src/features/diagnostic/**', '.github/workflows/huy-go.yml']
+    paths: ['services/catalog/**', 'services/clinical/**', 'services/diagnostic/**', 'contracts/http/catalog*', 'contracts/http/clinical*', 'contracts/http/diagnostic*', 'contracts/messages/**', 'tools/huy/**', 'tools/catalog-preview/**', 'tools/clinical-preview/**', 'apps/web/src/features/catalog/**', 'apps/web/src/features/clinical/**', 'apps/web/src/features/diagnostic/**', '.github/workflows/huy-go.yml']
   pull_request:
-    paths: ['services/catalog/**', 'services/clinical/**', 'services/diagnostic/**', 'contracts/http/catalog*', 'contracts/http/clinical*', 'contracts/http/diagnostic*', 'contracts/messages/clinical*', 'tools/huy/**', 'tools/catalog-preview/**', 'tools/clinical-preview/**', 'apps/web/src/features/catalog/**', 'apps/web/src/features/clinical/**', 'apps/web/src/features/diagnostic/**', '.github/workflows/huy-go.yml']
+    paths: ['services/catalog/**', 'services/clinical/**', 'services/diagnostic/**', 'contracts/http/catalog*', 'contracts/http/clinical*', 'contracts/http/diagnostic*', 'contracts/messages/**', 'tools/huy/**', 'tools/catalog-preview/**', 'tools/clinical-preview/**', 'apps/web/src/features/catalog/**', 'apps/web/src/features/clinical/**', 'apps/web/src/features/diagnostic/**', '.github/workflows/huy-go.yml']
 permissions:
   contents: read
 jobs:
@@ -42,6 +42,12 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U postgres -d umc_huy_test_ci"
           --health-interval 3s --health-timeout 3s --health-retries 20
+      rabbitmq:
+        image: rabbitmq:4.3.6-management
+        ports: ['5672:5672']
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 5s --health-timeout 5s --health-retries 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -53,7 +59,8 @@ jobs:
         env:
           TEST_DATABASE_URL: postgres://postgres:ci-only-not-a-production-secret@127.0.0.1:5432/umc_huy_test_ci?sslmode=disable
           CONTRACT_RESPONSE_FILE: ${{ runner.temp }}/catalog-http-responses.json
-        run: go test -race -count=1 -tags=integration -v ./internal/adapters/outbound/postgres
+          TEST_RABBITMQ_URL: amqp://guest:guest@127.0.0.1:5672/
+        run: go test -race -count=1 -tags=integration,brokerintegration -v ./internal/adapters/...
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -78,7 +85,8 @@ jobs:
           python tools/huy/generate_clinical_contract.py
           python tools/huy/generate_diagnostic_contract.py
           python tools/huy/generate_week3_messages.py
-          git diff --exit-code -- contracts/http/catalog.openapi.json contracts/http/clinical.openapi.json contracts/http/diagnostic.openapi.json contracts/messages/clinical-queue.v1.schema.json contracts/messages/clinical-ticket-snapshot.v1.schema.json contracts/messages/clinical-diagnostic.v1.schema.json
+          python tools/huy/generate_remaining_contracts.py
+          git diff --exit-code -- contracts/http/catalog.openapi.json contracts/http/clinical.openapi.json contracts/http/diagnostic.openapi.json contracts/messages
   catalog-web:
     runs-on: ubuntu-latest
     defaults:

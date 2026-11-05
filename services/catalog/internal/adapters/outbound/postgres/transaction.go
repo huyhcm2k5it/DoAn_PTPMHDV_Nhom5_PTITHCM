@@ -2,8 +2,6 @@ package postgres
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -95,12 +93,9 @@ func (p *priceTx) NextSequence(ctx context.Context) (int64, error) {
 	return seq, err
 }
 func (p *priceTx) AppendChanged(ctx context.Context, e ports.Changed) error {
-	payload := map[string]any{"messageId": e.MessageID, "messageKind": "EVENT", "messageType": "CatalogChanged", "schemaVersion": 1, "producer": "Catalog", "aggregateId": e.Price.ItemID, "aggregateVersion": e.Price.Revision, "correlationId": e.CorrelationID, "requestId": e.RequestID, "occurredAt": e.OccurredAt, "payload": map[string]any{"entityType": "PRICE_VERSION", "entityId": e.Price.PriceVersionID, "entityVersion": e.Price.Revision, "fullSnapshot": e.Price, "effectiveAt": e.Price.EffectiveFrom, "streamSequence": e.Sequence, "mode": "UPSERT"}}
-	raw, err := json.Marshal(payload)
+	raw, err := buildCatalogChangedEnvelope(e)
 	if err != nil {
 		return err
 	}
-	hash := sha256.Sum256(raw)
-	_, err = p.tx.Exec(ctx, `INSERT INTO outbox(message_id,aggregate_id,aggregate_version,message_kind,message_type,producer,destination,routing_key,payload,payload_hash) VALUES($1,$2,$3,'EVENT','CatalogChanged','Catalog','umc.events.catalog.v1','catalog.catalog-changed.v1',$4,$5)`, e.MessageID, e.Price.ItemID, e.Price.Revision, raw, hex.EncodeToString(hash[:]))
-	return err
+	return insertCatalogOutbox(ctx, p.tx, e.Price.ItemID, e.Price.Revision, raw)
 }

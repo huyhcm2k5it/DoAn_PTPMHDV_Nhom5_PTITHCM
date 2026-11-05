@@ -15,7 +15,7 @@ def run(args,**kwargs):
     return subprocess.run([str(a) for a in args],check=True,creationflags=hidden,**kwargs)
 env=os.environ.copy()
 for key,folder in [('GOCACHE','gocache'),('GOMODCACHE','gomodcache'),('GOPATH','gopath'),('GOTMPDIR','go-temp')]:
-    path=runtime/folder;path.mkdir(exist_ok=True);env[key]=str(path)
+    path=Path(env[key]) if env.get(key) else runtime/folder;path.mkdir(parents=True,exist_ok=True);env[key]=str(path)
 if not (data/'PG_VERSION').exists():
     run([program/'initdb.exe','-D',data,'-U','huy_test','-A','trust','--encoding=UTF8','--locale=C'],stdout=subprocess.DEVNULL)
 status=subprocess.run([str(program/'pg_ctl.exe'),'-D',str(data),'status'],stdout=subprocess.DEVNULL,creationflags=hidden)

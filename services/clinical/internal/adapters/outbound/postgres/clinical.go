@@ -38,11 +38,14 @@ func (p *Probe) Migrate(ctx context.Context) error {
 	if err := migrateTreatment(ctx, tx); err != nil {
 		return err
 	}
+	if err := migrateCatalogStream(ctx, tx); err != nil {
+		return err
+	}
 	return tx.Commit(ctx)
 }
 func (p *Probe) BusinessReady(ctx context.Context) error {
 	var ok bool
-	if e := p.pool.QueryRow(ctx, `SELECT count(*)=2 FROM schema_migrations WHERE version IN ('000001_clinical','000002_treatment')`).Scan(&ok); e != nil || !ok {
+	if e := p.pool.QueryRow(ctx, `SELECT count(*)=3 FROM schema_migrations WHERE version IN ('000001_clinical','000002_treatment','000003_catalog_stream')`).Scan(&ok); e != nil || !ok {
 		return domain.Fail("SERVICE_UNAVAILABLE", "Clinical migrations are required")
 	}
 	return nil
