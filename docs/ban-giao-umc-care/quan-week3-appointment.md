@@ -105,5 +105,6 @@ Content-Type: application/json
 ## Git handoff
 
 - No push or merge was performed.
-- Previous local commits: `59bed56 feat(appointment): deliver check-in and queue slice`, `9694e5e docs(handoff): record week3 appointment evidence`, `2ccda61 feat(appointment): add reschedule cancel and queue contracts`.
+- Source commits: `59bed56 feat(appointment): deliver check-in and queue slice`, `2ccda61 feat(appointment): add reschedule cancel and queue contracts`, `e419a68 fix(appointment): fail closed on stale reschedule price`.
+- Handoff commits: `9694e5e docs(handoff): record week3 appointment evidence`, `1db3642 docs(handoff): record appointment change evidence`.
 - No PR was created; open `quan` -> `develop` only after the receiver checks the contract and scope.
