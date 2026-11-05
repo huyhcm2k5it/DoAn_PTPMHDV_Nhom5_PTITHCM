@@ -1,6 +1,9 @@
 export type WebSession = {
+  userId: string;
   actorType: "PATIENT" | "DOCTOR" | "STAFF";
   capabilities: string[];
+  tokenVersion?: number;
+  lease?: (action: string) => Promise<string>;
 };
 
 export type GatewayTransport = (url: string, init?: RequestInit) => Promise<Response>;

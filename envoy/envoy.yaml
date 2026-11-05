@@ -41,6 +41,10 @@ static_resources:
                         # 3. Appointment Service (Quân)
                         - match: { prefix: "/api/v1/appointments" }
                           route: { cluster: appointment_service, timeout: 15s }
+                        - match: { prefix: "/api/v1/appointment-holds" }
+                          route: { cluster: appointment_service, timeout: 15s }
+                        - match: { prefix: "/api/v1/queues" }
+                          route: { cluster: appointment_service, timeout: 15s }
                         - match: { prefix: "/api/v1/slots" }
                           route: { cluster: appointment_service, timeout: 15s }
                         - match: { prefix: "/api/v1/schedules" }
@@ -67,10 +71,18 @@ static_resources:
                         # 6. Clinical Service (Huy)
                         - match: { prefix: "/api/v1/clinical" }
                           route: { cluster: clinical_service, timeout: 15s }
+                        - match: { prefix: "/api/v1/visits" }
+                          route: { cluster: clinical_service, timeout: 15s }
+                        - match: { prefix: "/api/v1/prescriptions" }
+                          route: { cluster: clinical_service, timeout: 15s }
 
                         # 7. Diagnostic Service (Huy)
                         - match: { prefix: "/api/v1/diagnostic" }
                           route: { cluster: diagnostic_service, timeout: 15s }
+                        - match: { prefix: "/api/v1/specimens" }
+                          route: { cluster: diagnostic_service, timeout: 15s }
+                        - match: { prefix: "/api/v1/admin/summary" }
+                          route: { cluster: appointment_service, timeout: 15s }
 
                         # 8. Billing Service (Hưng)
                         - match: { prefix: "/api/v1/billing" }
@@ -89,6 +101,36 @@ static_resources:
                           route: { cluster: notification_service, timeout: 15s }
 
                 http_filters:
+                  - name: envoy.filters.http.jwt_authn
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
+                      providers:
+                        umc_identity:
+                          issuer: umc-care-identity
+                          audiences: [umc-care-services]
+                          forward: true
+                          from_headers:
+                            - name: Authorization
+                              value_prefix: "Bearer "
+                          local_jwks:
+                            filename: /etc/envoy/jwt_public.pem
+                      rules:
+                        - match: { prefix: "/api/v1/auth" }
+                          requires: { allow_missing: {} }
+                        - match: { prefix: "/api/v1/catalog" }
+                          requires: { allow_missing: {} }
+                        - match: { prefix: "/api/v1/departments" }
+                          requires: { allow_missing: {} }
+                        - match: { prefix: "/api/v1/doctors" }
+                          requires: { allow_missing: {} }
+                        - match: { prefix: "/api/v1/medical-services" }
+                          requires: { allow_missing: {} }
+                        - match: { prefix: "/api/v1/prices" }
+                          requires: { allow_missing: {} }
+                        - match: { prefix: "/api/v1" }
+                          requires: { provider_name: umc_identity }
+                        - match: {}
+                          requires: { allow_missing: {} }
                   - name: envoy.filters.http.cors
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors

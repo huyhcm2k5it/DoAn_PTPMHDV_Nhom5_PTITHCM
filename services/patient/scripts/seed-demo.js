@@ -31,13 +31,17 @@ async function seed({
   if (dryRun) return patients;
   if (!uri) throw new Error('MONGODB_URI is required');
   const connection = await mongoose
-    .createConnection(uri, { autoCreate: false, autoIndex: false })
+    .createConnection(uri, {
+      autoCreate: false,
+      autoIndex: false,
+      runtimeAdapters: { os: require('node:os') },
+    })
     .asPromise();
   try {
     await ensurePatientStorage(connection);
     const Patient = getPatientModel(connection);
     for (const patient of patients)
-      await Patient.replaceOne({ id: patient.id }, patient, { upsert: true });
+      await Patient.updateOne({ id: patient.id }, { $setOnInsert: patient }, { upsert: true });
     return patients;
   } finally {
     await connection.close();

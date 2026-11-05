@@ -66,6 +66,7 @@ async function setup(t) {
       dbName: 'appointment_db',
       autoCreate: false,
       autoIndex: false,
+      runtimeAdapters: { os: require('node:os') },
     })
     .asPromise();
   t.after(async () => {

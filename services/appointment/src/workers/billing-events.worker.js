@@ -1,9 +1,11 @@
+const { createHash, randomUUID } = require('node:crypto');
 const { withMongoTransaction } = require('../../../../mongo/transaction.js');
 const {
   getAppointmentModel,
   getSlotModel,
   getInboxModel,
   getSettlementDecisionModel,
+  getOutboxModel,
 } = require('../models/appointment.model.js');
 const { ApiError } = require('../core/errors.js');
 
@@ -19,6 +21,72 @@ function assertSource(appointment, payload) {
       'SOURCE_MISMATCH',
       'Billing message does not match the local appointment revision.',
     );
+}
+
+function payloadHash(payload) {
+  return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+}
+
+async function handleReserveSettlementCommand({
+  connection,
+  message,
+  now = new Date(),
+  consumerName = 'appointment-settlement-command',
+}) {
+  if (!message?.messageId || message.messageKind !== 'COMMAND' || message.messageType !== 'ReserveSettlement')
+    throw new ApiError(400, 'INVALID_MESSAGE', 'ReserveSettlement command is incomplete.');
+  const Appointment = getAppointmentModel(connection);
+  const Inbox = getInboxModel(connection);
+  const Outbox = getOutboxModel(connection);
+  const hash = payloadHash(message.payload);
+  const existing = await Inbox.findOne({ message_id: message.messageId, consumer_name: consumerName }).lean();
+  if (existing) {
+    if (existing.payload_hash && existing.payload_hash !== hash)
+      throw new ApiError(409, 'MESSAGE_CONFLICT', 'MessageId was reused with another payload.');
+    return { duplicate: true };
+  }
+  return withMongoTransaction(connection, async (session) => {
+    await Inbox.create([{ message_id: message.messageId, consumer_name: consumerName, payload_hash: hash, received_at: now }], { session });
+    const payload = message.payload || {};
+    const appointment = await Appointment.findOne({ id: payload.sourceId }).session(session).lean();
+    assertSource(appointment, payload);
+    if (!payload.settlementId || !payload.chargeId || appointment.chargeId !== payload.chargeId)
+      throw new ApiError(409, 'SETTLEMENT_MISMATCH', 'ReserveSettlement does not match the charge.');
+    if (!['PENDING_PAYMENT', 'SETTLEMENT_LOCKED'].includes(appointment.state))
+      throw new ApiError(409, 'SETTLEMENT_STATE_CONFLICT', 'Appointment cannot reserve settlement now.');
+    if (appointment.state === 'SETTLEMENT_LOCKED' && appointment.settlementId === payload.settlementId)
+      return { duplicate: false, state: 'ACCEPTED', settlementId: payload.settlementId, fence: appointment.fence };
+    const fence = Number.isInteger(appointment.fence) && appointment.fence > 0 ? appointment.fence + 1 : 1;
+    const changed = await Appointment.updateOne(
+      { id: appointment.id, state: 'PENDING_PAYMENT' },
+      { $set: { state: 'SETTLEMENT_LOCKED', settlementId: payload.settlementId, fence, updatedAt: now }, $push: { stateHistory: { state: 'SETTLEMENT_LOCKED', at: now } }, $inc: { version: 1 } },
+      { session },
+    );
+    if (!changed.modifiedCount) throw new ApiError(409, 'VERSION_CONFLICT', 'Appointment changed.');
+    await Outbox.create([{
+      message_id: randomUUID(),
+      message_kind: 'EVENT',
+      message_type: 'SettlementReserved',
+      schema_version: 1,
+      producer: 'Appointment',
+      aggregate_id: appointment.id,
+      aggregate_version: appointment.version + 1,
+      correlation_id: message.correlationId || randomUUID(),
+      occurred_at: now,
+      payload: {
+        requestId: payload.requestId || null,
+        sourceType: 'APPOINTMENT',
+        sourceId: appointment.id,
+        sourceRevision: appointment.sourceRevision,
+        chargeId: appointment.chargeId,
+        settlementId: payload.settlementId,
+        state: 'ACCEPTED',
+        fence,
+        amountVnd: appointment.priceSnapshot?.amountVnd ?? null,
+      },
+    }], { session });
+    return { duplicate: false, state: 'ACCEPTED', settlementId: payload.settlementId, fence };
+  });
 }
 async function handleBillingMessage({
   connection,
@@ -36,7 +104,7 @@ async function handleBillingMessage({
   try {
     return await withMongoTransaction(connection, async (session) => {
       await Inbox.create(
-        [{ message_id: message.messageId, consumer_name: consumerName, received_at: now }],
+        [{ message_id: message.messageId, consumer_name: consumerName, payload_hash: payloadHash(message.payload), received_at: now }],
         { session },
       );
       const payload = message.payload;
@@ -76,7 +144,9 @@ async function handleBillingMessage({
                 state: 'SETTLEMENT_LOCKED',
                 settlementId: payload.settlementId,
                 fence: payload.fence,
+                updatedAt: now,
               },
+              $push: { stateHistory: { state: 'SETTLEMENT_LOCKED', at: now } },
               $inc: { version: 1 },
             },
             { session },
@@ -113,7 +183,8 @@ async function handleBillingMessage({
           await Appointment.updateOne(
             { id: appointment.id, state: 'SETTLEMENT_LOCKED', fence: payload.fence },
             {
-              $set: { state: 'PENDING_PAYMENT', settlementId: null, fence: null },
+              $set: { state: 'PENDING_PAYMENT', settlementId: null, fence: null, updatedAt: now },
+              $push: { stateHistory: { state: 'PENDING_PAYMENT', at: now, reasonCode: 'SETTLEMENT_FAILED' } },
               $inc: { version: 1 },
             },
             { session },
@@ -147,7 +218,7 @@ async function handleBillingMessage({
           );
         const changed = await Appointment.updateOne(
           { id: appointment.id, state: 'SETTLEMENT_LOCKED', fence: payload.fence },
-          { $set: { state: 'CONFIRMED', chargeStatus: 'PAID' }, $inc: { version: 1 } },
+          { $set: { state: 'CONFIRMED', chargeStatus: 'PAID', updatedAt: now }, $push: { stateHistory: { state: 'CONFIRMED', at: now, by: 'Billing' } }, $inc: { version: 1 } },
           { session },
         );
         if (!changed.modifiedCount) return { duplicate: false };
@@ -172,9 +243,13 @@ async function handleBillingMessage({
         message_id: message.messageId,
         consumer_name: consumerName,
       }).lean();
-      if (raced) return { duplicate: true };
+      if (raced) {
+        if (raced.payload_hash && raced.payload_hash !== payloadHash(message.payload))
+          throw new ApiError(409, 'MESSAGE_CONFLICT', 'MessageId was reused with another payload.');
+        return { duplicate: true };
+      }
     }
     throw error;
   }
 }
-module.exports = { handleBillingMessage, assertSource };
+module.exports = { handleBillingMessage, handleReserveSettlementCommand, assertSource };

@@ -23,6 +23,7 @@
       "type": "string",
       "enum": [
         "RequestCharge",
+        "ReserveSettlement",
         "ChargePrepared",
         "SettlementReserved",
         "SettlementDecision",
