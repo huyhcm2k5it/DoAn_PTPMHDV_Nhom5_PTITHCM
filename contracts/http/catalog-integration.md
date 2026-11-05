@@ -40,3 +40,7 @@ Projection seed hiện có doctor 911; 912 chưa cấp quyền protected. Identi
 ## Trạng thái bàn giao
 
 Standalone Go/PostgreSQL và W03 có thể phát triển/test độc lập. Chưa ghép: Envoy, Identity live/lease issuance/access projection delivery, shell/shared transport, luồng login → hồ sơ → slot, RabbitMQ publisher/consumer, Redis. Dockerfiles/Compose/CI đã định nghĩa; Docker runtime và GitHub CI phải xác minh khi môi trường sẵn. Không tính technical health endpoint vào sáu operation nghiệp vụ.
+
+## Canonical CatalogChanged v1 contract
+
+`../messages/catalog.v1.schema.json` defines full-snapshot UPSERT/TOMBSTONE and STREAM CHECKPOINT events. New envelopes use `producer="catalog"`, exchange `umc.events.catalog.v1` and routing key `catalog.catalog-changed.v1`. A consumer may accept producer `Catalog` and legacy routing alias `catalog.changed.v1` only while old persisted deliveries drain; publishers must not create new uppercase events. `entityVersion` and envelope `aggregateVersion` are monotonic for an entity; `streamSequence` orders the shared feed. A consumer may not clear an observed gap by applying a later checkpoint.

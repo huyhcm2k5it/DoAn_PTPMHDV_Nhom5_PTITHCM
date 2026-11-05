@@ -71,4 +71,4 @@ ticket=obj({'ticketId':uuid,'appointmentId':uuid,'patientId':uuid,'doctorId':uui
 ticket['allOf']=[{'if':{'properties':{'ticketType':{'const':'RETURN'}}},'then':{'required':['visitId']}},{'if':{'properties':{'ticketType':{'const':'FIRST'}}},'then':{'not':{'required':['visitId']}}}]
 snapshot={'$schema':'https://json-schema.org/draft/2020-12/schema','$id':'urn:umc-care:clinical-ticket-import:v1','title':'Trusted Appointment snapshot import (provisional handoff, not a public event)','type':'array','maxItems':1000,'items':ticket}
 (root/'contracts/messages/clinical-ticket-snapshot.v1.schema.json').write_text(json.dumps(snapshot,indent=2)+'\n',encoding='utf-8')
-print('Generated Clinical HTTP (10 operations), queue and trusted snapshot schemas')
+print('Generated Clinical HTTP (11 operations), queue and trusted snapshot schemas')

@@ -9,7 +9,9 @@ from openapi_spec_validator import validate
 root=Path(__file__).resolve().parents[2]
 doc=json.loads((root/'contracts/http/clinical.openapi.json').read_text(encoding='utf-8'))
 validate(doc)
-assert sorted(v['operationId'] for p in doc['paths'].values() for v in p.values())==['CL_%03d'%n for n in range(1,11)]
+assert sorted(v['operationId'] for p in doc['paths'].values() for v in p.values())==['CL_%03d'%n for n in range(1,12)]
+assert any(x['name']=='X-Authorization-Lease' and x['required'] for x in doc['paths']['/api/v1/patients/{patientId}/medical-records']['get']['parameters'])
+assert doc['components']['schemas']['MedicalRecord']['properties']['visit']['$ref']=='#/components/schemas/Visit'
 def validator(name):
     return Draft202012Validator({'$ref':'#/components/schemas/'+name,'components':doc['components']},format_checker=FormatChecker())
 draft={'symptoms':'','findings':'','assessment':'','diagnosis':'','expectedVersion':1}
