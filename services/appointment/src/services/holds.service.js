@@ -110,7 +110,7 @@ async function createHold({
         .lean();
       const activeAppointment = await Appointment.findOne({
         patientId,
-        state: { $in: ['PENDING_PAYMENT', 'SETTLEMENT_LOCKED', 'CONFIRMED'] },
+        state: { $in: ['PENDING_PAYMENT', 'SETTLEMENT_LOCKED', 'CONFIRMED', 'CHECKED_IN', 'IN_SERVICE'] },
         startAt: { $lt: slot.endAt },
         endAt: { $gt: slot.startAt },
       })
@@ -149,6 +149,8 @@ async function createHold({
         slotId,
         scheduleId: slot.scheduleId,
         doctorId: schedule.doctorId,
+        doctorUserId: schedule.doctorUserId,
+        departmentId: schedule.departmentId,
         serviceId: schedule.serviceId,
         slotStartAt: slot.startAt,
         slotEndAt: slot.endAt,

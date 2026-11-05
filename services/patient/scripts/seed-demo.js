@@ -37,7 +37,7 @@ async function seed({
     await ensurePatientStorage(connection);
     const Patient = getPatientModel(connection);
     for (const patient of patients)
-      await Patient.replaceOne({ id: patient.id }, patient, { upsert: true });
+      await Patient.updateOne({ id: patient.id }, { $setOnInsert: patient }, { upsert: true });
     return patients;
   } finally {
     await connection.close();

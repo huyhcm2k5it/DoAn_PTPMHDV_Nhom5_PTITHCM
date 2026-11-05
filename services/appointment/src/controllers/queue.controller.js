@@ -16,10 +16,13 @@ function createQueueController(dependencies) {
     async checkIn(req, res, next) {
       try {
         requireCapability(req, 'RECEPTION');
+        if (req.body?.expectedVersion == null)
+          throw new ApiError(400, 'VALIDATION_ERROR', 'expectedVersion is required.');
         const data = await checkInAppointment({
           connection: dependencies.connection,
           appointmentId: req.params.appointmentId,
           staffId: req.authContext.userId,
+          expectedVersion: req.body.expectedVersion,
           idempotencyKey: req.get('idempotency-key'),
           now: dependencies.now?.() || new Date(),
           createId: dependencies.createId,
@@ -50,6 +53,8 @@ function createQueueController(dependencies) {
     },
     async callNext(req, res, next) {
       try {
+        if (!['FIRST', 'RETURN'].includes(req.body?.ticketType))
+          throw new ApiError(400, 'VALIDATION_ERROR', 'ticketType is required and must be FIRST or RETURN.');
         const data = await callNextQueueTicket({
           connection: dependencies.connection,
           actorType: req.authContext.actorType,

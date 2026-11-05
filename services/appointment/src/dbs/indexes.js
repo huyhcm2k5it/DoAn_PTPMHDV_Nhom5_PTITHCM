@@ -56,7 +56,10 @@ const appointmentStorage = [
   },
   entity(
     'appointments',
-    [{ name: 'uq_appointment_hold', key: { holdId: 1 }, unique: true }],
+    [
+      { name: 'uq_appointment_hold', key: { holdId: 1 }, unique: true },
+      { name: 'ix_appointment_patient_time', key: { patientId: 1, startAt: 1, endAt: 1, state: 1 } },
+    ],
     ['holdId'],
   ),
   entity(
@@ -88,7 +91,10 @@ const appointmentStorage = [
   {
     name: 'command_results',
     validator: requiredFields(['command_id']),
-    indexes: [{ name: 'uq_command_result', key: { command_id: 1 }, unique: true }],
+    indexes: [
+      { name: 'uq_command_result', key: { command_id: 1 }, unique: true },
+      { name: 'uq_command_request', key: { request_id: 1 }, unique: true, sparse: true },
+    ],
   },
   {
     name: 'user_access_projection',
@@ -97,6 +103,13 @@ const appointmentStorage = [
   {
     name: 'patient_access_projection',
     indexes: [{ name: 'uq_patient_access_projection', key: { patientId: 1 }, unique: true }],
+  },
+  {
+    name: 'catalog_projection',
+    indexes: [
+      { name: 'uq_catalog_entity', key: { entityKey: 1 }, unique: true },
+      { name: 'ix_catalog_type_id', key: { entityType: 1, entityId: 1, entityVersion: -1 } },
+    ],
   },
   {
     name: 'projection_checkpoints',

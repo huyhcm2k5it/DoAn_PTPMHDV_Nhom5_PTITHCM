@@ -5,6 +5,7 @@ const {
   getScheduleModel,
   getSlotModel,
   getAppointmentModel,
+  getPatientTimeLockModel,
   getIdempotencyModel,
   getOutboxModel,
 } = require('../models/appointment.model.js');
@@ -103,10 +104,13 @@ async function createAppointment({
         slotId: hold.slotId,
         scheduleId: hold.scheduleId,
         doctorId: hold.doctorId,
+        doctorUserId: hold.doctorUserId,
+        departmentId: hold.departmentId,
         serviceId: hold.serviceId,
         startAt: hold.slotStartAt,
         endAt: hold.slotEndAt,
         state: 'PENDING_PAYMENT',
+        stateHistory: [{ state: 'PENDING_PAYMENT', at: now }],
         chargeSync: 'PENDING',
         priceSnapshot: hold.priceSnapshot || null,
         paymentDueAt: new Date(now.getTime() + 10 * 60 * 1000),
@@ -270,6 +274,7 @@ async function rescheduleAppointment({
   const Appointment = getAppointmentModel(connection);
   const Schedule = getScheduleModel(connection);
   const Slot = getSlotModel(connection);
+  const Lock = getPatientTimeLockModel(connection);
   const Idempotency = getIdempotencyModel(connection);
   const Outbox = getOutboxModel(connection);
   const replay = await existingIdempotency(Idempotency, principalId, route, idempotencyKey, hash);
@@ -317,6 +322,34 @@ async function rescheduleAppointment({
         throw new ApiError(409, 'PRICE_CHANGED', 'New slot does not have the accepted price snapshot.');
       if (slot.startAt <= now)
         throw new ApiError(409, 'SLOT_UNAVAILABLE', 'New slot is in the past.');
+      await Lock.updateOne(
+        { patientId },
+        { $set: { updatedAt: now }, $inc: { version: 1 } },
+        { upsert: true, session },
+      );
+      const [activeHold, activeAppointment] = await Promise.all([
+        getHoldModel(connection)
+          .findOne({
+            patientId,
+            status: 'HELD',
+            expiresAt: { $gt: now },
+            slotStartAt: { $lt: slot.endAt },
+            slotEndAt: { $gt: slot.startAt },
+          })
+          .session(session)
+          .lean(),
+        Appointment.findOne({
+          patientId,
+          id: { $ne: appointmentId },
+          state: { $in: ['PENDING_PAYMENT', 'SETTLEMENT_LOCKED', 'CONFIRMED', 'CHECKED_IN', 'IN_SERVICE'] },
+          startAt: { $lt: slot.endAt },
+          endAt: { $gt: slot.startAt },
+        })
+          .session(session)
+          .lean(),
+      ]);
+      if (activeHold || activeAppointment)
+        throw new ApiError(409, 'PATIENT_TIME_CONFLICT', 'New slot overlaps another patient booking.');
       const reserved = await Slot.updateOne(
         { id: newSlotId, $expr: { $lt: [{ $add: ['$heldCount', '$confirmedCount'] }, '$capacity'] } },
         { $inc: { confirmedCount: 1 } },
@@ -383,9 +416,14 @@ async function rescheduleAppointment({
             payload: {
               sourceType: 'APPOINTMENT',
               sourceId: appointmentId,
+              appointmentId,
+              patientId: appointment.patientId,
+              recipientUserId: appointment.principalId,
               sourceRevision: updated.sourceRevision,
               state: 'CONFIRMED',
               changeType: 'RESCHEDULED',
+              version: nextVersion,
+              reasonCode: 'RESCHEDULED',
               oldSlotId: appointment.slotId,
               newSlotId,
             },
@@ -490,8 +528,10 @@ async function cancelAppointment({
             state: 'CANCELLED',
             refundStatus,
             cancellationId,
+            cancelledAt: now,
             updatedAt: now,
           },
+          $push: { stateHistory: { state: 'CANCELLED', at: now, reasonCode } },
           $inc: { version: 1, sourceRevision: 1 },
         },
         { session },
@@ -519,9 +559,13 @@ async function cancelAppointment({
             payload: {
               sourceType: 'APPOINTMENT',
               sourceId: appointmentId,
+              appointmentId,
+              patientId: appointment.patientId,
+              recipientUserId: appointment.principalId,
               sourceRevision: appointment.sourceRevision + 1,
               state: 'CANCELLED',
               changeType: 'CANCELLED',
+              version: nextVersion,
               reasonCode,
               cancellationId,
               refundStatus,

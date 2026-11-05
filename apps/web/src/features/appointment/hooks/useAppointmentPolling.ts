@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AppointmentApi, AppointmentSummary } from '../types';
 
 const TERMINAL_STATES = new Set(['CONFIRMED', 'EXPIRED', 'CANCELLED', 'COMPLETED']);
@@ -11,10 +11,12 @@ export function useAppointmentPolling(
   const [data, setData] = useState<AppointmentSummary>();
   const [error, setError] = useState<unknown>();
   const [loading, setLoading] = useState(true);
+  const cleanupRef = useRef<(() => void) | undefined>(undefined);
   const intervalMs = options.intervalMs ?? 3000;
   const maxIntervalMs = options.maxIntervalMs ?? 15000;
 
   const load = useCallback(() => {
+    cleanupRef.current?.();
     const controller = new AbortController();
     let disposed = false;
     let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -47,11 +49,13 @@ export function useAppointmentPolling(
       }
     };
     void run();
-    return () => {
+    const cleanup = () => {
       disposed = true;
       controller.abort();
       if (timeout) clearTimeout(timeout);
     };
+    cleanupRef.current = cleanup;
+    return cleanup;
   }, [api, appointmentId, intervalMs, maxIntervalMs]);
 
   useEffect(() => load(), [load]);

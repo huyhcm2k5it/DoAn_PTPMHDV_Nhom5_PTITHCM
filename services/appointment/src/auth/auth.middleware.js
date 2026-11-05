@@ -14,6 +14,7 @@ function createAuthContext({ verifyBearerToken } = {}) {
       req.authContext = Object.freeze({
         userId: claims.sub,
         actorType,
+        tokenVersion: claims.tokenVersion,
         capabilities: Array.isArray(claims.capabilities) ? claims.capabilities : [],
         scopes: Array.isArray(claims.scopes) ? claims.scopes : [],
       });

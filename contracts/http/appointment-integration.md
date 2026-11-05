@@ -18,4 +18,4 @@ The 10-minute hold expiry is a domain operation. A Mongo TTL index may remove ol
 
 ## Cross-service handoff
 
-Appointment emits `RequestCharge` on `cmd.billing.v1` and consumes `ChargePrepared`, `SettlementReserved`, `ChargePaid`, and `SettlementDecision` only after producer/schema/source/fence checks. The broker topology, Billing schema and public-key/lease configuration are external handoffs; until they are delivered, local tests stop at the durable `PENDING_PAYMENT` boundary.
+Appointment emits `RequestCharge` and `ReserveSettlement` commands on `cmd.billing.v1`, and consumes `ChargePrepared`, `ChargePaid`, and `SettlementDecision`. Appointment owns the local settlement lock and publishes `SettlementReserved` only after the command is accepted in a Mongo transaction. The broker topology, Billing schema and public-key/lease configuration remain external handoffs until the integrated Compose gate.

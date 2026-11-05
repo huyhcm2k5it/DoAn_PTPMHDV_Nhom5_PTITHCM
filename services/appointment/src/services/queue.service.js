@@ -86,6 +86,7 @@ async function checkInAppointment({
   connection,
   appointmentId,
   staffId,
+  expectedVersion,
   idempotencyKey,
   now = new Date(),
   createId = randomUUID,
@@ -104,6 +105,8 @@ async function checkInAppointment({
     return await withMongoTransaction(connection, async (session) => {
       const appointment = await Appointment.findOne({ id: appointmentId }).session(session).lean();
       if (!appointment) throw new ApiError(404, 'NOT_FOUND', 'Appointment not found.');
+      if (expectedVersion != null && assertVersion(expectedVersion) !== appointment.version)
+        throw new ApiError(409, 'VERSION_CONFLICT', 'Appointment changed.');
       if (vietnamDate(appointment.startAt) !== vietnamDate(now))
         throw new ApiError(409, 'CHECKIN_DATE_MISMATCH', 'Check-in is allowed only on the appointment date.');
       if (appointment.state === 'CHECKED_IN') {
@@ -129,6 +132,7 @@ async function checkInAppointment({
         { id: appointmentId, state: 'CONFIRMED', version: appointment.version },
         {
           $set: { state: 'CHECKED_IN', checkedInAt: now, checkedInBy: staffId, updatedAt: now },
+          $push: { stateHistory: { state: 'CHECKED_IN', at: now, by: staffId } },
           $inc: { version: 1 },
         },
         { session },
@@ -145,6 +149,7 @@ async function checkInAppointment({
         ticketType: 'FIRST',
         returnRound: 0,
         state: 'WAITING',
+        stateHistory: [{ state: 'WAITING', at: now, by: staffId }],
         version: 1,
         createdAt: now,
         updatedAt: now,
@@ -152,6 +157,8 @@ async function checkInAppointment({
       };
       await QueueTicket.create([ticket], { session });
       const response = responseForTicket(ticket);
+      response.appointmentId = appointmentId;
+      response.ticket = { ...response };
       await saveReplay(
         Idempotency,
         { principalId: staffId, route, key: idempotencyKey, hash, response, now },
@@ -245,24 +252,24 @@ async function callNextQueueTicket({
   const QueueTicket = getQueueTicketModel(connection);
   const query = { appointmentDate: vietnamDate(now), ticketType, state: 'WAITING' };
   if (doctorId) query.doctorId = doctorId;
-  const ticket = await QueueTicket.findOneAndUpdate(
-    query,
-    { $set: { state: 'CALLED', calledAt: now, calledBy, updatedAt: now }, $inc: { version: 1 } },
-    { sort: { createdAt: 1, id: 1 }, returnDocument: 'after' },
-  ).lean();
-  if (!ticket) throw new ApiError(404, 'QUEUE_EMPTY', 'No waiting ticket matches the requested queue.');
-  const response = responseForTicket(ticket);
-  await Idempotency.create([
-    {
-      principal_id: calledBy,
-      route,
-      key: idempotencyKey,
-      request_hash: hash,
-      response,
-      created_at: now,
-    },
-  ]);
-  return response;
+  return withMongoTransaction(connection, async (session) => {
+    const replayInTransaction = await getReplay(Idempotency, calledBy, route, idempotencyKey, hash);
+    if (replayInTransaction) return replayInTransaction;
+    const ticket = await QueueTicket.findOneAndUpdate(
+      query,
+      { $set: { state: 'CALLED', calledAt: now, calledBy, updatedAt: now }, $push: { stateHistory: { state: 'CALLED', at: now, by: calledBy } }, $inc: { version: 1 } },
+      { sort: { createdAt: 1, id: 1 }, returnDocument: 'after', session },
+    ).lean();
+    if (!ticket) throw new ApiError(409, 'QUEUE_EMPTY', 'No waiting ticket matches the requested queue.');
+    const response = responseForTicket(ticket);
+    response.ticket = { ...response };
+    await saveReplay(
+      Idempotency,
+      { principalId: calledBy, route, key: idempotencyKey, hash, response, now },
+      session,
+    );
+    return response;
+  });
 }
 
 async function markNoShow({
@@ -308,6 +315,7 @@ async function markNoShow({
         { id: ticketId, state: { $in: ['WAITING', 'CALLED'] }, version },
         {
           $set: { state: 'NO_SHOW', noShowReason: reasonCode, noShowAt: now, updatedAt: now },
+          $push: { stateHistory: { state: 'NO_SHOW', at: now, by: staffId, reasonCode } },
           $inc: { version: 1 },
         },
         { session },
@@ -316,7 +324,7 @@ async function markNoShow({
       if (ticket.ticketType === 'FIRST') {
         await Appointment.updateOne(
           { id: ticket.appointmentId, state: { $in: ['CHECKED_IN', 'CONFIRMED'] } },
-          { $set: { state: 'NO_SHOW', noShowReason: reasonCode, updatedAt: now }, $inc: { version: 1 } },
+          { $set: { state: 'NO_SHOW', noShowReason: reasonCode, updatedAt: now }, $push: { stateHistory: { state: 'NO_SHOW', at: now, by: staffId, reasonCode } }, $inc: { version: 1 } },
           { session },
         );
       }

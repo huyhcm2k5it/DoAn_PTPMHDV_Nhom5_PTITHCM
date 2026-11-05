@@ -79,6 +79,11 @@ services:
       NODE_ENV: production
       PORT: "3000"
       MONGODB_URI: $PATIENT_MONGO_URI
+      JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
+      JWT_ISSUER: umc-care-identity
+      JWT_AUDIENCE: umc-care-services
+    volumes:
+      - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
     depends_on:
       mongo-bootstrap: { condition: service_completed_successfully }
     networks: [private]
@@ -94,6 +99,11 @@ services:
       NODE_ENV: production
       PORT: "3000"
       MONGODB_URI: $APPOINTMENT_MONGO_URI
+      JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
+      JWT_ISSUER: umc-care-identity
+      JWT_AUDIENCE: umc-care-services
+    volumes:
+      - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
     depends_on:
       mongo-bootstrap: { condition: service_completed_successfully }
     networks: [private]
@@ -102,6 +112,30 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    restart: unless-stopped
+  appointment-worker:
+    build: { context: ../.., dockerfile: services/appointment/Dockerfile }
+    command: ["npm", "run", "worker"]
+    environment:
+      NODE_ENV: production
+      MONGODB_URI: $APPOINTMENT_MONGO_URI
+      AMQP_URL: amqp://${RABBITMQ_DEFAULT_USER:-admin}:${RABBITMQ_DEFAULT_PASS:-YOUR_PASSWORD_HERE}@rabbitmq:5672/umc-care
+    depends_on:
+      mongo-bootstrap: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+    networks: [private]
+    restart: unless-stopped
+  patient-worker:
+    build: { context: ../.., dockerfile: services/patient/Dockerfile }
+    command: ["npm", "run", "worker"]
+    environment:
+      NODE_ENV: production
+      MONGODB_URI: $PATIENT_MONGO_URI
+      AMQP_URL: amqp://${RABBITMQ_DEFAULT_USER:-admin}:${RABBITMQ_DEFAULT_PASS:-YOUR_PASSWORD_HERE}@rabbitmq:5672/umc-care
+    depends_on:
+      mongo-bootstrap: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+    networks: [private]
     restart: unless-stopped
   pharmacy:
     build: { context: ../.., dockerfile: services/pharmacy/Dockerfile }
@@ -173,6 +207,8 @@ services:
     ports:
       - "8080:8080"
       - "9901:9901"
+    volumes:
+      - ../../infra/certs/jwt_public.pem:/etc/envoy/jwt_public.pem:ro
     depends_on:
       identity: { condition: service_healthy }
       billing: { condition: service_healthy }

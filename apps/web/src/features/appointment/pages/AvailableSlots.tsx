@@ -240,7 +240,6 @@ export function AvailableSlots({
               required
               type="date"
               value={date}
-              min={localDateToday()}
               onChange={(event) => {
                 setDate(event.target.value);
                 setSubmitted(false);

@@ -8,7 +8,7 @@ function createAuthContext({ verifyBearerToken } = {}) {
       if (!claims || typeof claims.sub !== 'string' || !claims.sub.trim()) throw new ApiError(401, 'UNAUTHENTICATED', 'Invalid token claims.');
       const actorType = String(claims.actorType || '').toUpperCase();
       if (!['PATIENT', 'DOCTOR', 'STAFF'].includes(actorType)) throw new ApiError(401, 'UNAUTHENTICATED', 'Invalid actor type.');
-      req.authContext = Object.freeze({ userId: claims.sub, actorType, capabilities: Array.isArray(claims.capabilities) ? claims.capabilities : [], scopes: Array.isArray(claims.scopes) ? claims.scopes : [] });
+      req.authContext = Object.freeze({ userId: claims.sub, actorType, tokenVersion: claims.tokenVersion, capabilities: Array.isArray(claims.capabilities) ? claims.capabilities : [], scopes: Array.isArray(claims.scopes) ? claims.scopes : [] });
       next();
     } catch (error) { next(error instanceof ApiError ? error : new ApiError(401, 'UNAUTHENTICATED', 'Invalid token claims.')); }
   };

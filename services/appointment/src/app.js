@@ -9,6 +9,8 @@ const {
 } = require('./routes/appointments.routes.js');
 const { errorHandler, notFound } = require('./core/errors.js');
 const { queueRoutes } = require('./routes/queue.routes.js');
+const { schedulesRoutes } = require('./routes/schedules.routes.js');
+const { summaryRoutes } = require('./routes/summary.routes.js');
 const { getScheduleModel, getSlotModel } = require('./models/appointment.model.js');
 const {
   authorizePatientAccess: defaultAuthorizePatientAccess,
@@ -39,8 +41,10 @@ function createApp({
     };
     app.use(
       '/api/v1/slots',
-      slotsRoutes({ Schedule: getScheduleModel(connection), Slot: getSlotModel(connection) }),
+      slotsRoutes({ Schedule: getScheduleModel(connection), Slot: getSlotModel(connection), verifyBearerToken }),
     );
+    app.use('/api/v1/schedules', schedulesRoutes(dependencies));
+    app.use('/api/v1/admin/summary', summaryRoutes(dependencies));
     app.use('/api/v1/appointment-holds', holdsRoutes(dependencies));
     app.use('/api/v1/appointments', appointmentsRoutes(dependencies));
     app.use('/api/v1/patients', patientAppointmentsRoutes(dependencies));
