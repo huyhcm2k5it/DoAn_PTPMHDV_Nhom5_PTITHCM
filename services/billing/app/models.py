@@ -1,3 +1,3 @@
-from app.domain.models import Charge, SettlementSaga, Payment, Receipt, Refund
+from app.domain.models import Charge, SettlementSaga, Payment, Receipt, Refund, BillingEventOutbox
 
-__all__ = ["Charge", "SettlementSaga", "Payment", "Receipt", "Refund"]
+__all__ = ["Charge", "SettlementSaga", "Payment", "Receipt", "Refund", "BillingEventOutbox"]

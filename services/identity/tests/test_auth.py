@@ -20,7 +20,8 @@ class AuthLoginTests(APITestCase):
         self.assertIn("accessToken", response_data["data"])
 
         # Kiểm tra token có đúng chữ ký RS256 bằng public key không
-        public_key_path = BASE_DIR / "infra" / "certs" / "jwt_public.pem"
+        local_pub = Path(__file__).resolve().parent.parent / "jwt_public.pem"
+        public_key_path = local_pub if local_pub.exists() else BASE_DIR / "infra" / "certs" / "jwt_public.pem"
         with open(public_key_path, "r", encoding="utf-8") as f:
             pub_key = f.read()
 

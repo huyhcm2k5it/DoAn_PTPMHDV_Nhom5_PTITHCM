@@ -143,3 +143,23 @@ class BillingServiceTests(APITestCase):
         )
         self.assertEqual(res2.status_code, status.HTTP_202_ACCEPTED)
         self.assertEqual(res1.json()["data"]["paymentId"], res2.json()["data"]["paymentId"])
+
+        # Giả lập đối soát hoàn tất: Charge chuyển sang PAID, Payment chuyển sang SUCCEEDED
+        self.charge.refresh_from_db()
+        self.charge.state = "PAID"
+        self.charge.settlement_state = "SUCCEEDED"
+        self.charge.save(update_fields=["state", "settlement_state"])
+
+        payment = Payment.objects.get(id=res1.json()["data"]["paymentId"])
+        payment.state = "SUCCEEDED"
+        payment.save(update_fields=["state"])
+
+        # Lần gửi 3 (retry gửi lại sau khi khoản thu đã PAID/settled): vẫn phải trả về 202 và giữ nguyên paymentId
+        res3 = self.client.post(
+            "/api/v1/payments/simulate",
+            {"chargeId": str(self.charge.id), "transactionId": tx_id},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY=key
+        )
+        self.assertEqual(res3.status_code, status.HTTP_202_ACCEPTED)
+        self.assertEqual(res3.json()["data"]["paymentId"], str(payment.id))
