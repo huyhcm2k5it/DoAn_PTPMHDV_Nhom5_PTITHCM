@@ -73,6 +73,10 @@ const appointmentStorage = [
         unique: true,
         partialFilterExpression: { claimId: { $type: 'string' } },
       },
+      {
+        name: 'ix_queue_today_state',
+        key: { state: 1, ticketType: 1, doctorId: 1, createdAt: 1 },
+      },
     ],
     ['appointmentId', 'ticketType', 'returnRound'],
   ),
