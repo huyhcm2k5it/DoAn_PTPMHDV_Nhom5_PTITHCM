@@ -22,7 +22,12 @@ async function listen(app, t) {
 }
 test('Patient read APIs scope by verified identity and ignore X-User-Id', async (t) => {
   const mongod = await MongoMemoryReplSet.create({ replSet: { count: 1 }, binary: { version: '8.0.16' } });
-  const connection = await mongoose.createConnection(mongod.getUri(), { dbName: 'patient_db', autoCreate: false, autoIndex: false }).asPromise();
+  const connection = await mongoose.createConnection(mongod.getUri(), {
+    dbName: 'patient_db',
+    autoCreate: false,
+    autoIndex: false,
+    runtimeAdapters: { os: require('node:os') },
+  }).asPromise();
   t.after(async () => { await connection.close(); await mongod.stop(); });
   await ensurePatientStorage(connection);
   const Patient = getPatientModel(connection);
@@ -59,7 +64,12 @@ test('Patient read APIs scope by verified identity and ignore X-User-Id', async 
 });
 test('AP-004 returns only open available slots in the Vietnam business day', async (t) => {
   const mongod = await MongoMemoryReplSet.create({ replSet: { count: 1 }, binary: { version: '8.0.16' } });
-  const connection = await mongoose.createConnection(mongod.getUri(), { dbName: 'appointment_db', autoCreate: false, autoIndex: false }).asPromise();
+  const connection = await mongoose.createConnection(mongod.getUri(), {
+    dbName: 'appointment_db',
+    autoCreate: false,
+    autoIndex: false,
+    runtimeAdapters: { os: require('node:os') },
+  }).asPromise();
   t.after(async () => { await connection.close(); await mongod.stop(); });
   await ensureAppointmentStorage(connection);
   const Schedule = getScheduleModel(connection);

@@ -31,7 +31,11 @@ async function seed({
   if (dryRun) return patients;
   if (!uri) throw new Error('MONGODB_URI is required');
   const connection = await mongoose
-    .createConnection(uri, { autoCreate: false, autoIndex: false })
+    .createConnection(uri, {
+      autoCreate: false,
+      autoIndex: false,
+      runtimeAdapters: { os: require('node:os') },
+    })
     .asPromise();
   try {
     await ensurePatientStorage(connection);
