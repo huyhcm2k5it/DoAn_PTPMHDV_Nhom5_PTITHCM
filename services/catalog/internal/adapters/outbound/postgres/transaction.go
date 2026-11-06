@@ -39,6 +39,21 @@ func priceError(err error) error {
 	}
 	return err
 }
+func (p *priceTx) AccessForShare(ctx context.Context, id string) (domain.Access, error) {
+	var access domain.Access
+	var caps []byte
+	err := p.tx.QueryRow(ctx, "SELECT user_id::text,actor_type,capabilities,token_version,status FROM user_access_projection WHERE user_id=$1 FOR SHARE", id).Scan(&access.UserID, &access.ActorType, &caps, &access.TokenVersion, &access.Status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return access, domain.Fail("SERVICE_UNAVAILABLE", "Identity access projection is not ready")
+	}
+	if err != nil {
+		return access, err
+	}
+	if err = json.Unmarshal(caps, &access.Capabilities); err != nil {
+		return access, fmt.Errorf("invalid access projection")
+	}
+	return access, nil
+}
 func (p *priceTx) Replay(ctx context.Context, actor, key string) (domain.PriceResult, string, bool, error) {
 	var r domain.PriceResult
 	var hash string

@@ -48,18 +48,30 @@ jobs:
         options: >-
           --health-cmd "rabbitmq-diagnostics -q ping"
           --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7.4-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping | grep -q PONG"
+          --health-interval 3s --health-timeout 3s --health-retries 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: '1.27.0'
           cache-dependency-path: services/catalog/go.sum
+      - name: Configure scoped Catalog Redis user
+        run: docker exec ${{ job.services.redis.id }} redis-cli ACL SETUSER catalog reset on '>ci-only-catalog-cache' '~umc:catalog:v1:*' +hello +auth +ping +get +set +setnx
       - name: Real PostgreSQL tests (not skipped)
         working-directory: services/catalog
         env:
           TEST_DATABASE_URL: postgres://postgres:ci-only-not-a-production-secret@127.0.0.1:5432/umc_huy_test_ci?sslmode=disable
           CONTRACT_RESPONSE_FILE: ${{ runner.temp }}/catalog-http-responses.json
           TEST_RABBITMQ_URL: amqp://guest:guest@127.0.0.1:5672/
+          TEST_REDIS_ADDR: 127.0.0.1:6379
+          TEST_REDIS_USERNAME: catalog
+          TEST_REDIS_PASSWORD: ci-only-catalog-cache
+          TEST_REDIS_EXPECT_ACL: '1'
         run: go test -race -count=1 -tags=integration,brokerintegration -v ./internal/adapters/...
       - uses: actions/setup-python@v5
         with:

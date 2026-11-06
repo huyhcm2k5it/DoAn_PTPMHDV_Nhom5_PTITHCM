@@ -13,6 +13,7 @@ import (
 	"time"
 	httpadapter "umccare/catalog/internal/adapters/inbound/http"
 	"umccare/catalog/internal/adapters/outbound/postgres"
+	redisadapter "umccare/catalog/internal/adapters/outbound/redis"
 	"umccare/catalog/internal/application/ports"
 	"umccare/catalog/internal/application/usecase"
 	"umccare/catalog/internal/config"
@@ -53,7 +54,16 @@ func run() error {
 		}
 		auth = httpadapter.NewJWT(access, lease, cfg.JWTIssuer, cfg.JWTAudience)
 	}
-	app := usecase.New(db, db, ports.RealClock{})
+	var cache ports.ReadCache
+	if cfg.RedisAddr != "" {
+		redisCache, cacheErr := redisadapter.New(cfg.RedisAddr, cfg.RedisUsername, cfg.RedisPassword)
+		if cacheErr != nil {
+			return cacheErr
+		}
+		defer redisCache.Close()
+		cache = redisCache
+	}
+	app := usecase.NewCached(db, db, ports.RealClock{}, cache, 10)
 	handler := httpadapter.New(httpadapter.Config{Name: cfg.Name, Ready: db.Ready}, app, auth)
 	server := &http.Server{Addr: cfg.Address, Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16 * 1024}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

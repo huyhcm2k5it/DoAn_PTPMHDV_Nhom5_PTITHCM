@@ -6,20 +6,36 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"strings"
+	"time"
 	"umccare/catalog/internal/application/ports"
 	"umccare/catalog/internal/domain"
 	"unicode/utf8"
 )
 
 type Service struct {
-	reader ports.Reader
-	prices ports.PriceTransactions
-	clock  ports.Clock
+	reader   ports.Reader
+	prices   ports.PriceTransactions
+	clock    ports.Clock
+	cache    ports.ReadCache
+	fallback chan struct{}
 }
 
-func New(r ports.Reader, p ports.PriceTransactions, c ports.Clock) *Service { return &Service{r, p, c} }
+func New(r ports.Reader, p ports.PriceTransactions, c ports.Clock) *Service {
+	return NewCached(r, p, c, nil, 10)
+}
+
+func NewCached(r ports.Reader, p ports.PriceTransactions, c ports.Clock, cache ports.ReadCache, maxFallback int) *Service {
+	if maxFallback < 1 {
+		maxFallback = 1
+	}
+	return &Service{reader: r, prices: p, clock: c, cache: cache, fallback: make(chan struct{}, maxFallback)}
+}
 func (s *Service) Departments(ctx context.Context) ([]domain.Department, error) {
-	return s.reader.Departments(ctx)
+	var result []domain.Department
+	err := s.cached(ctx, "departments", struct{}{}, time.Time{}, &result, func() (any, error) {
+		return s.reader.Departments(ctx)
+	})
+	return result, err
 }
 func (s *Service) Doctors(ctx context.Context, q ports.DoctorQuery) (ports.Doctors, error) {
 	if q.Page == 0 {
@@ -31,16 +47,33 @@ func (s *Service) Doctors(ctx context.Context, q ports.DoctorQuery) (ports.Docto
 	if q.Page < 1 || q.Page > 1000000 || q.Limit < 1 || q.Limit > 100 || (q.DepartmentID != "" && !domain.ValidID(q.DepartmentID)) {
 		return ports.Doctors{}, domain.Fail("VALIDATION_ERROR", "Invalid doctor filter or pagination")
 	}
-	return s.reader.Doctors(ctx, q)
+	var result ports.Doctors
+	err := s.cached(ctx, "doctors", q, time.Time{}, &result, func() (any, error) {
+		return s.reader.Doctors(ctx, q)
+	})
+	return result, err
 }
 func (s *Service) MedicalServices(ctx context.Context, q ports.ServiceQuery) ([]domain.MedicalService, error) {
 	if q.DepartmentID != "" && !domain.ValidID(q.DepartmentID) {
 		return nil, domain.Fail("VALIDATION_ERROR", "Invalid departmentId")
 	}
+	atWasExplicit := !q.At.IsZero()
 	if q.At.IsZero() {
 		q.At = s.clock.Now()
 	}
-	return s.reader.MedicalServices(ctx, q)
+	cacheQuery := struct {
+		DepartmentID string    `json:"departmentId"`
+		At           time.Time `json:"at"`
+		ExplicitAt   bool      `json:"explicitAt"`
+	}{DepartmentID: q.DepartmentID, At: q.At, ExplicitAt: atWasExplicit}
+	if !atWasExplicit {
+		cacheQuery.At = q.At.Truncate(time.Minute)
+	}
+	var result []domain.MedicalService
+	err := s.cached(ctx, "services", cacheQuery, q.At, &result, func() (any, error) {
+		return s.reader.MedicalServices(ctx, q)
+	})
+	return result, err
 }
 func (s *Service) authorize(ctx context.Context, p domain.Principal, capabilities ...string) error {
 	if p.UserID == "" {
@@ -76,7 +109,15 @@ func (s *Service) Medicines(ctx context.Context, p domain.Principal, q ports.Sea
 		return nil, domain.Fail("VALIDATION_ERROR", "Invalid catalog filter")
 	}
 	q.Q = strings.TrimSpace(q.Q)
-	return s.reader.Medicines(ctx, q, s.clock.Now())
+	at := s.clock.Now()
+	var result []domain.Medicine
+	err := s.cached(ctx, "medicines", struct {
+		Query ports.SearchQuery `json:"query"`
+		At    time.Time         `json:"at"`
+	}{q, at.Truncate(time.Minute)}, at, &result, func() (any, error) {
+		return s.reader.Medicines(ctx, q, at)
+	})
+	return result, err
 }
 func (s *Service) LabTests(ctx context.Context, p domain.Principal, q ports.SearchQuery) ([]domain.LabTest, error) {
 	if err := s.authorize(ctx, p, "LAB_TECH", "LAB_REVIEW", "ADMIN"); err != nil {
@@ -86,13 +127,33 @@ func (s *Service) LabTests(ctx context.Context, p domain.Principal, q ports.Sear
 		return nil, domain.Fail("VALIDATION_ERROR", "Invalid catalog filter")
 	}
 	q.Q = strings.TrimSpace(q.Q)
-	return s.reader.LabTests(ctx, q, s.clock.Now())
+	at := s.clock.Now()
+	var result []domain.LabTest
+	err := s.cached(ctx, "lab-tests", struct {
+		Query ports.SearchQuery `json:"query"`
+		At    time.Time         `json:"at"`
+	}{q, at.Truncate(time.Minute)}, at, &result, func() (any, error) {
+		return s.reader.LabTests(ctx, q, at)
+	})
+	return result, err
 }
+
+func (s *Service) authorizePriceTx(ctx context.Context, tx ports.PriceTx, p domain.Principal) error {
+	access, err := tx.AccessForShare(ctx, p.UserID)
+	if err != nil {
+		return err
+	}
+	if access.Status != "ACTIVE" || access.ActorType != "STAFF" || access.TokenVersion != p.TokenVersion || !domain.Has(access.Capabilities, "ADMIN") || !domain.Has(p.Capabilities, "ADMIN") || !p.LeaseExpiresAt.After(s.clock.Now()) {
+		return domain.Fail("FORBIDDEN", "Administrator access or authorization lease is no longer valid")
+	}
+	return nil
+}
+
 func (s *Service) CreatePrice(ctx context.Context, p domain.Principal, key string, input domain.PriceInput, meta ports.Meta) (result domain.PriceResult, err error) {
 	if err = s.authorize(ctx, p, "ADMIN"); err != nil {
 		return
 	}
-	if p.LeaseAction != "CA-004" {
+	if p.LeaseAction != "CA-004" || !p.LeaseExpiresAt.After(s.clock.Now()) {
 		err = domain.Fail("FORBIDDEN", "A current CA-004 authorization lease is required")
 		return
 	}
@@ -110,12 +171,19 @@ func (s *Service) CreatePrice(ctx context.Context, p domain.Principal, key strin
 	sum := sha256.Sum256(raw)
 	hash := hex.EncodeToString(sum[:])
 	now := s.clock.Now()
+	changed := false
 	err = s.prices.Within(ctx, p.UserID, key, func(tx ports.PriceTx) error {
 		old, oldHash, found, e := tx.Replay(ctx, p.UserID, key)
 		if e != nil {
 			return e
 		}
+		if !p.LeaseExpiresAt.After(s.clock.Now()) {
+			return domain.Fail("FORBIDDEN", "Authorization lease expired while processing the request")
+		}
 		if found {
+			if e = s.authorizePriceTx(ctx, tx, p); e != nil {
+				return e
+			}
 			if hash != oldHash {
 				return domain.Fail("IDEMPOTENCY_CONFLICT", "Key already used for another price request")
 			}
@@ -131,6 +199,15 @@ func (s *Service) CreatePrice(ctx context.Context, p domain.Principal, key strin
 		}
 		if !exists {
 			return domain.Fail("VALIDATION_ERROR", "Catalog item does not exist or is inactive")
+		}
+		if e = s.authorizePriceTx(ctx, tx, p); e != nil {
+			return e
+		}
+		if !p.LeaseExpiresAt.After(s.clock.Now()) {
+			return domain.Fail("FORBIDDEN", "Authorization lease expired while waiting for the item")
+		}
+		if e = input.Validate(s.clock.Now()); e != nil {
+			return e
 		}
 		overlap, e := tx.Overlap(ctx, input)
 		if e != nil {
@@ -155,7 +232,22 @@ func (s *Service) CreatePrice(ctx context.Context, p domain.Principal, key strin
 			return e
 		}
 		result = domain.PriceResult{PriceVersionID: price.PriceVersionID, Revision: revision, EffectiveFrom: price.EffectiveFrom}
-		return tx.SaveReplay(ctx, p.UserID, key, hash, result)
+		if e = tx.SaveReplay(ctx, p.UserID, key, hash, result); e != nil {
+			return e
+		}
+		if !p.LeaseExpiresAt.After(s.clock.Now()) {
+			return domain.Fail("FORBIDDEN", "Authorization lease expired before committing the price")
+		}
+		changed = true
+		return nil
 	})
+	if err == nil && changed && s.cache != nil {
+		// The database commit is authoritative. Cache invalidation is best effort
+		// and must never turn a committed price into an HTTP failure. Preserve
+		// request metadata but finish invalidation if the client disconnects.
+		invalidateCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 150*time.Millisecond)
+		_ = s.cache.BumpGeneration(invalidateCtx)
+		cancel()
+	}
 	return
 }

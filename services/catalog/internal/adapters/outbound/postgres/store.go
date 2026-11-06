@@ -192,6 +192,15 @@ func (s *Store) LabTests(ctx context.Context, q ports.SearchQuery, at time.Time)
 	}
 	return items, rows.Err()
 }
+func (s *Store) NextPriceBoundary(ctx context.Context, at time.Time) (*time.Time, error) {
+	var boundary *time.Time
+	err := s.pool.QueryRow(ctx, `SELECT min(boundary) FROM (
+		SELECT effective_from AS boundary FROM price_versions WHERE effective_from>$1
+		UNION ALL
+		SELECT effective_to AS boundary FROM price_versions WHERE effective_to>$1
+	) boundaries`, at).Scan(&boundary)
+	return boundary, err
+}
 func (s *Store) Access(ctx context.Context, id string) (domain.Access, error) {
 	var a domain.Access
 	var caps []byte

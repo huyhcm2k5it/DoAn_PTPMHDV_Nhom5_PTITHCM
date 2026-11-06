@@ -61,7 +61,7 @@ func TestRealPostgresTransactions(t *testing.T) {
 		t.Fatalf("missing price must be null, not a zero-VND fabricated price: %+v %v", noPrice, e)
 	}
 	app := usecase.New(db, db, ports.RealClock{})
-	admin := domain.Principal{UserID: "00000000-0000-4000-8000-000000000901", ActorType: "STAFF", Capabilities: []string{"ADMIN"}, TokenVersion: 1, LeaseAction: "CA-004"}
+	admin := domain.Principal{UserID: "00000000-0000-4000-8000-000000000901", ActorType: "STAFF", Capabilities: []string{"ADMIN"}, TokenVersion: 1, LeaseAction: "CA-004", LeaseExpiresAt: time.Now().Add(time.Hour)}
 	future := time.Now().UTC().Add(15 * 24 * time.Hour).Truncate(time.Second)
 	end := future.Add(time.Hour)
 	input := domain.PriceInput{ItemType: "EXAM", ItemID: "00000000-0000-4000-8000-000000000201", AmountVND: 123456, EffectiveFrom: future, EffectiveTo: &end}
@@ -152,6 +152,7 @@ func TestRealPostgresTransactions(t *testing.T) {
 	}
 	testHTTP(t, db)
 	testMixedCaseIdempotency(t, db)
+	testRevocationDuringItemLock(t, db)
 	if _, e = db.pool.Exec(ctx, "UPDATE user_access_projection SET capabilities='[]'::jsonb WHERE user_id=$1", admin.UserID); e != nil {
 		t.Fatal(e)
 	}
