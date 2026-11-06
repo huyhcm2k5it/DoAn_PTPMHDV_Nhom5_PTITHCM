@@ -43,12 +43,10 @@ services:
   rabbitmq:
     image: rabbitmq:4.3.6-management
     hostname: rabbitmq
-    environment:
-      RABBITMQ_DEFAULT_USER: $RABBITMQ_ADMIN_USER
-      RABBITMQ_DEFAULT_PASS: $RABBITMQ_ADMIN_PASSWORD
-      RABBITMQ_DEFAULT_VHOST: /umc-care
+    env_file:
+      - ../../rabbitmq/.env
     volumes: [rabbitmq_data:/var/lib/rabbitmq]
-    networks: [private]
+    networks: [private, default]
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 5s
@@ -56,12 +54,36 @@ services:
       retries: 20
       start_period: 15s
     restart: unless-stopped
+  postgres:
+    image: postgres:18
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_root_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./postgres/hung/init.sql:/docker-entrypoint-initdb.d/20-hung.sql:ro
+    networks:
+      - private
+      - default
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
   patient:
     build: { context: ../.., dockerfile: services/patient/Dockerfile }
     environment:
       NODE_ENV: production
       PORT: "3000"
       MONGODB_URI: $PATIENT_MONGO_URI
+      JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
+      JWT_ISSUER: umc-care-identity
+      JWT_AUDIENCE: umc-care-services
+    volumes:
+      - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
     depends_on:
       mongo-bootstrap: { condition: service_completed_successfully }
     networks: [private]
@@ -77,6 +99,11 @@ services:
       NODE_ENV: production
       PORT: "3000"
       MONGODB_URI: $APPOINTMENT_MONGO_URI
+      JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
+      JWT_ISSUER: umc-care-identity
+      JWT_AUDIENCE: umc-care-services
+    volumes:
+      - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
     depends_on:
       mongo-bootstrap: { condition: service_completed_successfully }
     networks: [private]
@@ -85,6 +112,30 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    restart: unless-stopped
+  appointment-worker:
+    build: { context: ../.., dockerfile: services/appointment/Dockerfile }
+    command: ["npm", "run", "worker"]
+    environment:
+      NODE_ENV: production
+      MONGODB_URI: $APPOINTMENT_MONGO_URI
+      AMQP_URL: amqp://${RABBITMQ_DEFAULT_USER:-admin}:${RABBITMQ_DEFAULT_PASS:-YOUR_PASSWORD_HERE}@rabbitmq:5672/umc-care
+    depends_on:
+      mongo-bootstrap: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+    networks: [private]
+    restart: unless-stopped
+  patient-worker:
+    build: { context: ../.., dockerfile: services/patient/Dockerfile }
+    command: ["npm", "run", "worker"]
+    environment:
+      NODE_ENV: production
+      MONGODB_URI: $PATIENT_MONGO_URI
+      AMQP_URL: amqp://${RABBITMQ_DEFAULT_USER:-admin}:${RABBITMQ_DEFAULT_PASS:-YOUR_PASSWORD_HERE}@rabbitmq:5672/umc-care
+    depends_on:
+      mongo-bootstrap: { condition: service_completed_successfully }
+      rabbitmq: { condition: service_healthy }
+    networks: [private]
     restart: unless-stopped
   pharmacy:
     build: { context: ../.., dockerfile: services/pharmacy/Dockerfile }
@@ -101,12 +152,77 @@ services:
       timeout: 3s
       retries: 20
     restart: unless-stopped
+  identity:
+    build: { context: ../../services/identity, dockerfile: Dockerfile }
+    env_file:
+      - ../../services/identity/.env
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [private]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  billing:
+    build: { context: ../../services/billing, dockerfile: Dockerfile }
+    env_file:
+      - ../../services/billing/.env
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [private]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  billing-worker:
+    build: { context: ../../services/billing, dockerfile: Dockerfile }
+    command: ["python", "manage.py", "run_billing_worker"]
+    env_file:
+      - ../../services/billing/.env
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+      billing: { condition: service_healthy }
+    networks: [private]
+    restart: unless-stopped
+  notification:
+    build: { context: ../../services/notification, dockerfile: Dockerfile }
+    env_file:
+      - ../../services/notification/.env
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [private]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  gateway:
+    build: { context: ../../envoy, dockerfile: Dockerfile }
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../../infra/certs/jwt_public.pem:/etc/envoy/jwt_public.pem:ro
+    depends_on:
+      identity: { condition: service_healthy }
+      billing: { condition: service_healthy }
+      notification: { condition: service_healthy }
+    networks:
+      - private
+      - default
+    restart: unless-stopped
 networks:
   private:
     internal: true
 volumes:
   mongo_data:
   rabbitmq_data:
+  postgres_data:
 secrets:
   mongo-keyfile:
     file: ../../mongo/secrets/replica.key

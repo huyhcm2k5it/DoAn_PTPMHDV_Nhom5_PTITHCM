@@ -1,0 +1,8 @@
+Django
+djangorestframework
+psycopg[binary]
+gunicorn
+python-dotenv
+PyJWT
+cryptography
+pika

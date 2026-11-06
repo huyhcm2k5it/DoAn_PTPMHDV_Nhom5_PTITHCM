@@ -21,6 +21,7 @@ test('access projection is idempotent, monotonic and fail-closed', async (t) => 
       dbName: 'appointment_db',
       autoCreate: false,
       autoIndex: false,
+      runtimeAdapters: { os: require('node:os') },
     })
     .asPromise();
   t.after(async () => {

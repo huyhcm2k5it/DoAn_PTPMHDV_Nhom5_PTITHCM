@@ -1,5 +1,6 @@
 const { connectDatabase } = require('../src/configs/database.js');
 const { getScheduleModel, getSlotModel } = require('../src/models/appointment.model.js');
+const { ensureAppointmentStorage } = require('../src/dbs/indexes.js');
 
 const ids = {
   ownerA: '11111111-1111-4111-8111-111111111111',
@@ -15,16 +16,25 @@ const ids = {
 async function seed({
   uri = process.env.MONGODB_URI,
   now = new Date(),
+  demoDate = process.env.DEMO_APPOINTMENT_DATE,
   dryRun = process.argv.includes('--dry-run'),
 } = {}) {
+  const vietnamTomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+    .toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+  const selectedDate = demoDate || vietnamTomorrow;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedDate))
+    throw new Error('DEMO_APPOINTMENT_DATE must be YYYY-MM-DD.');
+  const startAt = new Date(`${selectedDate}T08:00:00+07:00`);
+  const endAt = new Date(`${selectedDate}T10:00:00+07:00`);
+  const slotEndAt = new Date(`${selectedDate}T08:30:00+07:00`);
   const records = {
     schedule: {
       id: ids.schedule,
       doctorId: ids.doctor,
       serviceId: ids.service,
       room: 'A-101',
-      startAt: new Date('2026-11-02T01:00:00.000Z'),
-      endAt: new Date('2026-11-02T03:00:00.000Z'),
+      startAt,
+      endAt,
       capacityPerSlot: 1,
       status: 'OPEN',
       slotMinutes: 30,
@@ -33,8 +43,8 @@ async function seed({
     slot: {
       id: ids.slot,
       scheduleId: ids.schedule,
-      startAt: new Date('2026-11-02T01:00:00.000Z'),
-      endAt: new Date('2026-11-02T01:30:00.000Z'),
+      startAt,
+      endAt: slotEndAt,
       capacity: 1,
       heldCount: 0,
       confirmedCount: 0,
@@ -66,28 +76,29 @@ async function seed({
   if (!uri) throw new Error('MONGODB_URI is required');
   const connection = await connectDatabase(uri);
   try {
+    await ensureAppointmentStorage(connection);
     const Schedule = getScheduleModel(connection);
     const Slot = getSlotModel(connection);
-    await Schedule.replaceOne(
+    await Schedule.updateOne(
       { id: records.schedule.id },
-      { ...records.schedule, updatedAt: now },
+      { $setOnInsert: records.schedule },
       { upsert: true },
     );
-    await Slot.replaceOne({ id: records.slot.id }, records.slot, { upsert: true });
+    await Slot.updateOne({ id: records.slot.id }, { $setOnInsert: records.slot }, { upsert: true });
     for (const projection of records.access)
       await connection
         .collection('user_access_projection')
-        .replaceOne(
+        .updateOne(
           { userId: projection.userId },
-          { ...projection, updatedAt: now },
+          { $setOnInsert: { ...projection, updatedAt: now } },
           { upsert: true },
         );
     for (const projection of records.patientAccess)
       await connection
         .collection('patient_access_projection')
-        .replaceOne(
+        .updateOne(
           { patientId: projection.patientId },
-          { ...projection, updatedAt: now },
+          { $setOnInsert: { ...projection, updatedAt: now } },
           { upsert: true },
         );
     return records;

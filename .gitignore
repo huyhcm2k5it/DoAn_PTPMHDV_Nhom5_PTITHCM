@@ -19,8 +19,18 @@ coverage/
 mongo/secrets/
 
 .agents
+.workbuddy-ai
 
 # Chặn lộ khóa bí mật
 *private.pem
 __pycache__/
 *.pyc
+
+# Android build & IDE artifacts
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.cxx/
+captures/

@@ -18,6 +18,19 @@ function createPatientsRepository(Patient) {
       const { _id, ...data } = patient;
       return data;
     },
+
+    async search(query, { skip, limit }) {
+      const pattern = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const filter = {
+        active: { $ne: false },
+        $or: [{ id: pattern }, { fullName: pattern }, { contactPhone: pattern }],
+      };
+      const [items, total] = await Promise.all([
+        Patient.find(filter).sort({ fullName: 1, id: 1 }).skip(skip).limit(limit).lean(),
+        Patient.countDocuments(filter),
+      ]);
+      return { items: items.map((item) => { const { _id, ...data } = item; return data; }), total };
+    },
   };
 }
 module.exports = { createPatientsRepository };

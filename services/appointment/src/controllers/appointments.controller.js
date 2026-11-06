@@ -2,6 +2,8 @@ const {
   createAppointment,
   getAppointment,
   listPatientAppointments,
+  rescheduleAppointment,
+  cancelAppointment,
 } = require('../services/appointments.service.js');
 const { ApiError } = require('../core/errors.js');
 async function checkPatientAccess(dependencies, req, patientId, action) {
@@ -69,6 +71,65 @@ function createAppointmentsController(dependencies) {
           to: req.query.to,
           page: req.query.page,
           limit: req.query.limit,
+        });
+        res.status(200).json({ data, meta: { correlationId: req.correlationId } });
+      } catch (error) {
+        next(error);
+      }
+    },
+    async reschedule(req, res, next) {
+      try {
+        const existing = await getAppointment({
+          connection: dependencies.connection,
+          appointmentId: req.params.appointmentId,
+        });
+        await checkPatientAccess(
+          dependencies,
+          req,
+          existing.appointment.patientId,
+          'APPOINTMENT_RESCHEDULE',
+        );
+        const data = await rescheduleAppointment({
+          connection: dependencies.connection,
+          appointmentId: req.params.appointmentId,
+          principalId: req.authContext.userId,
+          patientId: existing.appointment.patientId,
+          newSlotId: req.body?.newSlotId,
+          expectedVersion: req.body?.expectedVersion,
+          idempotencyKey: req.get('idempotency-key'),
+          correlationId: req.correlationId,
+          now: dependencies.now?.() || new Date(),
+          resolvePriceSnapshot: dependencies.resolvePriceSnapshot,
+          createId: dependencies.createId,
+        });
+        res.status(200).json({ data, meta: { correlationId: req.correlationId } });
+      } catch (error) {
+        next(error);
+      }
+    },
+    async cancel(req, res, next) {
+      try {
+        const existing = await getAppointment({
+          connection: dependencies.connection,
+          appointmentId: req.params.appointmentId,
+        });
+        await checkPatientAccess(
+          dependencies,
+          req,
+          existing.appointment.patientId,
+          'APPOINTMENT_CANCEL',
+        );
+        const data = await cancelAppointment({
+          connection: dependencies.connection,
+          appointmentId: req.params.appointmentId,
+          principalId: req.authContext.userId,
+          patientId: existing.appointment.patientId,
+          reasonCode: req.body?.reasonCode,
+          expectedVersion: req.body?.expectedVersion,
+          idempotencyKey: req.get('idempotency-key'),
+          correlationId: req.correlationId,
+          now: dependencies.now?.() || new Date(),
+          createId: dependencies.createId,
         });
         res.status(200).json({ data, meta: { correlationId: req.correlationId } });
       } catch (error) {

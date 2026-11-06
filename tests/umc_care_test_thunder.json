@@ -1,0 +1,205 @@
+{
+  "info": {
+    "_postman_id": "c1f7a0b3-5678-4321-98ab-cdef01234567",
+    "name": "UMC Care Test Thunder",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "accessToken",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Identity & Auth",
+      "item": [
+        {
+          "name": "IA-001: Đăng ký PATIENT",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "11111111-aaaa-4111-8111-111111111111" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"0988776655\",\n  \"password\": \"MatKhauMoi@123\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/auth/register"
+            }
+          }
+        },
+        {
+          "name": "IA-002: Xác thực OTP đăng ký",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "22222222-aaaa-4222-8222-222222222222" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"0988776655\",\n  \"purpose\": \"REGISTER\",\n  \"otpCode\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/auth/otp/verify"
+            }
+          }
+        },
+        {
+          "name": "IA-003: Gửi lại OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "33333333-aaaa-4333-8333-333333333333" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"0988776655\",\n  \"purpose\": \"REGISTER\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/auth/otp/resend"
+            }
+          }
+        },
+        {
+          "name": "IA-004: Đăng nhập lấy JWT RS256",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"0901234567\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/auth/login"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.accessToken) {",
+                  "    pm.collectionVariables.set(\"accessToken\", jsonData.data.accessToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "IA-010: Tra cứu phiên & Lease",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/v1/auth/session?action=CA-004"
+            }
+          }
+        },
+        {
+          "name": "IA-007: Quên mật khẩu",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "44444444-aaaa-4444-8444-444444444444" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"0988776655\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/auth/password/forgot"
+            }
+          }
+        },
+        {
+          "name": "IA-008: Đặt lại mật khẩu với OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "55555555-aaaa-4555-8555-555555555555" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"0988776655\",\n  \"otpCode\": \"123456\",\n  \"newPassword\": \"NewPassword@2026\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/auth/password/reset"
+            }
+          }
+        },
+        {
+          "name": "IA-009: Đổi mật khẩu",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Idempotency-Key", "value": "66666666-aaaa-4666-8666-666666666666" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"0901234567\",\n  \"currentPassword\": \"password123\",\n  \"newPassword\": \"changedPassword@123\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/auth/password"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Billing & Payments",
+      "item": [
+        {
+          "name": "BI-013: Danh sách khoản thu",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8080/api/v1/charges?state=OPEN"
+            }
+          }
+        },
+        {
+          "name": "BI-002: Chi tiết khoản thu",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8080/api/v1/charges/00000000-0000-4000-8000-000000000001"
+            }
+          }
+        },
+        {
+          "name": "BI-004: Mô phỏng thanh toán (202 Accepted)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "77777777-aaaa-4777-8777-777777777777" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chargeId\": \"00000000-0000-4000-8000-000000000001\",\n  \"transactionId\": \"TXN_SIM_DEMO_001\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/payments/simulate"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

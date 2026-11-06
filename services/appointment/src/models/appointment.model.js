@@ -4,6 +4,8 @@ function getScheduleModel(connection) {
     {
       id: { type: String, required: true },
       doctorId: { type: String, required: true },
+      doctorUserId: String,
+      departmentId: String,
       serviceId: { type: String, required: true },
       room: String,
       startAt: { type: Date, required: true },
@@ -45,6 +47,8 @@ function getHoldModel(connection) {
       patientId: { type: String, required: true },
       slotId: { type: String, required: true },
       doctorId: { type: String, required: true },
+      doctorUserId: String,
+      departmentId: String,
       serviceId: { type: String, required: true },
       scheduleId: { type: String, required: true },
       slotStartAt: { type: Date, required: true },
@@ -78,6 +82,8 @@ function getAppointmentModel(connection) {
       slotId: { type: String, required: true },
       scheduleId: { type: String, required: true },
       doctorId: { type: String, required: true },
+      doctorUserId: String,
+      departmentId: String,
       serviceId: { type: String, required: true },
       startAt: { type: Date, required: true },
       endAt: { type: Date, required: true },
@@ -88,8 +94,11 @@ function getAppointmentModel(connection) {
           'PENDING_PAYMENT',
           'SETTLEMENT_LOCKED',
           'CONFIRMED',
+          'CHECKED_IN',
+          'IN_SERVICE',
           'EXPIRED',
           'CANCELLED',
+          'NO_SHOW',
           'COMPLETED',
         ],
       },
@@ -97,10 +106,18 @@ function getAppointmentModel(connection) {
       chargeId: String,
       chargeStatus: String,
       refundStatus: String,
+      cancellationId: String,
+      cancelledAt: Date,
       priceSnapshot: { type: connection.base.Schema.Types.Mixed, default: null },
+      slotHistory: { type: [connection.base.Schema.Types.Mixed], default: [] },
+      stateHistory: { type: [connection.base.Schema.Types.Mixed], default: [] },
       paymentDueAt: Date,
       settlementId: String,
       fence: Number,
+      visitId: String,
+      checkedInAt: Date,
+      checkedInBy: String,
+      noShowReason: String,
       version: { type: Number, default: 1 },
       createdAt: { type: Date, required: true },
       updatedAt: { type: Date, required: true },
@@ -110,6 +127,54 @@ function getAppointmentModel(connection) {
   schema.index({ holdId: 1 }, { unique: true, name: 'uq_appointment_hold' });
   schema.index({ patientId: 1, startAt: 1 }, { name: 'ix_appointment_patient_start' });
   return connection.model('Appointment', schema);
+}
+function getQueueTicketModel(connection) {
+  if (connection.models.QueueTicket) return connection.models.QueueTicket;
+  const schema = new connection.base.Schema(
+    {
+      id: { type: String, required: true },
+      appointmentId: { type: String, required: true },
+      patientId: { type: String, required: true },
+      doctorId: { type: String, required: true },
+      doctorUserId: String,
+      departmentId: String,
+      ticketType: { type: String, required: true, enum: ['FIRST', 'RETURN'] },
+      returnRound: { type: Number, required: true, min: 0 },
+      appointmentDate: { type: String, required: true },
+      state: {
+        type: String,
+        required: true,
+        enum: ['WAITING', 'CALLED', 'CLAIMED', 'IN_SERVICE', 'NO_SHOW', 'DONE'],
+      },
+      claimId: String,
+      visitId: String,
+      version: { type: Number, required: true, min: 1 },
+      calledAt: Date,
+      calledBy: String,
+      claimedAt: Date,
+      inServiceAt: Date,
+      completedAt: Date,
+      noShowReason: String,
+      noShowAt: Date,
+      stateHistory: { type: [connection.base.Schema.Types.Mixed], default: [] },
+      createdAt: { type: Date, required: true },
+      updatedAt: { type: Date, required: true },
+    },
+    { collection: 'queue_tickets', versionKey: false, strict: 'throw' },
+  );
+  schema.index(
+    { appointmentId: 1, ticketType: 1, returnRound: 1 },
+    { unique: true, name: 'uq_queue_appointment_round' },
+  );
+  schema.index(
+    { claimId: 1 },
+    { unique: true, sparse: true, name: 'uq_queue_claim' },
+  );
+  schema.index(
+    { state: 1, ticketType: 1, doctorId: 1, createdAt: 1 },
+    { name: 'ix_queue_today_state' },
+  );
+  return connection.model('QueueTicket', schema);
 }
 function getPatientTimeLockModel(connection) {
   if (connection.models.PatientTimeLock) return connection.models.PatientTimeLock;
@@ -159,6 +224,9 @@ function getOutboxModel(connection) {
       payload: { type: connection.base.Schema.Types.Mixed, required: true },
       published_at: Date,
       attempts: { type: Number, default: 0 },
+      next_attempt_at: Date,
+      claim_lease_until: Date,
+      claim_worker_id: String,
     },
     { collection: 'outbox', versionKey: false, strict: 'throw' },
   );
@@ -171,6 +239,7 @@ function getInboxModel(connection) {
     {
       message_id: { type: String, required: true },
       consumer_name: { type: String, required: true },
+      payload_hash: String,
       received_at: { type: Date, required: true },
     },
     { collection: 'inbox', versionKey: false, strict: 'throw' },
@@ -209,6 +278,7 @@ module.exports = {
   getSlotModel,
   getHoldModel,
   getAppointmentModel,
+  getQueueTicketModel,
   getPatientTimeLockModel,
   getIdempotencyModel,
   getOutboxModel,

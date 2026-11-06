@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import type { AppointmentApi } from '../types';
 import { ErrorPanel } from '../../../shared/ui/ErrorPanel';
@@ -10,11 +10,12 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
   const holdId = params.get('holdId') ?? '';
   const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle');
   const [error, setError] = useState<unknown>();
+  const idempotencyKey = useRef(crypto.randomUUID());
   async function confirm() {
     setState('loading');
     setError(undefined);
     try {
-      const result = await api.createAppointment({ patientId, holdId }, crypto.randomUUID());
+      const result = await api.createAppointment({ patientId, holdId }, idempotencyKey.current);
       navigate(`/patient/appointments/${encodeURIComponent(result.appointmentId)}`);
     } catch (caught) {
       setState('error');

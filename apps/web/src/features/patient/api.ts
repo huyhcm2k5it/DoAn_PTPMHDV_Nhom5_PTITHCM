@@ -20,6 +20,15 @@ export function createPatientApi(transport: GatewayTransport): PatientApi {
     }
     return body.data as T;
   }
+  async function mutate<T>(path: string, method: 'POST' | 'PATCH', input: unknown, signal?: AbortSignal): Promise<T> {
+    const response = await transport(path, { method, signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
+    const body = await response.json().catch(() => null);
+    if (!response.ok) {
+      const error = new Error(body?.error?.message ?? 'Không thể cập nhật hồ sơ.') as Error & { status: number; code?: string };
+      error.status = response.status; error.code = body?.error?.code; throw error;
+    }
+    return body.data.patient as T;
+  }
   return {
     list(page, limit, signal) {
       const query = new URLSearchParams({ page: String(page), limit: String(limit) });
@@ -29,5 +38,7 @@ export function createPatientApi(transport: GatewayTransport): PatientApi {
       const data = await request<{ patient: PatientProfile }>(`/api/v1/patients/${encodeURIComponent(patientId)}`, signal);
       return data.patient;
     },
+    create(input, signal) { return mutate<PatientProfile>('/api/v1/patients', 'POST', input, signal); },
+    update(patientId, input, signal) { return mutate<PatientProfile>(`/api/v1/patients/${encodeURIComponent(patientId)}`, 'PATCH', input, signal); },
   };
 }
