@@ -92,6 +92,11 @@ type LabRequest struct {
 	SourceVersion int            `json:"-"`
 	Tests         []TestSnapshot `json:"tests"`
 }
+type LabTerminal struct {
+	RequestID, VisitID, OrderID, State, Hash string
+	Revision                                 int
+	PublishedAt                              time.Time
+}
 type LabPending struct {
 	RequestID string `json:"requestId"`
 	State     string `json:"state"`

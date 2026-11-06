@@ -76,5 +76,7 @@ doc={'openapi':'3.1.1','info':{'title':'UMC Care Diagnostic','version':'1.1.0',
            parameter('page','query',{'type':'integer','minimum':1,'default':1}),
            parameter('limit','query',{'type':'integer','minimum':1,'maximum':100,'default':20})])},
      },'components':{'securitySchemes':{'bearerAuth':{'type':'http','scheme':'bearer','bearerFormat':'JWT (RS256)'}},'schemas':schemas}}
+doc['paths']['/api/v1/diagnostic-orders/{orderId}']['get']['description'] = 'DOCTOR reads require the current Appointment-owned doctor/visit grant projection; otherwise the request fails closed.'
+doc['paths']['/api/v1/diagnostic-orders/{orderId}/cancel']['post']['description'] = 'Cancellation is limited to a successfully settled, uncollected order and requires the current Appointment-owned doctor/visit grant projection. Billing owns refund execution.'
 (root/'contracts/http/diagnostic.openapi.json').write_text(json.dumps(doc,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 print('Generated Diagnostic HTTP (12 public operations; DI-001 remains disabled)')

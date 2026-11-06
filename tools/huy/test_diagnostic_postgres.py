@@ -35,6 +35,8 @@ try:
     created = True
     env['TEST_DATABASE_URL'] = f'postgres://huy_test@127.0.0.1:{port}/{database}?sslmode=disable'
     env['DIAGNOSTIC_CONTRACT_RESPONSE_FILE'] = str(runtime/'diagnostic-http-responses.json')
+    env['DIAGNOSTIC_RESULT_RESPONSE_FILE'] = str(runtime/'diagnostic-result-http-responses.json')
+    env['DIAGNOSTIC_RESULT_EVENT_FILE'] = str(runtime/'diagnostic-result-event.json')
     wire = runtime/'clinical-create-lab-wire.json'
     if wire.exists():
         env['CLINICAL_CREATE_LAB_WIRE_FILE'] = str(wire)

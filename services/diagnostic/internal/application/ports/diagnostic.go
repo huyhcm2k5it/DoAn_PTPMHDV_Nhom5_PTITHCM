@@ -40,3 +40,26 @@ type Diagnostic interface {
 	Sample(context.Context, domain.Principal, string, string, domain.SampleInput, bool) (domain.Specimen, error)
 	Reject(context.Context, domain.Principal, string, string, domain.RejectInput) (domain.Specimen, error)
 }
+
+type Results interface {
+	CreateResult(context.Context, domain.Principal, string, string, domain.ResultCreateInput) (domain.Result, error)
+	UpdateResult(context.Context, domain.Principal, string, string, domain.ResultUpdateInput) (domain.Result, error)
+	TransitionResult(context.Context, domain.Principal, string, string, string, int, string, domain.ResultMeta) (domain.Result, error)
+}
+
+// VisitGrantVerifier is implemented only by a trusted, current owner projection.
+// Absence is a fail-closed integration boundary.
+type VisitGrantVerifier interface {
+	VerifyVisitGrant(context.Context, string, string) error
+}
+type Cancellation interface {
+	CancelOrder(context.Context, domain.Principal, string, string, domain.CancelInput, domain.ResultMeta) (domain.CancelData, error)
+}
+
+type PublishedResultsReader interface {
+	PublishedResults(context.Context, domain.Principal, string, int, int) (domain.PublishedResults, error)
+}
+
+type PublishedResultsRecords interface {
+	PublishedResultsForPatient(context.Context, string, int, int) (domain.PublishedResults, error)
+}

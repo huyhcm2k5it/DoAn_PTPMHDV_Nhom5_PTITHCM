@@ -65,6 +65,8 @@ type Principal struct {
 	UserID, ActorType string
 	TokenVersion      int
 	Capabilities      []string
+	LeaseAction       string
+	LeaseExpiresAt    time.Time
 }
 type Access struct {
 	UserID, ActorType, Status string
@@ -140,6 +142,15 @@ type Order struct {
 	AttemptVersion  int            `json:"-"`
 	LastQueryAt     time.Time      `json:"-"`
 	CreatedAt       time.Time      `json:"createdAt"`
+}
+
+func (o Order) MarshalJSON() ([]byte, error) {
+	type alias Order
+	lifecycle := map[string]string{"PENDING_PAYMENT": "WAITING_PAYMENT", "SETTLEMENT_LOCKED": "SETTLEMENT_LOCKED", "PAID": "PAID", "SPECIMEN_COLLECTED": "SAMPLING", "SPECIMEN_REJECTED": "RECOLLECT_REQUIRED", "CANCELLED": "CANCELLED", "PUBLISHED": "PUBLISHED"}[o.State]
+	return json.Marshal(struct {
+		alias
+		LifecycleState string `json:"lifecycleState"`
+	}{alias: alias(o), LifecycleState: lifecycle})
 }
 
 // Stored uses an explicit wire alias to retain private aggregate fields in storage.
@@ -266,6 +277,7 @@ type List struct {
 type Detail struct {
 	Order     Order      `json:"order"`
 	Specimens []Specimen `json:"specimens"`
+	Results   []Result   `json:"results"`
 }
 type SampleInput struct {
 	Barcode string `json:"barcode"`

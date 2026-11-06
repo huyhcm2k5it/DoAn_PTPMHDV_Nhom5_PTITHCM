@@ -26,9 +26,16 @@ for bad in [{}, {'reasonCode':'','expectedVersion':1}, {'reasonCode':'HEMOLYSIS'
     assert list(validator('RejectInput').iter_errors(bad)), bad
 assert list(validator('SampleInput').iter_errors({'chargeState':'PAID'}))
 if len(sys.argv)>1:
-    fixtures=json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
-    assert fixtures, 'No actual HTTP fixtures were captured'
-    for name,body in fixtures.items():
-        validator(name).validate(body)
-    print('PASS: actual Diagnostic HTTP response fixtures')
+    validated = 0
+    fixture_names = set()
+    for fixture_path in sys.argv[1:]:
+        fixtures=json.loads(Path(fixture_path).read_text(encoding='utf-8'))
+        assert fixtures, f'No actual Diagnostic HTTP fixtures were captured in {fixture_path}'
+        for name,body in fixtures.items():
+            validator(name).validate(body)
+            fixture_names.add(name)
+            validated += 1
+    required = {'ResultDataResponse', 'PublishedResultsResponse', 'Error'}
+    assert required <= fixture_names, f'Missing actual Diagnostic response fixtures: {sorted(required-fixture_names)}'
+    print(f'PASS: actual Diagnostic HTTP response fixtures ({validated} responses)')
 print('PASS: Diagnostic OpenAPI, strict inputs and disabled recovery surface')

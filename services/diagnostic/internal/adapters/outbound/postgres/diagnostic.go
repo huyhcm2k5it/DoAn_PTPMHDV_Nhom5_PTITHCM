@@ -99,6 +99,33 @@ func (t diagnosticTx) Orders(ctx context.Context) ([]domain.Order, error) {
 	}
 	return items, rows.Err()
 }
+
+func (t diagnosticTx) PublishedResultsForPatient(ctx context.Context, patientID string, page, limit int) (domain.PublishedResults, error) {
+	out := domain.PublishedResults{Items: []domain.Result{}}
+	var raw []byte
+	err := t.tx.QueryRow(ctx, `WITH eligible AS (
+		SELECT result.value->'result' AS body,
+		       result.key AS result_id,
+		       (result.value->'result'->>'publishedAt')::timestamptz AS published_at
+		FROM lab_orders AS orders
+		JOIN objects AS relation ON relation.kind='result-order' AND relation.key=orders.id::text
+		JOIN objects AS result ON result.kind='result' AND result.key=relation.value#>>'{}'
+		WHERE orders.body->'order'->>'patientId'=$1
+		  AND result.value->'result'->>'state'='PUBLISHED'
+		  AND result.value->'result'->>'orderId'=orders.id::text
+		  AND result.value->'result'->>'publishedAt' IS NOT NULL
+	), page AS (
+		SELECT body,published_at,result_id FROM eligible
+		ORDER BY published_at DESC,result_id DESC LIMIT $2 OFFSET $3
+	)
+	SELECT COALESCE((SELECT jsonb_agg(body ORDER BY published_at DESC,result_id DESC) FROM page),'[]'::jsonb),
+	       (SELECT count(*) FROM eligible)`, patientID, limit, (page-1)*limit).Scan(&raw, &out.Total)
+	if err != nil {
+		return out, err
+	}
+	err = json.Unmarshal(raw, &out.Items)
+	return out, err
+}
 func (t diagnosticTx) SaveOrder(ctx context.Context, o domain.Order) error {
 	b, e := json.Marshal(o.Stored())
 	if e != nil {

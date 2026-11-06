@@ -41,11 +41,14 @@ func (p *Probe) Migrate(ctx context.Context) error {
 	if err := migrateCatalogStream(ctx, tx); err != nil {
 		return err
 	}
+	if err := migrateLabTerminal(ctx, tx); err != nil {
+		return err
+	}
 	return tx.Commit(ctx)
 }
 func (p *Probe) BusinessReady(ctx context.Context) error {
 	var ok bool
-	if e := p.pool.QueryRow(ctx, `SELECT count(*)=3 FROM schema_migrations WHERE version IN ('000001_clinical','000002_treatment','000003_catalog_stream')`).Scan(&ok); e != nil || !ok {
+	if e := p.pool.QueryRow(ctx, `SELECT count(*)=4 FROM schema_migrations WHERE version IN ('000001_clinical','000002_treatment','000003_catalog_stream','000004_lab_terminal')`).Scan(&ok); e != nil || !ok {
 		return domain.Fail("SERVICE_UNAVAILABLE", "Clinical migrations are required")
 	}
 	return nil
@@ -254,9 +257,33 @@ func (t clinicalTx) MarkMessage(ctx context.Context, id, hash string) error {
 }
 func (t clinicalTx) UpdateAccess(ctx context.Context, a domain.Access, version int) error {
 	_, e := t.tx.Exec(ctx, `INSERT INTO user_access_projection(user_id,actor_type,status,token_version,source_version)VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id)DO UPDATE SET actor_type=EXCLUDED.actor_type,status=EXCLUDED.status,token_version=EXCLUDED.token_version,source_version=EXCLUDED.source_version,applied_at=now() WHERE user_access_projection.source_version<EXCLUDED.source_version`, a.UserID, a.ActorType, a.Status, a.TokenVersion, version)
-	return e
+	if e != nil {
+		return e
+	}
+	var current domain.Access
+	var currentVersion int64
+	e = t.tx.QueryRow(ctx, `SELECT actor_type,status,token_version,source_version FROM user_access_projection WHERE user_id=$1 FOR UPDATE`, a.UserID).Scan(&current.ActorType, &current.Status, &current.TokenVersion, &currentVersion)
+	if e != nil {
+		return e
+	}
+	if currentVersion == int64(version) && (current.ActorType != a.ActorType || current.Status != a.Status || current.TokenVersion != a.TokenVersion) {
+		return domain.Fail("INVALID_MESSAGE", "Identity projection version has conflicting content")
+	}
+	return nil
 }
 func (t clinicalTx) UpdatePatientAccess(ctx context.Context, a domain.PatientAccess) error {
 	_, e := t.tx.Exec(ctx, `INSERT INTO patient_access_projection(patient_id,owner_user_id,active,policy_version)VALUES($1,$2,$3,$4) ON CONFLICT(patient_id)DO UPDATE SET owner_user_id=EXCLUDED.owner_user_id,active=EXCLUDED.active,policy_version=EXCLUDED.policy_version,applied_at=now() WHERE patient_access_projection.policy_version<EXCLUDED.policy_version`, a.PatientID, a.OwnerUserID, a.Active, a.PolicyVersion)
-	return e
+	if e != nil {
+		return e
+	}
+	var current domain.PatientAccess
+	var currentVersion int64
+	e = t.tx.QueryRow(ctx, `SELECT owner_user_id::text,active,policy_version FROM patient_access_projection WHERE patient_id=$1 FOR UPDATE`, a.PatientID).Scan(&current.OwnerUserID, &current.Active, &currentVersion)
+	if e != nil {
+		return e
+	}
+	if currentVersion == int64(a.PolicyVersion) && (current.OwnerUserID != domain.ID(a.OwnerUserID) || current.Active != a.Active) {
+		return domain.Fail("INVALID_MESSAGE", "Patient access projection version has conflicting content")
+	}
+	return nil
 }

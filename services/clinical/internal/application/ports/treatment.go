@@ -16,6 +16,8 @@ type TreatmentTx interface {
 	LabRequests(context.Context, string) ([]domain.LabRequest, error)
 	SaveLabRequest(context.Context, domain.LabRequest) error
 	LabRequest(context.Context, string) (domain.LabRequest, error)
+	LabTerminal(context.Context, string) (domain.LabTerminal, bool, error)
+	SaveLabTerminal(context.Context, domain.LabTerminal) error
 	DoctorID(context.Context, string) (string, error)
 	AppendMessage(context.Context, domain.Envelope, string, string) error
 }

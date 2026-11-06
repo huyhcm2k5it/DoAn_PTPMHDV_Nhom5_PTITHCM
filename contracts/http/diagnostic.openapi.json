@@ -205,7 +205,8 @@
               }
             }
           }
-        }
+        },
+        "description": "DOCTOR reads require the current Appointment-owned doctor/visit grant projection; otherwise the request fails closed."
       }
     },
     "/api/v1/diagnostic-orders/{orderId}/specimens": {
@@ -1348,7 +1349,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Cancellation is limited to a successfully settled, uncollected order and requires the current Appointment-owned doctor/visit grant projection. Billing owns refund execution."
       }
     },
     "/api/v1/patients/{patientId}/published-results": {

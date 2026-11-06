@@ -13,6 +13,8 @@ func (s *Service) HandleTreatmentMessage(ctx context.Context, exchange string, m
 	switch m.MessageType {
 	case "CatalogChanged":
 		return s.handleCatalogChanged(ctx, exchange, m)
+	case "LabResultPublished", "LabCancelled":
+		return s.handleLabTerminal(ctx, exchange, m)
 	case "LabOrderResolved":
 		if exchange != "umc.events.diagnostic.v1" || m.Producer != "diagnostic" || !domain.ValidID(m.CausationID) {
 			return domain.Fail("INVALID_MESSAGE", "Untrusted Diagnostic producer")
@@ -52,7 +54,8 @@ func (s *Service) HandleTreatmentMessage(ctx context.Context, exchange string, m
 				return e
 			}
 			if r.State != "PENDING" {
-				if r.State != p.State || r.OrderID != domain.ID(p.OrderID) || r.ReasonCode != p.ReasonCode || r.SourceVersion != p.Version {
+				matchingState := r.State == p.State || (p.State == "CREATED" && (r.State == "PUBLISHED" || r.State == "CANCELLED"))
+				if !matchingState || r.OrderID != domain.ID(p.OrderID) || r.ReasonCode != p.ReasonCode || r.SourceVersion != p.Version {
 					return domain.Fail("STATE_CONFLICT", "Conflicting LAB resolution")
 				}
 				return tx.MarkMessage(ctx, m.MessageID, domain.Hash(m))
@@ -61,29 +64,21 @@ func (s *Service) HandleTreatmentMessage(ctx context.Context, exchange string, m
 			r.OrderID = domain.ID(p.OrderID)
 			r.ReasonCode = p.ReasonCode
 			r.SourceVersion = p.Version
-			if e = tx.SaveLabRequest(ctx, r); e != nil {
-				return e
-			}
-			all, e := tx.LabRequests(ctx, v.ID)
+			terminal, found, e := tx.LabTerminal(ctx, r.RequestID)
 			if e != nil {
 				return e
 			}
-			state := "IN_PROGRESS"
-			for _, x := range all {
-				if x.State == "PENDING" {
-					state = "LAB_REQUEST_PENDING"
-					break
+			if found {
+				if p.State != "CREATED" || terminal.OrderID != r.OrderID || terminal.VisitID != r.VisitID {
+					return domain.Fail("STATE_CONFLICT", "LAB terminal does not match resolved order")
 				}
-				if x.State == "CREATED" {
-					state = "WAITING_LAB"
-				}
+				r.State = terminal.State
 			}
-			if v.State != "SIGNED" {
-				v.State = state
-				v.Version++
-				if e = tx.UpdateVisit(ctx, v); e != nil {
-					return e
-				}
+			if e = tx.SaveLabRequest(ctx, r); e != nil {
+				return e
+			}
+			if e = s.refreshLabVisit(ctx, tx, v, m); e != nil {
+				return e
 			}
 			return tx.MarkMessage(ctx, m.MessageID, domain.Hash(m))
 		})

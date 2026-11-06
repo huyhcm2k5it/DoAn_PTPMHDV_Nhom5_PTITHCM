@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"time"
 	"umccare/clinical/internal/domain"
 	"umccare/clinical/migrations"
@@ -45,6 +46,61 @@ func migrateCatalogStream(ctx context.Context, tx pgx.Tx) error {
 		return err
 	}
 	_, err = tx.Exec(ctx, `INSERT INTO schema_migrations(version)VALUES('000003_catalog_stream')`)
+	return err
+}
+
+func migrateLabTerminal(ctx context.Context, tx pgx.Tx) error {
+	var exists bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version='000004_lab_terminal')`).Scan(&exists); err != nil || exists {
+		return err
+	}
+	raw, err := migrations.Files.ReadFile("000004_lab_terminal.up.sql")
+	if err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, string(raw)); err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO schema_migrations(version) VALUES('000004_lab_terminal')`)
+	return err
+}
+
+func (t clinicalTx) LabTerminal(ctx context.Context, request string) (v domain.LabTerminal, found bool, err error) {
+	var revision *int
+	var publishedAt *time.Time
+	err = t.tx.QueryRow(ctx, `SELECT request_id::text,visit_id::text,order_id::text,state,semantic_hash,revision,published_at FROM lab_terminal_projection WHERE request_id=$1`, request).Scan(&v.RequestID, &v.VisitID, &v.OrderID, &v.State, &v.Hash, &revision, &publishedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return v, false, nil
+	}
+	if revision != nil {
+		v.Revision = *revision
+	}
+	if publishedAt != nil {
+		v.PublishedAt = publishedAt.UTC()
+	}
+	return v, err == nil, err
+}
+
+func (t clinicalTx) SaveLabTerminal(ctx context.Context, v domain.LabTerminal) error {
+	old, found, err := t.LabTerminal(ctx, v.RequestID)
+	if err != nil {
+		return err
+	}
+	if found {
+		if old.RequestID != v.RequestID || old.VisitID != v.VisitID || old.OrderID != v.OrderID || old.State != v.State || old.Hash != v.Hash || old.Revision != v.Revision || !old.PublishedAt.Equal(v.PublishedAt) {
+			return domain.Fail("STATE_CONFLICT", "Conflicting LAB terminal event")
+		}
+		return nil
+	}
+	var publishedAt *time.Time
+	if !v.PublishedAt.IsZero() {
+		publishedAt = &v.PublishedAt
+	}
+	_, err = t.tx.Exec(ctx, `INSERT INTO lab_terminal_projection(request_id,visit_id,order_id,state,semantic_hash,revision,published_at) VALUES($1,$2,$3,$4,$5,NULLIF($6,0),$7)`, v.RequestID, v.VisitID, v.OrderID, v.State, v.Hash, v.Revision, publishedAt)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		return domain.Fail("STATE_CONFLICT", "LAB order already belongs to another request")
+	}
 	return err
 }
 

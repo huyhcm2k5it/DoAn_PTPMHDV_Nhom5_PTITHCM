@@ -1,6 +1,6 @@
 # Clinical
 
-Owner: Huy. Go/Echo/pgx, with domain and application ports independent from drivers. Week 2 implements CL-001–004; later LAB, prescription and signing operations are outside this increment.
+Owner: Huy. Go/Echo/pgx, with domain and application ports independent from drivers. The service now covers CL-001–011 across worklist, visit notes, LAB requests, prescriptions, signing and patient medical-record reads.
 
 | Operation | Behavior |
 | --- | --- |
@@ -8,6 +8,7 @@ Owner: Huy. Go/Echo/pgx, with domain and application ports independent from driv
 | CL-002 `POST /api/v1/visits/start` | Atomically writes PENDING start request, idempotency response and ClaimQueueTicket outbox. Returns `202`, `Location` and `statusUrl`; no visit exists yet. |
 | CL-003 `GET /api/v1/visits/{visitId}` | Assigned doctor reads drafts. A patient can read only their owned SIGNED visit and its latest saved note. |
 | CL-004 `PUT /api/v1/visits/{visitId}/draft` | Replaces all four fields using expectedVersion and Idempotency-Key, creates an immutable note revision and increments visit version. |
+| CL-011 `GET /api/v1/patients/{patientId}/medical-records` | Paginated, no-store records for the patient owner: signed visits, the latest note saved by signing time, FINAL prescriptions and published LAB references only. |
 
 An ACCEPTED QueueTicketClaimed event creates one FIRST visit per appointment; RETURN resumes the same eligible visit once. REJECTED creates no visit. Both message ID and business result are deduplicated; conflicting terminal results are quarantined. A stale draft returns 409 and SIGNED visits cannot be edited.
 
@@ -85,8 +86,10 @@ CreateLabOrder is stored in the same PostgreSQL transaction as the pending reque
 
 Prescription names come from Clinical's trusted Catalog projection. Draft updates replace lines using expectedVersion; quantity must be a positive integer. Visit signing locks the visit and checks all registered LAB requests. FINAL requires a signed visit, at least one line, and no other FINAL prescription. Signed notes and FINAL prescriptions are immutable. Patient detail filters out draft/deleted prescriptions and internal LAB requests.
 
+CL-011 supports the PATIENT owner after checking the active PatientAccess projection and a current CL-011 authorization lease. DOCTOR access fails closed with 503 until the current doctor/visit assignment projection is supplied by the owning service; Clinical does not infer permission from a historical ticket snapshot.
+
 `cmd/import-catalog -file trusted-catalog.json` is an operator-only bootstrap while the shared Catalog entity stream is being wired. Input is an array of `{ "kind": "MEDICINE" | "LAB_TEST", "entity": { "id", "code", "name", "unit", "referenceRange", "revision", "status" } }`. Import checks monotonic revisions and rejects conflicting content at the same revision. No public HTTP bootstrap endpoint exists. Medicine/test full CatalogChanged snapshots keep this projection current. Price/checkpoint messages are not used for financial decisions in Clinical; Diagnostic owns lab pricing.
 
-The week 3 worker additionally binds `catalog.catalog-changed.v1` on `umc.events.catalog.v1` and `lab.order-resolved.v1` on `umc.events.diagnostic.v1`, and publishes `clinical.visit-signed.v1` / `clinical.prescription-finalized.v1` on `umc.events.clinical.v1`. Foreign exchanges must be provisioned by the shared topology owner.
+The worker binds `catalog.catalog-changed.v1` on `umc.events.catalog.v1` and `lab.order-resolved.v1`, `diagnostic.lab-result-published.v1`, `diagnostic.lab-cancelled.v1` on `umc.events.diagnostic.v1`. It retains terminal events received before order resolution and emits one `clinical.visit-return-ready.v1` only when all registered LAB requests have reached a terminal state. It also publishes `clinical.visit-signed.v1` / `clinical.prescription-finalized.v1` on `umc.events.clinical.v1`. Foreign exchanges must be provisioned by the shared topology owner.
 
 Verification: `go test ./...`, `go vet ./...`, and `go test -tags=integration ./internal/adapters/outbound/postgres` with TEST_DATABASE_URL restricted to an isolated umc_huy_test* database. Optional CLINICAL_WEEK3_CONTRACT_RESPONSE_FILE captures actual RSA-authenticated HTTP responses. Tests cover unsigned FINAL rejection, immutable FINAL, atomic single signing event, LAB/signing serialization, required leases, multiple LAB requests and patient privacy. Full Appointment/Billing/Pharmacy/Gateway integration remains dependent on those owners' running adapters.

@@ -37,6 +37,9 @@ try:
     env['CLINICAL_CONTRACT_RESPONSE_FILE'] = str(runtime/'clinical-http-responses.json')
     env['CLINICAL_WEEK3_CONTRACT_RESPONSE_FILE'] = str(runtime/'clinical-week3-http-responses.json')
     env['CLINICAL_CREATE_LAB_WIRE_FILE'] = str(runtime/'clinical-create-lab-wire.json')
+    diagnostic_event = runtime/'diagnostic-result-event.json'
+    if diagnostic_event.exists():
+        env['DIAGNOSTIC_RESULT_EVENT_FILE'] = str(diagnostic_event)
     result = subprocess.run([os.environ.get('GO_BIN',r'C:\Program Files\Go\bin\go.exe'),'test','-count=1','-tags=integration','-run',os.environ.get('HUY_CLINICAL_TEST_RUN','.'),'-v','./internal/adapters/outbound/postgres'], cwd=repo/'services/clinical', env=env, creationflags=hidden, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     output = result.stdout.decode('utf-8', errors='replace')
     (runtime/'clinical-postgres-integration.log').write_text(output,encoding='utf-8')

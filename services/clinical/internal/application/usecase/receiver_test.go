@@ -24,6 +24,31 @@ func (f *fakeHandler) HandleProjection(context.Context, string, domain.Envelope)
 	return f.err
 }
 
+type fakeTreatmentHandler struct{ fakeHandler }
+
+func (f *fakeTreatmentHandler) HandleTreatmentMessage(context.Context, string, domain.Envelope) error {
+	f.calls++
+	return f.err
+}
+
+func TestTerminalEventsUseDiagnosticContractRoutes(t *testing.T) {
+	for _, tc := range []struct{ event, route string }{{"LabResultPublished", "diagnostic.lab-result-published.v1"}, {"LabCancelled", "diagnostic.lab-cancelled.v1"}} {
+		t.Run(tc.event, func(t *testing.T) {
+			message := domain.Envelope{MessageID: domain.NewID(), MessageType: tc.event}
+			raw, _ := json.Marshal(message)
+			delivery := ports.Incoming{MessageID: message.MessageID, Exchange: "umc.events.diagnostic.v1", RoutingKey: tc.route, Body: raw}
+			handler, store := &fakeTreatmentHandler{}, &fakeDeliveryStore{}
+			if err := NewReceiver(handler, store).Receive(context.Background(), delivery); err != nil || handler.calls != 1 || store.dead != 0 {
+				t.Fatalf("contract route not delivered: calls=%d quarantined=%d err=%v", handler.calls, store.dead, err)
+			}
+			delivery.RoutingKey = "lab.untrusted.v1"
+			if err := NewReceiver(handler, store).Receive(context.Background(), delivery); err != nil || handler.calls != 1 || store.dead != 1 {
+				t.Fatalf("untrusted route accepted: calls=%d quarantined=%d err=%v", handler.calls, store.dead, err)
+			}
+		})
+	}
+}
+
 type fakeDeliveryStore struct {
 	scheduled, dead int
 	err             error

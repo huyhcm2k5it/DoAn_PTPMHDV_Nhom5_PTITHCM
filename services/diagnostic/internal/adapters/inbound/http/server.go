@@ -104,6 +104,7 @@ func New(p ports.Readiness, options ...Options) *echo.Echo {
 		return c.JSON(200, map[string]string{"status": "ready", "scope": scope})
 	})
 	registerDiagnostic(e, opts)
+	registerResults(e, opts)
 	return e
 }
 

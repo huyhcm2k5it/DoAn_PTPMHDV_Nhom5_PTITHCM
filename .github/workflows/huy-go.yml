@@ -91,6 +91,8 @@ jobs:
       - run: python tools/huy/check_catalog_contract.py
       - run: python tools/huy/check_clinical_contract.py
       - run: python tools/huy/check_diagnostic_contract.py
+      - run: python tools/huy/check_remaining_contracts.py
+      - run: python tools/huy/test_remaining_contracts.py
       - name: Generated contract stays reproducible
         run: |
           python tools/huy/generate_catalog_contract.py
@@ -193,14 +195,22 @@ jobs:
           TEST_DATABASE_URL: postgres://postgres:ci-only-not-a-production-secret@127.0.0.1:5432/umc_huy_test_diagnostic_ci?sslmode=disable
           TEST_RABBITMQ_URL: amqp://guest:guest@127.0.0.1:5672/
           DIAGNOSTIC_CONTRACT_RESPONSE_FILE: ${{ runner.temp }}/diagnostic-http-responses.json
+          DIAGNOSTIC_RESULT_RESPONSE_FILE: ${{ runner.temp }}/diagnostic-result-http-responses.json
+          DIAGNOSTIC_RESULT_EVENT_FILE: ${{ runner.temp }}/diagnostic-result-event.json
           CLINICAL_CREATE_LAB_WIRE_FILE: ${{ runner.temp }}/clinical-create-lab-wire.json
         run: go test -race -count=1 -tags=integration,brokerintegration -v ./internal/adapters/...
+      - name: Clinical consumes the actual Diagnostic published-result event
+        working-directory: services/clinical
+        env:
+          TEST_DATABASE_URL: postgres://postgres:ci-only-not-a-production-secret@127.0.0.1:5432/umc_huy_test_wire_clinical_ci?sslmode=disable
+          DIAGNOSTIC_RESULT_EVENT_FILE: ${{ runner.temp }}/diagnostic-result-event.json
+        run: go test -race -count=1 -tags=integration -run '^TestDiagnosticPublishedResultWire$' -v ./internal/adapters/outbound/postgres
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: pip install -r tools/huy/contract-requirements.txt
       - name: Validate actual Diagnostic HTTP responses
-        run: python tools/huy/check_diagnostic_contract.py "${{ runner.temp }}/diagnostic-http-responses.json"
+        run: python tools/huy/check_diagnostic_contract.py "${{ runner.temp }}/diagnostic-http-responses.json" "${{ runner.temp }}/diagnostic-result-http-responses.json"
   clinical-web:
     runs-on: ubuntu-latest
     defaults:

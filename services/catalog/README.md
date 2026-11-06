@@ -1,9 +1,9 @@
-# Catalog — Huy, tuần 1
+# Catalog
 
 Go 1.27.0 · Echo 5.4.0 · pgx 5.11.0 · PostgreSQL 18 · Hexagonal Architecture.
-Sáu HTTP operation CA-001–006 có implementation. Giá/idempotency/outbox nằm trong cùng PostgreSQL transaction. Catalog có checkpoint, snapshot, publisher/outbox và cache-aside Redis cho GET. Clinical/Diagnostic chỉ có nền chạy; không được tính là đã xong nghiệp vụ khám/LAB.
+Sáu HTTP operation CA-001–006, CatalogChanged v1 snapshot/checkpoint stream, RabbitMQ outbox publisher và bounded Redis cache-aside cho GET đều có implementation. Clinical và Diagnostic cũng có luồng nghiệp vụ riêng; xem từng service README và contract integration để biết giới hạn nối Appointment/Billing/Gateway còn lại.
 
-## Chạy với Compose riêng của Huy
+## Chạy với Compose riêng của Catalog
 
 Từ gốc repo, copy `infra/compose/huy.env.example` sang `infra/compose/.env.local`, điền năm password khác nhau (ký tự URL-safe). Cần Docker engine chạy:
 
@@ -15,7 +15,7 @@ Invoke-RestMethod http://127.0.0.1:8081/health/ready
 Invoke-RestMethod http://127.0.0.1:8081/api/v1/medical-services
 ```
 
-Compose bind API/DB/Redis vào loopback. Ba DB riêng `catalog_db`, `clinical_db`, `diagnostic_db`; mỗi role chỉ có quyền kết nối DB mình. Redis giới hạn 128 MiB với `allkeys-lru`; ACL chỉ cho user `default` truy cập prefix `umc:catalog:v1:*`. Không mở rộng init script sang DB có sẵn. Không xóa volume để sửa migration. Máy hiện không có Docker engine hoạt động, nên cần kiểm Docker build/run thực tế trước khi demo.
+Compose bind API/DB/Redis vào loopback. Redis giới hạn 128 MiB với `allkeys-lru`; ACL giới hạn user Catalog vào prefix `umc:catalog:v1:*`. Không mở rộng init script sang DB có sẵn. Không xóa volume để sửa migration.
 
 ## Chạy Go native
 
@@ -62,7 +62,7 @@ Response `{data,meta:{correlationId}}`; lỗi `{error:{code,message},meta:{corre
 
 `domain` chứa kiểu/quy tắc; `application/ports` chứa inbound/output port trung lập; `application/usecase` điều phối; `adapters/inbound/http` là Echo/JWT; `adapters/outbound/postgres` là pgx/transaction; `cmd` ghép dependency. Không import driver/framework vào lõi, không đọc DB service khác.
 
-Migration hiện có một version initial + bảng ledger + transaction/advisory lock; không phải framework migration đầy đủ. Khi thêm version tiếp theo phải mở rộng runner và kiểm upgrade từ version 1, không sửa file initial đã áp dụng.
+Migration hiện có hai version (`000001_catalog`, `000002_catalog_stream`) với ledger, transaction và advisory lock; đây là runner nhỏ theo dự án, không phải framework migration đầy đủ. Khi thêm version tiếp theo phải kiểm upgrade từ version 2, không sửa file đã áp dụng.
 
 ## Kiểm thử
 

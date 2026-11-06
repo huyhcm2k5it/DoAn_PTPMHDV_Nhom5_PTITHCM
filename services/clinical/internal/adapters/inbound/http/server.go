@@ -106,6 +106,7 @@ func New(p ports.Readiness, options ...Options) *echo.Echo {
 	if opts.App != nil {
 		registerClinical(e, opts)
 		registerTreatment(e, opts)
+		registerRecords(e, opts)
 	}
 	return e
 }
