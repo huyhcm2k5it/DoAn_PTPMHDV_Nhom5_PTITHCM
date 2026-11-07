@@ -11,7 +11,8 @@ from rest_framework.response import Response
 
 from app.api import idempotency
 from app.api.audit import record_audit
-from app.api.authz import correlation_id, error_response, require_capability
+from app.api.authz import error_response, require_capability
+from app.api.authz import correlation_id as get_correlation_id, error_response, require_capability
 from app.domain.models import AuditEvent, StaffCapability, User
 
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
@@ -109,7 +110,7 @@ def staff_list_view(request):
 
     return Response({
         "data": {"items": items, "total": total},
-        "meta": {"correlationId": correlation_id(request)},
+        "meta": {"correlationId": get_correlation_id(request)},
     }, status=200)
 
 
@@ -117,7 +118,7 @@ def staff_list_view(request):
 @require_capability("ADMIN")
 def staff_roles_view(request, staff_id):
     """IA-012: STAFF[ADMIN] cấp/thu hồi capability cho một tài khoản STAFF."""
-    correlation_id = correlation_id(request)
+    correlation_id = get_correlation_id(request)
 
     idempotency_key = request.headers.get("Idempotency-Key", "").strip()
     if not idempotency_key:
@@ -247,7 +248,7 @@ def staff_roles_view(request, staff_id):
                 .filter(capability="ADMIN", enabled=True)
                 .order_by("id")
             )
-            other_admins = sum(1 for c in admin_caps if c.user_id != staff.id)
+            other_admins = sum(1 for c in admin_caps if c.user.id != staff.id)
             if other_admins == 0:
                 return error_response(
                     request, 409, "LAST_ADMIN_REQUIRED",
@@ -353,5 +354,5 @@ def audit_list_view(request):
 
     return Response({
         "data": {"items": items, "total": total},
-        "meta": {"correlationId": correlation_id(request)},
+        "meta": {"correlationId": get_correlation_id(request)},
     }, status=200)
