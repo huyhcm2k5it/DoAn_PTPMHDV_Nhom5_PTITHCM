@@ -1,11 +1,11 @@
-# Catalog — Huy, tuần 1
+# Catalog
 
 Go 1.27.0 · Echo 5.4.0 · pgx 5.11.0 · PostgreSQL 18 · Hexagonal Architecture.
-Sáu HTTP operation CA-001–006 có implementation. Giá/idempotency/outbox nằm trong cùng PostgreSQL transaction. Clinical/Diagnostic chỉ có nền chạy; không được tính là đã xong nghiệp vụ khám/LAB.
+Sáu HTTP operation CA-001–006, CatalogChanged v1 snapshot/checkpoint stream, RabbitMQ outbox publisher và bounded Redis cache-aside cho GET đều có implementation. Clinical và Diagnostic cũng có luồng nghiệp vụ riêng; xem từng service README và contract integration để biết giới hạn nối Appointment/Billing/Gateway còn lại.
 
-## Chạy với Compose riêng của Huy
+## Chạy với Compose riêng của Catalog
 
-Từ gốc repo, copy `infra/compose/huy.env.example` sang `infra/compose/.env.local`, điền bốn password khác nhau (ký tự URL-safe). Cần Docker engine chạy:
+Từ gốc repo, copy `infra/compose/huy.env.example` sang `infra/compose/.env.local`, điền năm password khác nhau (ký tự URL-safe). Cần Docker engine chạy:
 
 ```powershell
 docker compose --env-file infra/compose/.env.local -f infra/compose/huy.catalog.yml up --build -d
@@ -15,7 +15,7 @@ Invoke-RestMethod http://127.0.0.1:8081/health/ready
 Invoke-RestMethod http://127.0.0.1:8081/api/v1/medical-services
 ```
 
-Compose bind API/DB vào loopback. Ba DB riêng `catalog_db`, `clinical_db`, `diagnostic_db`; mỗi role chỉ có quyền kết nối DB mình. Không mở rộng init script sang DB có sẵn. Không xóa volume để sửa migration. Image Docker đã có định nghĩa; phải kiểm Docker build/run thực tế trước khi demo vì máy triển khai hiện chưa có Docker engine hoạt động.
+Compose bind API/DB/Redis vào loopback. Redis giới hạn 128 MiB với `allkeys-lru`; ACL giới hạn user Catalog vào prefix `umc:catalog:v1:*`. Không mở rộng init script sang DB có sẵn. Không xóa volume để sửa migration.
 
 ## Chạy Go native
 
@@ -23,6 +23,10 @@ Tạo một DB riêng thuộc Catalog, set `DATABASE_URL` theo `.env.example`; k
 
 ```powershell
 $env:DATABASE_URL='postgres://catalog_owner:YOUR_URL_SAFE_PASSWORD@127.0.0.1:55432/catalog_db?sslmode=disable'
+# Redis là tùy chọn khi chạy native; thiếu REDIS_ADDR thì cache bị tắt.
+$env:REDIS_ADDR='127.0.0.1:56379'
+$env:REDIS_USERNAME='default'
+$env:REDIS_PASSWORD='YOUR_CATALOG_REDIS_PASSWORD'
 .\tools\huy\go.ps1 -Service catalog run ./cmd/migrate -seed
 .\tools\huy\go.ps1 -Service catalog run ./cmd/api
 ```
@@ -50,14 +54,15 @@ Response `{data,meta:{correlationId}}`; lỗi `{error:{code,message},meta:{corre
 - Mỗi cặp type/item khóa trước khi tính revision và ghi. DB exclusion constraint bảo vệ giá không chồng. Cùng actor/key/body chuẩn hóa UTC trả lại bản 201 cũ; actor/key UUID được chuẩn hóa hoa/thường khi khóa; đổi body với key cũ → 409 `IDEMPOTENCY_CONFLICT`.
 - Chưa có giá hiệu lực → `price:null`, không phải giá 0. Giá Catalog chỉ để hiển thị, Billing chốt quote/snapshot sau.
 - Seed dữ liệu học tập có ID cố định, không phải bác sĩ/bệnh nhân thật. Giá seed hữu hạn: từ đầu ngày hôm qua đến đầu ngày sau 2 ngày; chạy seed lại không ghi đè lịch sử hoặc quyền đã đổi. Khi demo ngoài cửa sổ đó cần tạo phiên bản tương lai hợp lệ bằng ADMIN, không sửa lịch sử.
-- Outbox `CatalogChanged` được lưu thật; tuần 1 chưa có publisher, retry/inbox consumer/checkpoint hay Redis. Không tuyên bố service khác đã nhận giá.
-- `/health/live` chỉ kiểm process; `/health/ready` kiểm kết nối/schema Catalog version 1. Không yêu cầu broker cho GET. Clinical/Diagnostic readiness mới kiểm own DB connectivity.
+- Cache-aside dùng khóa `umc:catalog:v1:{generation}:{filterHash}`, TTL 60 giây ±10% jitter và tối đa dừng trước mốc đổi giá. Cache không lưu quyền truy cập; mỗi request thuốc/xét nghiệm xác minh quyền trước khi đọc cache. Redis timeout 100 ms; circuit breaker mở 15 giây sau ba lỗi; fallback PostgreSQL giới hạn 10 request đồng thời.
+- Khi tạo giá thành công, generation cache đổi sau commit. Nếu Redis vắng mặt/lỗi, GET dùng giới hạn fallback; vượt giới hạn trả 503. Chạy native không cấu hình Redis sẽ dùng PostgreSQL trực tiếp.
+- `/health/live` chỉ kiểm process; `/health/ready` kiểm kết nối/schema Catalog. Không yêu cầu broker cho GET. Clinical/Diagnostic readiness mới kiểm own DB connectivity.
 
 ## Cấu trúc code
 
 `domain` chứa kiểu/quy tắc; `application/ports` chứa inbound/output port trung lập; `application/usecase` điều phối; `adapters/inbound/http` là Echo/JWT; `adapters/outbound/postgres` là pgx/transaction; `cmd` ghép dependency. Không import driver/framework vào lõi, không đọc DB service khác.
 
-Migration hiện có một version initial + bảng ledger + transaction/advisory lock; không phải framework migration đầy đủ. Khi thêm version tiếp theo phải mở rộng runner và kiểm upgrade từ version 1, không sửa file initial đã áp dụng.
+Migration hiện có hai version (`000001_catalog`, `000002_catalog_stream`) với ledger, transaction và advisory lock; đây là runner nhỏ theo dự án, không phải framework migration đầy đủ. Khi thêm version tiếp theo phải kiểm upgrade từ version 2, không sửa file đã áp dụng.
 
 ## Kiểm thử
 

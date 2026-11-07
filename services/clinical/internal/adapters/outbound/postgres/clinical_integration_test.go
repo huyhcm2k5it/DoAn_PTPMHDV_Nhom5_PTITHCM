@@ -40,6 +40,10 @@ func testDB(t *testing.T) *Probe {
 	if err = db.Migrate(context.Background()); err != nil {
 		t.Fatal("migration not repeatable", err)
 	}
+	// Existing integration scenarios seed a trusted, caught-up Catalog projection locally.
+	if _, err = db.pool.Exec(context.Background(), `UPDATE catalog_stream_state SET sequence=1,highest_observed=1,checkpoint_at=now() WHERE singleton=true`); err != nil {
+		t.Fatal("seed Catalog stream fixture", err)
+	}
 	return db
 }
 func seedAccess(t *testing.T, db *Probe) {

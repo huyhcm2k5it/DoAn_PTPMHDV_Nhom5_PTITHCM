@@ -2,8 +2,6 @@ package postgres
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -40,6 +38,21 @@ func priceError(err error) error {
 		return domain.Fail("OVERLAPPING_PRICE_PERIOD", "Price effective periods overlap")
 	}
 	return err
+}
+func (p *priceTx) AccessForShare(ctx context.Context, id string) (domain.Access, error) {
+	var access domain.Access
+	var caps []byte
+	err := p.tx.QueryRow(ctx, "SELECT user_id::text,actor_type,capabilities,token_version,status FROM user_access_projection WHERE user_id=$1 FOR SHARE", id).Scan(&access.UserID, &access.ActorType, &caps, &access.TokenVersion, &access.Status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return access, domain.Fail("SERVICE_UNAVAILABLE", "Identity access projection is not ready")
+	}
+	if err != nil {
+		return access, err
+	}
+	if err = json.Unmarshal(caps, &access.Capabilities); err != nil {
+		return access, fmt.Errorf("invalid access projection")
+	}
+	return access, nil
 }
 func (p *priceTx) Replay(ctx context.Context, actor, key string) (domain.PriceResult, string, bool, error) {
 	var r domain.PriceResult
@@ -95,12 +108,9 @@ func (p *priceTx) NextSequence(ctx context.Context) (int64, error) {
 	return seq, err
 }
 func (p *priceTx) AppendChanged(ctx context.Context, e ports.Changed) error {
-	payload := map[string]any{"messageId": e.MessageID, "messageKind": "EVENT", "messageType": "CatalogChanged", "schemaVersion": 1, "producer": "Catalog", "aggregateId": e.Price.ItemID, "aggregateVersion": e.Price.Revision, "correlationId": e.CorrelationID, "requestId": e.RequestID, "occurredAt": e.OccurredAt, "payload": map[string]any{"entityType": "PRICE_VERSION", "entityId": e.Price.PriceVersionID, "entityVersion": e.Price.Revision, "fullSnapshot": e.Price, "effectiveAt": e.Price.EffectiveFrom, "streamSequence": e.Sequence, "mode": "UPSERT"}}
-	raw, err := json.Marshal(payload)
+	raw, err := buildCatalogChangedEnvelope(e)
 	if err != nil {
 		return err
 	}
-	hash := sha256.Sum256(raw)
-	_, err = p.tx.Exec(ctx, `INSERT INTO outbox(message_id,aggregate_id,aggregate_version,message_kind,message_type,producer,destination,routing_key,payload,payload_hash) VALUES($1,$2,$3,'EVENT','CatalogChanged','Catalog','umc.events.catalog.v1','catalog.catalog-changed.v1',$4,$5)`, e.MessageID, e.Price.ItemID, e.Price.Revision, raw, hex.EncodeToString(hash[:]))
-	return err
+	return insertCatalogOutbox(ctx, p.tx, e.Price.ItemID, e.Price.Revision, raw)
 }

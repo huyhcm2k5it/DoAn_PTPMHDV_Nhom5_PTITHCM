@@ -7,7 +7,7 @@ function New-SecretHex([int]$bytes = 32) {
   $buffer = [byte[]]::new($bytes)
   $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
   try { $rng.GetBytes($buffer) } finally { $rng.Dispose() }
-  [Convert]::ToHexString($buffer).ToLowerInvariant()
+  [System.BitConverter]::ToString($buffer).Replace("-", "").ToLowerInvariant()
 }
 if (-not (Test-Path -LiteralPath $envPath)) {
   $rootPassword = New-SecretHex 32

@@ -7,12 +7,14 @@
   },
   "scripts": {
     "check": "node check-js.js",
-    "test": "node --test --test-concurrency=1 contracts.test.js service-api.test.js"
+    "test": "node --test --test-concurrency=1 *.test.js"
   },
   "dependencies": {
     "mongoose": "9.11.4"
   },
   "devDependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
     "mongodb-memory-server": "11.3.0"
   },
   "version": "0.0.0"

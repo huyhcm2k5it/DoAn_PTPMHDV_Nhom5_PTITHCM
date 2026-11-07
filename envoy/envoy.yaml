@@ -9,29 +9,41 @@ static_resources:
         - filters:
             - name: envoy.filters.network.http_connection_manager
               typed_config:
-                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                '@type': type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
                 stat_prefix: ingress_http
                 codec_type: AUTO
                 route_config:
                   name: local_route
                   virtual_hosts:
                     - name: umc_care_backend
-                      domains: ["*"]
+                      domains: ['*']
                       cors:
                         allow_origin_string_match:
                           - safe_regex:
-                              regex: ".*"
-                        allow_methods: "GET, PUT, POST, PATCH, DELETE, OPTIONS"
-                        allow_headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,Idempotency-Key,X-Correlation-Id,X-Authorization-Lease"
-                        expose_headers: "Location,Content-Length,Content-Range,X-Correlation-Id"
-                        max_age: "1728000"
+                              regex: '.*'
+                        allow_methods: 'GET, PUT, POST, PATCH, DELETE, OPTIONS'
+                        allow_headers: 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,Idempotency-Key,X-Correlation-Id,X-Authorization-Lease'
+                        expose_headers: 'Location,Content-Length,Content-Range,X-Correlation-Id'
+                        max_age: '1728000'
                       routes:
+                        # Recovery-only adapters remain closed in the normal demo profile.
+                        - match:
+                            path: '/api/v1/charges'
+                            headers: [{ name: ':method', string_match: { exact: 'POST' } }]
+                          direct_response: { status: 403 }
+                        - match:
+                            path: '/api/v1/diagnostic-orders'
+                            headers: [{ name: ':method', string_match: { exact: 'POST' } }]
+                          direct_response: { status: 403 }
+                        - match:
+                            safe_regex: { regex: '/api/v1/patients/[^/]+/appointments' }
+                          route: { cluster: appointment_service, timeout: 15s }
                         # 1. Identity Service (Hưng)
-                        - match: { prefix: "/api/v1/auth" }
+                        - match: { prefix: '/api/v1/auth' }
                           route: { cluster: identity_service, timeout: 15s }
-                        - match: { prefix: "/api/v1/admin/staff" }
+                        - match: { prefix: '/api/v1/admin/staff' }
                           route: { cluster: identity_service, timeout: 15s }
-                        - match: { prefix: "/api/v1/admin/audit" }
+                        - match: { prefix: '/api/v1/admin/audit' }
                           route: { cluster: identity_service, timeout: 15s }
                         # DEV ONLY: hộp thư SMS giả lập; service tự trả 404 khi ALLOW_DEV_OTP=false
                         - match: { prefix: "/api/v1/dev" }
@@ -46,75 +58,77 @@ static_resources:
                           route: { cluster: billing_service, timeout: 15s }
 
                         # 2. Patient Service (Quân)
-                        - match: { prefix: "/api/v1/patients" }
+                        - match: { prefix: '/api/v1/patients' }
                           route: { cluster: patient_service, timeout: 15s }
 
                         # 3. Appointment Service (Quân)
-                        - match: { prefix: "/api/v1/appointments" }
+                        - match: { prefix: '/api/v1/appointments' }
                           route: { cluster: appointment_service, timeout: 15s }
-                        - match: { prefix: "/api/v1/appointment-holds" }
+                        - match: { prefix: '/api/v1/appointment-holds' }
                           route: { cluster: appointment_service, timeout: 15s }
-                        - match: { prefix: "/api/v1/queues" }
+                        - match: { prefix: '/api/v1/queues' }
                           route: { cluster: appointment_service, timeout: 15s }
-                        - match: { prefix: "/api/v1/slots" }
+                        - match: { prefix: '/api/v1/slots' }
                           route: { cluster: appointment_service, timeout: 15s }
-                        - match: { prefix: "/api/v1/schedules" }
+                        - match: { prefix: '/api/v1/schedules' }
                           route: { cluster: appointment_service, timeout: 15s }
 
                         # 4. Catalog Service (Huy)
-                        - match: { prefix: "/api/v1/departments" }
+                        - match: { prefix: '/api/v1/departments' }
                           route: { cluster: catalog_service, timeout: 15s }
-                        - match: { prefix: "/api/v1/doctors" }
+                        - match: { prefix: '/api/v1/doctors' }
                           route: { cluster: catalog_service, timeout: 15s }
-                        - match: { prefix: "/api/v1/medical-services" }
+                        - match: { prefix: '/api/v1/medical-services' }
                           route: { cluster: catalog_service, timeout: 15s }
-                        - match: { prefix: "/api/v1/prices" }
+                        - match: { prefix: '/api/v1/prices' }
                           route: { cluster: catalog_service, timeout: 15s }
-                        - match: { prefix: "/api/v1/catalog" }
+                        - match: { prefix: '/api/v1/catalog' }
                           route: { cluster: catalog_service, timeout: 15s }
 
                         # 5. Pharmacy Service (Quân)
-                        - match: { prefix: "/api/v1/pharmacy" }
+                        - match: { prefix: '/api/v1/pharmacy' }
                           route: { cluster: pharmacy_service, timeout: 15s }
-                        - match: { prefix: "/api/v1/medicines" }
+                        - match: { prefix: '/api/v1/medicines' }
                           route: { cluster: pharmacy_service, timeout: 15s }
 
                         # 6. Clinical Service (Huy)
-                        - match: { prefix: "/api/v1/clinical" }
+                        - match: { prefix: '/api/v1/clinical' }
                           route: { cluster: clinical_service, timeout: 15s }
-                        - match: { prefix: "/api/v1/visits" }
+                        - match: { prefix: '/api/v1/visits' }
                           route: { cluster: clinical_service, timeout: 15s }
-                        - match: { prefix: "/api/v1/prescriptions" }
+                        - match: { prefix: '/api/v1/prescriptions' }
                           route: { cluster: clinical_service, timeout: 15s }
 
                         # 7. Diagnostic Service (Huy)
-                        - match: { prefix: "/api/v1/diagnostic" }
+                        - match: { prefix: '/api/v1/diagnostic-orders' }
                           route: { cluster: diagnostic_service, timeout: 15s }
-                        - match: { prefix: "/api/v1/specimens" }
+                        - match: { prefix: '/api/v1/diagnostic' }
                           route: { cluster: diagnostic_service, timeout: 15s }
-                        - match: { prefix: "/api/v1/admin/summary" }
+                        - match: { prefix: '/api/v1/specimens' }
+                          route: { cluster: diagnostic_service, timeout: 15s }
+                        - match: { prefix: '/api/v1/admin/summary' }
                           route: { cluster: appointment_service, timeout: 15s }
 
                         # 8. Billing Service (Hưng)
-                        - match: { prefix: "/api/v1/billing" }
+                        - match: { prefix: '/api/v1/billing' }
                           route: { cluster: billing_service, timeout: 15s }
-                        - match: { prefix: "/api/v1/charges" }
+                        - match: { prefix: '/api/v1/charges' }
                           route: { cluster: billing_service, timeout: 15s }
-                        - match: { prefix: "/api/v1/payments" }
+                        - match: { prefix: '/api/v1/payments' }
                           route: { cluster: billing_service, timeout: 15s }
-                        - match: { prefix: "/api/v1/receipts" }
+                        - match: { prefix: '/api/v1/receipts' }
                           route: { cluster: billing_service, timeout: 15s }
-                        - match: { prefix: "/api/v1/refunds" }
+                        - match: { prefix: '/api/v1/refunds' }
                           route: { cluster: billing_service, timeout: 15s }
 
                         # 9. Notification Service (Hưng)
-                        - match: { prefix: "/api/v1/notifications" }
+                        - match: { prefix: '/api/v1/notifications' }
                           route: { cluster: notification_service, timeout: 15s }
 
                 http_filters:
                   - name: envoy.filters.http.jwt_authn
                     typed_config:
-                      "@type": type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
+                      '@type': type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
                       providers:
                         umc_identity:
                           issuer: umc-care-identity
@@ -122,34 +136,34 @@ static_resources:
                           forward: true
                           from_headers:
                             - name: Authorization
-                              value_prefix: "Bearer "
+                              value_prefix: 'Bearer '
                           local_jwks:
-                            inline_string: '{"keys":[{"kty":"RSA","use":"sig","alg":"RS256","n":"zTqkaTjGVyQA3Xfl2kYkRAqI4FRtLM8IBsj3JYcVSrFOeivXdCHKIWAzbDH9lxk21Xrxrmp1VGNhOExxKFX6n-zg-vC1Ib8hc_VHJbelrQ9ysV_t8iRatYUFBaE9yq-6ZH0iIg1c6r-GT9vu8b0rb_CsE83fgLmTOhivud7ChNf2pYIASlUkf-pBJNDxtHl8vWNB4yWs7G9XNZwMuZAYrKK_RlXxSHTgTNloYI9tRrT21cupTew6zh5F0wb69UODeR74ox7vzvtm4xPtjSxJo1fgnVZriYq7GuXlNFHLDhp8Ce9oQrTfsQjoFQEvhx1lt18VRoedN8v1BxZ4fRduIQ","e":"AQAB"}]}'
+                            filename: /etc/envoy/jwks.json
                       rules:
-                        - match: { prefix: "/api/v1/auth" }
+                        - match: { prefix: '/api/v1/auth' }
                           requires: { allow_missing: {} }
-                        - match: { prefix: "/api/v1/catalog" }
+                        - match: { prefix: '/api/v1/catalog' }
                           requires: { allow_missing: {} }
-                        - match: { prefix: "/api/v1/departments" }
+                        - match: { prefix: '/api/v1/departments' }
                           requires: { allow_missing: {} }
-                        - match: { prefix: "/api/v1/doctors" }
+                        - match: { prefix: '/api/v1/doctors' }
                           requires: { allow_missing: {} }
-                        - match: { prefix: "/api/v1/medical-services" }
+                        - match: { prefix: '/api/v1/medical-services' }
                           requires: { allow_missing: {} }
-                        - match: { prefix: "/api/v1/prices" }
+                        - match: { prefix: '/api/v1/prices' }
                           requires: { allow_missing: {} }
-                        - match: { prefix: "/api/v1/dev" }
+                        - match: { prefix: '/api/v1/dev' }
                           requires: { allow_missing: {} }
-                        - match: { prefix: "/api/v1" }
+                        - match: { prefix: '/api/v1' }
                           requires: { provider_name: umc_identity }
                         - match: { prefix: "/" }
                           requires: { allow_missing: {} }
                   - name: envoy.filters.http.cors
                     typed_config:
-                      "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
+                      '@type': type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
                   - name: envoy.filters.http.router
                     typed_config:
-                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                      '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
   clusters:
     # 1. Identity Service

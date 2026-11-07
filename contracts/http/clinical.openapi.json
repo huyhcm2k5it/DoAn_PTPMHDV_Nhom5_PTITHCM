@@ -2,8 +2,8 @@
   "openapi": "3.1.1",
   "info": {
     "title": "UMC Care Clinical",
-    "version": "1.1.0",
-    "description": "CL-001–010. Transactional lab registry, draft and final prescriptions, visit signing. Signing requires a current authorization lease; unresolved LAB blocks signing. Patient reads expose only signed notes and FINAL prescriptions."
+    "version": "1.2.0",
+    "description": "CL-001–011. Transactional lab registry, draft and final prescriptions, visit signing, and paginated signed medical records. Signing and patient record reads require current authorization leases; unresolved LAB blocks signing. Patient reads expose only signed notes and FINAL prescriptions."
   },
   "paths": {
     "/api/v1/clinical/worklist": {
@@ -1229,6 +1229,128 @@
           }
         }
       }
+    },
+    "/api/v1/patients/{patientId}/medical-records": {
+      "get": {
+        "operationId": "CL_011",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "patientId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Authorization-Lease",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MedicalRecordsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "See error.code and meta.correlationId",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "See error.code and meta.correlationId",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "See error.code and meta.correlationId",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "See error.code and meta.correlationId",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "See error.code and meta.correlationId",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2053,6 +2175,96 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/LabPending"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "PublishedLabResultReference": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "orderId",
+          "revision",
+          "publishedAt"
+        ],
+        "additionalProperties": false
+      },
+      "MedicalRecord": {
+        "type": "object",
+        "properties": {
+          "visit": {
+            "$ref": "#/components/schemas/Visit"
+          },
+          "note": {
+            "$ref": "#/components/schemas/VisitNote"
+          },
+          "prescriptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Prescription"
+            }
+          },
+          "publishedLabResults": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublishedLabResultReference"
+            }
+          }
+        },
+        "required": [
+          "visit",
+          "note",
+          "prescriptions",
+          "publishedLabResults"
+        ],
+        "additionalProperties": false
+      },
+      "MedicalRecords": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MedicalRecord"
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "additionalProperties": false
+      },
+      "MedicalRecordsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/MedicalRecords"
           },
           "meta": {
             "$ref": "#/components/schemas/Meta"

@@ -19,6 +19,21 @@ services:
       interval: 3s
       timeout: 3s
       retries: 20
+  redis-huy:
+    image: redis:7.4-alpine
+    environment:
+      CATALOG_REDIS_PASSWORD: ${CATALOG_REDIS_PASSWORD:?set CATALOG_REDIS_PASSWORD}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        printf 'user default on >%s ~umc:catalog:v1:* +hello +auth +ping +get +set +setnx\n' "$${CATALOG_REDIS_PASSWORD}" > /tmp/catalog-users.acl &&
+        exec redis-server --aclfile /tmp/catalog-users.acl --maxmemory 128mb --maxmemory-policy allkeys-lru
+    ports: ["127.0.0.1:56379:6379"]
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$CATALOG_REDIS_PASSWORD\" redis-cli --user default ping | grep -q PONG"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
   catalog-migrate:
     build: ../../services/catalog
     image: umc-huy-catalog:local
@@ -33,9 +48,13 @@ services:
     ports: ["127.0.0.1:8081:8081"]
     environment:
       DATABASE_URL: postgres://catalog_owner:${CATALOG_DB_PASSWORD:?set CATALOG_DB_PASSWORD}@postgres-huy:5432/catalog_db?sslmode=disable
+      REDIS_ADDR: redis-huy:6379
+      REDIS_USERNAME: default
+      REDIS_PASSWORD: ${CATALOG_REDIS_PASSWORD:?set CATALOG_REDIS_PASSWORD}
       LISTEN_ADDR: :8081
     depends_on:
       catalog-migrate: {condition: service_completed_successfully}
+      redis-huy: {condition: service_healthy}
   clinical-migrate:
     build: ../../services/clinical
     image: umc-huy-clinical:local

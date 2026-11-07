@@ -117,6 +117,37 @@ async function setup(t) {
   return { connection, Schedule, Slot, base };
 }
 
+test('twenty different patients competing for the final slot have exactly one winner', async (t) => {
+  const { randomUUID } = require('node:crypto');
+  const { connection, Slot } = await setup(t);
+  const results = await Promise.allSettled(
+    Array.from({ length: 20 }, () =>
+      createHold({
+        connection,
+        patientId: randomUUID(),
+        principalId: randomUUID(),
+        slotId: 'slot-1',
+        idempotencyKey: randomUUID(),
+        now: new Date('2026-10-31T00:00:00Z'),
+        resolvePriceSnapshot: async () => ({
+          amountVnd: 100000,
+          snapshotHash: 'contention-fixture',
+          priceVersionId: 'price-1',
+          currency: 'VND',
+        }),
+      }),
+    ),
+  );
+  assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1);
+  const rejected = results.filter((r) => r.status === 'rejected');
+  assert.equal(rejected.length, 19);
+  assert.ok(rejected.every((r) => r.reason.status === 409));
+  const slot = await Slot.findOne({ id: 'slot-1' }).lean();
+  assert.equal(slot.heldCount, 1);
+  assert.equal(slot.confirmedCount, 0);
+  assert.equal(await connection.collection('holds').countDocuments({ status: 'HELD' }), 1);
+});
+
 test('AP-008 reserves the last slot once and AP-009 releases it', async (t) => {
   const { Slot, base } = await setup(t);
   const hold = await fetch(base + '/api/v1/appointment-holds', {
@@ -462,7 +493,10 @@ test('AP-015 check-in is date/payment guarded and creates one FIRST ticket', asy
     idempotencyKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa01',
     now: new Date('2026-10-31T00:00:00Z'),
     resolvePriceSnapshot: async () => ({
-      priceVersionId: 'price-1', amountVnd: 100000, currency: 'VND', snapshotHash: 'hash-1',
+      priceVersionId: 'price-1',
+      amountVnd: 100000,
+      currency: 'VND',
+      snapshotHash: 'hash-1',
     }),
   });
   const response = await fetch(base + '/api/v1/appointments', {
@@ -522,7 +556,10 @@ test('AP-016/AP-017/AP-018 list, call and no-show use a compare-and-set version'
     idempotencyKey: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb01',
     now: new Date('2026-10-31T00:00:00Z'),
     resolvePriceSnapshot: async () => ({
-      priceVersionId: 'price-1', amountVnd: 100000, currency: 'VND', snapshotHash: 'hash-1',
+      priceVersionId: 'price-1',
+      amountVnd: 100000,
+      currency: 'VND',
+      snapshotHash: 'hash-1',
     }),
   });
   const response = await fetch(base + '/api/v1/appointments', {
@@ -600,7 +637,10 @@ test('AP-016/AP-017/AP-018 list, call and no-show use a compare-and-set version'
   });
   assert.equal(noShow.state, 'NO_SHOW');
   assert.equal((await Appointment.findOne({ id: appointmentId })).state, 'NO_SHOW');
-  assert.equal(await getQueueTicketModel(connection).countDocuments({ appointmentId, state: 'NO_SHOW' }), 1);
+  assert.equal(
+    await getQueueTicketModel(connection).countDocuments({ appointmentId, state: 'NO_SHOW' }),
+    1,
+  );
 });
 
 test('AP-013 reschedules atomically and AP-014 cancels with one refund request', async (t) => {
@@ -630,7 +670,10 @@ test('AP-013 reschedules atomically and AP-014 cancels with one refund request',
     idempotencyKey: 'cccccccc-cccc-4ccc-8ccc-cccccccccc01',
     now: new Date('2026-10-31T00:00:00Z'),
     resolvePriceSnapshot: async () => ({
-      priceVersionId: 'price-1', amountVnd: 100000, currency: 'VND', snapshotHash: 'hash-1',
+      priceVersionId: 'price-1',
+      amountVnd: 100000,
+      currency: 'VND',
+      snapshotHash: 'hash-1',
     }),
   });
   const committed = await createAppointment({
@@ -660,7 +703,10 @@ test('AP-013 reschedules atomically and AP-014 cancels with one refund request',
     idempotencyKey: 'cccccccc-cccc-4ccc-8ccc-cccccccccc03',
     now: new Date('2026-10-30T00:00:00Z'),
     resolvePriceSnapshot: async () => ({
-      priceVersionId: 'price-1', amountVnd: 100000, currency: 'VND', snapshotHash: 'hash-1',
+      priceVersionId: 'price-1',
+      amountVnd: 100000,
+      currency: 'VND',
+      snapshotHash: 'hash-1',
     }),
     createId: () => 'reschedule-event-1',
   });

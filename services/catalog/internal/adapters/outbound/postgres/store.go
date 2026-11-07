@@ -32,7 +32,13 @@ func New(ctx context.Context, dsn string) (*Store, error) {
 func (s *Store) Close() { s.pool.Close() }
 func (s *Store) Ready(ctx context.Context) error {
 	var version int
-	return s.pool.QueryRow(ctx, "SELECT version FROM schema_migrations WHERE version=1").Scan(&version)
+	if err := s.pool.QueryRow(ctx, "SELECT COALESCE(max(version),0) FROM schema_migrations").Scan(&version); err != nil {
+		return err
+	}
+	if version < 2 {
+		return domain.Fail("SERVICE_UNAVAILABLE", "Catalog stream migration is required")
+	}
+	return nil
 }
 func (s *Store) Migrate(ctx context.Context) error {
 	tx, err := s.pool.Begin(ctx)
@@ -46,16 +52,25 @@ func (s *Store) Migrate(ctx context.Context) error {
 	if _, err = tx.Exec(ctx, "CREATE TABLE IF NOT EXISTS schema_migrations(version integer PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())"); err != nil {
 		return err
 	}
-	var exists bool
-	if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=1)").Scan(&exists); err != nil {
-		return err
-	}
-	if !exists {
-		sql, _ := migrations.Files.ReadFile("000001_catalog.up.sql")
+	for _, migration := range []struct {
+		version int
+		file    string
+	}{{1, "000001_catalog.up.sql"}, {2, "000002_catalog_stream.up.sql"}} {
+		var exists bool
+		if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=$1)", migration.version).Scan(&exists); err != nil {
+			return err
+		}
+		if exists {
+			continue
+		}
+		sql, readErr := migrations.Files.ReadFile(migration.file)
+		if readErr != nil {
+			return readErr
+		}
 		if _, err = tx.Exec(ctx, string(sql)); err != nil {
 			return err
 		}
-		if _, err = tx.Exec(ctx, "INSERT INTO schema_migrations(version) VALUES(1)"); err != nil {
+		if _, err = tx.Exec(ctx, "INSERT INTO schema_migrations(version) VALUES($1)", migration.version); err != nil {
 			return err
 		}
 	}
@@ -176,6 +191,15 @@ func (s *Store) LabTests(ctx context.Context, q ports.SearchQuery, at time.Time)
 		items = append(items, x)
 	}
 	return items, rows.Err()
+}
+func (s *Store) NextPriceBoundary(ctx context.Context, at time.Time) (*time.Time, error) {
+	var boundary *time.Time
+	err := s.pool.QueryRow(ctx, `SELECT min(boundary) FROM (
+		SELECT effective_from AS boundary FROM price_versions WHERE effective_from>$1
+		UNION ALL
+		SELECT effective_to AS boundary FROM price_versions WHERE effective_to>$1
+	) boundaries`, at).Scan(&boundary)
+	return boundary, err
 }
 func (s *Store) Access(ctx context.Context, id string) (domain.Access, error) {
 	var a domain.Access

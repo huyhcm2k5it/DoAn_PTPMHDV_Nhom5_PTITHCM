@@ -15,8 +15,8 @@ port = os.environ.get('HUY_TEST_PG_PORT', '55440')
 hidden = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
 env = os.environ.copy()
 for key, folder in [('GOCACHE','gocache'),('GOMODCACHE','gomodcache'),('GOPATH','gopath'),('GOTMPDIR','go-temp')]:
-    path = runtime / folder
-    path.mkdir(exist_ok=True)
+    path = Path(env[key]) if env.get(key) else runtime / folder
+    path.mkdir(parents=True, exist_ok=True)
     env[key] = str(path)
 
 def run(args, **kwargs):
@@ -35,6 +35,8 @@ try:
     created = True
     env['TEST_DATABASE_URL'] = f'postgres://huy_test@127.0.0.1:{port}/{database}?sslmode=disable'
     env['DIAGNOSTIC_CONTRACT_RESPONSE_FILE'] = str(runtime/'diagnostic-http-responses.json')
+    env['DIAGNOSTIC_RESULT_RESPONSE_FILE'] = str(runtime/'diagnostic-result-http-responses.json')
+    env['DIAGNOSTIC_RESULT_EVENT_FILE'] = str(runtime/'diagnostic-result-event.json')
     wire = runtime/'clinical-create-lab-wire.json'
     if wire.exists():
         env['CLINICAL_CREATE_LAB_WIRE_FILE'] = str(wire)

@@ -35,6 +35,15 @@ type Changed struct {
 	Price         domain.Price
 	Sequence      int64
 }
+type Outgoing struct {
+	MessageID  string
+	Exchange   string
+	RoutingKey string
+	Body       []byte
+}
+type PublisherStore interface {
+	PublishPending(context.Context, func(context.Context, Outgoing) error) (bool, error)
+}
 type Reader interface {
 	Departments(context.Context) ([]domain.Department, error)
 	Doctors(context.Context, DoctorQuery) (Doctors, error)
@@ -43,7 +52,23 @@ type Reader interface {
 	LabTests(context.Context, SearchQuery, time.Time) ([]domain.LabTest, error)
 	Access(context.Context, string) (domain.Access, error)
 }
+
+// ReadCache is deliberately payload-agnostic so the application layer owns
+// cache keys, authorization order and response serialization.
+type ReadCache interface {
+	Generation(context.Context) (string, error)
+	Get(context.Context, string) ([]byte, bool, error)
+	Set(context.Context, string, []byte, time.Time) error
+	BumpGeneration(context.Context) error
+}
+
+// PriceBoundaryReader lets cache TTLs stop before a price becomes active or
+// expires. Readers without this optional capability still use the short TTL.
+type PriceBoundaryReader interface {
+	NextPriceBoundary(context.Context, time.Time) (*time.Time, error)
+}
 type PriceTx interface {
+	AccessForShare(context.Context, string) (domain.Access, error)
 	Replay(context.Context, string, string) (domain.PriceResult, string, bool, error)
 	LockItem(context.Context, string, string) (bool, error)
 	Overlap(context.Context, domain.PriceInput) (bool, error)

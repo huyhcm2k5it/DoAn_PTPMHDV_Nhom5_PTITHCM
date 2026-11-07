@@ -56,7 +56,7 @@ func (r *Receiver) Receive(ctx context.Context, d ports.Incoming) error {
 	}
 	var err error
 	switch {
-	case (event.MessageType == "CatalogChanged" && d.Exchange == "umc.events.catalog.v1" && d.RoutingKey == "catalog.catalog-changed.v1") || (event.MessageType == "LabOrderResolved" && d.Exchange == "umc.events.diagnostic.v1" && d.RoutingKey == "lab.order-resolved.v1"):
+	case (event.MessageType == "CatalogChanged" && d.Exchange == "umc.events.catalog.v1" && d.RoutingKey == "catalog.catalog-changed.v1") || (event.MessageType == "LabOrderResolved" && d.Exchange == "umc.events.diagnostic.v1" && d.RoutingKey == "lab.order-resolved.v1") || (event.MessageType == "LabResultPublished" && d.Exchange == "umc.events.diagnostic.v1" && d.RoutingKey == "diagnostic.lab-result-published.v1") || (event.MessageType == "LabCancelled" && d.Exchange == "umc.events.diagnostic.v1" && d.RoutingKey == "diagnostic.lab-cancelled.v1"):
 		handler, ok := r.handler.(interface {
 			HandleTreatmentMessage(context.Context, string, domain.Envelope) error
 		})

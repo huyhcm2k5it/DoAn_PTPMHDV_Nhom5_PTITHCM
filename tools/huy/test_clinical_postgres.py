@@ -15,8 +15,8 @@ port = os.environ.get('HUY_TEST_PG_PORT', '55439')
 hidden = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
 env = os.environ.copy()
 for key, folder in [('GOCACHE','gocache'),('GOMODCACHE','gomodcache'),('GOPATH','gopath'),('GOTMPDIR','go-temp')]:
-    path = runtime / folder
-    path.mkdir(exist_ok=True)
+    path = Path(env[key]) if env.get(key) else runtime / folder
+    path.mkdir(parents=True, exist_ok=True)
     env[key] = str(path)
 
 def run(args, **kwargs):
@@ -37,6 +37,9 @@ try:
     env['CLINICAL_CONTRACT_RESPONSE_FILE'] = str(runtime/'clinical-http-responses.json')
     env['CLINICAL_WEEK3_CONTRACT_RESPONSE_FILE'] = str(runtime/'clinical-week3-http-responses.json')
     env['CLINICAL_CREATE_LAB_WIRE_FILE'] = str(runtime/'clinical-create-lab-wire.json')
+    diagnostic_event = runtime/'diagnostic-result-event.json'
+    if diagnostic_event.exists():
+        env['DIAGNOSTIC_RESULT_EVENT_FILE'] = str(diagnostic_event)
     result = subprocess.run([os.environ.get('GO_BIN',r'C:\Program Files\Go\bin\go.exe'),'test','-count=1','-tags=integration','-run',os.environ.get('HUY_CLINICAL_TEST_RUN','.'),'-v','./internal/adapters/outbound/postgres'], cwd=repo/'services/clinical', env=env, creationflags=hidden, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     output = result.stdout.decode('utf-8', errors='replace')
     (runtime/'clinical-postgres-integration.log').write_text(output,encoding='utf-8')

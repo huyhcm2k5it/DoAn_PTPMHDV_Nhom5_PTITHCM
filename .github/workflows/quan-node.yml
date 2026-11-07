@@ -5,6 +5,10 @@ on:
     paths:
       - 'services/appointment/**'
       - 'services/patient/**'
+      - 'services/pharmacy/**'
+      - 'mongo/**'
+      - 'scripts/dev/**'
+      - 'tools/quan/**'
       - 'tests/mongo/**'
       - 'apps/web/**'
       - 'contracts/**'
@@ -16,6 +20,10 @@ on:
     paths:
       - 'services/appointment/**'
       - 'services/patient/**'
+      - 'services/pharmacy/**'
+      - 'mongo/**'
+      - 'scripts/dev/**'
+      - 'tools/quan/**'
       - 'tests/mongo/**'
       - 'apps/web/**'
       - 'contracts/**'
@@ -32,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [appointment, patient]
+        service: [appointment, patient, pharmacy]
     defaults:
       run:
         working-directory: services/${{ matrix.service }}
@@ -91,6 +99,34 @@ jobs:
       - run: npm test -- --maxWorkers=1
       - run: npm run build
 
+  pharmacy-broker:
+    runs-on: ubuntu-24.04
+    services:
+      rabbitmq:
+        image: rabbitmq:4.3.6-management
+        env:
+          RABBITMQ_DEFAULT_USER: quan-ci
+          RABBITMQ_DEFAULT_PASS: isolated-test-only
+          RABBITMQ_DEFAULT_VHOST: quan-ci-pharmacy
+        ports: ['5672:5672']
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.14.0'
+      - name: Install isolated broker test dependencies
+        run: |
+          npm ci --ignore-scripts --prefix tests/mongo
+          npm ci --ignore-scripts --prefix services/pharmacy
+      - name: Real RabbitMQ producer receiver and restart tests
+        working-directory: tests/mongo
+        env:
+          TEST_AMQP_URL: amqp://quan-ci:isolated-test-only@127.0.0.1:5672/quan-ci-pharmacy
+        run: node --test pharmacy-broker.integration.js
+
   contracts:
     runs-on: ubuntu-latest
     steps:
@@ -112,3 +148,9 @@ jobs:
           for (const path of paths) JSON.parse(fs.readFileSync(path, 'utf8'));
           console.log(`validated ${paths.length} JSON documents`);
           NODE
+      - name: Reproduce Pharmacy OpenAPI contract
+        run: node tools/quan/generate-pharmacy-contract.js --check
+      - name: Validate Pharmacy quorum receiver bindings
+        run: node tools/quan/check-pharmacy-topology.js
+      - name: Validate Compose structure without resolving local secrets
+        run: docker compose -f infra/compose/compose.yaml config --no-env-resolution --no-interpolate --quiet

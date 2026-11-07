@@ -106,6 +106,13 @@ func (s *Service) Detail(ctx context.Context, p domain.Principal, id string) (ou
 			return e
 		}
 		if p.ActorType == "DOCTOR" {
+			verifier, ok := t.(ports.VisitGrantVerifier)
+			if !ok {
+				return domain.Fail("SERVICE_UNAVAILABLE", "Current doctor-visit grant projection unavailable")
+			}
+			if err := verifier.VerifyVisitGrant(ctx, o.VisitID, domain.ID(p.UserID)); err != nil {
+				return err
+			}
 			var mapping struct {
 				IdentityUserID string `json:"identityUserId"`
 			}
@@ -116,9 +123,21 @@ func (s *Service) Detail(ctx context.Context, p domain.Principal, id string) (ou
 				return domain.Fail("NOT_FOUND", "Order not found")
 			}
 		}
-		out = domain.Detail{Order: o, Specimens: o.Specimens}
+		out = domain.Detail{Order: o, Specimens: o.Specimens, Results: []domain.Result{}}
 		if out.Specimens == nil {
 			out.Specimens = []domain.Specimen{}
+		}
+		var resultID string
+		if e = load(ctx, t, "result-order", o.ID, &resultID); e == nil {
+			var r resultRecord
+			if e = load(ctx, t, "result", resultID, &r); e != nil {
+				return e
+			}
+			if p.ActorType != "DOCTOR" || r.Result.State == "PUBLISHED" {
+				out.Results = append(out.Results, r.Result)
+			}
+		} else if domain.Code(e) != "NOT_FOUND" {
+			return e
 		}
 		return nil
 	})
@@ -221,6 +240,12 @@ func (s *Service) Reject(ctx context.Context, p domain.Principal, id, key string
 				}
 				if o.State != "SPECIMEN_COLLECTED" || sp.State != "COLLECTED" || sp.Version != in.ExpectedVersion || n != len(o.Specimens)-1 {
 					return domain.Fail("SPECIMEN_ALREADY_PROCESSED", "Specimen changed or was processed")
+				}
+				var resultID string
+				if e = load(ctx, t, "result-order", o.ID, &resultID); e == nil {
+					return domain.Fail("SPECIMEN_ALREADY_PROCESSED", "Specimen has a result")
+				} else if domain.Code(e) != "NOT_FOUND" {
+					return e
 				}
 				sp.State = "REJECTED"
 				sp.ReasonCode = in.ReasonCode

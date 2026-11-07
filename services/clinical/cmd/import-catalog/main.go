@@ -23,16 +23,6 @@ func main() {
 		if len(raw) > 4<<20 {
 			return io.ErrShortBuffer
 		}
-		var entries []postgres.CatalogImport
-		decoder := json.NewDecoder(bytes.NewReader(raw))
-		decoder.DisallowUnknownFields()
-		if e = decoder.Decode(&entries); e != nil {
-			return e
-		}
-		var extra any
-		if decoder.Decode(&extra) != io.EOF {
-			return io.ErrUnexpectedEOF
-		}
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		db, e := postgres.New(ctx, os.Getenv("DATABASE_URL"))
@@ -43,7 +33,28 @@ func main() {
 		if e = db.BusinessReady(ctx); e != nil {
 			return e
 		}
-		return db.ImportCatalog(ctx, entries)
+		decoder := json.NewDecoder(bytes.NewReader(raw))
+		decoder.DisallowUnknownFields()
+		if len(bytes.TrimSpace(raw)) > 0 && bytes.TrimSpace(raw)[0] == '[' {
+			var entries []postgres.CatalogImport
+			if e = decoder.Decode(&entries); e != nil {
+				return e
+			}
+			var extra any
+			if decoder.Decode(&extra) != io.EOF {
+				return io.ErrUnexpectedEOF
+			}
+			return db.ImportCatalog(ctx, entries)
+		}
+		var snapshot postgres.CatalogSnapshotImport
+		if e = decoder.Decode(&snapshot); e != nil {
+			return e
+		}
+		var extra any
+		if decoder.Decode(&extra) != io.EOF {
+			return io.ErrUnexpectedEOF
+		}
+		return db.ImportCatalogSnapshot(ctx, snapshot)
 	}
 	if e := run(); e != nil {
 		slog.Error("Trusted catalog import failed")

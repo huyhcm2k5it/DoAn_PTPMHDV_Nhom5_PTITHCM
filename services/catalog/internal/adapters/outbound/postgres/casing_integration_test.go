@@ -37,7 +37,7 @@ func testMixedCaseIdempotency(t *testing.T, db *Store) {
 			key := domain.NewID()
 			results := make(chan error, 2)
 			for i := 0; i < 2; i++ {
-				p := domain.Principal{UserID: user, ActorType: "STAFF", Capabilities: []string{"ADMIN"}, TokenVersion: 1, LeaseAction: "CA-004"}
+				p := domain.Principal{UserID: user, ActorType: "STAFF", Capabilities: []string{"ADMIN"}, TokenVersion: 1, LeaseAction: "CA-004", LeaseExpiresAt: time.Now().Add(time.Hour)}
 				k := key
 				in := input
 				if i == 1 {

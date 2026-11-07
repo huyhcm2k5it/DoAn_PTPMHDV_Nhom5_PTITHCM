@@ -107,6 +107,9 @@ func (s *Service) Handle(ctx context.Context, exchange, route string, m domain.E
 		if e != nil {
 			return e
 		}
+		if gap {
+			return nil
+		}
 		return t.MarkMessage(ctx, domain.ID(m.MessageID), h)
 	})
 	if err != nil {
@@ -150,24 +153,56 @@ func (s *Service) project(ctx context.Context, t ports.Tx, m domain.Envelope) er
 			EntityVersion              int
 			FullSnapshot               json.RawMessage
 			EffectiveAt                time.Time
-			StreamSequence             int
+			StreamSequence             int64
 		}
-		if strictJSON(m.Payload, &p) != nil || p.StreamSequence < 1 || !domain.Has([]string{"UPSERT", "TOMBSTONE", "CHECKPOINT"}, p.Mode) {
+		if strictJSON(m.Payload, &p) != nil || p.StreamSequence < 0 || (p.Mode != "CHECKPOINT" && p.StreamSequence < 1) || !domain.Has([]string{"UPSERT", "TOMBSTONE", "CHECKPOINT"}, p.Mode) {
 			return domain.Fail("INVALID_MESSAGE", "Invalid catalog projection")
 		}
 		var prior struct {
-			Sequence int
+			Sequence int64
 			At       time.Time
 		}
 		e := load(ctx, t, "catalog", "checkpoint", &prior)
 		if e != nil && domain.Code(e) != "NOT_FOUND" {
 			return e
 		}
+		if p.Mode == "CHECKPOINT" {
+			var snapshot struct {
+				Sequence int64     `json:"sequence"`
+				At       time.Time `json:"at"`
+			}
+			if strictJSON(p.FullSnapshot, &snapshot) != nil || snapshot.Sequence != p.StreamSequence || snapshot.At.IsZero() || domain.ID(m.AggregateID) != domain.ID(p.EntityID) {
+				return domain.Fail("INVALID_MESSAGE", "Invalid checkpoint snapshot")
+			}
+			if p.EntityType != "STREAM" || !domain.ValidID(p.EntityID) || p.EntityVersion < 1 || p.EffectiveAt.IsZero() || m.AggregateVersion != p.EntityVersion {
+				return domain.Fail("INVALID_MESSAGE", "Invalid catalog checkpoint")
+			}
+			if p.StreamSequence > prior.Sequence {
+				var highest int64
+				ge := load(ctx, t, "catalog", "highest_observed", &highest)
+				if ge != nil && domain.Code(ge) != "NOT_FOUND" {
+					return ge
+				}
+				if p.StreamSequence > highest {
+					if ge = t.Put(ctx, "catalog", "highest_observed", p.StreamSequence); ge != nil {
+						return ge
+					}
+				}
+				return domain.Fail("CATALOG_STREAM_GAP", "Checkpoint is ahead of applied Catalog events")
+			}
+			if p.StreamSequence == prior.Sequence && m.OccurredAt.After(prior.At) {
+				return t.Put(ctx, "catalog", "checkpoint", map[string]any{"sequence": prior.Sequence, "at": m.OccurredAt})
+			}
+			return nil
+		}
+		if !domain.Has([]string{"DEPARTMENT", "DOCTOR", "SERVICE", "MEDICINE", "LAB_TEST", "PRICE_VERSION"}, p.EntityType) || !domain.ValidID(p.EntityID) || p.EntityVersion < 1 || len(p.FullSnapshot) == 0 || m.AggregateVersion != p.EntityVersion || (p.EntityType != "PRICE_VERSION" && domain.ID(m.AggregateID) != domain.ID(p.EntityID)) {
+			return domain.Fail("INVALID_MESSAGE", "Invalid Catalog stream event")
+		}
 		if p.StreamSequence <= prior.Sequence {
 			return nil
 		}
 		if p.StreamSequence != prior.Sequence+1 {
-			var highest int
+			var highest int64
 			ge := load(ctx, t, "catalog", "highest_observed", &highest)
 			if ge != nil && domain.Code(ge) != "NOT_FOUND" {
 				return ge

@@ -105,11 +105,12 @@ type Access struct {
 	Status       string
 }
 type Principal struct {
-	UserID       string
-	ActorType    string
-	Capabilities []string
-	TokenVersion int
-	LeaseAction  string
+	UserID         string
+	ActorType      string
+	Capabilities   []string
+	TokenVersion   int
+	LeaseAction    string
+	LeaseExpiresAt time.Time
 }
 
 func Has(xs []string, s string) bool {

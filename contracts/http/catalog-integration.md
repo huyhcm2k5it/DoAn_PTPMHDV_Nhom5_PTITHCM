@@ -1,6 +1,6 @@
-# Bàn giao Catalog tuần 1 — chưa tích hợp Gateway/Identity
+# Catalog API and integration contract
 
-Owner: Huy. Baseline sáu operation giữ method/path/permission API86 v5.2. Dùng `catalog.openapi.json`; file JSON thay tên `.yaml` trong plan, cùng chuẩn OpenAPI 3.1.1. Đây là ghi chú bàn giao trong repo, chưa gửi cho thành viên khác.
+The six operations preserve the API86 v5.2 method/path/permission baseline. `catalog.openapi.json` is the OpenAPI 3.1.1 machine-readable contract.
 
 ## Điểm cần Hưng/Quân ghép
 
@@ -12,9 +12,9 @@ Owner: Huy. Baseline sáu operation giữ method/path/permission API86 v5.2. Dù
 
 Access JWT RS256: `iss`, `aud`, `exp`, `iat` nếu có, `sub` UUID, `actorType` PATIENT/DOCTOR/STAFF, `capabilities` array string, `tokenVersion` integer. Issuer/audience phải đúng config. Code kiểm chữ ký, hạn, issued-at tương lai nếu claim có; lease bắt buộc có iat/exp. Không lấy quyền từ query/body/header role.
 
-CA-004 thêm header `X-Authorization-Lease`: JWT RS256, cùng issuer/audience, `sub` và tokenVersion với bearer, `action:"CA-004"`, iat/exp và thời hạn tối đa 30 giây. Cần lease mới mỗi lần retry nếu lease trước hết hạn, giữ nguyên Idempotency-Key và body. **Tên claim/header này là lựa chọn nối tạm vì chưa có Identity implementation; Hưng cần đối chiếu trước khi tích hợp.** Không được nói auth live đã ghép.
+CA-004 thêm header `X-Authorization-Lease`: JWT RS256, cùng issuer/audience, `sub` và tokenVersion với bearer, `action:"CA-004"`, iat/exp và thời hạn tối đa 30 giây. Cần lease mới mỗi lần retry nếu lease trước hết hạn, giữ nguyên Idempotency-Key và body. Identity/Gateway phải cấp đúng claim và header này trong shared runtime trước khi xem auth live là đã ghép.
 
-Các protected operation đối chiếu `user_access_projection` cùng status ACTIVE, actor/tokenVersion và capabilities. Thiếu projection trả 503, sai quyền/revoked trả 403. Tuần 1 seed projection demo; tuần 2 nhận Identity event/checkpoint mới có cập nhật tự động. Không dùng projection seed làm dữ liệu người thật.
+Các protected operation đối chiếu `user_access_projection` cùng status ACTIVE, actor/tokenVersion và capabilities. Thiếu projection trả 503, sai quyền/revoked trả 403. Worker nhận IdentityAccessChanged và áp dụng theo source version; cùng version nhưng khác nội dung bị quarantine. Projection seed chỉ dành cho demo, không phải dữ liệu người thật.
 
 ## Seed ID cho phát triển
 
@@ -33,10 +33,14 @@ Projection seed hiện có doctor 911; 912 chưa cấp quyền protected. Identi
 
 - Half-open `[from,to)`; no current price => null. Không tự kết thúc giá vô hạn. Khoảng tương lai tối thiểu 5 phút, timestamp chính xác tối đa microsecond (quá mức trả 400), amount VND int64; frontend ghi trong giới hạn số nguyên an toàn JS.
 - Response/idempotency cùng actor/key/canonical UTC body. Replay 201 không phát sinh price/outbox thứ hai. UI giữ key trong phiên form; thay phiên/refresh không thay thế API truy vết giao dịch sau này.
-- Transaction ghi price + idempotency + sequence + outbox. Event đang lưu trong DB, **chưa publish RabbitMQ**. Exchange/routing đề xuất: `umc.events.catalog.v1` / `catalog.catalog-changed.v1`.
-- Root envelope: messageId, messageKind EVENT, messageType CatalogChanged, schemaVersion 1, producer Catalog, aggregateId=itemId, aggregateVersion=price revision, correlationId/requestId/occurredAt. Payload: entityType PRICE_VERSION, entityId=priceVersionId, entityVersion, fullSnapshot Price, effectiveAt, streamSequence, mode UPSERT.
-- `PRICE_VERSION` và event envelope phải chốt với consumer tuần 2; chưa có event JSON Schema chính thức hoặc consumer compatibility test. Không dùng field này để tuyên bố đã đồng bộ Billing/Appointment.
+- Transaction ghi price + idempotency + sequence + outbox. Catalog worker phát durable outbox qua RabbitMQ publisher confirms và phát checkpoint định kỳ. Exchange/routing chuẩn: `umc.events.catalog.v1` / `catalog.catalog-changed.v1`.
+- Root envelope: messageId, messageKind EVENT, messageType CatalogChanged, schemaVersion 1, producer `catalog`, aggregateId, aggregateVersion, correlationId/requestId/occurredAt. Payload dùng full snapshot cho `UPSERT`/`TOMBSTONE` và watermark cho `CHECKPOINT`; JSON Schema có tại `../messages/catalog.v1.schema.json`.
+- PostgreSQL, RabbitMQ và Redis adapter tests chạy trong CI, gồm kiểm tra ACL Redis scoped, stream sequence/checkpoint và event envelope. Đây là bằng chứng của adapter Catalog; nó không chứng minh các dịch vụ Appointment/Billing hoặc Gateway đã được ghép.
 
 ## Trạng thái bàn giao
 
-Standalone Go/PostgreSQL và W03 có thể phát triển/test độc lập. Chưa ghép: Envoy, Identity live/lease issuance/access projection delivery, shell/shared transport, luồng login → hồ sơ → slot, RabbitMQ publisher/consumer, Redis. Dockerfiles/Compose/CI đã định nghĩa; Docker runtime và GitHub CI phải xác minh khi môi trường sẵn. Không tính technical health endpoint vào sáu operation nghiệp vụ.
+Catalog runs independently with PostgreSQL, RabbitMQ and Redis adapters. Shared Gate 3 still depends on Gateway routes/shared transport and live Identity lease issuance, plus the Appointment/Billing end-to-end journey. Technical health endpoints are separate from the six business operations.
+
+## Canonical CatalogChanged v1 contract
+
+`../messages/catalog.v1.schema.json` defines full-snapshot UPSERT/TOMBSTONE and STREAM CHECKPOINT events. New envelopes use `producer="catalog"`, exchange `umc.events.catalog.v1` and routing key `catalog.catalog-changed.v1`. A consumer may accept producer `Catalog` and legacy routing alias `catalog.changed.v1` only while old persisted deliveries drain; publishers must not create new uppercase events. `entityVersion` and envelope `aggregateVersion` are monotonic for an entity; `streamSequence` orders the shared feed. A consumer may not clear an observed gap by applying a later checkpoint.

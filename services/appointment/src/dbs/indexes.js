@@ -6,6 +6,14 @@ const {
 } = require('../../../../mongo/storage.js');
 
 const appointmentStorage = [
+  {
+    name: 'retry_jobs',
+    indexes: [
+      { name: 'uq_retry_job', key: { id: 1 }, unique: true },
+      { name: 'ix_retry_due', key: { consumerName: 1, state: 1, nextAttemptAt: 1, leaseUntil: 1 } },
+    ],
+  },
+  { name: 'dead_letters', indexes: [{ name: 'uq_dead_letter', key: { id: 1 }, unique: true }] },
   entity('schedules', [
     { name: 'ix_schedules_doctor_start', key: { doctorId: 1, startAt: 1 } },
     { name: 'ix_schedules_room_start', key: { room: 1, startAt: 1 } },
@@ -58,7 +66,10 @@ const appointmentStorage = [
     'appointments',
     [
       { name: 'uq_appointment_hold', key: { holdId: 1 }, unique: true },
-      { name: 'ix_appointment_patient_time', key: { patientId: 1, startAt: 1, endAt: 1, state: 1 } },
+      {
+        name: 'ix_appointment_patient_time',
+        key: { patientId: 1, startAt: 1, endAt: 1, state: 1 },
+      },
     ],
     ['holdId'],
   ),

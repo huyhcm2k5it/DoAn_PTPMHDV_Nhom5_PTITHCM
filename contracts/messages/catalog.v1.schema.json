@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:umc-care:catalog-changed:v1",
+  "title": "CatalogChanged v1",
+  "description": "Full entity snapshots, tombstones and stream checkpoints. New producer identity is lowercase catalog; uppercase Catalog is accepted only for already persisted v1 deliveries.",
+  "type": "object",
+  "properties": {
+    "messageId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "messageKind": {
+      "const": "EVENT"
+    },
+    "messageType": {
+      "const": "CatalogChanged"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "producer": {
+      "enum": [
+        "catalog",
+        "Catalog"
+      ]
+    },
+    "aggregateId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "aggregateVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647
+    },
+    "correlationId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "causationId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "requestId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "payload": {
+      "type": "object",
+      "properties": {
+        "entityType": {
+          "enum": [
+            "DEPARTMENT",
+            "DOCTOR",
+            "SERVICE",
+            "MEDICINE",
+            "LAB_TEST",
+            "PRICE_VERSION",
+            "STREAM"
+          ]
+        },
+        "entityId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "entityVersion": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "fullSnapshot": {
+          "type": "object"
+        },
+        "effectiveAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "streamSequence": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "mode": {
+          "enum": [
+            "UPSERT",
+            "TOMBSTONE",
+            "CHECKPOINT"
+          ]
+        }
+      },
+      "required": [
+        "entityType",
+        "entityId",
+        "entityVersion",
+        "fullSnapshot",
+        "effectiveAt",
+        "streamSequence",
+        "mode"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "CHECKPOINT"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "entityType": {
+                "const": "STREAM"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": [
+                  "UPSERT",
+                  "TOMBSTONE"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "streamSequence": {
+                "minimum": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "messageId",
+    "messageKind",
+    "messageType",
+    "schemaVersion",
+    "producer",
+    "aggregateId",
+    "aggregateVersion",
+    "correlationId",
+    "causationId",
+    "requestId",
+    "occurredAt",
+    "payload"
+  ],
+  "additionalProperties": false
+}

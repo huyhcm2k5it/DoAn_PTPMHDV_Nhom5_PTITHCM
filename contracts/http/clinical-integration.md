@@ -40,3 +40,7 @@ Before the booking gate, Quân/Hưng must verify sourceType/sourceId/sourceRevis
 ## Delivery evidence
 
 Native PostgreSQL tests assert PENDING before claim, single visit under eight duplicate claim deliveries, RETURN reusing visit, rejected claims, idempotency conflicts, six concurrent draft writers, rollback on outbox insertion error, auth revocation, strict payloads, durable retry leases and quarantine outbox. Real RSA-backed HTTP responses can be checked against OpenAPI. The separate broker integration test requires a real isolated RabbitMQ endpoint to verify mandatory publisher confirms/returns. A full Gate 2 still requires the actual owner services, Gateway, shell and clean Compose run.
+
+## CL-011 signed medical records
+
+CL-011 returns a stable page of `MedicalRecord` values for one patient. It requires an authorization lease and checks local PatientAccess plus the current doctor/visit assignment projection. PATIENT may read only their own records; DOCTOR may read records for their assigned patient relationship. The query never accepts an owner override. Only SIGNED visits and their final signed note are included; only FINAL prescriptions and published-result references are included. No draft note, draft prescription, unresolved LAB, or raw unprojected result can appear. Clinical keeps only the order/revision publication reference from Diagnostic; DI-013 remains the owner of result values.

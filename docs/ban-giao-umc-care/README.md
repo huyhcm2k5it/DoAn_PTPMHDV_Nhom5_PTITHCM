@@ -12,6 +12,10 @@
 
 ## Tài liệu chuẩn đang có
 
+- [Quân tuần 4 — Pharmacy, web, contract và receiver gates](quan-week4-pharmacy.md) — cập nhật 07/11/2026.
+- [Quân tuần 5 — kiểm thử, công cụ nghiệm thu và release còn chờ](quan-week5-release.md).
+- [Tracker 24 task tuần 4–5](quan-week4-5-status.csv) — trạng thái theo bằng chứng local và gate liên owner.
+
 - [Quy định GitHub và phân quyền thư mục lập ngày 24/10](../QUY_DINH_GITHUB_NHOM5_HUY_QUAN_HUNG_20261024.md): nguồn quy tắc chi tiết về nhánh, review, owner và conflict.
 - [BRD](../UMC_Care_BRD_9_Service_v5_20261017.md), [SRS](../UMC_Care_SRS_9_Service_v5_20261017.md), [UC](../UMC_Care_UC_9_Service_v5_20261017.md), [ERD](../UMC_Care_ERD_9_Service_v5_20261017.md): baseline nghiệp vụ.
 
