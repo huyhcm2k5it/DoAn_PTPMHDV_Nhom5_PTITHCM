@@ -22,6 +22,12 @@ import type { ClinicalApi } from '../features/clinical/types';
 import { createDiagnosticApi } from '../features/diagnostic/api';
 import { DiagnosticFeature } from '../features/diagnostic/DiagnosticFeature';
 import type { DiagnosticApi } from '../features/diagnostic/types';
+import { createPharmacyApi } from '../features/pharmacy/api';
+import type { PharmacyApi } from '../features/pharmacy/types';
+import { StockPage } from '../features/pharmacy/pages/StockPage';
+import { PrescriptionQueue } from '../features/pharmacy/pages/PrescriptionQueue';
+import { PrescriptionDetail } from '../features/pharmacy/pages/PrescriptionDetail';
+import { PatientMedicationStatus } from '../features/pharmacy/pages/PatientMedicationStatus';
 import { withAuthRedirect } from './runtime';
 import type { WebRuntime } from './runtime';
 import './app.css';
@@ -52,11 +58,26 @@ function AppLayout({ session }: { session?: WebRuntime['session'] }) {
             <Link to="/patient/profiles/new">Tạo hồ sơ</Link>
             <Link to="/patient/appointments/new">Tra cứu lịch khám</Link>
             <Link to="/patient/appointments">Lịch hẹn</Link>
+            {session?.actorType === 'PATIENT' && (
+              <Link to="/patient/medications">Trạng thái thuốc</Link>
+            )}
+            {session?.actorType === 'STAFF' && session.capabilities.includes('PHARMACY') && (
+              <Link to="/staff/pharmacy">Quầy dược</Link>
+            )}
             {session?.actorType === 'DOCTOR' && <Link to="/doctor/clinical">Bàn khám</Link>}
-            {session?.actorType === 'STAFF' && session.capabilities.includes('RECEPTION') && <Link to="/staff/reception">Quầy tiếp nhận</Link>}
-            {session?.actorType === 'STAFF' && session.capabilities.includes('ADMIN') && <Link to="/staff/schedules">Quản trị ca khám</Link>}
-            {session?.actorType === 'STAFF' && session.capabilities.includes('ADMIN') && <Link to="/staff/summary">Tổng hợp vận hành</Link>}
-            {session?.actorType === 'STAFF' && session.capabilities.some((item) => item === 'LAB_TECH' || item === 'LAB_REVIEW') && <Link to="/staff/diagnostic">Phòng xét nghiệm</Link>}
+            {session?.actorType === 'STAFF' && session.capabilities.includes('RECEPTION') && (
+              <Link to="/staff/reception">Quầy tiếp nhận</Link>
+            )}
+            {session?.actorType === 'STAFF' && session.capabilities.includes('ADMIN') && (
+              <Link to="/staff/schedules">Quản trị ca khám</Link>
+            )}
+            {session?.actorType === 'STAFF' && session.capabilities.includes('ADMIN') && (
+              <Link to="/staff/summary">Tổng hợp vận hành</Link>
+            )}
+            {session?.actorType === 'STAFF' &&
+              session.capabilities.some((item) => item === 'LAB_TECH' || item === 'LAB_REVIEW') && (
+                <Link to="/staff/diagnostic">Phòng xét nghiệm</Link>
+              )}
           </nav>
           <div className="sidebar-help">
             <span className="help-icon" aria-hidden="true">
@@ -88,17 +109,42 @@ function ProfileEditRoute({ api }: { api: PatientApi }) {
     api.getById(patientId, controller.signal).then(setProfile, setError);
     return () => controller.abort();
   }, [api, patientId]);
-  if (error) return <section className="page-content"><p role="alert">Không tải được hồ sơ.</p></section>;
-  if (!profile) return <section className="page-content"><p role="status">Đang tải hồ sơ…</p></section>;
+  if (error)
+    return (
+      <section className="page-content">
+        <p role="alert">Không tải được hồ sơ.</p>
+      </section>
+    );
+  if (!profile)
+    return (
+      <section className="page-content">
+        <p role="status">Đang tải hồ sơ…</p>
+      </section>
+    );
   return <ProfileForm api={api} initial={profile} />;
 }
 
+function PharmacyAccess({ session }: { session?: WebRuntime['session'] }) {
+  if (session?.actorType !== 'STAFF' || !session.capabilities.includes('PHARMACY'))
+    return (
+      <section className="state-card state-error" role="alert">
+        <h1>Không đủ quyền</h1>
+        <p>Tài khoản chưa được cấp quyền dược.</p>
+      </section>
+    );
+  return <Outlet key={session.userId} />;
+}
+function PharmacyDetailRoute({ api }: { api: PharmacyApi }) {
+  const { prescriptionId = '' } = useParams();
+  return <PrescriptionDetail key={prescriptionId} api={api} prescriptionId={prescriptionId} />;
+}
 function AppRoutes({
   patientApi,
   appointmentApi,
   catalogApi,
   clinicalApi,
   diagnosticApi,
+  pharmacyApi,
   session,
 }: {
   patientApi: PatientApi;
@@ -106,6 +152,7 @@ function AppRoutes({
   catalogApi: Pick<CatalogApi, 'departments' | 'doctors' | 'services'>;
   clinicalApi: ClinicalApi;
   diagnosticApi: DiagnosticApi;
+  pharmacyApi: PharmacyApi;
   session?: WebRuntime['session'];
 }) {
   return (
@@ -118,7 +165,10 @@ function AppRoutes({
           path="/patient/profiles/:patientId"
           element={<ProfileDetailRoute api={patientApi} />}
         />
-        <Route path="/patient/profiles/:patientId/edit" element={<ProfileEditRoute api={patientApi} />} />
+        <Route
+          path="/patient/profiles/:patientId/edit"
+          element={<ProfileEditRoute api={patientApi} />}
+        />
         <Route
           path="/patient/appointments/new"
           element={<AvailableSlots api={appointmentApi} catalog={catalogApi} />}
@@ -131,8 +181,55 @@ function AppRoutes({
         <Route path="/staff/reception" element={<ReceptionQueue api={appointmentApi} />} />
         <Route path="/staff/schedules" element={<ScheduleAdmin api={appointmentApi} />} />
         <Route path="/staff/summary" element={<AdminSummary api={appointmentApi} />} />
-        <Route path="/doctor/clinical" element={<ClinicalFeature api={clinicalApi} session={session ? { userId: session.userId, actorType: session.actorType } : undefined} />} />
-        <Route path="/staff/diagnostic" element={<DiagnosticFeature api={diagnosticApi} session={session ? { userId: session.userId, actorType: session.actorType, capabilities: session.capabilities } : undefined} />} />
+        <Route element={<PharmacyAccess session={session} />}>
+          <Route path="/staff/pharmacy" element={<StockPage api={pharmacyApi} />} />
+          <Route
+            path="/staff/pharmacy/prescriptions"
+            element={<PrescriptionQueue api={pharmacyApi} />}
+          />
+          <Route
+            path="/staff/pharmacy/prescriptions/:prescriptionId"
+            element={<PharmacyDetailRoute api={pharmacyApi} />}
+          />
+        </Route>
+        <Route
+          path="/patient/medications"
+          element={
+            session?.actorType === 'PATIENT' ? (
+              <PatientMedicationStatus key={session.userId} api={pharmacyApi} />
+            ) : (
+              <section role="alert">Vui lòng đăng nhập bằng tài khoản bệnh nhân.</section>
+            )
+          }
+        />
+        <Route
+          path="/doctor/clinical"
+          element={
+            <ClinicalFeature
+              api={clinicalApi}
+              session={
+                session ? { userId: session.userId, actorType: session.actorType } : undefined
+              }
+            />
+          }
+        />
+        <Route
+          path="/staff/diagnostic"
+          element={
+            <DiagnosticFeature
+              api={diagnosticApi}
+              session={
+                session
+                  ? {
+                      userId: session.userId,
+                      actorType: session.actorType,
+                      capabilities: session.capabilities,
+                    }
+                  : undefined
+              }
+            />
+          }
+        />
         <Route
           path="/patient/appointments/:appointmentId"
           element={<AppointmentDetail api={appointmentApi} />}
@@ -155,18 +252,37 @@ export function App({ runtime }: { runtime?: WebRuntime }) {
   const transport = runtime?.transport ?? noAdapter;
   const apiTransport = useMemo(
     () => (runtime ? withAuthRedirect(runtime.transport, runtime.onUnauthorized) : transport),
-    [runtime, transport],
+    [runtime, transport, runtime?.session?.userId, runtime?.session?.tokenVersion],
   );
   const patientApi = useMemo(() => createPatientApi(apiTransport), [apiTransport]);
   const appointmentApi = useMemo(() => createAppointmentApi(apiTransport), [apiTransport]);
   const catalogApi = useMemo(() => createCatalogApi(apiTransport), [apiTransport]);
-  const clinicalApi = useMemo(() => createClinicalApi(apiTransport, {
-    authorizationLease: runtime?.session?.lease ? (action, resourceId) => runtime.session!.lease!(`${action}:${resourceId}`) : undefined,
-  }), [apiTransport, runtime?.session?.lease]);
+  const clinicalApi = useMemo(
+    () =>
+      createClinicalApi(apiTransport, {
+        authorizationLease: runtime?.session?.lease
+          ? (action) => runtime.session!.lease!(action)
+          : undefined,
+      }),
+    [apiTransport, runtime?.session?.lease],
+  );
   const diagnosticApi = useMemo(() => createDiagnosticApi(apiTransport), [apiTransport]);
+  const pharmacyApi = useMemo(
+    () => createPharmacyApi(apiTransport, { authorizationLease: runtime?.session?.lease }),
+    [apiTransport, runtime?.session?.lease],
+  );
   return (
     <BrowserRouter>
-      <AppRoutes patientApi={patientApi} appointmentApi={appointmentApi} catalogApi={catalogApi} clinicalApi={clinicalApi} diagnosticApi={diagnosticApi} session={runtime?.session} />
+      <AppRoutes
+        key={runtime?.session?.userId || 'public'}
+        patientApi={patientApi}
+        appointmentApi={appointmentApi}
+        catalogApi={catalogApi}
+        clinicalApi={clinicalApi}
+        diagnosticApi={diagnosticApi}
+        pharmacyApi={pharmacyApi}
+        session={runtime?.session}
+      />
     </BrowserRouter>
   );
 }
