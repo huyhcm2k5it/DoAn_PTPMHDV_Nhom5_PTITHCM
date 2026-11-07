@@ -1,0 +1,71 @@
+.pharmacy {
+  display: grid;
+  gap: 20px;
+}
+.pharmacy .page-heading {
+  margin-bottom: 0;
+}
+.pharmacy .button {
+  min-height: 44px;
+}
+.pharmacy .pharmacy-id {
+  overflow-wrap: anywhere;
+}
+.pharmacy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.pharmacy-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.pharmacy table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.pharmacy caption {
+  padding: 16px;
+  font-weight: 650;
+  text-align: left;
+}
+.pharmacy th,
+.pharmacy td {
+  padding: 14px;
+  text-align: left;
+  border-top: 1px solid var(--line);
+}
+.pharmacy thead {
+  background: var(--soft);
+  color: var(--ink);
+}
+.pharmacy small {
+  display: block;
+  color: var(--muted);
+  font-weight: 400;
+  margin-top: 6px;
+}
+.pharmacy .state-card ul {
+  padding-left: 22px;
+  line-height: 1.7;
+}
+.pharmacy button:focus-visible,
+.pharmacy a:focus-visible,
+.pharmacy input:focus-visible {
+  outline: 3px solid var(--teal);
+  outline-offset: 3px;
+}
+@media (max-width: 600px) {
+  .pharmacy-actions {
+    display: grid;
+  }
+  .pharmacy th,
+  .pharmacy td {
+    padding: 10px;
+    font-size: 14px;
+  }
+}

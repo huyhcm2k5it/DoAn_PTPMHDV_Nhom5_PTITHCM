@@ -70,6 +70,27 @@
       "type": "topic",
       "durable": true,
       "auto_delete": false
+    },
+    {
+      "name": "umc.events.pharmacy.v1",
+      "vhost": "/umc-care",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false
+    },
+    {
+      "name": "umc.commands.pharmacy.v1",
+      "vhost": "/umc-care",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false
+    },
+    {
+      "name": "umc.deadletters.pharmacy.v1",
+      "vhost": "/umc-care",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false
     }
   ],
   "queues": [
@@ -85,28 +106,36 @@
       "vhost": "/umc-care",
       "durable": true,
       "auto_delete": false,
-      "arguments": {}
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
     },
     {
       "name": "cmd.appointment.v1",
       "vhost": "/umc-care",
       "durable": true,
       "auto_delete": false,
-      "arguments": {}
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
     },
     {
       "name": "evt.appointment.access.v1",
       "vhost": "/umc-care",
       "durable": true,
       "auto_delete": false,
-      "arguments": {}
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
     },
     {
       "name": "evt.appointment.catalog.v1",
       "vhost": "/umc-care",
       "durable": true,
       "auto_delete": false,
-      "arguments": {}
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
     },
     {
       "name": "evt.clinical.v1",
@@ -120,7 +149,36 @@
       "vhost": "/umc-care",
       "durable": true,
       "auto_delete": false,
-      "arguments": {}
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
+    },
+    {
+      "name": "evt.pharmacy.v1",
+      "vhost": "/umc-care",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
+    },
+    {
+      "name": "cmd.pharmacy.v1",
+      "vhost": "/umc-care",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
+    },
+    {
+      "name": "dlq.pharmacy.v1",
+      "vhost": "/umc-care",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
     }
   ],
   "bindings": [
@@ -234,6 +292,102 @@
       "destination": "dlq.appointment.v1",
       "destination_type": "queue",
       "routing_key": "appointment.quarantine.v1",
+      "arguments": {}
+    },
+    {
+      "source": "umc.events.clinical.v1",
+      "vhost": "/umc-care",
+      "destination": "evt.pharmacy.v1",
+      "destination_type": "queue",
+      "routing_key": "clinical.prescription-finalized.v1",
+      "arguments": {}
+    },
+    {
+      "source": "umc.events.catalog.v1",
+      "vhost": "/umc-care",
+      "destination": "evt.pharmacy.v1",
+      "destination_type": "queue",
+      "routing_key": "catalog.catalog-changed.v1",
+      "arguments": {}
+    },
+    {
+      "source": "umc.events.patient.v1",
+      "vhost": "/umc-care",
+      "destination": "evt.pharmacy.v1",
+      "destination_type": "queue",
+      "routing_key": "patient.patient-access-changed.v1",
+      "arguments": {}
+    },
+    {
+      "source": "umc.events.identity.v1",
+      "vhost": "/umc-care",
+      "destination": "evt.pharmacy.v1",
+      "destination_type": "queue",
+      "routing_key": "identity.identity-access-changed.v1",
+      "arguments": {}
+    },
+    {
+      "source": "umc.commands.billing.v1",
+      "vhost": "/umc-care",
+      "destination": "cmd.pharmacy.v1",
+      "destination_type": "queue",
+      "routing_key": "pharmacy.reserve-settlement.v1",
+      "arguments": {}
+    },
+    {
+      "source": "umc.events.billing.v1",
+      "vhost": "/umc-care",
+      "destination": "evt.pharmacy.v1",
+      "destination_type": "queue",
+      "routing_key": "billing.charge-prepared.v1",
+      "arguments": {}
+    },
+    {
+      "source": "umc.events.billing.v1",
+      "vhost": "/umc-care",
+      "destination": "evt.pharmacy.v1",
+      "destination_type": "queue",
+      "routing_key": "billing.charge-paid.v1",
+      "arguments": {}
+    },
+    {
+      "source": "umc.events.billing.v1",
+      "vhost": "/umc-care",
+      "destination": "evt.pharmacy.v1",
+      "destination_type": "queue",
+      "routing_key": "billing.settlement-decision.v1",
+      "arguments": {}
+    },
+    {
+      "source": "umc.deadletters.pharmacy.v1",
+      "vhost": "/umc-care",
+      "destination": "dlq.pharmacy.v1",
+      "destination_type": "queue",
+      "routing_key": "pharmacy.quarantine.v1",
+      "arguments": {}
+    },
+    {
+      "source": "umc.commands.pharmacy.v1",
+      "vhost": "/umc-care",
+      "destination": "cmd.billing.v1",
+      "destination_type": "queue",
+      "routing_key": "billing.request-charge.v1",
+      "arguments": {}
+    },
+    {
+      "source": "umc.commands.pharmacy.v1",
+      "vhost": "/umc-care",
+      "destination": "cmd.billing.v1",
+      "destination_type": "queue",
+      "routing_key": "billing.query-settlement.v1",
+      "arguments": {}
+    },
+    {
+      "source": "umc.events.pharmacy.v1",
+      "vhost": "/umc-care",
+      "destination": "cmd.billing.v1",
+      "destination_type": "queue",
+      "routing_key": "pharmacy.settlement-reserved.v1",
       "arguments": {}
     }
   ],
