@@ -1,5 +1,7 @@
 import uuid
 import hashlib
+import logging
+import re
 import secrets
 from datetime import datetime, timezone as dt_tz, timedelta
 from django.utils import timezone
@@ -7,11 +9,55 @@ from django.db import transaction
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from app.application.token_service import generate_access_token, verify_access_token, generate_authorization_lease
+from app.api.audit import record_audit
 from app.domain.models import User, OtpRequest, Session, StaffCapability
+from app.infrastructure.sms import get_sms_sender
+
+logger = logging.getLogger(__name__)
+
+PHONE_PATTERN = re.compile(r"^[0-9]{9,11}$")
+MIN_PASSWORD_LENGTH = 8
+MAX_PASSWORD_LENGTH = 128
+MAX_FAILED_LOGINS = 5
+LOCKOUT_MINUTES = 15
 
 def get_correlation_id(request):
     """Lấy correlationId từ header hoặc tự sinh nếu thiếu."""
     return request.headers.get("X-Correlation-Id", str(uuid.uuid4()))
+
+def normalize_phone(raw):
+    """Chuẩn hoá số điện thoại; trả None nếu không hợp lệ.
+
+    Cột phone là varchar(20) nên phải chặn trước khi ghi, nếu không Postgres
+    ném DataError và API trả 500 thay vì 400.
+    """
+    phone = str(raw or "").strip().replace(" ", "")
+    if not PHONE_PATTERN.match(phone):
+        return None
+    return phone
+
+def validate_password(password):
+    """Trả thông báo lỗi hoặc None nếu mật khẩu hợp lệ."""
+    if len(password) < MIN_PASSWORD_LENGTH:
+        return f"Mật khẩu phải có ít nhất {MIN_PASSWORD_LENGTH} ký tự."
+    if len(password) > MAX_PASSWORD_LENGTH:
+        return f"Mật khẩu tối đa {MAX_PASSWORD_LENGTH} ký tự."
+    return None
+
+def send_otp(phone, code, purpose, correlation_id):
+    """Gửi OTP qua kênh đã cấu hình; trả response 503 nếu kênh lỗi."""
+    try:
+        get_sms_sender().send_otp(phone, code, purpose)
+        return None
+    except Exception:
+        logger.exception("Không gửi được OTP cho %s", phone)
+        return Response({
+            "error": {
+                "code": "SMS_UNAVAILABLE",
+                "message": "Chưa gửi được mã xác thực, vui lòng thử lại sau."
+            },
+            "meta": {"correlationId": correlation_id}
+        }, status=503)
 
 # ==============================================================================
 # IA-001: ĐĂNG KÝ TÀI KHOẢN PATIENT
@@ -20,11 +66,18 @@ def get_correlation_id(request):
 def register_view(request):
     """IA-001: Tạo tài khoản PATIENT từ số điện thoại chưa đăng ký và phát OTP."""
     correlation_id = get_correlation_id(request)
-    phone = str(request.data.get("phone", "")).strip()
+    phone = normalize_phone(request.data.get("phone"))
     password = str(request.data.get("password", ""))
     if not phone or not password:
         return Response({
-            "error": {"code": "VALIDATION_ERROR", "message": "Số điện thoại và mật khẩu là bắt buộc."},
+            "error": {"code": "VALIDATION_ERROR", "message": "Số điện thoại không hợp lệ hoặc thiếu mật khẩu."},
+            "meta": {"correlationId": correlation_id}
+        }, status=400)
+
+    password_error = validate_password(password)
+    if password_error:
+        return Response({
+            "error": {"code": "VALIDATION_ERROR", "message": password_error},
             "meta": {"correlationId": correlation_id}
         }, status=400)
 
@@ -59,6 +112,10 @@ def register_view(request):
     otp_request.set_code(otp_code)
     otp_request.save()
 
+    send_error = send_otp(phone, otp_code, "REGISTER", correlation_id)
+    if send_error:
+        return send_error
+
     return Response({
         "data": {
             "userId": str(user.id),
@@ -75,13 +132,13 @@ def register_view(request):
 def otp_verify_view(request):
     """IA-002: Kiểm tra OTP theo purpose, giới hạn thời hạn và số lần thử."""
     correlation_id = get_correlation_id(request)
-    phone = str(request.data.get("phone", "")).strip()
+    phone = normalize_phone(request.data.get("phone"))
     purpose = str(request.data.get("purpose", "")).strip().upper()
     otp_code = str(request.data.get("otpCode", "")).strip()
 
     if not phone or not purpose or not otp_code:
         return Response({
-            "error": {"code": "VALIDATION_ERROR", "message": "phone, purpose và otpCode là bắt buộc."},
+            "error": {"code": "VALIDATION_ERROR", "message": "phone không hợp lệ, purpose và otpCode là bắt buộc."},
             "meta": {"correlationId": correlation_id}
         }, status=400)
 
@@ -122,6 +179,12 @@ def otp_verify_view(request):
     # Đánh dấu đã dùng
     otp_req.used_at = timezone.now()
     otp_req.save(update_fields=["used_at"])
+    record_audit(
+        "AUTH_OTP_VERIFIED",
+        correlation_id,
+        actor_user_id=otp_req.user.id if otp_req.user else None,
+        detail={"purpose": purpose},
+    )
 
     status_result = "VERIFIED"
     if purpose == "REGISTER":
@@ -147,12 +210,12 @@ def otp_verify_view(request):
 def otp_resend_view(request):
     """IA-003: Gửi lại OTP cho đúng purpose khi hết thời gian chờ (cooldown 60s)."""
     correlation_id = get_correlation_id(request)
-    phone = str(request.data.get("phone", "")).strip()
+    phone = normalize_phone(request.data.get("phone"))
     purpose = str(request.data.get("purpose", "")).strip().upper()
 
     if not phone or not purpose:
         return Response({
-            "error": {"code": "VALIDATION_ERROR", "message": "phone và purpose là bắt buộc."},
+            "error": {"code": "VALIDATION_ERROR", "message": "phone không hợp lệ hoặc thiếu purpose."},
             "meta": {"correlationId": correlation_id}
         }, status=400)
 
@@ -178,6 +241,10 @@ def otp_resend_view(request):
     otp_request.set_code(otp_code)
     otp_request.save()
 
+    send_error = send_otp(phone, otp_code, purpose, correlation_id)
+    if send_error:
+        return send_error
+
     return Response({
         "data": {
             "accepted": True,
@@ -193,10 +260,10 @@ def otp_resend_view(request):
 def forgot_password_view(request):
     """IA-007: Phát OTP quên mật khẩu; phản hồi an toàn không tiết lộ SĐT có tài khoản hay không."""
     correlation_id = get_correlation_id(request)
-    phone = str(request.data.get("phone", "")).strip()
+    phone = normalize_phone(request.data.get("phone"))
     if not phone:
         return Response({
-            "error": {"code": "VALIDATION_ERROR", "message": "Số điện thoại là bắt buộc."},
+            "error": {"code": "VALIDATION_ERROR", "message": "Số điện thoại không hợp lệ."},
             "meta": {"correlationId": correlation_id}
         }, status=400)
 
@@ -213,6 +280,9 @@ def forgot_password_view(request):
         )
         otp_request.set_code(otp_code)
         otp_request.save()
+        # Kênh giao lỗi không được làm lộ việc số này có tài khoản hay không
+        if send_otp(phone, otp_code, "RESET", correlation_id) is not None:
+            logger.warning("Không gửi được OTP RESET nhưng vẫn trả accepted để chống enumeration")
 
     # Luôn trả về 200 accepted theo chuẩn bảo mật chống enumeration
     return Response({
@@ -230,13 +300,20 @@ def forgot_password_view(request):
 def reset_password_view(request):
     """IA-008: Kiểm OTP đặt lại mật khẩu, tiêu thụ mã 1 lần và lưu mật khẩu mới."""
     correlation_id = get_correlation_id(request)
-    phone = str(request.data.get("phone", "")).strip()
+    phone = normalize_phone(request.data.get("phone"))
     otp_code = str(request.data.get("otpCode", "")).strip()
     new_password = str(request.data.get("newPassword", ""))
 
     if not phone or not otp_code or not new_password:
         return Response({
-            "error": {"code": "VALIDATION_ERROR", "message": "phone, otpCode và newPassword là bắt buộc."},
+            "error": {"code": "VALIDATION_ERROR", "message": "phone không hợp lệ, otpCode và newPassword là bắt buộc."},
+            "meta": {"correlationId": correlation_id}
+        }, status=400)
+
+    password_error = validate_password(new_password)
+    if password_error:
+        return Response({
+            "error": {"code": "VALIDATION_ERROR", "message": password_error},
             "meta": {"correlationId": correlation_id}
         }, status=400)
 
@@ -280,8 +357,16 @@ def reset_password_view(request):
     if user:
         user.set_password(new_password)
         user.token_version += 1  # Thu hồi toàn bộ JWT cũ
-        user.save(update_fields=["password_hash", "token_version"])
+        user.failed_login_attempts = 0
+        user.locked_until = None
+        user.save(update_fields=["password_hash", "token_version", "failed_login_attempts", "locked_until"])
         Session.objects.filter(user=user, revoked_at__isnull=True).update(revoked_at=timezone.now())
+        record_audit(
+            "AUTH_PASSWORD_RESET",
+            correlation_id,
+            actor_user_id=user.id,
+            detail={"via": "OTP"},
+        )
 
     return Response({
         "data": {
@@ -324,6 +409,13 @@ def change_password_view(request):
             "meta": {"correlationId": correlation_id}
         }, status=400)
 
+    password_error = validate_password(new_password)
+    if password_error:
+        return Response({
+            "error": {"code": "VALIDATION_ERROR", "message": password_error},
+            "meta": {"correlationId": correlation_id}
+        }, status=400)
+
     user = User.objects.filter(id=sub).first()
     if not user or user.status != "ACTIVE":
         return Response({
@@ -347,6 +439,12 @@ def change_password_view(request):
     user.token_version += 1
     user.save(update_fields=["password_hash", "token_version"])
     Session.objects.filter(user=user, revoked_at__isnull=True).update(revoked_at=timezone.now())
+    record_audit(
+        "AUTH_PASSWORD_CHANGED",
+        correlation_id,
+        actor_user_id=user.id,
+        detail={"via": "current_password"},
+    )
 
     return Response({
         "data": {
@@ -362,12 +460,12 @@ def change_password_view(request):
 def login_view(request):
     """IA-004: Đăng nhập cho cả 3 actor, trả access token RS256 và refresh token hợp lệ lưu DB."""
     correlation_id = get_correlation_id(request)
-    phone = str(request.data.get("phone", "")).strip()
+    phone = normalize_phone(request.data.get("phone"))
     password = str(request.data.get("password", ""))
 
     if not phone or not password:
         return Response({
-            "error": {"code": "VALIDATION_ERROR", "message": "Số điện thoại và mật khẩu không được để trống."},
+            "error": {"code": "VALIDATION_ERROR", "message": "Số điện thoại không hợp lệ hoặc mật khẩu trống."},
             "meta": {"correlationId": correlation_id}
         }, status=400)
 
@@ -378,6 +476,16 @@ def login_view(request):
             "meta": {"correlationId": correlation_id}
         }, status=401)
 
+    now = timezone.now()
+    if user.locked_until and user.locked_until > now:
+        return Response({
+            "error": {
+                "code": "ACCOUNT_LOCKED",
+                "message": "Tài khoản tạm khoá do đăng nhập sai nhiều lần, vui lòng thử lại sau."
+            },
+            "meta": {"correlationId": correlation_id}
+        }, status=429)
+
     if user.status != "ACTIVE":
         return Response({
             "error": {"code": "UNAUTHENTICATED", "message": "Tài khoản chưa được kích hoạt hoặc bị khóa."},
@@ -385,10 +493,31 @@ def login_view(request):
         }, status=401)
 
     if not user.check_password(password):
+        attempts = user.failed_login_attempts + 1
+        update_fields = ["failed_login_attempts"]
+        if attempts >= MAX_FAILED_LOGINS:
+            user.locked_until = now + timedelta(minutes=LOCKOUT_MINUTES)
+            user.failed_login_attempts = 0
+            update_fields.append("locked_until")
+        else:
+            user.failed_login_attempts = attempts
+        user.save(update_fields=update_fields)
+        record_audit(
+            "AUTH_LOGIN_FAILED",
+            correlation_id,
+            actor_user_id=user.id,
+            detail={"failedAttempts": attempts, "locked": attempts >= MAX_FAILED_LOGINS},
+        )
         return Response({
             "error": {"code": "UNAUTHENTICATED", "message": "Số điện thoại hoặc mật khẩu không chính xác."},
             "meta": {"correlationId": correlation_id}
         }, status=401)
+
+    # Đăng nhập đúng thì xoá bộ đếm sai và mở khoá
+    if user.failed_login_attempts or user.locked_until:
+        user.failed_login_attempts = 0
+        user.locked_until = None
+        user.save(update_fields=["failed_login_attempts", "locked_until"])
 
     # Lấy capabilities thực tế từ DB
     capabilities = list(StaffCapability.objects.filter(user=user, enabled=True).values_list("capability", flat=True))
@@ -407,6 +536,13 @@ def login_view(request):
         user=user,
         refresh_hash=refresh_hash,
         expires_at=timezone.now() + timedelta(days=7)
+    )
+
+    record_audit(
+        "AUTH_LOGIN_SUCCEEDED",
+        correlation_id,
+        actor_user_id=user.id,
+        detail={"actorType": user.actor_type},
     )
 
     return Response({

@@ -1,0 +1,388 @@
+{
+  "info": {
+    "_postman_id": "c1f7a0b3-5678-4321-98ab-cdef01234567",
+    "name": "Identity Service Tests (Thunder / Postman)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Bộ test API Identity Service: Đăng ký OTP, Đăng nhập JWT, Quên/Đổi mật khẩu, Session, Admin Staff & Audit."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "patientAccessToken",
+      "value": ""
+    },
+    {
+      "key": "staffAccessToken",
+      "value": ""
+    },
+    {
+      "key": "otpCode",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "IA-001: Đăng ký PATIENT",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "11111111-aaaa-4111-8111-111111111111"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"0988776655\",\n  \"password\": \"MatKhauMoi@123\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/v1/auth/register"
+        }
+      }
+    },
+    {
+      "name": "IA-000: Hộp thư OTP (Đăng ký)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/api/v1/dev/otp-inbox?phone=0988776655&purpose=REGISTER"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.data && jsonData.data.items && jsonData.data.items.length > 0) {",
+              "    pm.collectionVariables.set(\"otpCode\", jsonData.data.items[0].otpCode);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "IA-002: Xác thực OTP đăng ký",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "22222222-aaaa-4222-8222-222222222222"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"0988776655\",\n  \"purpose\": \"REGISTER\",\n  \"otpCode\": \"{{otpCode}}\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/v1/auth/otp/verify"
+        }
+      }
+    },
+    {
+      "name": "IA-003: Gửi lại OTP",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "33333333-aaaa-4333-8333-333333333333"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"0988776655\",\n  \"purpose\": \"REGISTER\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/v1/auth/otp/resend"
+        }
+      }
+    },
+    {
+      "name": "IA-004: Đăng nhập lấy JWT RS256",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"0901234567\",\n  \"password\": \"password123\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/v1/auth/login"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.data && jsonData.data.accessToken) {",
+              "    pm.collectionVariables.set(\"accessToken\", jsonData.data.accessToken);",
+              "    pm.collectionVariables.set(\"patientAccessToken\", jsonData.data.accessToken);",
+              "}",
+              "if (jsonData.data && jsonData.data.refreshToken) {",
+              "    pm.collectionVariables.set(\"refreshToken\", jsonData.data.refreshToken);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "IA-004b: Đăng nhập STAFF (CASHIER + ADMIN)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"0909999901\",\n  \"password\": \"password123\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/v1/auth/login"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.data && jsonData.data.accessToken) {",
+              "    pm.collectionVariables.set(\"staffAccessToken\", jsonData.data.accessToken);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "IA-005: Refresh Token (Cấp access token mới & xoay vòng)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/v1/auth/refresh"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.data && jsonData.data.accessToken) {",
+              "    pm.collectionVariables.set(\"accessToken\", jsonData.data.accessToken);",
+              "}",
+              "if (jsonData.data && jsonData.data.refreshToken) {",
+              "    pm.collectionVariables.set(\"refreshToken\", jsonData.data.refreshToken);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "IA-010: Tra cứu phiên & Lease",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/v1/auth/session"
+        }
+      }
+    },
+    {
+      "name": "IA-007: Quên mật khẩu",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"0988776655\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/v1/auth/password/forgot"
+        }
+      }
+    },
+    {
+      "name": "IA-000b: Hộp thư OTP (Quên mật khẩu)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/api/v1/dev/otp-inbox?phone=0988776655&purpose=RESET_PASSWORD"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.data && jsonData.data.items && jsonData.data.items.length > 0) {",
+              "    pm.collectionVariables.set(\"otpCode\", jsonData.data.items[0].otpCode);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "IA-008: Đặt lại mật khẩu với OTP",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "55555555-aaaa-4555-8555-555555555555"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"0988776655\",\n  \"otpCode\": \"{{otpCode}}\",\n  \"newPassword\": \"MatKhauMoi@456\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/v1/auth/password/reset"
+        }
+      }
+    },
+    {
+      "name": "IA-009: Đổi mật khẩu",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "66666666-aaaa-4666-8666-666666666666"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"currentPassword\": \"password123\",\n  \"newPassword\": \"password123\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/v1/auth/password"
+        }
+      }
+    },
+    {
+      "name": "IA-011: STAFF[ADMIN] Danh sách nhân viên",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{staffAccessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/v1/admin/staff?page=1&limit=20"
+        }
+      }
+    },
+    {
+      "name": "IA-013: STAFF[ADMIN] Tra cứu nhật ký Audit",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{staffAccessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/v1/admin/audit?page=1&limit=20"
+        }
+      }
+    },
+    {
+      "name": "IA-006: Logout (Thu hồi session)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/v1/auth/logout"
+        }
+      }
+    }
+  ]
+}

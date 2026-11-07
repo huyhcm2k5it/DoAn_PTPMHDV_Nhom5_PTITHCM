@@ -1,9 +1,16 @@
 import uuid
 from django.db import models
 from django.contrib.auth.hashers import make_password, check_password
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from django.db.models.manager import RelatedManager
 
 class User(models.Model):
     """Bảng users: Quản lý thông tin tài khoản cho cả 3 actor (PATIENT, DOCTOR, STAFF)."""
+    if TYPE_CHECKING:
+        capabilities: RelatedManager["StaffCapability"]
+        
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     phone = models.CharField(max_length=20, unique=True, help_text="Số điện thoại định danh")
     password_hash = models.CharField(max_length=255)
@@ -21,6 +28,8 @@ class User(models.Model):
     version = models.IntegerField(default=1)
     token_version = models.IntegerField(default=1, help_text="Tăng khi đổi mật khẩu để thu hồi token cũ")
     access_version = models.IntegerField(default=1)
+    failed_login_attempts = models.PositiveIntegerField(default=0, help_text="Số lần đăng nhập sai liên tiếp")
+    locked_until = models.DateTimeField(null=True, blank=True, help_text="Khoá tạm đăng nhập tới thời điểm này")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -123,3 +132,52 @@ class AuditEvent(models.Model):
 
     def __str__(self):
         return f"Audit {self.action} by {self.actor_user_id} at {self.at}"
+
+
+class DevSmsInbox(models.Model):
+    """Hộp thư SMS giả lập cho demo local.
+
+    Chỉ dùng khi SMS_BACKEND=dev_inbox. Bảng này thay cho màn hình điện thoại:
+    endpoint dev đọc mã ở đây để người dùng nhập lại đúng mã đã gửi.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    phone = models.CharField(max_length=20)
+    purpose = models.CharField(max_length=20)
+    body = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "dev_sms_inbox"
+        indexes = [
+            models.Index(fields=["phone", "created_at"], name="idx_dev_sms_phone_created"),
+        ]
+
+    def __str__(self):
+        return f"SMS {self.phone} [{self.purpose}] at {self.created_at}"
+
+class IdempotencyRecord(models.Model):
+    """Bảng idempotency_records: giữ request hash theo Idempotency-Key.
+
+    02_ThamSo yêu cầu "cùng key với payload khác phải trả 409", nên ngoài việc
+    replay kết quả cũ còn phải phát hiện payload đã đổi so với lần ghi đầu.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    scope = models.CharField(max_length=40, help_text="API ID sở hữu khóa, ví dụ IA-012")
+    key = models.CharField(max_length=100)
+    request_hash = models.CharField(max_length=64)
+    response = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "idempotency_records"
+        constraints = [
+            models.UniqueConstraint(fields=["scope", "key"], name="uq_identity_idem_scope_key"),
+        ]
+        indexes = [
+            models.Index(fields=["created_at"], name="idx_identity_idem_created"),
+        ]
+
+    def __str__(self):
+        return f"Idempotency {self.scope}/{self.key}"

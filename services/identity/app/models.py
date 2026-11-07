@@ -1,3 +1,19 @@
-from app.domain.models import User, OtpRequest, Session, StaffCapability, AuditEvent
+from app.domain.models import (
+    AuditEvent,
+    DevSmsInbox,
+    IdempotencyRecord,
+    OtpRequest,
+    Session,
+    StaffCapability,
+    User,
+)
 
-__all__ = ["User", "OtpRequest", "Session", "StaffCapability", "AuditEvent"]
+__all__ = [
+    "AuditEvent",
+    "DevSmsInbox",
+    "IdempotencyRecord",
+    "OtpRequest",
+    "Session",
+    "StaffCapability",
+    "User",
+]

@@ -12,6 +12,8 @@ from app.api.view_auth import (
     refresh_token_view,
     logout_view,
 )
+from app.api.view_dev import dev_otp_inbox_view
+from app.api import view_admin
 urlpatterns = [
     # Health checks
     path("health/ready", health_ready, name="health_ready"),
@@ -32,7 +34,17 @@ urlpatterns = [
     path("api/v1/auth/password", change_password_view, name="auth_password_change"),
 
     # IA-005: Refresh Token & Token Rotation
-    path("api/v1/auth/token/refresh", refresh_token_view, name="auth_refresh"),
-    # IA-011: Đăng xuất
+    path("api/v1/auth/refresh", refresh_token_view, name="auth_refresh"),
+    # IA-006: Đăng xuất
     path("api/v1/auth/logout", logout_view, name="auth_logout"),
+
+     # IA-011: STAFF[ADMIN] xem danh sách nhân viên và quyền hiện có
+    path("api/v1/admin/staff", view_admin.staff_list_view, name="admin_staff_list"),
+    # IA-012: STAFF[ADMIN] cấp/thu hồi capability
+    path("api/v1/admin/staff/<uuid:staff_id>/roles", view_admin.staff_roles_view, name="admin_staff_roles"),
+    # IA-013: STAFF[ADMIN] tra cứu nhật ký kiểm toán
+    path("api/v1/admin/audit", view_admin.audit_list_view, name="admin_audit_list"),
+
+    # DEV ONLY: hộp thư SMS giả lập, bị tắt khi ALLOW_DEV_OTP=false
+    path("api/v1/dev/otp-inbox", dev_otp_inbox_view, name="dev_otp_inbox"),
 ]
