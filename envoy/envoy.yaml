@@ -33,6 +33,17 @@ static_resources:
                           route: { cluster: identity_service, timeout: 15s }
                         - match: { prefix: "/api/v1/admin/audit" }
                           route: { cluster: identity_service, timeout: 15s }
+                        # DEV ONLY: hộp thư SMS giả lập; service tự trả 404 khi ALLOW_DEV_OTP=false
+                        - match: { prefix: "/api/v1/dev" }
+                          route: { cluster: identity_service, timeout: 15s }
+
+                        # BI-010: báo cáo doanh thu thuộc Billing, không phải Identity
+                        - match: { prefix: "/api/v1/admin/reports" }
+                          route: { cluster: billing_service, timeout: 15s }
+
+                        # BI-003: Patient charges routed to billing_service
+                        - match: { safe_regex: { regex: "^/api/v1/patients/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/charges$" } }
+                          route: { cluster: billing_service, timeout: 15s }
 
                         # 2. Patient Service (Quân)
                         - match: { prefix: "/api/v1/patients" }
@@ -113,7 +124,7 @@ static_resources:
                             - name: Authorization
                               value_prefix: "Bearer "
                           local_jwks:
-                            filename: /etc/envoy/jwt_public.pem
+                            inline_string: '{"keys":[{"kty":"RSA","use":"sig","alg":"RS256","n":"zTqkaTjGVyQA3Xfl2kYkRAqI4FRtLM8IBsj3JYcVSrFOeivXdCHKIWAzbDH9lxk21Xrxrmp1VGNhOExxKFX6n-zg-vC1Ib8hc_VHJbelrQ9ysV_t8iRatYUFBaE9yq-6ZH0iIg1c6r-GT9vu8b0rb_CsE83fgLmTOhivud7ChNf2pYIASlUkf-pBJNDxtHl8vWNB4yWs7G9XNZwMuZAYrKK_RlXxSHTgTNloYI9tRrT21cupTew6zh5F0wb69UODeR74ox7vzvtm4xPtjSxJo1fgnVZriYq7GuXlNFHLDhp8Ce9oQrTfsQjoFQEvhx1lt18VRoedN8v1BxZ4fRduIQ","e":"AQAB"}]}'
                       rules:
                         - match: { prefix: "/api/v1/auth" }
                           requires: { allow_missing: {} }
@@ -127,9 +138,11 @@ static_resources:
                           requires: { allow_missing: {} }
                         - match: { prefix: "/api/v1/prices" }
                           requires: { allow_missing: {} }
+                        - match: { prefix: "/api/v1/dev" }
+                          requires: { allow_missing: {} }
                         - match: { prefix: "/api/v1" }
                           requires: { provider_name: umc_identity }
-                        - match: {}
+                        - match: { prefix: "/" }
                           requires: { allow_missing: {} }
                   - name: envoy.filters.http.cors
                     typed_config:
