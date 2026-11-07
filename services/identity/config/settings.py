@@ -4,7 +4,11 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-insecure-identity-secret-key-latest")
-DEBUG = os.getenv("DEBUG", "True").lower() == "true"
+DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+# Hộp thư SMS giả lập cho demo local. Bật riêng, độc lập với DEBUG,
+# để demo có thể chạy DEBUG=False mà vẫn lấy được OTP.
+ALLOW_DEV_OTP = os.getenv("ALLOW_DEV_OTP", "false").lower() == "true"
+
 
 ALLOWED_HOSTS = ["*"]
 

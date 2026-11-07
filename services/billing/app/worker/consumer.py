@@ -4,7 +4,7 @@ import time
 import pika
 from django.db import transaction
 from django.utils import timezone
-from app.domain.models import Charge, Payment, SettlementSaga, BillingEventOutbox
+from app.domain.models import Charge, Payment, Receipt, SettlementSaga, BillingEventOutbox
 from app.worker.event_bus import (
     get_rabbitmq_connection,
     publish_charge_prepared,
@@ -83,8 +83,16 @@ def handle_request_charge(payload: dict):
         outbox.save(update_fields=["published_at"])
 
 def process_pending_settlements():
-    """Tự động xử lý đối soát cho các khoản thanh toán mô phỏng đang PENDING."""
-    pending_payment_ids = list(Payment.objects.filter(state="PENDING", method="SIMULATION").values_list("id", flat=True)[:50])
+    """Tự động xử lý đối soát cho các khoản thanh toán đang PENDING.
+
+    Áp dụng cho cả SIMULATION (bệnh nhân tự trả) và COUNTER (thu tại quầy):
+    cả hai đều phải chốt PAID và phát hành biên nhận qua cùng một luồng.
+    """
+    pending_payment_ids = list(
+        Payment.objects.filter(state="PENDING", method__in=("SIMULATION", "COUNTER"))
+        .order_by("attempted_at")
+        .values_list("id", flat=True)[:50]
+    )
     for payment_id in pending_payment_ids:
         with transaction.atomic():
             payment = Payment.objects.select_for_update(skip_locked=True).filter(id=payment_id, state="PENDING").first()
@@ -104,6 +112,16 @@ def process_pending_settlements():
             if payment.saga:
                 payment.saga.state = "SUCCEEDED"
                 payment.saga.save(update_fields=["state", "updated_at"])
+
+            receipt_no = f"REC-{now.strftime('%Y%m%d')}-{payment.id.hex[:8].upper()}"
+            Receipt.objects.get_or_create(
+                payment=payment,
+                defaults={
+                    "charge": charge,
+                    "receipt_no": receipt_no,
+                    "amount_vnd": charge.amount_vnd
+                }
+            )
 
             outbox_payload = {
                 "chargeId": str(charge.id),

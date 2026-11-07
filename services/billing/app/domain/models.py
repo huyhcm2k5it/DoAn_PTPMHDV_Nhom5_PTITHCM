@@ -21,6 +21,10 @@ class Charge(models.Model):
 
     class Meta:
         db_table = "charges"
+        indexes = [
+            models.Index(fields=["patient_id", "created_at"], name="idx_charges_patient_created"),
+            models.Index(fields=["state", "created_at"], name="idx_charges_state_created"),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["source_type", "source_id", "source_revision"],
@@ -77,6 +81,9 @@ class Payment(models.Model):
 
     class Meta:
         db_table = "payments"
+        indexes = [
+            models.Index(fields=["state", "paid_at"], name="idx_payments_state_paid"),
+        ]
 
     def __str__(self):
         return f"Payment {self.id} - Tx: {self.transaction_id} ({self.state})"
@@ -112,6 +119,9 @@ class Refund(models.Model):
 
     class Meta:
         db_table = "refunds"
+        indexes = [
+            models.Index(fields=["state", "updated_at"], name="idx_refunds_state_updated"),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=["charge", "cancellation_id", "reason_code"],
@@ -142,3 +152,55 @@ class BillingEventOutbox(models.Model):
 
     def __str__(self):
         return f"OutboxEvent {self.id} ({self.event_type}) - Published: {self.published_at is not None}"
+
+
+class IdempotencyRecord(models.Model):
+    """Bảng idempotency_records: giữ request hash theo Idempotency-Key.
+
+    02_ThamSo yêu cầu "cùng key với payload khác phải trả 409", nên ngoài việc
+    replay kết quả cũ còn phải phát hiện payload đã đổi so với lần ghi đầu.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    scope = models.CharField(max_length=40, help_text="API ID sở hữu khóa, ví dụ BI-004")
+    key = models.CharField(max_length=100)
+    request_hash = models.CharField(max_length=64)
+    response = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "idempotency_records"
+        constraints = [
+            models.UniqueConstraint(fields=["scope", "key"], name="uq_idem_scope_key"),
+        ]
+        indexes = [
+            models.Index(fields=["created_at"], name="idx_idem_created"),
+        ]
+
+    def __str__(self):
+        return f"Idempotency {self.scope}/{self.key}"
+
+
+class BillingAuditEvent(models.Model):
+    """Bảng billing_audit_events: vết nghiệp vụ tiền.
+
+    BI-007 ghi rõ reasonCode "được ghi vào audit"; bảng này là nơi lưu vết đó,
+    tách khỏi audit an ninh của Identity.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    action = models.CharField(max_length=60)
+    actor_user_id = models.UUIDField(null=True, blank=True)
+    target_id = models.UUIDField(null=True, blank=True)
+    payload = models.JSONField(default=dict)
+    correlation_id = models.CharField(max_length=64, blank=True)
+    at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "billing_audit_events"
+        indexes = [
+            models.Index(fields=["action", "at"], name="idx_billing_audit_action_at"),
+        ]
+
+    def __str__(self):
+        return f"BillingAudit {self.action} at {self.at}"

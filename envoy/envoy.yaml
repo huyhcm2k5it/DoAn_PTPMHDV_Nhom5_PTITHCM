@@ -45,6 +45,17 @@ static_resources:
                           route: { cluster: identity_service, timeout: 15s }
                         - match: { prefix: '/api/v1/admin/audit' }
                           route: { cluster: identity_service, timeout: 15s }
+                        # DEV ONLY: hộp thư SMS giả lập; service tự trả 404 khi ALLOW_DEV_OTP=false
+                        - match: { prefix: "/api/v1/dev" }
+                          route: { cluster: identity_service, timeout: 15s }
+
+                        # BI-010: báo cáo doanh thu thuộc Billing, không phải Identity
+                        - match: { prefix: "/api/v1/admin/reports" }
+                          route: { cluster: billing_service, timeout: 15s }
+
+                        # BI-003: Patient charges routed to billing_service
+                        - match: { safe_regex: { regex: "^/api/v1/patients/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/charges$" } }
+                          route: { cluster: billing_service, timeout: 15s }
 
                         # 2. Patient Service (Quân)
                         - match: { prefix: '/api/v1/patients' }
@@ -141,9 +152,11 @@ static_resources:
                           requires: { allow_missing: {} }
                         - match: { prefix: '/api/v1/prices' }
                           requires: { allow_missing: {} }
+                        - match: { prefix: '/api/v1/dev' }
+                          requires: { allow_missing: {} }
                         - match: { prefix: '/api/v1' }
                           requires: { provider_name: umc_identity }
-                        - match: {}
+                        - match: { prefix: "/" }
                           requires: { allow_missing: {} }
                   - name: envoy.filters.http.cors
                     typed_config:

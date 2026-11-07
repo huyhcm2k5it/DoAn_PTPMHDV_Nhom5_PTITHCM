@@ -230,6 +230,16 @@ services:
       timeout: 3s
       retries: 20
     restart: unless-stopped
+  notification-worker:
+    build: { context: ../../services/notification, dockerfile: Dockerfile }
+    command: ["python", "manage.py", "run_notification_worker"]
+    env_file:
+      - ../../services/notification/.env
+    restart: unless-stopped
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      notification: { condition: service_healthy }
+    networks: [private]
   gateway:
     build: { context: ../../envoy, dockerfile: Dockerfile }
     ports:

@@ -1,0 +1,160 @@
+{
+  "info": {
+    "_postman_id": "d3f9b2e5-5678-4321-98ab-cdef01234569",
+    "name": "Notification Service Tests (Thunder / Postman)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Bộ test API Notification Service: Lấy danh sách thông báo, lọc chưa đọc, phân trang, đánh dấu đã đọc (Idempotency)."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "patientAccessToken",
+      "value": ""
+    },
+    {
+      "key": "notificationId",
+      "value": "e0000000-0000-0000-0000-000000000001"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Login PATIENT (Lấy patientAccessToken)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"0901234567\",\n  \"password\": \"password123\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8080/api/v1/auth/login"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.data && jsonData.data.accessToken) {",
+              "    pm.collectionVariables.set(\"patientAccessToken\", jsonData.data.accessToken);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "NO-001: Danh sách thông báo (Mặc định)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{patientAccessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/v1/notifications"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.data && jsonData.data.items && jsonData.data.items.length > 0) {",
+              "    pm.collectionVariables.set(\"notificationId\", jsonData.data.items[0].id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "NO-001b: Lọc thông báo chưa đọc (unreadOnly=true)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{patientAccessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/v1/notifications?unreadOnly=true"
+        }
+      }
+    },
+    {
+      "name": "NO-001c: Phân trang danh sách thông báo",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{patientAccessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/v1/notifications?page=1&limit=5"
+        }
+      }
+    },
+    {
+      "name": "NO-002: Đánh dấu thông báo đã đọc (Có Idempotency-Key)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{patientAccessToken}}"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "notif-read-58dde946-b635-4a59-98e6-33f7ed2afcd9"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/v1/notifications/{{notificationId}}/read"
+        }
+      }
+    },
+    {
+      "name": "NO-002b: Đánh dấu đã đọc thiếu Idempotency-Key (mong đợi 400)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{patientAccessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/v1/notifications/{{notificationId}}/read"
+        }
+      }
+    },
+    {
+      "name": "NO-001: Không có token (mong đợi 401)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/api/v1/notifications"
+        }
+      }
+    }
+  ]
+}
