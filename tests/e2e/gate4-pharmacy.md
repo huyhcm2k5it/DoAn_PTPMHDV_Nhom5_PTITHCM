@@ -19,18 +19,18 @@ Hưng xác nhận Identity/Billing/Notification/Android. Mỗi người tự ch�
 
 ## Hành trình không LAB
 
-| Bước | Owner/API | Kết quả phải thấy |
-| --- | --- | --- |
-| Đăng nhập, tạo/chọn hồ sơ | Hưng IA / Quân PT | Đúng patient ownership |
-| Giữ slot, đặt lịch | Quân AP-008/AP-010 | Một hold, appointment PENDING_PAYMENT; charge qua outbox |
-| Thanh toán lịch | Hưng BI + Quân AP | Reserve/Reserved + ChargePaid/Decision đúng fence; CONFIRMED |
-| Check-in, gọi, claim FIRST | Quân AP + Huy CL | Một ticket; doctor/department mapping có nguồn |
-| Khám, ký, FINAL | Huy CL | PrescriptionFinalized envelope, revision và medicineCode thật |
-| Tiếp nhận toa | Quân PH-003/004 | Thấy FINAL qua Gateway, patient chỉ thấy trạng thái tối thiểu |
-| Giữ toàn toa | Quân PH-005 | 202, holdId/statusUrl; reserved tăng nguyên tử; onHand chưa giảm |
-| Thanh toán thuốc | Hưng BI + Quân PH | Cùng sourceId/attempt; fence số nguyên; hai bằng chứng cục bộ → COMMITTED |
-| Phát thuốc | Quân PH-008 | Một dispense; onHand và reserved cùng giảm một lần; MedicationDispensed |
-| Theo dõi | Hưng Android/Notification + Quân web | Trạng thái patient giống owner; Notification không phải bằng chứng thu tiền |
+| Bước                       | Owner/API                            | Kết quả phải thấy                                                           |
+| -------------------------- | ------------------------------------ | --------------------------------------------------------------------------- |
+| Đăng nhập, tạo/chọn hồ sơ  | Hưng IA / Quân PT                    | Đúng patient ownership                                                      |
+| Giữ slot, đặt lịch         | Quân AP-008/AP-010                   | Một hold, appointment PENDING_PAYMENT; charge qua outbox                    |
+| Thanh toán lịch            | Hưng BI + Quân AP                    | Reserve/Reserved + ChargePaid/Decision đúng fence; CONFIRMED                |
+| Check-in, gọi, claim FIRST | Quân AP + Huy CL                     | Một ticket; doctor/department mapping có nguồn                              |
+| Khám, ký, FINAL            | Huy CL                               | PrescriptionFinalized envelope, revision và medicineCode thật               |
+| Tiếp nhận toa              | Quân PH-003/004                      | Thấy FINAL qua Gateway, patient chỉ thấy trạng thái tối thiểu               |
+| Giữ toàn toa               | Quân PH-005                          | 202, holdId/statusUrl; reserved tăng nguyên tử; onHand chưa giảm            |
+| Thanh toán thuốc           | Hưng BI + Quân PH                    | Cùng sourceId/attempt; fence số nguyên; hai bằng chứng cục bộ → COMMITTED   |
+| Phát thuốc                 | Quân PH-008                          | Một dispense; onHand và reserved cùng giảm một lần; MedicationDispensed     |
+| Theo dõi                   | Hưng Android/Notification + Quân web | Trạng thái patient giống owner; Notification không phải bằng chứng thu tiền |
 
 ## Hành trình có LAB
 
@@ -71,4 +71,5 @@ Hưng:
 Quân:
 Status: BLOCKED / REVIEW / INTEGRATED
 ```
+
 Chỉ chuyển INTEGRATED khi có evidence thực tế và người nhận xác nhận.

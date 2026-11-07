@@ -1,6 +1,6 @@
 # UMC Care
 
-UMC Care uses nine independently owned services. The current local branch adds Mongo storage contracts and Node.js CommonJS scaffolds for Quân’s Patient, Appointment and Pharmacy services.
+UMC Care uses nine independently owned services. Quân’s Patient, Appointment and Pharmacy services use Node.js, Express, Mongoose and JavaScript CommonJS. The quan branch now includes Pharmacy PH-001..008, its web workspace, transactional stock/settlement workflows and integration tooling.
 
 ## GitHub workflow
 
@@ -17,8 +17,16 @@ UMC Care uses nine independently owned services. The current local branch adds M
 - tests: contract and integration tests.
 - docs: project source documentation.
 
-Each service owns its database. Patient, Appointment and Pharmacy use separate Mongo databases and credentials. Their containers are private to the Compose network; Envoy routing and JWT verification are still awaiting the gateway owner’s handoff.
+Each service owns its database. Patient, Appointment and Pharmacy use separate Mongo databases and credentials. Their containers are private to the Compose network. Envoy routes, JWT/JWKS and shared Compose are configured; actual Identity/Billing interoperability and nine-service acceptance remain pending owner verification.
 
 ## Mongo storage and HTTP tests
 
-The isolated Mongo test package is in tests/mongo. It starts a temporary authenticated replica set for storage contracts and exercises the Patient read APIs and public AP-004 slot query. Each Node service has its own package, lockfile, syntax check and health test. See the README files beside each package for commands.
+The isolated Mongo test package is in tests/mongo. It starts temporary replica sets for storage, HTTP/schema, booking, Pharmacy, concurrency, rollback and recovery checks. Each Node service has its own package and lockfile. Install dependencies with npm ci in services/patient, services/appointment, services/pharmacy, tests/mongo and apps/web, then run:
+
+```powershell
+powershell -File tools/quan/verify-local.ps1
+```
+
+Setup/migration/seed instructions: [shared Compose README](infra/compose/README.md).
+Current implementation and unresolved receiver gates: [Quân week 4 handoff](docs/ban-giao-umc-care/quan-week4-pharmacy.md), [week 5 release preparation](docs/ban-giao-umc-care/quan-week5-release.md), [24-task tracker](docs/ban-giao-umc-care/quan-week4-5-status.csv).
+Local tests passing does not mean live E2E, remote CI, Android or release acceptance has completed.

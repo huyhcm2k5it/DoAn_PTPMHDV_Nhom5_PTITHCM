@@ -17,16 +17,16 @@ vì máy hiện không có Docker daemon.
 
 ## Ma trận thực nghiệm còn chờ
 
-| Điểm ngắt | Cách kiểm | Invariant phải thấy |
-| --- | --- | --- |
-| Trước Mongo commit | Dừng worker test khi transaction chưa commit | Không domain/outbox nửa vời |
-| Sau commit trước ack | Dừng worker, bật lại | Inbox bỏ lặp, reserved/receipt/dispense không tăng lần hai |
-| Sau publish trước mark | Dừng publisher sau broker confirm | Phát lại cùng messageId, receiver chỉ một effect |
-| Broker dừng | Dừng broker trong project test riêng | Outbox còn pending, không tự unlock UNKNOWN |
-| Mongo dừng | Dừng Mongo test | Không ack nếu chưa lưu domain/retry/quarantine bền vững |
-| Poison/producer giả | Publish vào vhost test | dead_letters + outbox quarantine có body gốc/messageId |
-| Ba retry thất bại | Lỗi owner có chủ đích trong test | 5/15/60 giây + jitter rồi quarantine |
-| Phục hồi tất cả | Bật dependencies và worker | Drain có giới hạn, không hot requeue |
+| Điểm ngắt              | Cách kiểm                                    | Invariant phải thấy                                        |
+| ---------------------- | -------------------------------------------- | ---------------------------------------------------------- |
+| Trước Mongo commit     | Dừng worker test khi transaction chưa commit | Không domain/outbox nửa vời                                |
+| Sau commit trước ack   | Dừng worker, bật lại                         | Inbox bỏ lặp, reserved/receipt/dispense không tăng lần hai |
+| Sau publish trước mark | Dừng publisher sau broker confirm            | Phát lại cùng messageId, receiver chỉ một effect           |
+| Broker dừng            | Dừng broker trong project test riêng         | Outbox còn pending, không tự unlock UNKNOWN                |
+| Mongo dừng             | Dừng Mongo test                              | Không ack nếu chưa lưu domain/retry/quarantine bền vững    |
+| Poison/producer giả    | Publish vào vhost test                       | dead_letters + outbox quarantine có body gốc/messageId     |
+| Ba retry thất bại      | Lỗi owner có chủ đích trong test             | 5/15/60 giây + jitter rồi quarantine                       |
+| Phục hồi tất cả        | Bật dependencies và worker                   | Drain có giới hạn, không hot requeue                       |
 
 Appointment và Pharmacy đã dùng retry_jobs trong DB, không dựa TTL/DLX làm đường retry bền vững.
 Các queue owner Quân trong definitions mới khai báo quorum.
