@@ -8,18 +8,23 @@ logger = logging.getLogger(__name__)
 
 RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "rabbitmq")
 RABBITMQ_PORT = int(os.getenv("RABBITMQ_PORT", "5672"))
-RABBITMQ_USER = os.getenv("RABBITMQ_USER")
-RABBITMQ_PASSWORD = os.getenv("RABBITMQ_PASSWORD")
-if not RABBITMQ_USER or not RABBITMQ_PASSWORD:
-    raise RuntimeError("Biến môi trường RABBITMQ_USER và RABBITMQ_PASSWORD là bắt buộc và không được để trống.")
 RABBITMQ_VHOST = os.getenv("RABBITMQ_VHOST", "/umc-care")
 
 BILLING_EVENTS_EXCHANGE = "umc.events.billing.v1"
 APPOINTMENT_COMMANDS_EXCHANGE = "umc.commands.appointment.v1"
 
 def get_rabbitmq_connection():
-    """Tạo kết nối tới RabbitMQ Broker."""
-    credentials = pika.PlainCredentials(RABBITMQ_USER, RABBITMQ_PASSWORD)
+    """Tạo kết nối tới RabbitMQ Broker.
+
+    Biến môi trường được kiểm tra tại đây thay vì lúc import module, để module
+    còn import được cho unit test và cho các lệnh không cần broker
+    (migrate, test, kiểm tra cấu hình).
+    """
+    user = os.getenv("RABBITMQ_USER")
+    password = os.getenv("RABBITMQ_PASSWORD")
+    if not user or not password:
+        raise RuntimeError("Biến môi trường RABBITMQ_USER và RABBITMQ_PASSWORD là bắt buộc và không được để trống.")
+    credentials = pika.PlainCredentials(user, password)
     parameters = pika.ConnectionParameters(
         host=RABBITMQ_HOST,
         port=RABBITMQ_PORT,
