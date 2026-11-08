@@ -14,6 +14,7 @@ from app.api.audit import record_audit
 from app.api.authz import error_response, require_capability
 from app.api.authz import correlation_id as get_correlation_id, error_response, require_capability
 from app.domain.models import AuditEvent, StaffCapability, User
+from app.infrastructure.outbox import record_identity_access_changed
 
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 MAX_IDEMPOTENCY_KEY = 100
@@ -268,7 +269,9 @@ def staff_roles_view(request, staff_id):
 
         staff.version += 1
         staff.access_version += 1
-        staff.save(update_fields=["version", "access_version"])
+        staff.token_version += 1
+        staff.save(update_fields=["version", "access_version", "token_version"])
+        record_identity_access_changed(staff, correlation_id=correlation_id)
 
         staff = User.objects.prefetch_related("capabilities").get(id=staff.id)
         data = {

@@ -6,6 +6,7 @@ from app.domain.models import (
     Session,
     StaffCapability,
     User,
+    IdentityEventOutbox,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "Session",
     "StaffCapability",
     "User",
+    "IdentityEventOutbox",
 ]
