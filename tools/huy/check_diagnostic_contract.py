@@ -8,9 +8,10 @@ from openapi_spec_validator import validate
 root = Path(__file__).resolve().parents[2]
 doc = json.loads((root/'contracts/http/diagnostic.openapi.json').read_text(encoding='utf-8'))
 validate(doc)
-assert sorted(v['operationId'] for p in doc['paths'].values() for v in p.values()) == ['DI_%03d'%n for n in range(2,14)]
+assert sorted(v['operationId'] for p in doc['paths'].values() for v in p.values()) == ['DI_%03d'%n for n in range(1,14)]
 assert '/api/v1/diagnostic-orders' in doc['paths']
-assert 'post' not in doc['paths']['/api/v1/diagnostic-orders'], 'Recovery endpoint must remain disabled'
+assert doc['paths']['/api/v1/diagnostic-orders']['post'].get('x-enabled-by-default') is False, 'Recovery endpoint must remain disabled'
+assert doc['paths']['/api/v1/diagnostic-orders']['post'].get('x-visibility') == 'private', 'Recovery endpoint must remain private'
 assert 'LabResultItem' in doc['components']['schemas']
 assert 'lifecycleState' in doc['components']['schemas']['Order']['properties']
 assert 'expectedVersion' in doc['components']['schemas']['ResultUpdateInput']['required']

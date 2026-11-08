@@ -119,7 +119,7 @@ export function createAppointmentApi(transport: GatewayTransport): AppointmentAp
       return request<ScheduleResult['schedule']>(`/api/v1/schedules/${encodeURIComponent(scheduleId)}`, { method: 'PATCH', signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
     },
     getAdminSummary(date, signal) {
-      return request<AdminSummary>(`/api/v1/admin/summary?${new URLSearchParams({ date })}`, { signal });
+      return request<AdminSummary>(`/api/v1/admin/appointments/summary?${new URLSearchParams({ date })}`, { signal });
     },
     listSchedules(input = {}, signal) {
       const query = new URLSearchParams(input);

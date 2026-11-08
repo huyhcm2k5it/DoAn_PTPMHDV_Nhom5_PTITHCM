@@ -14,9 +14,10 @@ def extend(doc, obj, ref, uuid, version, date_time, operation, parameter, key, v
         'lines':{'type':'array','items':ref('PrescriptionLine')},'finalizedAt':date_time},
         ['id','visitId','patientId','state','version','revision','lines'])
     s['LabInput'] = obj({'tests':{'type':'array','minItems':1,'maxItems':100,
-        'items':obj({'testId':uuid,'revision':version})}})
+        'items':obj({'testId':uuid,'revision':version})},'replacesRequestId':uuid,'expectedSourceVersion':version},['tests'])
+    s['LabInput']['dependentRequired']={'replacesRequestId':['expectedSourceVersion'],'expectedSourceVersion':['replacesRequestId']}
     test_snapshot=obj({'testId':uuid,'revision':version,'code':text,'name':text,'unit':text,'referenceRange':text})
-    s['LabRequest'] = obj({'requestId':uuid,'visitId':uuid,'state':{'enum':['PENDING','CREATED','REJECTED']},
+    s['LabRequest'] = obj({'requestId':uuid,'visitId':uuid,'state':{'enum':['PENDING','CREATED','REJECTED','FAILED','SUPERSEDED']},
         'orderId':uuid,'reasonCode':text,'tests':{'type':'array','items':test_snapshot}},['requestId','visitId','state','tests'])
     s['LabPending'] = obj({'requestId':uuid,'state':{'const':'PENDING'},
         'statusUrl':{'type':'string','format':'uri-reference'}})

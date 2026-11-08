@@ -43,13 +43,13 @@ function createPatientsController(dependencies) {
     },
     async create(req, res, next) {
       try {
-        const patient = await createPatient({ connection: dependencies.connection, Patient: dependencies.Patient, authContext: req.authContext, body: req.body, createId: dependencies.createId, now: dependencies.now?.() || new Date() });
+        const patient = await createPatient({ connection: dependencies.connection, Patient: dependencies.Patient, authContext: req.authContext, body: req.body, idempotencyKey: req.get('idempotency-key'), requestId: req.correlationId, correlationId: req.correlationId, createId: dependencies.createId, now: dependencies.now?.() || new Date() });
         res.status(201).json({ data: { patient }, meta: { correlationId: req.correlationId } });
       } catch (error) { next(error); }
     },
     async update(req, res, next) {
       try {
-        const patient = await updatePatient({ connection: dependencies.connection, Patient: dependencies.Patient, authContext: req.authContext, patientId: req.params.patientId, body: req.body, expectedVersion: req.body?.expectedVersion, now: dependencies.now?.() || new Date() });
+        const patient = await updatePatient({ connection: dependencies.connection, Patient: dependencies.Patient, authContext: req.authContext, patientId: req.params.patientId, body: req.body, idempotencyKey: req.get('idempotency-key'), requestId: req.correlationId, correlationId: req.correlationId, expectedVersion: req.body?.expectedVersion, now: dependencies.now?.() || new Date() });
         res.status(200).json({ data: { patient }, meta: { correlationId: req.correlationId } });
       } catch (error) { next(error); }
     },

@@ -86,7 +86,7 @@ async function billing(type, holdId, extra = {}) {
         fence: r.fence,
         amountVnd: r.amountVnd,
         amountHash: r.snapshotHash,
-        attemptVersion: r.version,
+        attemptVersion: type === 'ReserveSettlement' ? (extra.settlementId && extra.settlementId !== r.settlementId ? (r.reserveAttemptVersion || 0) + 1 : (r.reserveAttemptVersion || 1)) : r.version,
         ...extra,
       },
     },
@@ -330,7 +330,7 @@ test('hold reserves full FINAL prescription and RequestCharge together and repla
     1,
   );
   const outbox = await h.connection.collection('outbox').findOne({ message_type: 'RequestCharge' });
-  assert.equal(outbox.payload.sourceType, 'PHARMACY');
+  assert.equal(outbox.payload.sourceType, 'MED_HOLD');
   assert.equal(outbox.payload.sourceRevision, 1);
   assert.equal(outbox.payload.amountVnd, 1000);
   assert.equal(outbox.payload.recipientUserId, owner);

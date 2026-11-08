@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:umc-care:identity-access:v1",
+  "title": "IdentityAccessChanged and PatientAccessChanged v1",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "messageId",
+        "messageKind",
+        "messageType",
+        "schemaVersion",
+        "producer",
+        "aggregateId",
+        "aggregateVersion",
+        "correlationId",
+        "causationId",
+        "requestId",
+        "occurredAt",
+        "payload"
+      ],
+      "properties": {
+        "messageId": { "type": "string", "format": "uuid" },
+        "messageKind": { "const": "EVENT" },
+        "messageType": { "const": "IdentityAccessChanged" },
+        "schemaVersion": { "const": 1 },
+        "producer": { "const": "identity" },
+        "aggregateId": { "type": "string", "format": "uuid" },
+        "aggregateVersion": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "correlationId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "causationId": { "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] },
+        "requestId": { "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] },
+        "occurredAt": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["userId", "status", "actorType", "capabilities", "tokenVersion", "phoneVerified", "version"],
+          "properties": {
+            "userId": { "type": "string", "format": "uuid" },
+            "status": { "type": "string", "enum": ["UNVERIFIED", "ACTIVE", "LOCKED", "BLOCKED"] },
+            "actorType": { "type": "string", "enum": ["PATIENT", "DOCTOR", "STAFF"] },
+            "capabilities": { "type": "array", "items": { "type": "string" } },
+            "tokenVersion": { "type": "integer", "minimum": 1 },
+            "phoneVerified": { "type": "boolean" },
+            "version": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "messageId",
+        "messageKind",
+        "messageType",
+        "schemaVersion",
+        "producer",
+        "aggregateId",
+        "aggregateVersion",
+        "correlationId",
+        "causationId",
+        "requestId",
+        "occurredAt",
+        "payload"
+      ],
+      "properties": {
+        "messageId": { "type": "string", "format": "uuid" },
+        "messageKind": { "const": "EVENT" },
+        "messageType": { "const": "PatientAccessChanged" },
+        "schemaVersion": { "const": 1 },
+        "producer": { "const": "patient" },
+        "aggregateId": { "type": "string", "format": "uuid" },
+        "aggregateVersion": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "correlationId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "causationId": { "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] },
+        "requestId": { "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] },
+        "occurredAt": { "type": "string", "format": "date-time" },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["patientId", "ownerUserId", "active", "policyVersion"],
+          "properties": {
+            "patientId": { "type": "string", "format": "uuid" },
+            "ownerUserId": { "type": "string", "format": "uuid" },
+            "active": { "type": "boolean" },
+            "policyVersion": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    }
+  ]
+}

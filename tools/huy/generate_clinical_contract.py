@@ -38,10 +38,25 @@ key = parameter('Idempotency-Key','header',uuid,True)
 visit_id = parameter('visitId','path',uuid,True)
 correlation = parameter('X-Correlation-ID','header',{'type':'string','pattern':'^[A-Za-z0-9._:-]{1,128}$'})
 
+ERROR_CODES = {
+    '400': ['VALIDATION_ERROR'],
+    '401': ['UNAUTHENTICATED', 'AUTHZ_LEASE_EXPIRED'],
+    '403': ['FORBIDDEN'],
+    '404': ['NOT_FOUND', 'START_REQUEST_NOT_FOUND'],
+    '409': ['STATE_CONFLICT', 'TICKET_ALREADY_CLAIMED', 'TICKET_VERSION_CONFLICT', 'VISIT_ALREADY_SIGNED', 'VISIT_VERSION_CONFLICT', 'LAB_REQUEST_DUPLICATE', 'VISIT_NOT_ACTIVE', 'PRESCRIPTION_NOT_DRAFT', 'PRICE_VERSION_CONFLICT', 'LAB_RESULT_PENDING', 'VISIT_NOT_READY', 'ORDER_NOT_PAID', 'SPECIMEN_ALREADY_COLLECTED', 'SPECIMEN_ALREADY_PROCESSED', 'RESULT_VERSION_CONFLICT', 'RESULT_ALREADY_PUBLISHED', 'RESULT_INCOMPLETE', 'RESULT_NOT_IN_REVIEW', 'SELF_REVIEW_FORBIDDEN'],
+    '503': ['SERVICE_UNAVAILABLE'],
+}
+
 def operation(id,response,status=200,parameters=None,body=None,errors=None):
-    result={'operationId':id,'security':[{'bearerAuth':[]}],'parameters':[correlation]+(parameters or []),'responses':{str(status):{'description':'Committed locally; poll statusUrl for the claim result' if status==202 else 'Success','content':{'application/json':{'schema':ref(response)}}}}}
+    oid = id.replace('_', '-')
+    sensitive = oid in {'CL-009', 'CL-010', 'CL-011', 'DI-008', 'DI-009', 'DI-011'}
+    sec = {'bearerAuth': [], **({'authorizationLease': []} if sensitive else {})}
+    result={'operationId':id,'security':[sec],'parameters':[correlation]+(parameters or []),'responses':{str(status):{'description':'Committed locally; poll statusUrl for the claim result' if status==202 else 'Success','content':{'application/json':{'schema':ref(response)}}}}}
+    if sensitive:
+        result['x-authorization-lease']={'action':oid,'maxAgeSeconds':30,'expiryLeewaySeconds':0,'expiredStatus':401,'expiredCode':'AUTHZ_LEASE_EXPIRED'}
     for code in errors or [400,401,403,404,503]:
-        result['responses'][str(code)]={'description':'See error.code and meta.correlationId','content':{'application/json':{'schema':ref('Error')}}}
+        s=str(code)
+        result['responses'][s]={'description':', '.join(ERROR_CODES.get(s,[]))+': See error.code and meta.correlationId','x-error-codes':ERROR_CODES.get(s,[]),'content':{'application/json':{'schema':ref('Error')}}}
     if status==202:
         result['responses']['202']['headers']={'Location':{'required':True,'schema':{'type':'string','format':'uri-reference'}}}
     if body:
@@ -53,7 +68,7 @@ doc={'openapi':'3.1.1','info':{'title':'UMC Care Clinical week 2','version':'1.0
     '/api/v1/visits/start':{'post':operation('CL_002','StartResponse',202,[key],'StartInput',[400,401,403,404,409,503])},
     '/api/v1/visits/{visitId}':{'get':operation('CL_003','VisitDetailResponse',parameters=[visit_id])},
     '/api/v1/visits/{visitId}/draft':{'put':operation('CL_004','DraftResponse',parameters=[visit_id,key],body='DraftInput',errors=[400,401,403,404,409,503])},
-},'components':{'securitySchemes':{'bearerAuth':{'type':'http','scheme':'bearer','bearerFormat':'JWT (RS256)'}},'schemas':schemas}}
+},'components':{'securitySchemes':{'bearerAuth':{'type':'http','scheme':'bearer','bearerFormat':'JWT (RS256)'},'authorizationLease':{'type':'apiKey','in':'header','name':'X-Authorization-Lease','description':'Short-lived signed JWT from Identity (<=30s, 0s leeway)'}},'schemas':schemas}}
 from clinical_week3_contract import extend
 extend(doc,obj,ref,uuid,version,date_time,operation,parameter,key,visit_id)
 (root/'contracts/http/clinical.openapi.json').write_text(json.dumps(doc,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')

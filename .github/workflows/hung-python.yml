@@ -1,0 +1,47 @@
+name: Hung Python backend
+on:
+  push:
+    paths: ['services/identity/**', 'services/billing/**', 'services/notification/**', 'tools/be/**', '.github/workflows/hung-python.yml']
+  pull_request:
+    paths: ['services/identity/**', 'services/billing/**', 'services/notification/**', 'tools/be/**', '.github/workflows/hung-python.yml']
+permissions:
+  contents: read
+jobs:
+  django:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [identity, billing, notification]
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: umc_test
+          POSTGRES_PASSWORD: isolated-ci-only
+          POSTGRES_DB: umc_be_test_backend
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U umc_test -d umc_be_test_backend"
+          --health-interval 3s --health-timeout 3s --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+          cache-dependency-path: services/${{ matrix.service }}/requirements.txt
+      - run: pip install -r services/${{ matrix.service }}/requirements.txt
+      - name: PostgreSQL tests, migrations, real JWT (never empty/SQLite gate)
+        env:
+          TEST_SERVICE: ${{ matrix.service }}
+        shell: bash
+        run: |
+          export "${TEST_SERVICE^^}_DB_NAME=umc_be_test_backend"
+          export "${TEST_SERVICE^^}_DB_HOST=127.0.0.1"
+          export "${TEST_SERVICE^^}_DB_USER=umc_test"
+          export "${TEST_SERVICE^^}_DB_PASSWORD=isolated-ci-only"
+          python tools/be/test_django.py "$TEST_SERVICE"
+      - name: Migration model consistency
+        working-directory: services/${{ matrix.service }}
+        run: python manage.py makemigrations --check --dry-run

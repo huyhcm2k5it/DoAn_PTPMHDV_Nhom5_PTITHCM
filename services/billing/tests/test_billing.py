@@ -45,7 +45,7 @@ def bearer(actor_type="STAFF", capabilities=()):
         {
             "iss": "umc-care-identity",
             "aud": "umc-care-services",
-            "sub": str(uuid.uuid4()),
+            "sub": str(uuid.uuid5(uuid.NAMESPACE_URL, "billing-fixture:"+actor_type+":"+str(capabilities))),
             "actorType": actor_type,
             "capabilities": list(capabilities),
             "tokenVersion": 1,
@@ -58,8 +58,28 @@ def bearer(actor_type="STAFF", capabilities=()):
     return {"HTTP_AUTHORIZATION": f"Bearer {token}"}
 
 
-def cashier():
-    return bearer("STAFF", ["CASHIER"])
+def cashier(action="BI-005"):
+    return with_lease(bearer("STAFF", ["CASHIER"]), action)
+
+
+def with_lease(headers, action):
+    from datetime import datetime, timezone
+    p=jwt.decode(headers["HTTP_AUTHORIZATION"].split(" ",1)[1],options={"verify_signature":False})
+    now=int(datetime.now(timezone.utc).timestamp())
+    lease=jwt.encode({"iss":"umc-care-identity","aud":"umc-care-services","sub":p["sub"],
+        "tokenType":"LEASE","action":action,"tokenVersion":1,"iat":now,"exp":now+30},
+        _private_key(),algorithm="RS256")
+    return {**headers,"HTTP_X_AUTHORIZATION_LEASE":lease}
+
+
+def patient(patient_id):
+    from app.domain.models import PatientAccessProjection
+    headers=bearer("PATIENT", [])
+    p=jwt.decode(headers["HTTP_AUTHORIZATION"].split(" ",1)[1],options={"verify_signature":False})
+    PatientAccessProjection.objects.update_or_create(patient_id=patient_id,defaults={
+        "owner_user_id":p["sub"],"version":1,"active":True,"body_hash":"fixture"})
+    return with_lease(headers,"BI-004")
+
 
 
 class BillingServiceTests(APITestCase):
@@ -133,7 +153,7 @@ class BillingServiceTests(APITestCase):
             },
             format="json",
             HTTP_IDEMPOTENCY_KEY=idempotency_key,
-            **cashier()
+            **patient(self.patient_id)
         )
 
         self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
@@ -158,7 +178,7 @@ class BillingServiceTests(APITestCase):
                 "transactionId": "TX_TEST_FAIL"
             },
             format="json",
-            **cashier()
+            **patient(self.patient_id)
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.json()["error"]["code"], "VALIDATION_ERROR")
@@ -183,7 +203,7 @@ class BillingServiceTests(APITestCase):
             },
             format="json",
             HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
-            **cashier()
+            **patient(self.patient_id)
         )
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertEqual(response.json()["error"]["code"], "DUPLICATE_TRANSACTION")
@@ -199,7 +219,7 @@ class BillingServiceTests(APITestCase):
             {"chargeId": str(self.charge.id), "transactionId": tx_id},
             format="json",
             HTTP_IDEMPOTENCY_KEY=key,
-            **cashier()
+            **patient(self.patient_id)
         )
         self.assertEqual(res1.status_code, status.HTTP_202_ACCEPTED)
 
@@ -209,7 +229,7 @@ class BillingServiceTests(APITestCase):
             {"chargeId": str(self.charge.id), "transactionId": tx_id},
             format="json",
             HTTP_IDEMPOTENCY_KEY=key,
-            **cashier()
+            **patient(self.patient_id)
         )
         self.assertEqual(res2.status_code, status.HTTP_202_ACCEPTED)
         self.assertEqual(res1.json()["data"]["paymentId"], res2.json()["data"]["paymentId"])
@@ -232,7 +252,7 @@ class BillingServiceTests(APITestCase):
             {"chargeId": str(self.charge.id), "transactionId": tx_id},
             format="json",
             HTTP_IDEMPOTENCY_KEY=key,
-            **cashier()
+            **patient(self.patient_id)
         )
         self.assertEqual(res3.status_code, status.HTTP_202_ACCEPTED)
         self.assertEqual(res3.json()["data"]["paymentId"], str(payment.id))

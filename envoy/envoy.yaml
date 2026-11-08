@@ -1,306 +1,1149 @@
 static_resources:
   listeners:
-    - name: ingress_listener
-      address:
-        socket_address:
-          address: 0.0.0.0
-          port_value: 8080
-      filter_chains:
-        - filters:
-            - name: envoy.filters.network.http_connection_manager
-              typed_config:
-                '@type': type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-                stat_prefix: ingress_http
-                codec_type: AUTO
-                route_config:
-                  name: local_route
-                  virtual_hosts:
-                    - name: umc_care_backend
-                      domains: ['*']
-                      cors:
-                        allow_origin_string_match:
-                          - safe_regex:
-                              regex: '.*'
-                        allow_methods: 'GET, PUT, POST, PATCH, DELETE, OPTIONS'
-                        allow_headers: 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,Idempotency-Key,X-Correlation-Id,X-Authorization-Lease'
-                        expose_headers: 'Location,Content-Length,Content-Range,X-Correlation-Id'
-                        max_age: '1728000'
-                      routes:
-                        # Recovery-only adapters remain closed in the normal demo profile.
-                        - match:
-                            path: '/api/v1/charges'
-                            headers: [{ name: ':method', string_match: { exact: 'POST' } }]
-                          direct_response: { status: 403 }
-                        - match:
-                            path: '/api/v1/diagnostic-orders'
-                            headers: [{ name: ':method', string_match: { exact: 'POST' } }]
-                          direct_response: { status: 403 }
-                        - match:
-                            safe_regex: { regex: '/api/v1/patients/[^/]+/appointments' }
-                          route: { cluster: appointment_service, timeout: 15s }
-                        # 1. Identity Service (Hưng)
-                        - match: { prefix: '/api/v1/auth' }
-                          route: { cluster: identity_service, timeout: 15s }
-                        - match: { prefix: '/api/v1/admin/staff' }
-                          route: { cluster: identity_service, timeout: 15s }
-                        - match: { prefix: '/api/v1/admin/audit' }
-                          route: { cluster: identity_service, timeout: 15s }
-                        # DEV ONLY: hộp thư SMS giả lập; service tự trả 404 khi ALLOW_DEV_OTP=false
-                        - match: { prefix: "/api/v1/dev" }
-                          route: { cluster: identity_service, timeout: 15s }
-
-                        # BI-010: báo cáo doanh thu thuộc Billing, không phải Identity
-                        - match: { prefix: "/api/v1/admin/reports" }
-                          route: { cluster: billing_service, timeout: 15s }
-
-                        # BI-003: Patient charges routed to billing_service
-                        - match: { safe_regex: { regex: "^/api/v1/patients/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/charges$" } }
-                          route: { cluster: billing_service, timeout: 15s }
-
-                        # 2. Patient Service (Quân)
-                        - match: { prefix: '/api/v1/patients' }
-                          route: { cluster: patient_service, timeout: 15s }
-
-                        # 3. Appointment Service (Quân)
-                        - match: { prefix: '/api/v1/appointments' }
-                          route: { cluster: appointment_service, timeout: 15s }
-                        - match: { prefix: '/api/v1/appointment-holds' }
-                          route: { cluster: appointment_service, timeout: 15s }
-                        - match: { prefix: '/api/v1/queues' }
-                          route: { cluster: appointment_service, timeout: 15s }
-                        - match: { prefix: '/api/v1/slots' }
-                          route: { cluster: appointment_service, timeout: 15s }
-                        - match: { prefix: '/api/v1/schedules' }
-                          route: { cluster: appointment_service, timeout: 15s }
-
-                        # 4. Catalog Service (Huy)
-                        - match: { prefix: '/api/v1/departments' }
-                          route: { cluster: catalog_service, timeout: 15s }
-                        - match: { prefix: '/api/v1/doctors' }
-                          route: { cluster: catalog_service, timeout: 15s }
-                        - match: { prefix: '/api/v1/medical-services' }
-                          route: { cluster: catalog_service, timeout: 15s }
-                        - match: { prefix: '/api/v1/prices' }
-                          route: { cluster: catalog_service, timeout: 15s }
-                        - match: { prefix: '/api/v1/catalog' }
-                          route: { cluster: catalog_service, timeout: 15s }
-
-                        # 5. Pharmacy Service (Quân)
-                        - match: { prefix: '/api/v1/pharmacy' }
-                          route: { cluster: pharmacy_service, timeout: 15s }
-                        - match: { prefix: '/api/v1/medicines' }
-                          route: { cluster: pharmacy_service, timeout: 15s }
-
-                        # 6. Clinical Service (Huy)
-                        - match: { prefix: '/api/v1/clinical' }
-                          route: { cluster: clinical_service, timeout: 15s }
-                        - match: { prefix: '/api/v1/visits' }
-                          route: { cluster: clinical_service, timeout: 15s }
-                        - match: { prefix: '/api/v1/prescriptions' }
-                          route: { cluster: clinical_service, timeout: 15s }
-
-                        # 7. Diagnostic Service (Huy)
-                        - match: { prefix: '/api/v1/diagnostic-orders' }
-                          route: { cluster: diagnostic_service, timeout: 15s }
-                        - match: { prefix: '/api/v1/diagnostic' }
-                          route: { cluster: diagnostic_service, timeout: 15s }
-                        - match: { prefix: '/api/v1/specimens' }
-                          route: { cluster: diagnostic_service, timeout: 15s }
-                        - match: { prefix: '/api/v1/admin/summary' }
-                          route: { cluster: appointment_service, timeout: 15s }
-
-                        # 8. Billing Service (Hưng)
-                        - match: { prefix: '/api/v1/billing' }
-                          route: { cluster: billing_service, timeout: 15s }
-                        - match: { prefix: '/api/v1/charges' }
-                          route: { cluster: billing_service, timeout: 15s }
-                        - match: { prefix: '/api/v1/payments' }
-                          route: { cluster: billing_service, timeout: 15s }
-                        - match: { prefix: '/api/v1/receipts' }
-                          route: { cluster: billing_service, timeout: 15s }
-                        - match: { prefix: '/api/v1/refunds' }
-                          route: { cluster: billing_service, timeout: 15s }
-
-                        # 9. Notification Service (Hưng)
-                        - match: { prefix: '/api/v1/notifications' }
-                          route: { cluster: notification_service, timeout: 15s }
-
-                http_filters:
-                  - name: envoy.filters.http.jwt_authn
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
-                      providers:
-                        umc_identity:
-                          issuer: umc-care-identity
-                          audiences: [umc-care-services]
-                          forward: true
-                          from_headers:
-                            - name: Authorization
-                              value_prefix: 'Bearer '
-                          local_jwks:
-                            filename: /etc/envoy/jwks.json
-                      rules:
-                        - match: { prefix: '/api/v1/auth' }
-                          requires: { allow_missing: {} }
-                        - match: { prefix: '/api/v1/catalog' }
-                          requires: { allow_missing: {} }
-                        - match: { prefix: '/api/v1/departments' }
-                          requires: { allow_missing: {} }
-                        - match: { prefix: '/api/v1/doctors' }
-                          requires: { allow_missing: {} }
-                        - match: { prefix: '/api/v1/medical-services' }
-                          requires: { allow_missing: {} }
-                        - match: { prefix: '/api/v1/prices' }
-                          requires: { allow_missing: {} }
-                        - match: { prefix: '/api/v1/dev' }
-                          requires: { allow_missing: {} }
-                        - match: { prefix: '/api/v1' }
-                          requires: { provider_name: umc_identity }
-                        - match: { prefix: "/" }
-                          requires: { allow_missing: {} }
-                  - name: envoy.filters.http.cors
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
-                  - name: envoy.filters.http.router
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-
+  - name: ingress_listener
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 8080
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.http_connection_manager
+        typed_config:
+          '@type': type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: ingress_http
+          codec_type: AUTO
+          route_config:
+            name: local_route
+            virtual_hosts:
+            - name: umc_care_backend
+              domains:
+              - '*'
+              cors:
+                allow_origin_string_match:
+                - exact: http://localhost:5173
+                - exact: http://127.0.0.1:5173
+                - exact: http://localhost:8080
+                - exact: http://127.0.0.1:8080
+                allow_methods: GET, PUT, POST, PATCH, DELETE, OPTIONS
+                allow_headers: DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,Idempotency-Key,X-Correlation-Id,X-Authorization-Lease
+                expose_headers: Location,Content-Length,Content-Range,X-Correlation-Id
+                max_age: '1728000'
+              routes:
+              - name: IA-001
+                match: &id001
+                  path: /api/v1/auth/register
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: identity_service
+                  timeout: 15s
+              - name: IA-002
+                match: &id002
+                  path: /api/v1/auth/otp/verify
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: identity_service
+                  timeout: 15s
+              - name: IA-003
+                match: &id003
+                  path: /api/v1/auth/otp/resend
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: identity_service
+                  timeout: 15s
+              - name: IA-004
+                match: &id004
+                  path: /api/v1/auth/login
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: identity_service
+                  timeout: 15s
+              - name: IA-005
+                match:
+                  path: /api/v1/auth/refresh
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: identity_service
+                  timeout: 15s
+              - name: IA-006
+                match:
+                  path: /api/v1/auth/logout
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: identity_service
+                  timeout: 15s
+              - name: IA-007
+                match: &id005
+                  path: /api/v1/auth/password/forgot
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: identity_service
+                  timeout: 15s
+              - name: IA-008
+                match: &id006
+                  path: /api/v1/auth/password/reset
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: identity_service
+                  timeout: 15s
+              - name: IA-009
+                match:
+                  path: /api/v1/auth/password
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: PUT
+                route:
+                  cluster: identity_service
+                  timeout: 15s
+              - name: IA-010
+                match:
+                  path: /api/v1/auth/session
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: identity_service
+                  timeout: 15s
+              - name: IA-011
+                match:
+                  path: /api/v1/admin/staff
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: identity_service
+                  timeout: 15s
+              - name: IA-012
+                match:
+                  safe_regex:
+                    regex: /api/v1/admin/staff/[^/]+/roles
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: PUT
+                route:
+                  cluster: identity_service
+                  timeout: 15s
+              - name: IA-013
+                match:
+                  path: /api/v1/admin/audit
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: identity_service
+                  timeout: 15s
+              - name: IA-014
+                match:
+                  path: /api/v1/internal/users/resolve
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                direct_response:
+                  status: 403
+              - name: PT-001
+                match:
+                  path: /api/v1/patients
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: patient_service
+                  timeout: 15s
+              - name: PT-003
+                match:
+                  path: /api/v1/patients
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: patient_service
+                  timeout: 15s
+              - name: PT-002
+                match:
+                  path: /api/v1/patients/search
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: patient_service
+                  timeout: 15s
+              - name: PT-004
+                match:
+                  safe_regex:
+                    regex: /api/v1/patients/[^/]+
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: patient_service
+                  timeout: 15s
+              - name: PT-005
+                match:
+                  safe_regex:
+                    regex: /api/v1/patients/[^/]+
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: PATCH
+                route:
+                  cluster: patient_service
+                  timeout: 15s
+              - name: CA-001
+                match: &id007
+                  path: /api/v1/departments
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: catalog_service
+                  timeout: 15s
+              - name: CA-002
+                match: &id008
+                  path: /api/v1/doctors
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: catalog_service
+                  timeout: 15s
+              - name: CA-003
+                match: &id009
+                  path: /api/v1/medical-services
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: catalog_service
+                  timeout: 15s
+              - name: AP-004
+                match: &id010
+                  path: /api/v1/slots/available
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: appointment_service
+                  timeout: 15s
+              - name: AP-005
+                match:
+                  path: /api/v1/schedules
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: appointment_service
+                  timeout: 15s
+              - name: AP-006
+                match:
+                  safe_regex:
+                    regex: /api/v1/schedules/[^/]+
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: PATCH
+                route:
+                  cluster: appointment_service
+                  timeout: 15s
+              - name: CA-004
+                match:
+                  path: /api/v1/prices
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: catalog_service
+                  timeout: 15s
+              - name: AP-008
+                match:
+                  path: /api/v1/appointment-holds
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: appointment_service
+                  timeout: 15s
+              - name: AP-009
+                match:
+                  safe_regex:
+                    regex: /api/v1/appointment\-holds/[^/]+
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: DELETE
+                route:
+                  cluster: appointment_service
+                  timeout: 15s
+              - name: AP-010
+                match:
+                  path: /api/v1/appointments
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: appointment_service
+                  timeout: 15s
+              - name: AP-011
+                match:
+                  safe_regex:
+                    regex: /api/v1/appointments/[^/]+
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: appointment_service
+                  timeout: 15s
+              - name: AP-012
+                match:
+                  safe_regex:
+                    regex: /api/v1/patients/[^/]+/appointments
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: appointment_service
+                  timeout: 15s
+              - name: AP-013
+                match:
+                  safe_regex:
+                    regex: /api/v1/appointments/[^/]+/reschedule
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: appointment_service
+                  timeout: 15s
+              - name: AP-014
+                match:
+                  safe_regex:
+                    regex: /api/v1/appointments/[^/]+/cancel
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: appointment_service
+                  timeout: 15s
+              - name: AP-015
+                match:
+                  safe_regex:
+                    regex: /api/v1/appointments/[^/]+/check\-in
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: appointment_service
+                  timeout: 15s
+              - name: AP-016
+                match:
+                  path: /api/v1/queues/today
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: appointment_service
+                  timeout: 15s
+              - name: AP-017
+                match:
+                  path: /api/v1/queues/call-next
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: appointment_service
+                  timeout: 15s
+              - name: AP-018
+                match:
+                  safe_regex:
+                    regex: /api/v1/queues/[^/]+/no\-show
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: appointment_service
+                  timeout: 15s
+              - name: AP-019
+                match:
+                  path: /api/v1/admin/appointments/summary
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: appointment_service
+                  timeout: 15s
+              - name: CL-001
+                match:
+                  path: /api/v1/clinical/worklist
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: clinical_service
+                  timeout: 15s
+              - name: CL-002
+                match:
+                  path: /api/v1/visits/start
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: clinical_service
+                  timeout: 15s
+              - name: CL-003
+                match:
+                  safe_regex:
+                    regex: /api/v1/visits/[^/]+
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: clinical_service
+                  timeout: 15s
+              - name: CL-004
+                match:
+                  safe_regex:
+                    regex: /api/v1/visits/[^/]+/draft
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: PUT
+                route:
+                  cluster: clinical_service
+                  timeout: 15s
+              - name: CL-005
+                match:
+                  safe_regex:
+                    regex: /api/v1/visits/[^/]+/lab\-orders
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: clinical_service
+                  timeout: 15s
+              - name: CL-006
+                match:
+                  safe_regex:
+                    regex: /api/v1/visits/[^/]+/prescriptions
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: clinical_service
+                  timeout: 15s
+              - name: CL-007
+                match:
+                  safe_regex:
+                    regex: /api/v1/prescriptions/[^/]+
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: PUT
+                route:
+                  cluster: clinical_service
+                  timeout: 15s
+              - name: CL-008
+                match:
+                  safe_regex:
+                    regex: /api/v1/prescriptions/[^/]+
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: DELETE
+                route:
+                  cluster: clinical_service
+                  timeout: 15s
+              - name: CL-009
+                match:
+                  safe_regex:
+                    regex: /api/v1/prescriptions/[^/]+/finalize
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: clinical_service
+                  timeout: 15s
+              - name: CL-010
+                match:
+                  safe_regex:
+                    regex: /api/v1/visits/[^/]+/complete
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: clinical_service
+                  timeout: 15s
+              - name: CL-011
+                match:
+                  safe_regex:
+                    regex: /api/v1/patients/[^/]+/medical\-records
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: clinical_service
+                  timeout: 15s
+              - name: DI-001
+                match:
+                  path: /api/v1/diagnostic-orders
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                direct_response:
+                  status: 403
+              - name: DI-002
+                match:
+                  path: /api/v1/diagnostic-orders
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: diagnostic_service
+                  timeout: 15s
+              - name: DI-003
+                match:
+                  safe_regex:
+                    regex: /api/v1/diagnostic\-orders/[^/]+
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: diagnostic_service
+                  timeout: 15s
+              - name: DI-004
+                match:
+                  safe_regex:
+                    regex: /api/v1/diagnostic\-orders/[^/]+/specimens
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: diagnostic_service
+                  timeout: 15s
+              - name: DI-005
+                match:
+                  safe_regex:
+                    regex: /api/v1/specimens/[^/]+/reject
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: diagnostic_service
+                  timeout: 15s
+              - name: DI-006
+                match:
+                  safe_regex:
+                    regex: /api/v1/diagnostic\-orders/[^/]+/recollect
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: diagnostic_service
+                  timeout: 15s
+              - name: DI-007
+                match:
+                  safe_regex:
+                    regex: /api/v1/diagnostic\-orders/[^/]+/results
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: diagnostic_service
+                  timeout: 15s
+              - name: DI-008
+                match:
+                  safe_regex:
+                    regex: /api/v1/results/[^/]+
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: PUT
+                route:
+                  cluster: diagnostic_service
+                  timeout: 15s
+              - name: DI-009
+                match:
+                  safe_regex:
+                    regex: /api/v1/results/[^/]+/submit\-review
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: diagnostic_service
+                  timeout: 15s
+              - name: DI-010
+                match:
+                  safe_regex:
+                    regex: /api/v1/results/[^/]+/return\-rework
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: diagnostic_service
+                  timeout: 15s
+              - name: DI-011
+                match:
+                  safe_regex:
+                    regex: /api/v1/results/[^/]+/publish
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: diagnostic_service
+                  timeout: 15s
+              - name: DI-012
+                match:
+                  safe_regex:
+                    regex: /api/v1/diagnostic\-orders/[^/]+/cancel
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: diagnostic_service
+                  timeout: 15s
+              - name: DI-013
+                match:
+                  safe_regex:
+                    regex: /api/v1/patients/[^/]+/published\-results
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: diagnostic_service
+                  timeout: 15s
+              - name: PH-001
+                match:
+                  path: /api/v1/pharmacy/stock
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: pharmacy_service
+                  timeout: 15s
+              - name: PH-002
+                match:
+                  path: /api/v1/pharmacy/stock/receipts
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: pharmacy_service
+                  timeout: 15s
+              - name: PH-003
+                match:
+                  path: /api/v1/pharmacy/prescriptions/queue
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: pharmacy_service
+                  timeout: 15s
+              - name: PH-004
+                match:
+                  safe_regex:
+                    regex: /api/v1/pharmacy/prescriptions/[^/]+
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: pharmacy_service
+                  timeout: 15s
+              - name: PH-005
+                match:
+                  safe_regex:
+                    regex: /api/v1/pharmacy/prescriptions/[^/]+/holds
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: pharmacy_service
+                  timeout: 15s
+              - name: PH-006
+                match:
+                  safe_regex:
+                    regex: /api/v1/pharmacy/holds/[^/]+
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: DELETE
+                route:
+                  cluster: pharmacy_service
+                  timeout: 15s
+              - name: PH-007
+                match:
+                  safe_regex:
+                    regex: /api/v1/pharmacy/holds/[^/]+/commit
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: pharmacy_service
+                  timeout: 15s
+              - name: PH-008
+                match:
+                  safe_regex:
+                    regex: /api/v1/pharmacy/holds/[^/]+/dispense
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: pharmacy_service
+                  timeout: 15s
+              - name: BI-001
+                match:
+                  path: /api/v1/charges
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                direct_response:
+                  status: 403
+              - name: BI-013
+                match:
+                  path: /api/v1/charges
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: billing_service
+                  timeout: 15s
+              - name: BI-002
+                match:
+                  safe_regex:
+                    regex: /api/v1/charges/[^/]+
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: billing_service
+                  timeout: 15s
+              - name: BI-003
+                match:
+                  safe_regex:
+                    regex: /api/v1/patients/[^/]+/charges
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: billing_service
+                  timeout: 15s
+              - name: BI-004
+                match:
+                  path: /api/v1/payments/simulate
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: billing_service
+                  timeout: 15s
+              - name: BI-005
+                match:
+                  path: /api/v1/payments/counter
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: billing_service
+                  timeout: 15s
+              - name: BI-006
+                match:
+                  safe_regex:
+                    regex: /api/v1/receipts/[^/]+
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: billing_service
+                  timeout: 15s
+              - name: BI-007
+                match:
+                  path: /api/v1/refunds
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: billing_service
+                  timeout: 15s
+              - name: BI-014
+                match:
+                  path: /api/v1/refunds
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: billing_service
+                  timeout: 15s
+              - name: BI-008
+                match:
+                  safe_regex:
+                    regex: /api/v1/refunds/[^/]+/execute
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                route:
+                  cluster: billing_service
+                  timeout: 15s
+              - name: BI-009
+                match:
+                  safe_regex:
+                    regex: /api/v1/refunds/[^/]+
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: billing_service
+                  timeout: 15s
+              - name: BI-010
+                match:
+                  path: /api/v1/admin/reports/summary
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: billing_service
+                  timeout: 15s
+              - name: NO-001
+                match:
+                  path: /api/v1/notifications
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: notification_service
+                  timeout: 15s
+              - name: NO-002
+                match:
+                  safe_regex:
+                    regex: /api/v1/notifications/[^/]+/read
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: PATCH
+                route:
+                  cluster: notification_service
+                  timeout: 15s
+              - name: CA-005
+                match:
+                  path: /api/v1/catalog/medicines
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: catalog_service
+                  timeout: 15s
+              - name: CA-006
+                match:
+                  path: /api/v1/catalog/lab-tests
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: catalog_service
+                  timeout: 15s
+              - match:
+                  prefix: /
+                direct_response:
+                  status: 404
+              response_headers_to_add:
+              - header:
+                  key: x-correlation-id
+                  value: '%REQ(X-REQUEST-ID)%'
+                append_action: OVERWRITE_IF_EXISTS_OR_ADD
+          http_filters:
+          - name: envoy.filters.http.local_ratelimit
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+              stat_prefix: gateway_rate
+              token_bucket:
+                max_tokens: 100
+                tokens_per_fill: 100
+                fill_interval: 1s
+              filter_enabled:
+                runtime_key: gateway_rate_enabled
+                default_value:
+                  numerator: 100
+                  denominator: HUNDRED
+              filter_enforced:
+                runtime_key: gateway_rate_enforced
+                default_value:
+                  numerator: 100
+                  denominator: HUNDRED
+              response_headers_to_add:
+              - append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                header:
+                  key: retry-after
+                  value: '1'
+          - name: envoy.filters.http.jwt_authn
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.http.jwt_authn.v3.JwtAuthentication
+              providers:
+                umc_identity:
+                  issuer: umc-care-identity
+                  audiences:
+                  - umc-care-services
+                  forward: true
+                  from_headers:
+                  - name: Authorization
+                    value_prefix: 'Bearer '
+                  local_jwks:
+                    filename: /etc/envoy/jwks.json
+              rules:
+              - match:
+                  path: /api/v1/auth/refresh
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: POST
+                requires:
+                  allow_missing: {}
+              - match: *id001
+                requires:
+                  allow_missing: {}
+              - match: *id002
+                requires:
+                  allow_missing: {}
+              - match: *id003
+                requires:
+                  allow_missing: {}
+              - match: *id004
+                requires:
+                  allow_missing: {}
+              - match: *id005
+                requires:
+                  allow_missing: {}
+              - match: *id006
+                requires:
+                  allow_missing: {}
+              - match: *id007
+                requires:
+                  allow_missing: {}
+              - match: *id008
+                requires:
+                  allow_missing: {}
+              - match: *id009
+                requires:
+                  allow_missing: {}
+              - match: *id010
+                requires:
+                  allow_missing: {}
+              - match:
+                  prefix: /
+                requires:
+                  provider_name: umc_identity
+          - name: envoy.filters.http.cors
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
+          - name: envoy.filters.http.router
+            typed_config:
+              '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+          generate_request_id: true
+          preserve_external_request_id: false
   clusters:
-    # 1. Identity Service
-    - name: identity_service
-      connect_timeout: 2s
-      type: STRICT_DNS
-      lb_policy: ROUND_ROBIN
-      load_assignment:
-        cluster_name: identity_service
-        endpoints:
-          - lb_endpoints:
-              - endpoint:
-                  address:
-                    socket_address:
-                      address: identity
-                      port_value: 8000
-
-    # 2. Patient Service
-    - name: patient_service
-      connect_timeout: 2s
-      type: STRICT_DNS
-      lb_policy: ROUND_ROBIN
-      load_assignment:
-        cluster_name: patient_service
-        endpoints:
-          - lb_endpoints:
-              - endpoint:
-                  address:
-                    socket_address:
-                      address: patient
-                      port_value: 3000
-
-    # 3. Appointment Service
-    - name: appointment_service
-      connect_timeout: 2s
-      type: STRICT_DNS
-      lb_policy: ROUND_ROBIN
-      load_assignment:
-        cluster_name: appointment_service
-        endpoints:
-          - lb_endpoints:
-              - endpoint:
-                  address:
-                    socket_address:
-                      address: appointment
-                      port_value: 3000
-
-    # 4. Catalog Service
-    - name: catalog_service
-      connect_timeout: 2s
-      type: STRICT_DNS
-      lb_policy: ROUND_ROBIN
-      load_assignment:
-        cluster_name: catalog_service
-        endpoints:
-          - lb_endpoints:
-              - endpoint:
-                  address:
-                    socket_address:
-                      address: catalog
-                      port_value: 8081
-
-    # 5. Pharmacy Service
-    - name: pharmacy_service
-      connect_timeout: 2s
-      type: STRICT_DNS
-      lb_policy: ROUND_ROBIN
-      load_assignment:
-        cluster_name: pharmacy_service
-        endpoints:
-          - lb_endpoints:
-              - endpoint:
-                  address:
-                    socket_address:
-                      address: pharmacy
-                      port_value: 3000
-
-    # 6. Clinical Service
-    - name: clinical_service
-      connect_timeout: 2s
-      type: STRICT_DNS
-      lb_policy: ROUND_ROBIN
-      load_assignment:
-        cluster_name: clinical_service
-        endpoints:
-          - lb_endpoints:
-              - endpoint:
-                  address:
-                    socket_address:
-                      address: clinical
-                      port_value: 8082
-
-    # 7. Diagnostic Service
-    - name: diagnostic_service
-      connect_timeout: 2s
-      type: STRICT_DNS
-      lb_policy: ROUND_ROBIN
-      load_assignment:
-        cluster_name: diagnostic_service
-        endpoints:
-          - lb_endpoints:
-              - endpoint:
-                  address:
-                    socket_address:
-                      address: diagnostic
-                      port_value: 8083
-
-    # 8. Billing Service
-    - name: billing_service
-      connect_timeout: 2s
-      type: STRICT_DNS
-      lb_policy: ROUND_ROBIN
-      load_assignment:
-        cluster_name: billing_service
-        endpoints:
-          - lb_endpoints:
-              - endpoint:
-                  address:
-                    socket_address:
-                      address: billing
-                      port_value: 8000
-
-    # 9. Notification Service
-    - name: notification_service
-      connect_timeout: 2s
-      type: STRICT_DNS
-      lb_policy: ROUND_ROBIN
-      load_assignment:
-        cluster_name: notification_service
-        endpoints:
-          - lb_endpoints:
-              - endpoint:
-                  address:
-                    socket_address:
-                      address: notification
-                      port_value: 8000
-
+  - name: identity_service
+    connect_timeout: 2s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: identity_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: identity
+                port_value: 8000
+  - name: patient_service
+    connect_timeout: 2s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: patient_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: patient
+                port_value: 3000
+  - name: appointment_service
+    connect_timeout: 2s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: appointment_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: appointment
+                port_value: 3000
+  - name: catalog_service
+    connect_timeout: 2s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: catalog_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: catalog
+                port_value: 8081
+  - name: pharmacy_service
+    connect_timeout: 2s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: pharmacy_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: pharmacy
+                port_value: 3000
+  - name: clinical_service
+    connect_timeout: 2s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: clinical_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: clinical
+                port_value: 8082
+  - name: diagnostic_service
+    connect_timeout: 2s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: diagnostic_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: diagnostic
+                port_value: 8083
+  - name: billing_service
+    connect_timeout: 2s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: billing_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: billing
+                port_value: 8000
+  - name: notification_service
+    connect_timeout: 2s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    load_assignment:
+      cluster_name: notification_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: notification
+                port_value: 8000
 admin:
   address:
     socket_address:

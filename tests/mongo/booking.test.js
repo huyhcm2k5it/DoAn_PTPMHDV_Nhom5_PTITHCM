@@ -101,6 +101,7 @@ async function setup(t) {
     createAppointmentApp({
       connection,
       verifyBearerToken,
+      verifyAuthorizationLease: async (token, options) => token === 'test-identity-lease' ? ({ tokenType: 'LEASE', action: options.action, sub: options.subject, tokenVersion: options.tokenVersion, iat: 1793404800, exp: 1793404830 }) : null,
       authorizePatientAccess,
       now: () => new Date('2026-10-31T00:00:00Z'),
       resolvePriceSnapshot: async () => ({
@@ -154,6 +155,7 @@ test('AP-008 reserves the last slot once and AP-009 releases it', async (t) => {
     method: 'POST',
     headers: {
       authorization: 'Bearer a',
+      'x-authorization-lease': 'test-identity-lease',
       'content-type': 'application/json',
       'idempotency-key': '11111111-1111-4111-8111-111111111111',
     },
@@ -168,6 +170,7 @@ test('AP-008 reserves the last slot once and AP-009 releases it', async (t) => {
     method: 'POST',
     headers: {
       authorization: 'Bearer a',
+      'x-authorization-lease': 'test-identity-lease',
       'content-type': 'application/json',
       'idempotency-key': '11111111-1111-4111-8111-111111111111',
     },
@@ -179,6 +182,7 @@ test('AP-008 reserves the last slot once and AP-009 releases it', async (t) => {
     method: 'POST',
     headers: {
       authorization: 'Bearer a',
+      'x-authorization-lease': 'test-identity-lease',
       'content-type': 'application/json',
       'idempotency-key': '11111111-1111-4111-8111-111111111111',
     },
@@ -190,6 +194,7 @@ test('AP-008 reserves the last slot once and AP-009 releases it', async (t) => {
     method: 'POST',
     headers: {
       authorization: 'Bearer a',
+      'x-authorization-lease': 'test-identity-lease',
       'content-type': 'application/json',
       'idempotency-key': '22222222-2222-4222-8222-222222222222',
     },
@@ -201,6 +206,7 @@ test('AP-008 reserves the last slot once and AP-009 releases it', async (t) => {
     method: 'DELETE',
     headers: {
       authorization: 'Bearer a',
+      'x-authorization-lease': 'test-identity-lease',
       'idempotency-key': '33333333-3333-4333-8333-333333333333',
     },
   });
@@ -230,6 +236,7 @@ test('AP-010 consumes a hold into PENDING_PAYMENT and AP-011/AP-012 read it', as
     method: 'POST',
     headers: {
       authorization: 'Bearer a',
+      'x-authorization-lease': 'test-identity-lease',
       'content-type': 'application/json',
       'idempotency-key': '55555555-5555-4555-8555-555555555555',
     },
@@ -242,6 +249,7 @@ test('AP-010 consumes a hold into PENDING_PAYMENT and AP-011/AP-012 read it', as
     method: 'POST',
     headers: {
       authorization: 'Bearer a',
+      'x-authorization-lease': 'test-identity-lease',
       'content-type': 'application/json',
       'idempotency-key': '55555555-5555-4555-8555-555555555555',
     },
@@ -396,6 +404,7 @@ test('Billing messages require matching source and fence before CONFIRMED', asyn
     method: 'POST',
     headers: {
       authorization: 'Bearer a',
+      'x-authorization-lease': 'test-identity-lease',
       'content-type': 'application/json',
       'idempotency-key': '88888888-8888-4888-8888-888888888888',
     },
@@ -503,6 +512,7 @@ test('AP-015 check-in is date/payment guarded and creates one FIRST ticket', asy
     method: 'POST',
     headers: {
       authorization: 'Bearer a',
+      'x-authorization-lease': 'test-identity-lease',
       'content-type': 'application/json',
       'idempotency-key': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa02',
     },
@@ -566,6 +576,7 @@ test('AP-016/AP-017/AP-018 list, call and no-show use a compare-and-set version'
     method: 'POST',
     headers: {
       authorization: 'Bearer a',
+      'x-authorization-lease': 'test-identity-lease',
       'content-type': 'application/json',
       'idempotency-key': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb02',
     },
@@ -755,6 +766,7 @@ test('pending payment expiry releases capacity once and emits AppointmentChanged
     method: 'POST',
     headers: {
       authorization: 'Bearer a',
+      'x-authorization-lease': 'test-identity-lease',
       'content-type': 'application/json',
       'idempotency-key': '88888888-8888-4888-8888-888888888889',
     },
@@ -800,6 +812,7 @@ test('outbox publisher marks RequestCharge only after confirm', async (t) => {
     method: 'POST',
     headers: {
       authorization: 'Bearer a',
+      'x-authorization-lease': 'test-identity-lease',
       'content-type': 'application/json',
       'idempotency-key': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     },

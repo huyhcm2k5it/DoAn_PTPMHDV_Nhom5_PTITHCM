@@ -97,6 +97,8 @@ def authenticate(request):
     if len(parts) != 2 or parts[0].lower() != "bearer":
         raise AuthError(401, "UNAUTHENTICATED", "Thiếu header Authorization: Bearer <token>.")
     claims = _decode(parts[1])
+    if claims.get("action") or claims.get("tokenType") not in (None, "ACCESS") or claims.get("actorType") not in ("PATIENT", "STAFF", "DOCTOR"):
+        raise AuthError(401, "UNAUTHENTICATED", "Access token required.")
     capabilities = claims.get("capabilities") or []
     if not isinstance(capabilities, list):
         raise AuthError(401, "UNAUTHENTICATED", "Claim capabilities không hợp lệ.")
@@ -183,6 +185,9 @@ def can_read_patient_resource(principal, patient_id):
     """
     if principal.actor_type == "STAFF":
         return principal.has("CASHIER")
+    if principal.actor_type == "PATIENT":
+        from app.domain.models import PatientAccessProjection
+        return PatientAccessProjection.objects.filter(patient_id=patient_id, owner_user_id=principal.user_id, active=True).exists()
     return False
 
 

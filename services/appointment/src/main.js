@@ -4,7 +4,8 @@ const { createJwtVerifier } = require('./auth/jwt-verifier.js');
 const { createCatalogPriceResolver } = require('./services/catalog-projection.service.js');
 async function main() {
   const connection = await connectDatabase(process.env.MONGODB_URI);
-  const app = createApp({ connection, verifyBearerToken: createJwtVerifier(), resolvePriceSnapshot: createCatalogPriceResolver(connection) });
+  await require('./configs/redis').configureSlotCache();
+  const app = createApp({ connection, verifyBearerToken: createJwtVerifier(), verifyAuthorizationLease: createJwtVerifier(), resolvePriceSnapshot: createCatalogPriceResolver(connection) });
   const server = app.listen(Number(process.env.PORT || 3000), '0.0.0.0');
   let shuttingDown = false;
   async function shutdown(signal) {

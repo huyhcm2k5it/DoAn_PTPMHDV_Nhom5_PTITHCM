@@ -85,7 +85,7 @@ func DeclareOwned(ch *amqp.Channel) error {
 	if err := ch.ExchangeDeclare("umc.events.catalog.v1", "topic", true, false, false, false, nil); err != nil {
 		return err
 	}
-	if _, err := ch.QueueDeclare("evt.catalog.v1", true, false, false, false, nil); err != nil {
+	if _, err := ch.QueueDeclare("evt.catalog.v1", true, false, false, false, amqp.Table{"x-queue-type":"quorum"}); err != nil {
 		return err
 	}
 	return ch.QueueBind("evt.catalog.v1", "identity.identity-access-changed.v1", "umc.events.identity.v1", false, nil)

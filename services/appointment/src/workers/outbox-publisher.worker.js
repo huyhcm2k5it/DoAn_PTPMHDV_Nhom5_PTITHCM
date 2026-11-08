@@ -67,7 +67,7 @@ async function publishOutboxBatch({
         aggregateId: record.aggregate_id,
         aggregateVersion: record.aggregate_version,
         correlationId: record.correlation_id,
-        requestId: record.request_id || record.message_id,
+        requestId: record.request_id || record.payload?.requestId || record.message_id,
         causationId: record.causation_id || record.message_id,
         occurredAt: record.occurred_at,
         payload: record.payload,

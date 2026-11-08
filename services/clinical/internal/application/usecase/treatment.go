@@ -87,8 +87,23 @@ func (s *Service) RequestLab(ctx context.Context, p domain.Principal, id, key st
 		if e != nil {
 			return e
 		}
+		if input.ReplacesRequestID != "" {
+			replaced, e := tx.LabRequest(ctx, domain.ID(input.ReplacesRequestID))
+			if e != nil {
+				return e
+			}
+			if replaced.VisitID != v.ID || (replaced.State != "REJECTED" && replaced.State != "FAILED") || replaced.SourceVersion != input.ExpectedSourceVersion {
+				return domain.Fail("STATE_CONFLICT", "LAB replacement revision or state changed")
+			}
+			replaced.State = "SUPERSEDED"
+			// Persist actor, intent and new request correlation in the existing replay and registry transaction.
+			replaced.ReasonCode += "|RESUBMITTED:" + domain.ID(key)
+			if e = tx.SaveLabRequest(ctx, replaced); e != nil {
+				return e
+			}
+		}
 		for _, request := range prior {
-			if request.State == "REJECTED" || len(request.Tests) != len(input.Tests) {
+			if request.RequestID == domain.ID(input.ReplacesRequestID) || request.State == "SUPERSEDED" || len(request.Tests) != len(input.Tests) {
 				continue
 			}
 			same := true
@@ -345,10 +360,8 @@ func (s *Service) Complete(ctx context.Context, p domain.Principal, id, key stri
 		if e != nil {
 			return e
 		}
-		for _, r := range requests {
-			if r.State != "PUBLISHED" && r.State != "CANCELLED" && r.State != "REJECTED" {
-				return domain.Fail("LAB_PENDING", "All LAB requests must be resolved before signing")
-			}
+		if !labsResolved(requests) {
+			return domain.Fail("LAB_PENDING", "All LAB requests must be resolved before signing")
 		}
 		if v.State != "IN_PROGRESS" {
 			return domain.Fail("STATE_CONFLICT", "Visit not ready for signing")
@@ -378,4 +391,13 @@ func (s *Service) Complete(ctx context.Context, p domain.Principal, id, key stri
 		return tx.SaveReplay(ctx, domain.ID(p.UserID), "CL-010", domain.ID(key), hash, out)
 	})
 	return
+}
+
+func labsResolved(requests []domain.LabRequest) bool {
+	for _, r := range requests {
+		if r.State != "PUBLISHED" && r.State != "CANCELLED" && r.State != "SUPERSEDED" {
+			return false
+		}
+	}
+	return true
 }

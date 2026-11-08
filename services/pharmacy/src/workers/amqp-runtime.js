@@ -44,7 +44,7 @@ const routes = [
     'COMMAND',
     handleBillingMessage,
   ],
-  ...['ChargePrepared', 'ChargePaid', 'SettlementDecision'].map((type) => [
+  ...['ChargePrepared', 'ChargePaid', 'SettlementDecision', 'BillingStatusChanged'].map((type) => [
     'umc.events.billing.v1',
     'billing.' + type.replace(/[A-Z]/g, (m, i) => (i ? '-' : '') + m.toLowerCase()) + '.v1',
     'billing',

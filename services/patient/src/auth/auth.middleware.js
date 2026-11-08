@@ -6,6 +6,7 @@ function createAuthContext({ verifyBearerToken } = {}) {
       if (!match || typeof verifyBearerToken !== 'function') throw new ApiError(401, 'UNAUTHENTICATED', 'Missing or invalid bearer token.');
       const claims = await verifyBearerToken(match[1]);
       if (!claims || typeof claims.sub !== 'string' || !claims.sub.trim()) throw new ApiError(401, 'UNAUTHENTICATED', 'Invalid token claims.');
+      if (claims.action || claims.tokenType === 'LEASE') throw new ApiError(401, 'UNAUTHENTICATED', 'Access token required.');
       const actorType = String(claims.actorType || '').toUpperCase();
       if (!['PATIENT', 'DOCTOR', 'STAFF'].includes(actorType)) throw new ApiError(401, 'UNAUTHENTICATED', 'Invalid actor type.');
       req.authContext = Object.freeze({ userId: claims.sub, actorType, tokenVersion: claims.tokenVersion, capabilities: Array.isArray(claims.capabilities) ? claims.capabilities : [], scopes: Array.isArray(claims.scopes) ? claims.scopes : [] });

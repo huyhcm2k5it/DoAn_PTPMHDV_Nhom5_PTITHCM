@@ -57,10 +57,15 @@ type TestSelection struct {
 	Revision int    `json:"revision"`
 }
 type LabInput struct {
-	Tests []TestSelection `json:"tests"`
+	Tests                 []TestSelection `json:"tests"`
+	ReplacesRequestID     string          `json:"replacesRequestId,omitempty"`
+	ExpectedSourceVersion int             `json:"expectedSourceVersion,omitempty"`
 }
 
 func (i LabInput) Validate() error {
+	if (i.ReplacesRequestID == "" && i.ExpectedSourceVersion != 0) || (i.ReplacesRequestID != "" && (!ValidID(i.ReplacesRequestID) || i.ExpectedSourceVersion < 1)) {
+		return Fail("VALIDATION_ERROR", "Revisioned replacement identity required")
+	}
 	if len(i.Tests) < 1 || len(i.Tests) > 100 {
 		return Fail("VALIDATION_ERROR", "One to 100 tests required")
 	}

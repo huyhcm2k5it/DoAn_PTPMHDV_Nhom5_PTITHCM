@@ -20,6 +20,8 @@ function envelopeFor({ message, payload, state, claimId, reasonCode, aggregateVe
     aggregate_id: payload.ticketId,
     aggregate_version: aggregateVersion,
     correlation_id: message.correlationId || message.requestId || randomUUID(),
+    request_id: payload.requestId || message.requestId || message.messageId,
+    causation_id: message.messageId,
     occurred_at: now,
     payload: {
       requestId: payload.requestId || message.requestId || message.messageId,
@@ -55,12 +57,14 @@ async function handleClaimQueueTicketCommand({
   if (existingCommand) {
     if (existingCommand.request_hash && existingCommand.request_hash !== hash)
       throw new ApiError(409, 'MESSAGE_CONFLICT', 'Command id was reused with another payload.');
+    await connection.collection('outbox').updateOne({ message_id: existingCommand.response_message_id }, { $set: { published_at: null } });
     return existingCommand.response;
   }
   const existingRequest = await commandResults.findOne({ request_id: payload.requestId });
   if (existingRequest) {
     if (existingRequest.request_hash !== hash)
       throw new ApiError(409, 'MESSAGE_CONFLICT', 'Request id was reused with another payload.');
+    await connection.collection('outbox').updateOne({ message_id: existingRequest.response_message_id }, { $set: { published_at: null } });
     return existingRequest.response;
   }
   const Appointment = getAppointmentModel(connection);
@@ -126,24 +130,16 @@ async function handleClaimQueueTicketCommand({
       };
       eventPayload = { ...payload, appointmentId: ticket.appointmentId, patientId: ticket.patientId, visitId, claimId };
     }
+    const responseMessage = envelopeFor({ message, payload: eventPayload, state: response.state, claimId: response.claimId, reasonCode: response.reasonCode, aggregateVersion: response.version, now });
     await commandResults.insertOne({
       command_id: message.messageId,
       request_id: payload.requestId,
       request_hash: hash,
       response,
+      response_message_id: responseMessage.message_id,
       created_at: now,
     }, { session });
-    if (ticket) {
-      await Outbox.create([envelopeFor({
-        message,
-        payload: eventPayload,
-        state: response.state,
-        claimId: response.claimId,
-        reasonCode: response.reasonCode,
-        aggregateVersion: response.version,
-        now,
-      })], { session });
-    }
+    await Outbox.create([responseMessage], { session });
     return response;
     });
   } catch (error) {

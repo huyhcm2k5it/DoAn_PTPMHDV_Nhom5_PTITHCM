@@ -3,10 +3,161 @@
   "info": {
     "title": "UMC Care Diagnostic",
     "version": "1.1.0",
-    "description": "DI-002–013. LAB_TECH collects specimens and writes drafts; LAB_REVIEW returns/publishes with two-person review. Patient reads expose only PUBLISHED results. State aliases preserve existing API values; DI-001 recovery remains disabled and absent from the public routes."
+    "description": "DI-001–013. LAB_TECH collects specimens and writes drafts; LAB_REVIEW returns/publishes with two-person review. Patient reads expose only PUBLISHED results. State aliases preserve existing API values; DI-001 recovery remains disabled by default (private service token only)."
   },
   "paths": {
     "/api/v1/diagnostic-orders": {
+      "post": {
+        "operationId": "DI_001",
+        "security": [
+          {
+            "serviceAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryOrderDataResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND, START_REQUEST_NOT_FOUND: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "NOT_FOUND",
+              "START_REQUEST_NOT_FOUND"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "STATE_CONFLICT, TICKET_ALREADY_CLAIMED, TICKET_VERSION_CONFLICT, VISIT_ALREADY_SIGNED, VISIT_VERSION_CONFLICT, LAB_REQUEST_DUPLICATE, VISIT_NOT_ACTIVE, PRESCRIPTION_NOT_DRAFT, PRICE_VERSION_CONFLICT, LAB_RESULT_PENDING, VISIT_NOT_READY, ORDER_NOT_PAID, SPECIMEN_ALREADY_COLLECTED, SPECIMEN_ALREADY_PROCESSED, RESULT_VERSION_CONFLICT, RESULT_ALREADY_PUBLISHED, RESULT_INCOMPLETE, RESULT_NOT_IN_REVIEW, SELF_REVIEW_FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "TICKET_ALREADY_CLAIMED",
+              "TICKET_VERSION_CONFLICT",
+              "VISIT_ALREADY_SIGNED",
+              "VISIT_VERSION_CONFLICT",
+              "LAB_REQUEST_DUPLICATE",
+              "VISIT_NOT_ACTIVE",
+              "PRESCRIPTION_NOT_DRAFT",
+              "PRICE_VERSION_CONFLICT",
+              "LAB_RESULT_PENDING",
+              "VISIT_NOT_READY",
+              "ORDER_NOT_PAID",
+              "SPECIMEN_ALREADY_COLLECTED",
+              "SPECIMEN_ALREADY_PROCESSED",
+              "RESULT_VERSION_CONFLICT",
+              "RESULT_ALREADY_PUBLISHED",
+              "RESULT_INCOMPLETE",
+              "RESULT_NOT_IN_REVIEW",
+              "SELF_REVIEW_FORBIDDEN"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoveryOrderInput"
+              }
+            }
+          }
+        },
+        "x-enabled-by-default": false,
+        "x-visibility": "private",
+        "x-owner-evidence-required": true
+      },
       "get": {
         "operationId": "DI_002",
         "security": [
@@ -30,6 +181,15 @@
             "required": false,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
             }
           },
           {
@@ -64,7 +224,10 @@
             }
           },
           "400": {
-            "description": "See error.code and meta.correlationId",
+            "description": "VALIDATION_ERROR: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -74,7 +237,11 @@
             }
           },
           "401": {
-            "description": "See error.code and meta.correlationId",
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -84,7 +251,10 @@
             }
           },
           "403": {
-            "description": "See error.code and meta.correlationId",
+            "description": "FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -94,7 +264,11 @@
             }
           },
           "404": {
-            "description": "See error.code and meta.correlationId",
+            "description": "NOT_FOUND, START_REQUEST_NOT_FOUND: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "NOT_FOUND",
+              "START_REQUEST_NOT_FOUND"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -104,7 +278,10 @@
             }
           },
           "503": {
-            "description": "See error.code and meta.correlationId",
+            "description": "SERVICE_UNAVAILABLE: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -156,7 +333,10 @@
             }
           },
           "400": {
-            "description": "See error.code and meta.correlationId",
+            "description": "VALIDATION_ERROR: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -166,7 +346,11 @@
             }
           },
           "401": {
-            "description": "See error.code and meta.correlationId",
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -176,7 +360,10 @@
             }
           },
           "403": {
-            "description": "See error.code and meta.correlationId",
+            "description": "FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -186,7 +373,11 @@
             }
           },
           "404": {
-            "description": "See error.code and meta.correlationId",
+            "description": "NOT_FOUND, START_REQUEST_NOT_FOUND: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "NOT_FOUND",
+              "START_REQUEST_NOT_FOUND"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -196,7 +387,10 @@
             }
           },
           "503": {
-            "description": "See error.code and meta.correlationId",
+            "description": "SERVICE_UNAVAILABLE: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -258,7 +452,10 @@
             }
           },
           "400": {
-            "description": "See error.code and meta.correlationId",
+            "description": "VALIDATION_ERROR: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -268,7 +465,11 @@
             }
           },
           "401": {
-            "description": "See error.code and meta.correlationId",
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -278,7 +479,10 @@
             }
           },
           "403": {
-            "description": "See error.code and meta.correlationId",
+            "description": "FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -288,7 +492,11 @@
             }
           },
           "404": {
-            "description": "See error.code and meta.correlationId",
+            "description": "NOT_FOUND, START_REQUEST_NOT_FOUND: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "NOT_FOUND",
+              "START_REQUEST_NOT_FOUND"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -298,7 +506,28 @@
             }
           },
           "409": {
-            "description": "See error.code and meta.correlationId",
+            "description": "STATE_CONFLICT, TICKET_ALREADY_CLAIMED, TICKET_VERSION_CONFLICT, VISIT_ALREADY_SIGNED, VISIT_VERSION_CONFLICT, LAB_REQUEST_DUPLICATE, VISIT_NOT_ACTIVE, PRESCRIPTION_NOT_DRAFT, PRICE_VERSION_CONFLICT, LAB_RESULT_PENDING, VISIT_NOT_READY, ORDER_NOT_PAID, SPECIMEN_ALREADY_COLLECTED, SPECIMEN_ALREADY_PROCESSED, RESULT_VERSION_CONFLICT, RESULT_ALREADY_PUBLISHED, RESULT_INCOMPLETE, RESULT_NOT_IN_REVIEW, SELF_REVIEW_FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "TICKET_ALREADY_CLAIMED",
+              "TICKET_VERSION_CONFLICT",
+              "VISIT_ALREADY_SIGNED",
+              "VISIT_VERSION_CONFLICT",
+              "LAB_REQUEST_DUPLICATE",
+              "VISIT_NOT_ACTIVE",
+              "PRESCRIPTION_NOT_DRAFT",
+              "PRICE_VERSION_CONFLICT",
+              "LAB_RESULT_PENDING",
+              "VISIT_NOT_READY",
+              "ORDER_NOT_PAID",
+              "SPECIMEN_ALREADY_COLLECTED",
+              "SPECIMEN_ALREADY_PROCESSED",
+              "RESULT_VERSION_CONFLICT",
+              "RESULT_ALREADY_PUBLISHED",
+              "RESULT_INCOMPLETE",
+              "RESULT_NOT_IN_REVIEW",
+              "SELF_REVIEW_FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -308,7 +537,10 @@
             }
           },
           "503": {
-            "description": "See error.code and meta.correlationId",
+            "description": "SERVICE_UNAVAILABLE: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -379,7 +611,10 @@
             }
           },
           "400": {
-            "description": "See error.code and meta.correlationId",
+            "description": "VALIDATION_ERROR: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -389,7 +624,11 @@
             }
           },
           "401": {
-            "description": "See error.code and meta.correlationId",
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -399,7 +638,10 @@
             }
           },
           "403": {
-            "description": "See error.code and meta.correlationId",
+            "description": "FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -409,7 +651,11 @@
             }
           },
           "404": {
-            "description": "See error.code and meta.correlationId",
+            "description": "NOT_FOUND, START_REQUEST_NOT_FOUND: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "NOT_FOUND",
+              "START_REQUEST_NOT_FOUND"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -419,7 +665,28 @@
             }
           },
           "409": {
-            "description": "See error.code and meta.correlationId",
+            "description": "STATE_CONFLICT, TICKET_ALREADY_CLAIMED, TICKET_VERSION_CONFLICT, VISIT_ALREADY_SIGNED, VISIT_VERSION_CONFLICT, LAB_REQUEST_DUPLICATE, VISIT_NOT_ACTIVE, PRESCRIPTION_NOT_DRAFT, PRICE_VERSION_CONFLICT, LAB_RESULT_PENDING, VISIT_NOT_READY, ORDER_NOT_PAID, SPECIMEN_ALREADY_COLLECTED, SPECIMEN_ALREADY_PROCESSED, RESULT_VERSION_CONFLICT, RESULT_ALREADY_PUBLISHED, RESULT_INCOMPLETE, RESULT_NOT_IN_REVIEW, SELF_REVIEW_FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "TICKET_ALREADY_CLAIMED",
+              "TICKET_VERSION_CONFLICT",
+              "VISIT_ALREADY_SIGNED",
+              "VISIT_VERSION_CONFLICT",
+              "LAB_REQUEST_DUPLICATE",
+              "VISIT_NOT_ACTIVE",
+              "PRESCRIPTION_NOT_DRAFT",
+              "PRICE_VERSION_CONFLICT",
+              "LAB_RESULT_PENDING",
+              "VISIT_NOT_READY",
+              "ORDER_NOT_PAID",
+              "SPECIMEN_ALREADY_COLLECTED",
+              "SPECIMEN_ALREADY_PROCESSED",
+              "RESULT_VERSION_CONFLICT",
+              "RESULT_ALREADY_PUBLISHED",
+              "RESULT_INCOMPLETE",
+              "RESULT_NOT_IN_REVIEW",
+              "SELF_REVIEW_FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -429,7 +696,10 @@
             }
           },
           "503": {
-            "description": "See error.code and meta.correlationId",
+            "description": "SERVICE_UNAVAILABLE: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -500,7 +770,10 @@
             }
           },
           "400": {
-            "description": "See error.code and meta.correlationId",
+            "description": "VALIDATION_ERROR: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -510,7 +783,11 @@
             }
           },
           "401": {
-            "description": "See error.code and meta.correlationId",
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -520,7 +797,10 @@
             }
           },
           "403": {
-            "description": "See error.code and meta.correlationId",
+            "description": "FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -530,7 +810,11 @@
             }
           },
           "404": {
-            "description": "See error.code and meta.correlationId",
+            "description": "NOT_FOUND, START_REQUEST_NOT_FOUND: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "NOT_FOUND",
+              "START_REQUEST_NOT_FOUND"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -540,7 +824,28 @@
             }
           },
           "409": {
-            "description": "See error.code and meta.correlationId",
+            "description": "STATE_CONFLICT, TICKET_ALREADY_CLAIMED, TICKET_VERSION_CONFLICT, VISIT_ALREADY_SIGNED, VISIT_VERSION_CONFLICT, LAB_REQUEST_DUPLICATE, VISIT_NOT_ACTIVE, PRESCRIPTION_NOT_DRAFT, PRICE_VERSION_CONFLICT, LAB_RESULT_PENDING, VISIT_NOT_READY, ORDER_NOT_PAID, SPECIMEN_ALREADY_COLLECTED, SPECIMEN_ALREADY_PROCESSED, RESULT_VERSION_CONFLICT, RESULT_ALREADY_PUBLISHED, RESULT_INCOMPLETE, RESULT_NOT_IN_REVIEW, SELF_REVIEW_FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "TICKET_ALREADY_CLAIMED",
+              "TICKET_VERSION_CONFLICT",
+              "VISIT_ALREADY_SIGNED",
+              "VISIT_VERSION_CONFLICT",
+              "LAB_REQUEST_DUPLICATE",
+              "VISIT_NOT_ACTIVE",
+              "PRESCRIPTION_NOT_DRAFT",
+              "PRICE_VERSION_CONFLICT",
+              "LAB_RESULT_PENDING",
+              "VISIT_NOT_READY",
+              "ORDER_NOT_PAID",
+              "SPECIMEN_ALREADY_COLLECTED",
+              "SPECIMEN_ALREADY_PROCESSED",
+              "RESULT_VERSION_CONFLICT",
+              "RESULT_ALREADY_PUBLISHED",
+              "RESULT_INCOMPLETE",
+              "RESULT_NOT_IN_REVIEW",
+              "SELF_REVIEW_FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -550,7 +855,10 @@
             }
           },
           "503": {
-            "description": "See error.code and meta.correlationId",
+            "description": "SERVICE_UNAVAILABLE: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -630,7 +938,10 @@
             }
           },
           "400": {
-            "description": "See error.code and meta.correlationId",
+            "description": "VALIDATION_ERROR: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -640,7 +951,11 @@
             }
           },
           "401": {
-            "description": "See error.code and meta.correlationId",
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -650,7 +965,10 @@
             }
           },
           "403": {
-            "description": "See error.code and meta.correlationId",
+            "description": "FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -660,7 +978,11 @@
             }
           },
           "404": {
-            "description": "See error.code and meta.correlationId",
+            "description": "NOT_FOUND, START_REQUEST_NOT_FOUND: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "NOT_FOUND",
+              "START_REQUEST_NOT_FOUND"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -670,7 +992,28 @@
             }
           },
           "409": {
-            "description": "See error.code and meta.correlationId",
+            "description": "STATE_CONFLICT, TICKET_ALREADY_CLAIMED, TICKET_VERSION_CONFLICT, VISIT_ALREADY_SIGNED, VISIT_VERSION_CONFLICT, LAB_REQUEST_DUPLICATE, VISIT_NOT_ACTIVE, PRESCRIPTION_NOT_DRAFT, PRICE_VERSION_CONFLICT, LAB_RESULT_PENDING, VISIT_NOT_READY, ORDER_NOT_PAID, SPECIMEN_ALREADY_COLLECTED, SPECIMEN_ALREADY_PROCESSED, RESULT_VERSION_CONFLICT, RESULT_ALREADY_PUBLISHED, RESULT_INCOMPLETE, RESULT_NOT_IN_REVIEW, SELF_REVIEW_FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "TICKET_ALREADY_CLAIMED",
+              "TICKET_VERSION_CONFLICT",
+              "VISIT_ALREADY_SIGNED",
+              "VISIT_VERSION_CONFLICT",
+              "LAB_REQUEST_DUPLICATE",
+              "VISIT_NOT_ACTIVE",
+              "PRESCRIPTION_NOT_DRAFT",
+              "PRICE_VERSION_CONFLICT",
+              "LAB_RESULT_PENDING",
+              "VISIT_NOT_READY",
+              "ORDER_NOT_PAID",
+              "SPECIMEN_ALREADY_COLLECTED",
+              "SPECIMEN_ALREADY_PROCESSED",
+              "RESULT_VERSION_CONFLICT",
+              "RESULT_ALREADY_PUBLISHED",
+              "RESULT_INCOMPLETE",
+              "RESULT_NOT_IN_REVIEW",
+              "SELF_REVIEW_FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -680,7 +1023,10 @@
             }
           },
           "503": {
-            "description": "See error.code and meta.correlationId",
+            "description": "SERVICE_UNAVAILABLE: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -707,7 +1053,8 @@
         "operationId": "DI_008",
         "security": [
           {
-            "bearerAuth": []
+            "bearerAuth": [],
+            "authorizationLease": []
           }
         ],
         "parameters": [
@@ -760,7 +1107,10 @@
             }
           },
           "400": {
-            "description": "See error.code and meta.correlationId",
+            "description": "VALIDATION_ERROR: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -770,7 +1120,11 @@
             }
           },
           "401": {
-            "description": "See error.code and meta.correlationId",
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -780,7 +1134,10 @@
             }
           },
           "403": {
-            "description": "See error.code and meta.correlationId",
+            "description": "FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -790,7 +1147,11 @@
             }
           },
           "404": {
-            "description": "See error.code and meta.correlationId",
+            "description": "NOT_FOUND, START_REQUEST_NOT_FOUND: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "NOT_FOUND",
+              "START_REQUEST_NOT_FOUND"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -800,7 +1161,28 @@
             }
           },
           "409": {
-            "description": "See error.code and meta.correlationId",
+            "description": "STATE_CONFLICT, TICKET_ALREADY_CLAIMED, TICKET_VERSION_CONFLICT, VISIT_ALREADY_SIGNED, VISIT_VERSION_CONFLICT, LAB_REQUEST_DUPLICATE, VISIT_NOT_ACTIVE, PRESCRIPTION_NOT_DRAFT, PRICE_VERSION_CONFLICT, LAB_RESULT_PENDING, VISIT_NOT_READY, ORDER_NOT_PAID, SPECIMEN_ALREADY_COLLECTED, SPECIMEN_ALREADY_PROCESSED, RESULT_VERSION_CONFLICT, RESULT_ALREADY_PUBLISHED, RESULT_INCOMPLETE, RESULT_NOT_IN_REVIEW, SELF_REVIEW_FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "TICKET_ALREADY_CLAIMED",
+              "TICKET_VERSION_CONFLICT",
+              "VISIT_ALREADY_SIGNED",
+              "VISIT_VERSION_CONFLICT",
+              "LAB_REQUEST_DUPLICATE",
+              "VISIT_NOT_ACTIVE",
+              "PRESCRIPTION_NOT_DRAFT",
+              "PRICE_VERSION_CONFLICT",
+              "LAB_RESULT_PENDING",
+              "VISIT_NOT_READY",
+              "ORDER_NOT_PAID",
+              "SPECIMEN_ALREADY_COLLECTED",
+              "SPECIMEN_ALREADY_PROCESSED",
+              "RESULT_VERSION_CONFLICT",
+              "RESULT_ALREADY_PUBLISHED",
+              "RESULT_INCOMPLETE",
+              "RESULT_NOT_IN_REVIEW",
+              "SELF_REVIEW_FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -810,7 +1192,10 @@
             }
           },
           "503": {
-            "description": "See error.code and meta.correlationId",
+            "description": "SERVICE_UNAVAILABLE: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -819,6 +1204,13 @@
               }
             }
           }
+        },
+        "x-authorization-lease": {
+          "action": "DI-008",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
         },
         "requestBody": {
           "required": true,
@@ -837,7 +1229,8 @@
         "operationId": "DI_009",
         "security": [
           {
-            "bearerAuth": []
+            "bearerAuth": [],
+            "authorizationLease": []
           }
         ],
         "parameters": [
@@ -890,7 +1283,10 @@
             }
           },
           "400": {
-            "description": "See error.code and meta.correlationId",
+            "description": "VALIDATION_ERROR: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -900,7 +1296,11 @@
             }
           },
           "401": {
-            "description": "See error.code and meta.correlationId",
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -910,7 +1310,10 @@
             }
           },
           "403": {
-            "description": "See error.code and meta.correlationId",
+            "description": "FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -920,7 +1323,11 @@
             }
           },
           "404": {
-            "description": "See error.code and meta.correlationId",
+            "description": "NOT_FOUND, START_REQUEST_NOT_FOUND: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "NOT_FOUND",
+              "START_REQUEST_NOT_FOUND"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -930,7 +1337,28 @@
             }
           },
           "409": {
-            "description": "See error.code and meta.correlationId",
+            "description": "STATE_CONFLICT, TICKET_ALREADY_CLAIMED, TICKET_VERSION_CONFLICT, VISIT_ALREADY_SIGNED, VISIT_VERSION_CONFLICT, LAB_REQUEST_DUPLICATE, VISIT_NOT_ACTIVE, PRESCRIPTION_NOT_DRAFT, PRICE_VERSION_CONFLICT, LAB_RESULT_PENDING, VISIT_NOT_READY, ORDER_NOT_PAID, SPECIMEN_ALREADY_COLLECTED, SPECIMEN_ALREADY_PROCESSED, RESULT_VERSION_CONFLICT, RESULT_ALREADY_PUBLISHED, RESULT_INCOMPLETE, RESULT_NOT_IN_REVIEW, SELF_REVIEW_FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "TICKET_ALREADY_CLAIMED",
+              "TICKET_VERSION_CONFLICT",
+              "VISIT_ALREADY_SIGNED",
+              "VISIT_VERSION_CONFLICT",
+              "LAB_REQUEST_DUPLICATE",
+              "VISIT_NOT_ACTIVE",
+              "PRESCRIPTION_NOT_DRAFT",
+              "PRICE_VERSION_CONFLICT",
+              "LAB_RESULT_PENDING",
+              "VISIT_NOT_READY",
+              "ORDER_NOT_PAID",
+              "SPECIMEN_ALREADY_COLLECTED",
+              "SPECIMEN_ALREADY_PROCESSED",
+              "RESULT_VERSION_CONFLICT",
+              "RESULT_ALREADY_PUBLISHED",
+              "RESULT_INCOMPLETE",
+              "RESULT_NOT_IN_REVIEW",
+              "SELF_REVIEW_FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -940,7 +1368,10 @@
             }
           },
           "503": {
-            "description": "See error.code and meta.correlationId",
+            "description": "SERVICE_UNAVAILABLE: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -949,6 +1380,13 @@
               }
             }
           }
+        },
+        "x-authorization-lease": {
+          "action": "DI-009",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
         },
         "requestBody": {
           "required": true,
@@ -1020,7 +1458,10 @@
             }
           },
           "400": {
-            "description": "See error.code and meta.correlationId",
+            "description": "VALIDATION_ERROR: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1030,7 +1471,11 @@
             }
           },
           "401": {
-            "description": "See error.code and meta.correlationId",
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1040,7 +1485,10 @@
             }
           },
           "403": {
-            "description": "See error.code and meta.correlationId",
+            "description": "FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1050,7 +1498,11 @@
             }
           },
           "404": {
-            "description": "See error.code and meta.correlationId",
+            "description": "NOT_FOUND, START_REQUEST_NOT_FOUND: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "NOT_FOUND",
+              "START_REQUEST_NOT_FOUND"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1060,7 +1512,28 @@
             }
           },
           "409": {
-            "description": "See error.code and meta.correlationId",
+            "description": "STATE_CONFLICT, TICKET_ALREADY_CLAIMED, TICKET_VERSION_CONFLICT, VISIT_ALREADY_SIGNED, VISIT_VERSION_CONFLICT, LAB_REQUEST_DUPLICATE, VISIT_NOT_ACTIVE, PRESCRIPTION_NOT_DRAFT, PRICE_VERSION_CONFLICT, LAB_RESULT_PENDING, VISIT_NOT_READY, ORDER_NOT_PAID, SPECIMEN_ALREADY_COLLECTED, SPECIMEN_ALREADY_PROCESSED, RESULT_VERSION_CONFLICT, RESULT_ALREADY_PUBLISHED, RESULT_INCOMPLETE, RESULT_NOT_IN_REVIEW, SELF_REVIEW_FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "TICKET_ALREADY_CLAIMED",
+              "TICKET_VERSION_CONFLICT",
+              "VISIT_ALREADY_SIGNED",
+              "VISIT_VERSION_CONFLICT",
+              "LAB_REQUEST_DUPLICATE",
+              "VISIT_NOT_ACTIVE",
+              "PRESCRIPTION_NOT_DRAFT",
+              "PRICE_VERSION_CONFLICT",
+              "LAB_RESULT_PENDING",
+              "VISIT_NOT_READY",
+              "ORDER_NOT_PAID",
+              "SPECIMEN_ALREADY_COLLECTED",
+              "SPECIMEN_ALREADY_PROCESSED",
+              "RESULT_VERSION_CONFLICT",
+              "RESULT_ALREADY_PUBLISHED",
+              "RESULT_INCOMPLETE",
+              "RESULT_NOT_IN_REVIEW",
+              "SELF_REVIEW_FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1070,7 +1543,10 @@
             }
           },
           "503": {
-            "description": "See error.code and meta.correlationId",
+            "description": "SERVICE_UNAVAILABLE: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1097,7 +1573,8 @@
         "operationId": "DI_011",
         "security": [
           {
-            "bearerAuth": []
+            "bearerAuth": [],
+            "authorizationLease": []
           }
         ],
         "parameters": [
@@ -1150,7 +1627,10 @@
             }
           },
           "400": {
-            "description": "See error.code and meta.correlationId",
+            "description": "VALIDATION_ERROR: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1160,7 +1640,11 @@
             }
           },
           "401": {
-            "description": "See error.code and meta.correlationId",
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1170,7 +1654,10 @@
             }
           },
           "403": {
-            "description": "See error.code and meta.correlationId",
+            "description": "FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1180,7 +1667,11 @@
             }
           },
           "404": {
-            "description": "See error.code and meta.correlationId",
+            "description": "NOT_FOUND, START_REQUEST_NOT_FOUND: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "NOT_FOUND",
+              "START_REQUEST_NOT_FOUND"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1190,7 +1681,28 @@
             }
           },
           "409": {
-            "description": "See error.code and meta.correlationId",
+            "description": "STATE_CONFLICT, TICKET_ALREADY_CLAIMED, TICKET_VERSION_CONFLICT, VISIT_ALREADY_SIGNED, VISIT_VERSION_CONFLICT, LAB_REQUEST_DUPLICATE, VISIT_NOT_ACTIVE, PRESCRIPTION_NOT_DRAFT, PRICE_VERSION_CONFLICT, LAB_RESULT_PENDING, VISIT_NOT_READY, ORDER_NOT_PAID, SPECIMEN_ALREADY_COLLECTED, SPECIMEN_ALREADY_PROCESSED, RESULT_VERSION_CONFLICT, RESULT_ALREADY_PUBLISHED, RESULT_INCOMPLETE, RESULT_NOT_IN_REVIEW, SELF_REVIEW_FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "TICKET_ALREADY_CLAIMED",
+              "TICKET_VERSION_CONFLICT",
+              "VISIT_ALREADY_SIGNED",
+              "VISIT_VERSION_CONFLICT",
+              "LAB_REQUEST_DUPLICATE",
+              "VISIT_NOT_ACTIVE",
+              "PRESCRIPTION_NOT_DRAFT",
+              "PRICE_VERSION_CONFLICT",
+              "LAB_RESULT_PENDING",
+              "VISIT_NOT_READY",
+              "ORDER_NOT_PAID",
+              "SPECIMEN_ALREADY_COLLECTED",
+              "SPECIMEN_ALREADY_PROCESSED",
+              "RESULT_VERSION_CONFLICT",
+              "RESULT_ALREADY_PUBLISHED",
+              "RESULT_INCOMPLETE",
+              "RESULT_NOT_IN_REVIEW",
+              "SELF_REVIEW_FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1200,7 +1712,10 @@
             }
           },
           "503": {
-            "description": "See error.code and meta.correlationId",
+            "description": "SERVICE_UNAVAILABLE: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1209,6 +1724,13 @@
               }
             }
           }
+        },
+        "x-authorization-lease": {
+          "action": "DI-011",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
         },
         "requestBody": {
           "required": true,
@@ -1280,7 +1802,10 @@
             }
           },
           "400": {
-            "description": "See error.code and meta.correlationId",
+            "description": "VALIDATION_ERROR: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1290,7 +1815,11 @@
             }
           },
           "401": {
-            "description": "See error.code and meta.correlationId",
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1300,7 +1829,10 @@
             }
           },
           "403": {
-            "description": "See error.code and meta.correlationId",
+            "description": "FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1310,7 +1842,11 @@
             }
           },
           "404": {
-            "description": "See error.code and meta.correlationId",
+            "description": "NOT_FOUND, START_REQUEST_NOT_FOUND: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "NOT_FOUND",
+              "START_REQUEST_NOT_FOUND"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1320,7 +1856,28 @@
             }
           },
           "409": {
-            "description": "See error.code and meta.correlationId",
+            "description": "STATE_CONFLICT, TICKET_ALREADY_CLAIMED, TICKET_VERSION_CONFLICT, VISIT_ALREADY_SIGNED, VISIT_VERSION_CONFLICT, LAB_REQUEST_DUPLICATE, VISIT_NOT_ACTIVE, PRESCRIPTION_NOT_DRAFT, PRICE_VERSION_CONFLICT, LAB_RESULT_PENDING, VISIT_NOT_READY, ORDER_NOT_PAID, SPECIMEN_ALREADY_COLLECTED, SPECIMEN_ALREADY_PROCESSED, RESULT_VERSION_CONFLICT, RESULT_ALREADY_PUBLISHED, RESULT_INCOMPLETE, RESULT_NOT_IN_REVIEW, SELF_REVIEW_FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "TICKET_ALREADY_CLAIMED",
+              "TICKET_VERSION_CONFLICT",
+              "VISIT_ALREADY_SIGNED",
+              "VISIT_VERSION_CONFLICT",
+              "LAB_REQUEST_DUPLICATE",
+              "VISIT_NOT_ACTIVE",
+              "PRESCRIPTION_NOT_DRAFT",
+              "PRICE_VERSION_CONFLICT",
+              "LAB_RESULT_PENDING",
+              "VISIT_NOT_READY",
+              "ORDER_NOT_PAID",
+              "SPECIMEN_ALREADY_COLLECTED",
+              "SPECIMEN_ALREADY_PROCESSED",
+              "RESULT_VERSION_CONFLICT",
+              "RESULT_ALREADY_PUBLISHED",
+              "RESULT_INCOMPLETE",
+              "RESULT_NOT_IN_REVIEW",
+              "SELF_REVIEW_FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1330,7 +1887,10 @@
             }
           },
           "503": {
-            "description": "See error.code and meta.correlationId",
+            "description": "SERVICE_UNAVAILABLE: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1423,7 +1983,10 @@
             }
           },
           "400": {
-            "description": "See error.code and meta.correlationId",
+            "description": "VALIDATION_ERROR: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1433,7 +1996,11 @@
             }
           },
           "401": {
-            "description": "See error.code and meta.correlationId",
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1443,7 +2010,10 @@
             }
           },
           "403": {
-            "description": "See error.code and meta.correlationId",
+            "description": "FORBIDDEN: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1453,7 +2023,11 @@
             }
           },
           "404": {
-            "description": "See error.code and meta.correlationId",
+            "description": "NOT_FOUND, START_REQUEST_NOT_FOUND: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "NOT_FOUND",
+              "START_REQUEST_NOT_FOUND"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1463,7 +2037,10 @@
             }
           },
           "503": {
-            "description": "See error.code and meta.correlationId",
+            "description": "SERVICE_UNAVAILABLE: See error.code and meta.correlationId",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1481,7 +2058,20 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "JWT (RS256)"
+        "bearerFormat": "JWT (RS256)",
+        "x-token-type": "access"
+      },
+      "serviceAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT (RS256)",
+        "x-token-type": "service"
+      },
+      "authorizationLease": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Authorization-Lease",
+        "description": "Short-lived signed JWT from Identity (<=30s, 0s leeway)"
       }
     },
     "schemas": {
@@ -2002,9 +2592,53 @@
           "barcode": {
             "type": "string",
             "maxLength": 128
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
           }
         },
         "required": [],
+        "additionalProperties": false
+      },
+      "RecoveryOrderInput": {
+        "type": "object",
+        "properties": {
+          "visitId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "testCodes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        },
+        "required": [
+          "visitId",
+          "testCodes"
+        ],
+        "additionalProperties": false
+      },
+      "RecoveryOrderData": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "$ref": "#/components/schemas/Order"
+          },
+          "chargeStatus": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "order",
+          "chargeStatus"
+        ],
         "additionalProperties": false
       },
       "RejectInput": {
@@ -2206,6 +2840,22 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/PublishedResults"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "RecoveryOrderDataResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RecoveryOrderData"
           },
           "meta": {
             "$ref": "#/components/schemas/Meta"

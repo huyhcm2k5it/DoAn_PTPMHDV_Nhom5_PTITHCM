@@ -20,6 +20,7 @@
   "dependencies": {
     "amqplib": "^0.10.7",
     "express": "^5.1.0",
-    "mongoose": "9.11.4"
+    "mongoose": "9.11.4",
+    "redis": "^5.10.0"
   }
 }

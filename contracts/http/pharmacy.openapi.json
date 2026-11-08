@@ -7,7 +7,7 @@
   "paths": {
     "/api/v1/pharmacy/stock": {
       "get": {
-        "operationId": "PH-001",
+        "operationId": "PH_001",
         "tags": [
           "Pharmacy"
         ],
@@ -68,7 +68,10 @@
             }
           },
           "400": {
-            "description": "Operation rejected or unavailable",
+            "description": "VALIDATION_ERROR: Operation rejected or unavailable",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -78,7 +81,11 @@
             }
           },
           "401": {
-            "description": "Operation rejected or unavailable",
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: Operation rejected or unavailable",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -88,7 +95,10 @@
             }
           },
           "403": {
-            "description": "Operation rejected or unavailable",
+            "description": "FORBIDDEN: Operation rejected or unavailable",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -98,7 +108,10 @@
             }
           },
           "404": {
-            "description": "Operation rejected or unavailable",
+            "description": "NOT_FOUND: Operation rejected or unavailable",
+            "x-error-codes": [
+              "NOT_FOUND"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -108,7 +121,15 @@
             }
           },
           "409": {
-            "description": "Operation rejected or unavailable",
+            "description": "STATE_CONFLICT, INSUFFICIENT_STOCK, PRESCRIPTION_REVISION_CONFLICT, HOLD_EXPIRED, SETTLEMENT_NOT_CONFIRMED, ALREADY_DISPENSED: Operation rejected or unavailable",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "INSUFFICIENT_STOCK",
+              "PRESCRIPTION_REVISION_CONFLICT",
+              "HOLD_EXPIRED",
+              "SETTLEMENT_NOT_CONFIRMED",
+              "ALREADY_DISPENSED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -118,7 +139,10 @@
             }
           },
           "503": {
-            "description": "Operation rejected or unavailable",
+            "description": "SERVICE_UNAVAILABLE: Operation rejected or unavailable",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -132,15 +156,23 @@
     },
     "/api/v1/pharmacy/stock/receipts": {
       "post": {
-        "operationId": "PH-002",
+        "operationId": "PH_002",
         "tags": [
           "Pharmacy"
         ],
         "security": [
           {
-            "bearerAuth": []
+            "bearerAuth": [],
+            "authorizationLease": []
           }
         ],
+        "x-authorization-lease": {
+          "action": "PH-002",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
+        },
         "parameters": [
           {
             "in": "header",
@@ -184,7 +216,10 @@
             }
           },
           "400": {
-            "description": "Operation rejected or unavailable",
+            "description": "VALIDATION_ERROR: Operation rejected or unavailable",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -194,7 +229,11 @@
             }
           },
           "401": {
-            "description": "Operation rejected or unavailable",
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: Operation rejected or unavailable",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -204,7 +243,10 @@
             }
           },
           "403": {
-            "description": "Operation rejected or unavailable",
+            "description": "FORBIDDEN: Operation rejected or unavailable",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -214,7 +256,10 @@
             }
           },
           "404": {
-            "description": "Operation rejected or unavailable",
+            "description": "NOT_FOUND: Operation rejected or unavailable",
+            "x-error-codes": [
+              "NOT_FOUND"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -224,7 +269,15 @@
             }
           },
           "409": {
-            "description": "Operation rejected or unavailable",
+            "description": "STATE_CONFLICT, INSUFFICIENT_STOCK, PRESCRIPTION_REVISION_CONFLICT, HOLD_EXPIRED, SETTLEMENT_NOT_CONFIRMED, ALREADY_DISPENSED: Operation rejected or unavailable",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "INSUFFICIENT_STOCK",
+              "PRESCRIPTION_REVISION_CONFLICT",
+              "HOLD_EXPIRED",
+              "SETTLEMENT_NOT_CONFIRMED",
+              "ALREADY_DISPENSED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -234,7 +287,10 @@
             }
           },
           "503": {
-            "description": "Operation rejected or unavailable",
+            "description": "SERVICE_UNAVAILABLE: Operation rejected or unavailable",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -248,15 +304,23 @@
     },
     "/api/v1/pharmacy/prescriptions/queue": {
       "get": {
-        "operationId": "PH-003",
+        "operationId": "PH_003",
         "tags": [
           "Pharmacy"
         ],
         "security": [
           {
-            "bearerAuth": []
+            "bearerAuth": [],
+            "authorizationLease": []
           }
         ],
+        "x-authorization-lease": {
+          "action": "PH-003",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
+        },
         "parameters": [
           {
             "in": "query",
@@ -303,7 +367,10 @@
             }
           },
           "400": {
-            "description": "Operation rejected or unavailable",
+            "description": "VALIDATION_ERROR: Operation rejected or unavailable",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -313,7 +380,11 @@
             }
           },
           "401": {
-            "description": "Operation rejected or unavailable",
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: Operation rejected or unavailable",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -323,7 +394,10 @@
             }
           },
           "403": {
-            "description": "Operation rejected or unavailable",
+            "description": "FORBIDDEN: Operation rejected or unavailable",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -333,7 +407,10 @@
             }
           },
           "404": {
-            "description": "Operation rejected or unavailable",
+            "description": "NOT_FOUND: Operation rejected or unavailable",
+            "x-error-codes": [
+              "NOT_FOUND"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -343,7 +420,15 @@
             }
           },
           "409": {
-            "description": "Operation rejected or unavailable",
+            "description": "STATE_CONFLICT, INSUFFICIENT_STOCK, PRESCRIPTION_REVISION_CONFLICT, HOLD_EXPIRED, SETTLEMENT_NOT_CONFIRMED, ALREADY_DISPENSED: Operation rejected or unavailable",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "INSUFFICIENT_STOCK",
+              "PRESCRIPTION_REVISION_CONFLICT",
+              "HOLD_EXPIRED",
+              "SETTLEMENT_NOT_CONFIRMED",
+              "ALREADY_DISPENSED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -353,7 +438,10 @@
             }
           },
           "503": {
-            "description": "Operation rejected or unavailable",
+            "description": "SERVICE_UNAVAILABLE: Operation rejected or unavailable",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -367,15 +455,23 @@
     },
     "/api/v1/pharmacy/prescriptions/{prescriptionId}": {
       "get": {
-        "operationId": "PH-004",
+        "operationId": "PH_004",
         "tags": [
           "Pharmacy"
         ],
         "security": [
           {
-            "bearerAuth": []
+            "bearerAuth": [],
+            "authorizationLease": []
           }
         ],
+        "x-authorization-lease": {
+          "action": "PH-004",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
+        },
         "parameters": [
           {
             "in": "query",
@@ -428,7 +524,10 @@
             }
           },
           "400": {
-            "description": "Operation rejected or unavailable",
+            "description": "VALIDATION_ERROR: Operation rejected or unavailable",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -438,7 +537,11 @@
             }
           },
           "401": {
-            "description": "Operation rejected or unavailable",
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: Operation rejected or unavailable",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -448,7 +551,10 @@
             }
           },
           "403": {
-            "description": "Operation rejected or unavailable",
+            "description": "FORBIDDEN: Operation rejected or unavailable",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -458,7 +564,10 @@
             }
           },
           "404": {
-            "description": "Operation rejected or unavailable",
+            "description": "NOT_FOUND: Operation rejected or unavailable",
+            "x-error-codes": [
+              "NOT_FOUND"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -468,7 +577,15 @@
             }
           },
           "409": {
-            "description": "Operation rejected or unavailable",
+            "description": "STATE_CONFLICT, INSUFFICIENT_STOCK, PRESCRIPTION_REVISION_CONFLICT, HOLD_EXPIRED, SETTLEMENT_NOT_CONFIRMED, ALREADY_DISPENSED: Operation rejected or unavailable",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "INSUFFICIENT_STOCK",
+              "PRESCRIPTION_REVISION_CONFLICT",
+              "HOLD_EXPIRED",
+              "SETTLEMENT_NOT_CONFIRMED",
+              "ALREADY_DISPENSED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -478,7 +595,10 @@
             }
           },
           "503": {
-            "description": "Operation rejected or unavailable",
+            "description": "SERVICE_UNAVAILABLE: Operation rejected or unavailable",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -492,15 +612,23 @@
     },
     "/api/v1/pharmacy/prescriptions/{prescriptionId}/holds": {
       "post": {
-        "operationId": "PH-005",
+        "operationId": "PH_005",
         "tags": [
           "Pharmacy"
         ],
         "security": [
           {
-            "bearerAuth": []
+            "bearerAuth": [],
+            "authorizationLease": []
           }
         ],
+        "x-authorization-lease": {
+          "action": "PH-005",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
+        },
         "parameters": [
           {
             "in": "path",
@@ -571,7 +699,10 @@
             }
           },
           "400": {
-            "description": "Operation rejected or unavailable",
+            "description": "VALIDATION_ERROR: Operation rejected or unavailable",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -581,7 +712,11 @@
             }
           },
           "401": {
-            "description": "Operation rejected or unavailable",
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: Operation rejected or unavailable",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -591,7 +726,10 @@
             }
           },
           "403": {
-            "description": "Operation rejected or unavailable",
+            "description": "FORBIDDEN: Operation rejected or unavailable",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -601,7 +739,10 @@
             }
           },
           "404": {
-            "description": "Operation rejected or unavailable",
+            "description": "NOT_FOUND: Operation rejected or unavailable",
+            "x-error-codes": [
+              "NOT_FOUND"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -611,7 +752,15 @@
             }
           },
           "409": {
-            "description": "Operation rejected or unavailable",
+            "description": "STATE_CONFLICT, INSUFFICIENT_STOCK, PRESCRIPTION_REVISION_CONFLICT, HOLD_EXPIRED, SETTLEMENT_NOT_CONFIRMED, ALREADY_DISPENSED: Operation rejected or unavailable",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "INSUFFICIENT_STOCK",
+              "PRESCRIPTION_REVISION_CONFLICT",
+              "HOLD_EXPIRED",
+              "SETTLEMENT_NOT_CONFIRMED",
+              "ALREADY_DISPENSED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -621,7 +770,10 @@
             }
           },
           "503": {
-            "description": "Operation rejected or unavailable",
+            "description": "SERVICE_UNAVAILABLE: Operation rejected or unavailable",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -635,15 +787,23 @@
     },
     "/api/v1/pharmacy/holds/{holdId}": {
       "delete": {
-        "operationId": "PH-006",
+        "operationId": "PH_006",
         "tags": [
           "Pharmacy"
         ],
         "security": [
           {
-            "bearerAuth": []
+            "bearerAuth": [],
+            "authorizationLease": []
           }
         ],
+        "x-authorization-lease": {
+          "action": "PH-006",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
+        },
         "parameters": [
           {
             "in": "query",
@@ -696,7 +856,10 @@
             }
           },
           "400": {
-            "description": "Operation rejected or unavailable",
+            "description": "VALIDATION_ERROR: Operation rejected or unavailable",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -706,7 +869,11 @@
             }
           },
           "401": {
-            "description": "Operation rejected or unavailable",
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: Operation rejected or unavailable",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -716,7 +883,10 @@
             }
           },
           "403": {
-            "description": "Operation rejected or unavailable",
+            "description": "FORBIDDEN: Operation rejected or unavailable",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -726,7 +896,10 @@
             }
           },
           "404": {
-            "description": "Operation rejected or unavailable",
+            "description": "NOT_FOUND: Operation rejected or unavailable",
+            "x-error-codes": [
+              "NOT_FOUND"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -736,7 +909,15 @@
             }
           },
           "409": {
-            "description": "Operation rejected or unavailable",
+            "description": "STATE_CONFLICT, INSUFFICIENT_STOCK, PRESCRIPTION_REVISION_CONFLICT, HOLD_EXPIRED, SETTLEMENT_NOT_CONFIRMED, ALREADY_DISPENSED: Operation rejected or unavailable",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "INSUFFICIENT_STOCK",
+              "PRESCRIPTION_REVISION_CONFLICT",
+              "HOLD_EXPIRED",
+              "SETTLEMENT_NOT_CONFIRMED",
+              "ALREADY_DISPENSED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -746,7 +927,10 @@
             }
           },
           "503": {
-            "description": "Operation rejected or unavailable",
+            "description": "SERVICE_UNAVAILABLE: Operation rejected or unavailable",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -760,15 +944,23 @@
     },
     "/api/v1/pharmacy/holds/{holdId}/commit": {
       "post": {
-        "operationId": "PH-007",
+        "operationId": "PH_007",
         "tags": [
           "Pharmacy"
         ],
         "security": [
           {
-            "bearerAuth": []
+            "bearerAuth": [],
+            "authorizationLease": []
           }
         ],
+        "x-authorization-lease": {
+          "action": "PH-007",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
+        },
         "parameters": [
           {
             "in": "path",
@@ -839,7 +1031,10 @@
             }
           },
           "400": {
-            "description": "Operation rejected or unavailable",
+            "description": "VALIDATION_ERROR: Operation rejected or unavailable",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -849,7 +1044,11 @@
             }
           },
           "401": {
-            "description": "Operation rejected or unavailable",
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: Operation rejected or unavailable",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -859,7 +1058,10 @@
             }
           },
           "403": {
-            "description": "Operation rejected or unavailable",
+            "description": "FORBIDDEN: Operation rejected or unavailable",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -869,7 +1071,10 @@
             }
           },
           "404": {
-            "description": "Operation rejected or unavailable",
+            "description": "NOT_FOUND: Operation rejected or unavailable",
+            "x-error-codes": [
+              "NOT_FOUND"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -879,7 +1084,15 @@
             }
           },
           "409": {
-            "description": "Operation rejected or unavailable",
+            "description": "STATE_CONFLICT, INSUFFICIENT_STOCK, PRESCRIPTION_REVISION_CONFLICT, HOLD_EXPIRED, SETTLEMENT_NOT_CONFIRMED, ALREADY_DISPENSED: Operation rejected or unavailable",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "INSUFFICIENT_STOCK",
+              "PRESCRIPTION_REVISION_CONFLICT",
+              "HOLD_EXPIRED",
+              "SETTLEMENT_NOT_CONFIRMED",
+              "ALREADY_DISPENSED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -889,7 +1102,10 @@
             }
           },
           "503": {
-            "description": "Operation rejected or unavailable",
+            "description": "SERVICE_UNAVAILABLE: Operation rejected or unavailable",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -903,15 +1119,23 @@
     },
     "/api/v1/pharmacy/holds/{holdId}/dispense": {
       "post": {
-        "operationId": "PH-008",
+        "operationId": "PH_008",
         "tags": [
           "Pharmacy"
         ],
         "security": [
           {
-            "bearerAuth": []
+            "bearerAuth": [],
+            "authorizationLease": []
           }
         ],
+        "x-authorization-lease": {
+          "action": "PH-008",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
+        },
         "parameters": [
           {
             "in": "path",
@@ -975,7 +1199,10 @@
             }
           },
           "400": {
-            "description": "Operation rejected or unavailable",
+            "description": "VALIDATION_ERROR: Operation rejected or unavailable",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -985,7 +1212,11 @@
             }
           },
           "401": {
-            "description": "Operation rejected or unavailable",
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: Operation rejected or unavailable",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -995,7 +1226,10 @@
             }
           },
           "403": {
-            "description": "Operation rejected or unavailable",
+            "description": "FORBIDDEN: Operation rejected or unavailable",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1005,7 +1239,10 @@
             }
           },
           "404": {
-            "description": "Operation rejected or unavailable",
+            "description": "NOT_FOUND: Operation rejected or unavailable",
+            "x-error-codes": [
+              "NOT_FOUND"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1015,7 +1252,15 @@
             }
           },
           "409": {
-            "description": "Operation rejected or unavailable",
+            "description": "STATE_CONFLICT, INSUFFICIENT_STOCK, PRESCRIPTION_REVISION_CONFLICT, HOLD_EXPIRED, SETTLEMENT_NOT_CONFIRMED, ALREADY_DISPENSED: Operation rejected or unavailable",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "INSUFFICIENT_STOCK",
+              "PRESCRIPTION_REVISION_CONFLICT",
+              "HOLD_EXPIRED",
+              "SETTLEMENT_NOT_CONFIRMED",
+              "ALREADY_DISPENSED"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1025,7 +1270,10 @@
             }
           },
           "503": {
-            "description": "Operation rejected or unavailable",
+            "description": "SERVICE_UNAVAILABLE: Operation rejected or unavailable",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
             "content": {
               "application/json": {
                 "schema": {
@@ -1044,6 +1292,11 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT"
+      },
+      "authorizationLease": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Authorization-Lease"
       }
     },
     "schemas": {
@@ -1072,7 +1325,16 @@
                 "type": "string"
               },
               "details": {
-                "type": "object"
+                "type": "object",
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "number",
+                    "integer",
+                    "boolean",
+                    "null"
+                  ]
+                }
               }
             },
             "required": [

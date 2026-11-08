@@ -16,7 +16,8 @@ type Authenticator interface {
 	Authenticate(context.Context, string) (domain.Principal, error)
 }
 type Options struct {
-	App   ports.Diagnostic
+	Recovery RecoveryBoundary
+App   ports.Diagnostic
 	Auth  Authenticator
 	Ready func(context.Context) error
 }
@@ -104,6 +105,7 @@ func New(p ports.Readiness, options ...Options) *echo.Echo {
 		return c.JSON(200, map[string]string{"status": "ready", "scope": scope})
 	})
 	registerDiagnostic(e, opts)
+registerRecovery(e, opts)
 	registerResults(e, opts)
 	return e
 }
