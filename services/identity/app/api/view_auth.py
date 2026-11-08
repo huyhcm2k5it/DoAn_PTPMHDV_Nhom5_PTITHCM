@@ -12,6 +12,7 @@ from app.application.token_service import generate_access_token, verify_access_t
 from app.api.audit import record_audit
 from app.domain.models import User, OtpRequest, Session, StaffCapability
 from app.infrastructure.sms import get_sms_sender
+from app.infrastructure.outbox import record_identity_access_changed
 
 logger = logging.getLogger(__name__)
 
@@ -83,11 +84,23 @@ def register_view(request):
 
     # Kiểm tra SĐT đã tồn tại chưa
     existing_user = User.objects.filter(phone=phone).first()
-    if existing_user and existing_user.status == "ACTIVE":
-        return Response({
-            "error": {"code": "PHONE_ALREADY_REGISTERED", "message": "Số điện thoại này đã được đăng ký."},
-            "meta": {"correlationId": correlation_id}
-        }, status=409)
+    if existing_user:
+        if existing_user.status == "BLOCKED":
+            return Response({
+                "error": {
+                    "code": "AUTH_USER_BLOCKED",
+                    "message": "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên."
+                },
+                "meta": {"correlationId": correlation_id}
+            }, status=403)
+        if existing_user.status == "ACTIVE":
+            return Response({
+                "error": {
+                    "code": "PHONE_ALREADY_REGISTERED",
+                    "message": "Số điện thoại này đã được đăng ký."
+                },
+                "meta": {"correlationId": correlation_id}
+            }, status=409)
 
     # Nếu chưa có thì tạo mới, nếu có ở dạng PENDING thì chỉ cập nhật lại mật khẩu
     if not existing_user:
@@ -190,10 +203,16 @@ def otp_verify_view(request):
     if purpose == "REGISTER":
         user = User.objects.filter(phone=phone).first()
         if user:
+            if user.status == "BLOCKED":
+                return Response({
+                    "error": {"code": "AUTH_USER_BLOCKED", "message": "Tài khoản đang bị khóa, không thể kích hoạt."},
+                    "meta": {"correlationId": correlation_id}
+                }, status=403)
             user.status = "ACTIVE"
             user.phone_verified_at = timezone.now()
             user.save(update_fields=["status", "phone_verified_at"])
             status_result = user.status
+            record_identity_access_changed(user, correlation_id=correlation_id)
 
     return Response({
         "data": {
@@ -361,6 +380,7 @@ def reset_password_view(request):
         user.locked_until = None
         user.save(update_fields=["password_hash", "token_version", "failed_login_attempts", "locked_until"])
         Session.objects.filter(user=user, revoked_at__isnull=True).update(revoked_at=timezone.now())
+        record_identity_access_changed(user, correlation_id=correlation_id)
         record_audit(
             "AUTH_PASSWORD_RESET",
             correlation_id,
@@ -439,6 +459,7 @@ def change_password_view(request):
     user.token_version += 1
     user.save(update_fields=["password_hash", "token_version"])
     Session.objects.filter(user=user, revoked_at__isnull=True).update(revoked_at=timezone.now())
+    record_identity_access_changed(user, correlation_id=correlation_id)
     record_audit(
         "AUTH_PASSWORD_CHANGED",
         correlation_id,
@@ -600,24 +621,33 @@ def session_view(request):
         for cap in capabilities_qs
     ]
 
-    action = request.query_params.get("action", "")
+    action = request.query_params.get("action", "").strip()
     lease_token = None
     if action:
+        # Danh sách action nhạy cảm theo quy định
+        PATIENT_ACTIONS = {"PT-001", "PT-002", "PT-003", "CL-011", "DI-013"}
+        STAFF_ACTIONS = {
+            "CA-004", "CL-005", "CL-006", "CL-007", "CL-008", "CL-009", "CL-010",
+            "DI-008", "DI-009", "DI-010", "DI-011",
+            "PH002", "PH003", "PH004", "PH005", "PH006", "PH007", "PH008",
+            "BI-008", "BI-009"
+        }
+        
+        # PATIENT chỉ được xin lease của PATIENT
+        if user.actor_type == "PATIENT" and action not in PATIENT_ACTIONS:
+            return Response({
+                "error": {"code": "FORBIDDEN", "message": f"Tài khoản bệnh nhân không có quyền xin lease cho action {action}."},
+                "meta": {"correlationId": correlation_id}
+            }, status=403)
+            
+        # STAFF chỉ được xin lease nếu đang ACTIVE
+        if user.actor_type == "STAFF" and action not in STAFF_ACTIONS:
+            return Response({
+                "error": {"code": "FORBIDDEN", "message": f"Action {action} không nằm trong danh mục lease hợp lệ."},
+                "meta": {"correlationId": correlation_id}
+            }, status=403)
+
         lease_token = generate_authorization_lease(str(user.id), action, user.token_version)
-
-    exp = payload.get("exp")
-    expires_at_iso = datetime.fromtimestamp(exp, tz=dt_tz.utc).isoformat() if exp else None
-
-    return Response({
-        "data": {
-            "userId": str(user.id),
-            "actorType": user.actor_type,
-            "capabilities": capabilities_data,
-            "expiresAt": expires_at_iso,
-            "authorizationLease": lease_token
-        },
-        "meta": {"correlationId": correlation_id}
-    }, status=200)
 
 # ==============================================================================
 # IA-005: REFRESH TOKEN & TOKEN ROTATION
@@ -690,16 +720,29 @@ def logout_view(request):
     correlation_id = get_correlation_id(request)
     refresh_token = str(request.data.get("refreshToken", "")).strip()
 
+    user = None
     if refresh_token:
         token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
         session = Session.objects.filter(refresh_hash=token_hash, revoked_at__isnull=True).first()
         if session:
             session.revoked_at = timezone.now()
             session.save(update_fields=["revoked_at"])
-
+            user = session.user
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        try:
+            payload = verify_access_token(auth_header.split(" ", 1)[1])
+            sub = payload.get("sub")
+            if sub and not user:
+                user = User.objects.filter(id=sub).first()
+        except Exception:
+            pass
+    if user:
+        with transaction.atomic():
+            user.token_version += 1
+            user.save(update_fields=["token_version"])
+            record_identity_access_changed(user, correlation_id=correlation_id)
     return Response({
-        "data": {
-            "revoked": True
-        },
+        "data": {"revoked": True},
         "meta": {"correlationId": correlation_id}
     }, status=200)

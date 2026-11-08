@@ -181,3 +181,23 @@ class IdempotencyRecord(models.Model):
 
     def __str__(self):
         return f"Idempotency {self.scope}/{self.key}"
+
+class IdentityEventOutbox(models.Model):
+    """Bảng outbox cho Identity: phát sự kiện IdentityAccessChanged."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    event_type = models.CharField(max_length=50, default="IdentityAccessChanged")
+    exchange = models.CharField(max_length=100, default="umc.events.identity.v1")
+    routing_key = models.CharField(max_length=100, default="identity.identity-access-changed.v1")
+    payload = models.JSONField(default=dict)
+    published_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "identity_event_outbox"
+        indexes = [
+            models.Index(fields=["published_at", "created_at"], name="idx_id_outbox_pub_created"),
+        ]
+
+    def __str__(self):
+        return f"IdentityEventOutbox {self.event_type} [{self.id}] pub={bool(self.published_at)}"
+

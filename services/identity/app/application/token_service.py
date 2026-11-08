@@ -6,8 +6,11 @@ import jwt
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 PRIVATE_KEY_PATH = os.getenv("JWT_PRIVATE_KEY_PATH", BASE_DIR / "jwt_private.pem")
 
-PUBLIC_KEY_PATH = os.getenv("JWT_PUBLIC_KEY_PATH")
-if not PUBLIC_KEY_PATH:
+PUBLIC_KEY_PATH: str | Path
+configured_public_key_path = os.getenv("JWT_PUBLIC_KEY_PATH")
+if configured_public_key_path:
+    PUBLIC_KEY_PATH = configured_public_key_path
+else:
     local_pub = BASE_DIR / "jwt_public.pem"
     repo_pub = BASE_DIR.parent.parent / "infra" / "certs" / "jwt_public.pem"
     PUBLIC_KEY_PATH = local_pub if local_pub.exists() else repo_pub
@@ -36,8 +39,9 @@ def generate_access_token(user_id: str, actor_type: str, capabilities: list, tok
         "actorType": actor_type,
         "capabilities": capabilities,
         "tokenVersion": token_version,
+        "typ": "access",
         "iat": now,
-        "exp": now + 900,  # 15 phút
+        "exp": now + 900,
     }
     return jwt.encode(payload, get_private_key(), algorithm="RS256")
 
@@ -52,7 +56,7 @@ def verify_access_token(token: str) -> dict:
     )
 
 def generate_authorization_lease(user_id: str, action: str, token_version: int = 1) -> str:
-    """Ký Authorization Lease ngắn tối đa 30 giây cho thao tác nhạy cảm (như đổi giá CA-004)."""
+    """Ký Authorization Lease ngắn tối đa 30 giây cho thao tác nhạy cảm."""
     now = int(time.time())
     payload = {
         "iss": "umc-care-identity",
@@ -60,7 +64,8 @@ def generate_authorization_lease(user_id: str, action: str, token_version: int =
         "sub": str(user_id),
         "action": action,
         "tokenVersion": token_version,
+        "typ": "lease",
         "iat": now,
-        "exp": now + 30,  # Tối đa 30 giây
+        "exp": now + 30,  # Bắt buộc <= 30 giây
     }
     return jwt.encode(payload, get_private_key(), algorithm="RS256")
