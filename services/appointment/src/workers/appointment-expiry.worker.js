@@ -48,7 +48,7 @@ async function expirePendingAppointments({
             message_kind: 'EVENT',
             message_type: 'AppointmentChanged',
             schema_version: 1,
-            producer: 'Appointment',
+            producer: 'appointment',
             aggregate_id: candidate.id,
             aggregate_version: candidate.version + 1,
             correlation_id: candidate.requestId,
@@ -71,3 +71,6 @@ async function expirePendingAppointments({
 }
 
 module.exports = { expirePendingAppointments };
+
+// Cache invalidation runs after successful transaction commit.
+module.exports.expirePendingAppointments = async (...args) => { const result = await expirePendingAppointments(...args); await require('../services/slot-cache.service').getSlotCache().invalidate(); return result; };

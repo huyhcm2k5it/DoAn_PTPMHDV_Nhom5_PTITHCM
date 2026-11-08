@@ -17,7 +17,7 @@ const {
 } = require('./services/access-projection.service.js');
 function createApp({
   connection,
-  verifyBearerToken,
+  verifyBearerToken, verifyAuthorizationLease,
   authorizePatientAccess,
   now,
   createId,
@@ -32,6 +32,7 @@ function createApp({
     const dependencies = {
       connection,
       verifyBearerToken,
+      verifyAuthorizationLease,
       authorizePatientAccess:
         authorizePatientAccess ||
         ((args) => defaultAuthorizePatientAccess({ connection, ...args })),
@@ -44,7 +45,7 @@ function createApp({
       slotsRoutes({ Schedule: getScheduleModel(connection), Slot: getSlotModel(connection), verifyBearerToken }),
     );
     app.use('/api/v1/schedules', schedulesRoutes(dependencies));
-    app.use('/api/v1/admin/summary', summaryRoutes(dependencies));
+    app.use('/api/v1/admin/appointments/summary', summaryRoutes(dependencies));
     app.use('/api/v1/appointment-holds', holdsRoutes(dependencies));
     app.use('/api/v1/appointments', appointmentsRoutes(dependencies));
     app.use('/api/v1/patients', patientAppointmentsRoutes(dependencies));

@@ -5,8 +5,13 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from app.api import idempotency
+from app.auth.lease import require_lease
 from app.auth.jwt_auth import authenticated, require_staff
-from app.domain.models import Charge, Payment, SettlementSaga
+from app.domain.models import Charge, Payment, SettlementSaga, BillingEventOutbox
+from app.auth.jwt_auth import can_read_patient_resource, patient_scope_error
+from app.infrastructure.message_delivery import make_envelope, digest, OWNERS
+from django.utils import timezone
+from datetime import timedelta
 
 
 def get_correlation_id(request):
@@ -87,6 +92,8 @@ def settle_payment(
                     "meta": {"correlationId": correlation_id}
                 }, status=404)
 
+            if not can_read_patient_resource(request.principal, charge.patient_id):
+                return None, patient_scope_error(request)
             # Kiểm tra lại sau khi đã giữ khóa dòng charge để chặn hai request song song
             data, conflict = idempotency.replay(scope, idempotency_key, payload)
             if conflict:
@@ -94,7 +101,7 @@ def settle_payment(
             if data is not None:
                 return data, None
 
-            if charge.state != "OPEN" or charge.settlement_state in ("REQUESTED", "SUCCEEDED"):
+            if charge.state != "OPEN" or charge.settlement_state in ("REQUESTED", "RESERVED", "IN_DOUBT", "SUCCEEDED") or (charge.expires_at and charge.expires_at <= timezone.now()) or charge.source_type not in OWNERS:
                 return None, Response({
                     "error": {
                         "code": "CHARGE_NOT_PAYABLE",
@@ -112,7 +119,10 @@ def settle_payment(
                 source_id=charge.source_id,
                 source_revision=charge.source_revision,
                 state="REQUESTED",
-                fence=1
+                version=(SettlementSaga.objects.filter(charge=charge).order_by("-version").values_list("version", flat=True).first() or 0) + 1,
+                fence=None,
+                amount_hash=charge.snapshot_hash,
+                deadline_at=timezone.now() + timedelta(seconds=60)
             )
 
             payment = Payment.objects.create(
@@ -123,12 +133,21 @@ def settle_payment(
                 state="PENDING",
                 method=method,
                 idempotency_key=idempotency_key,
-                fence=1
+                settlement_id=saga.id,
+                source_revision=charge.source_revision,
+                fence=0
             )
 
+            reserve = {"settlementId": str(saga.id), "chargeId": str(charge.id), "sourceType": charge.source_type,
+                "sourceId": str(charge.source_id), "sourceRevision": charge.source_revision,
+                "amountHash": saga.amount_hash, "attemptVersion": saga.version}
+            BillingEventOutbox.objects.create(event_type="ReserveSettlement", exchange="umc.commands.billing.v1",
+                routing_key=OWNERS[charge.source_type] + ".reserve-settlement.v1",
+                payload=make_envelope("ReserveSettlement", reserve, saga.id, saga.version, kind="COMMAND"))
+            charge.settlement_id = saga.id
             charge.settlement_saga_id = saga.id
             charge.settlement_state = "REQUESTED"
-            charge.save(update_fields=["settlement_saga_id", "settlement_state"])
+            charge.save(update_fields=["settlement_saga_id", "settlement_state", "settlement_id"])
 
             data = payment_data(payment, request_id)
             idempotency.remember(scope, idempotency_key, payload, data)
@@ -140,6 +159,7 @@ def settle_payment(
 
 @api_view(["POST"])
 @authenticated
+@require_lease("BI-004")
 def simulate_payment_view(request):
     """BI-004: Giả lập thanh toán cho khoản thu, tạo payment PENDING và saga REQUESTED.
 
@@ -148,7 +168,7 @@ def simulate_payment_view(request):
     correlation_id = get_correlation_id(request)
     principal = request.principal
     is_cashier = principal.actor_type == "STAFF" and principal.has("CASHIER")
-    if principal.actor_type != "PATIENT" and not is_cashier:
+    if principal.actor_type != "PATIENT":
         return Response({
             "error": {
                 "code": "FORBIDDEN",
@@ -178,7 +198,10 @@ def simulate_payment_view(request):
     except (ValueError, TypeError):
         return validation_error(request, "Trường chargeId phải là UUID hợp lệ.")
 
-    scope = "BI-004"
+    charge = Charge.objects.filter(id=charge_uuid).first()
+    if charge and not can_read_patient_resource(principal, charge.patient_id):
+        return patient_scope_error(request)
+    scope = "BI-004:" + uuid.uuid5(uuid.NAMESPACE_URL, principal.user_id + str(charge_uuid)).hex
     payload = {"chargeId": str(charge_uuid), "transactionId": transaction_id}
     request_id = request_id_for("payment", charge_uuid, idempotency_key)
 
@@ -205,6 +228,7 @@ def simulate_payment_view(request):
 
 @api_view(["POST"])
 @require_staff("CASHIER")
+@require_lease("BI-005")
 def counter_payment_view(request):
     """BI-005: Thu viện phí tại quầy bệnh viện (CASHIER)."""
     correlation_id = get_correlation_id(request)
@@ -235,7 +259,7 @@ def counter_payment_view(request):
     except (ValueError, TypeError):
         return validation_error(request, "Trường chargeId phải là UUID hợp lệ.")
 
-    scope = "BI-005"
+    scope = "BI-005:" + uuid.uuid5(uuid.NAMESPACE_URL, request.principal.user_id + str(charge_uuid)).hex
     payload = {
         "chargeId": str(charge_uuid),
         "transactionId": transaction_id,

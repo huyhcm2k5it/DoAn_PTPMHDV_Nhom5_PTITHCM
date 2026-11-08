@@ -25,7 +25,7 @@ const ROUTES = [
   {
     queue: 'cmd.appointment.v1',
     exchange: 'umc.commands.billing.v1',
-    key: 'billing.reserve-settlement.v1',
+    key: 'appointment.reserve-settlement.v1',
   },
   {
     queue: 'evt.appointment.v1',
@@ -35,14 +35,10 @@ const ROUTES = [
   {
     queue: 'evt.appointment.v1',
     exchange: 'umc.events.billing.v1',
-    key: 'billing.settlement-reserved.v1',
-  },
-  {
-    queue: 'evt.appointment.v1',
-    exchange: 'umc.events.billing.v1',
     key: 'billing.settlement-decision.v1',
   },
   { queue: 'evt.appointment.v1', exchange: 'umc.events.billing.v1', key: 'billing.charge-paid.v1' },
+  { queue: 'evt.appointment.v1', exchange: 'umc.events.billing.v1', key: 'billing.billing-status-changed.v1' },
   {
     queue: 'evt.appointment.v1',
     exchange: 'umc.events.clinical.v1',
@@ -54,17 +50,17 @@ const ROUTES = [
     key: 'clinical.visit-return-ready.v1',
   },
   {
-    queue: 'evt.appointment.access.v1',
+    queue: 'evt.appointment.v1',
     exchange: 'umc.events.identity.v1',
     key: 'identity.identity-access-changed.v1',
   },
   {
-    queue: 'evt.appointment.access.v1',
+    queue: 'evt.appointment.v1',
     exchange: 'umc.events.patient.v1',
     key: 'patient.patient-access-changed.v1',
   },
   {
-    queue: 'evt.appointment.catalog.v1',
+    queue: 'evt.appointment.v1',
     exchange: 'umc.events.catalog.v1',
     key: 'catalog.catalog-changed.v1',
   },
@@ -76,7 +72,7 @@ function routeFor(message, routingKey) {
   if (message.messageKind === 'COMMAND' && message.messageType === 'ReserveSettlement')
     return 'reserve';
   if (
-    ['ChargePrepared', 'SettlementReserved', 'SettlementDecision', 'ChargePaid'].includes(
+    ['ChargePrepared', 'SettlementDecision', 'ChargePaid', 'BillingStatusChanged'].includes(
       message.messageType,
     )
   )
@@ -125,11 +121,11 @@ async function dispatchMessage({ connection, message, exchange, routingKey, now 
   const kind = routeFor(message, routingKey);
   const expected = {
     'appointment.claim-queue-ticket.v1': 'ClaimQueueTicket',
-    'billing.reserve-settlement.v1': 'ReserveSettlement',
+    'appointment.reserve-settlement.v1': 'ReserveSettlement',
     'billing.charge-prepared.v1': 'ChargePrepared',
-    'billing.settlement-reserved.v1': 'SettlementReserved',
     'billing.settlement-decision.v1': 'SettlementDecision',
     'billing.charge-paid.v1': 'ChargePaid',
+    'billing.billing-status-changed.v1': 'BillingStatusChanged',
     'clinical.visit-signed.v1': 'VisitSigned',
     'clinical.visit-return-ready.v1': 'VisitReturnReady',
     'identity.identity-access-changed.v1': 'IdentityAccessChanged',

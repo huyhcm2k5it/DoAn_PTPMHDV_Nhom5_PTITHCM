@@ -3,31 +3,39 @@ services:
   mongo:
     image: mongo:8.0.16
     command:
-      ['mongod', '--replSet', 'rs0', '--bind_ip_all', '--keyFile', '/run/secrets/mongo-keyfile']
+    - cp /run/secrets/mongo-keyfile /tmp/umc-mongo.key && chmod 400 /tmp/umc-mongo.key
+      && chown mongodb:mongodb /tmp/umc-mongo.key && exec docker-entrypoint.sh mongod
+      --replSet rs0 --bind_ip_all --keyFile /tmp/umc-mongo.key
     environment:
       MONGO_INITDB_ROOT_USERNAME: $MONGO_ROOT_USER
       MONGO_INITDB_ROOT_PASSWORD: $MONGO_ROOT_PASSWORD
     secrets:
-      - source: mongo-keyfile
-        target: mongo-keyfile
-        mode: 0400
-    volumes: [mongo_data:/data/db]
-    networks: [private]
+    - source: mongo-keyfile
+      target: mongo-keyfile
+      mode: 256
+    volumes:
+    - mongo_data:/data/db
+    networks:
+    - private
     healthcheck:
       test:
-        [
-          'CMD-SHELL',
-          'mongosh --quiet --host localhost --username "$$MONGO_INITDB_ROOT_USERNAME" --password "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "db.adminCommand({ping:1}).ok"',
-        ]
+      - CMD-SHELL
+      - mongosh --quiet --host localhost --username "$$MONGO_INITDB_ROOT_USERNAME"
+        --password "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval
+        "db.adminCommand({ping:1}).ok"
       interval: 5s
       timeout: 5s
       retries: 30
       start_period: 30s
     restart: unless-stopped
+    entrypoint:
+    - bash
+    - -ec
   mongo-bootstrap:
     image: mongo:8.0.16
     depends_on:
-      mongo: { condition: service_healthy }
+      mongo:
+        condition: service_healthy
     environment:
       MONGO_ROOT_USER: $MONGO_ROOT_USER
       MONGO_ROOT_PASSWORD: $MONGO_ROOT_PASSWORD
@@ -35,25 +43,38 @@ services:
       APPOINTMENT_DB_PASSWORD: $APPOINTMENT_DB_PASSWORD
       PHARMACY_DB_PASSWORD: $PHARMACY_DB_PASSWORD
     volumes:
-      - ../../mongo/init-replica.js:/bootstrap/init-replica.js:ro
-      - ../../mongo/init-users.js:/bootstrap/init-users.js:ro
-    networks: [private]
-    entrypoint: ['sh', '-ec']
+    - ../../mongo/init-replica.js:/bootstrap/init-replica.js:ro
+    - ../../mongo/init-users.js:/bootstrap/init-users.js:ro
+    networks:
+    - private
+    entrypoint:
+    - sh
+    - -ec
     command:
-      - |
-        uri="mongodb://$$MONGO_ROOT_USER:$$MONGO_ROOT_PASSWORD@mongo:27017/admin?authSource=admin"
-        mongosh "$$uri" --quiet --eval "load('/bootstrap/init-replica.js'); initializeReplica()"
-        mongosh "$$uri" --quiet --eval "load('/bootstrap/init-users.js'); createOwnerUsers({patient:'$$PATIENT_DB_PASSWORD',appointment:'$$APPOINTMENT_DB_PASSWORD',pharmacy:'$$PHARMACY_DB_PASSWORD'})"
+    - 'uri="mongodb://$$MONGO_ROOT_USER:$$MONGO_ROOT_PASSWORD@mongo:27017/admin?authSource=admin"
+
+      mongosh "$$uri" --quiet --eval "load(''/bootstrap/init-replica.js''); initializeReplica()"
+
+      mongosh "$$uri" --quiet --eval "load(''/bootstrap/init-users.js''); createOwnerUsers({patient:''$$PATIENT_DB_PASSWORD'',appointment:''$$APPOINTMENT_DB_PASSWORD'',pharmacy:''$$PHARMACY_DB_PASSWORD''})"
+
+      '
     restart: 'no'
   rabbitmq:
     image: rabbitmq:4.3.6-management
     hostname: rabbitmq
     env_file:
-      - ../../rabbitmq/.env
-    volumes: [rabbitmq_data:/var/lib/rabbitmq]
-    networks: [private, default]
+    - ../../rabbitmq/.env
+    volumes:
+    - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+    - private
+    - default
     healthcheck:
-      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      test:
+      - CMD
+      - rabbitmq-diagnostics
+      - -q
+      - ping
       interval: 5s
       timeout: 5s
       retries: 20
@@ -61,25 +82,34 @@ services:
     restart: unless-stopped
   postgres:
     image: postgres:18
-    ports:
-      - '127.0.0.1:5432:5432'
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_root_password}
+      POSTGRES_USER: umc_bootstrap
+      POSTGRES_DB: umc_bootstrap
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:?set owner database password}
+      BILLING_DB_PASSWORD: ${BILLING_DB_PASSWORD:?set owner database password}
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?set owner database password}
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD:?set owner database password}
+      CLINICAL_DB_PASSWORD: ${CLINICAL_DB_PASSWORD:?set owner database password}
+      DIAGNOSTIC_DB_PASSWORD: ${DIAGNOSTIC_DB_PASSWORD:?set owner database password}
     volumes:
-      - postgres_data:/var/lib/postgresql
-      - ./postgres/hung/init.sql:/docker-entrypoint-initdb.d/20-hung.sql:ro
+    - postgres_be_data:/var/lib/postgresql
+    - ./postgres/all/init.sh:/docker-entrypoint-initdb.d/10-owners.sh:ro
     networks:
-      - private
-      - default
+    - private
+    - default
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      test:
+      - CMD-SHELL
+      - pg_isready -U umc_bootstrap -d umc_bootstrap
       interval: 5s
       timeout: 3s
       retries: 20
     restart: unless-stopped
   patient:
-    build: { context: ../.., dockerfile: services/patient/Dockerfile }
+    build:
+      context: ../..
+      dockerfile: services/patient/Dockerfile
     environment:
       NODE_ENV: production
       PORT: '3000'
@@ -88,24 +118,26 @@ services:
       JWT_ISSUER: umc-care-identity
       JWT_AUDIENCE: umc-care-services
     volumes:
-      - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
+    - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
     depends_on:
-      mongo-bootstrap: { condition: service_completed_successfully }
-    networks: [private]
+      mongo-bootstrap:
+        condition: service_completed_successfully
+    networks:
+    - private
     healthcheck:
       test:
-        [
-          'CMD',
-          'node',
-          '-e',
-          "fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
-        ]
+      - CMD
+      - node
+      - -e
+      - fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
       interval: 5s
       timeout: 3s
       retries: 20
     restart: unless-stopped
   appointment:
-    build: { context: ../.., dockerfile: services/appointment/Dockerfile }
+    build:
+      context: ../..
+      dockerfile: services/appointment/Dockerfile
     environment:
       NODE_ENV: production
       PORT: '3000'
@@ -113,49 +145,68 @@ services:
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
       JWT_ISSUER: umc-care-identity
       JWT_AUDIENCE: umc-care-services
+      APPOINTMENT_REDIS_URL: redis://appointment:${APPOINTMENT_REDIS_PASSWORD}@redis-catalog:6379
     volumes:
-      - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
+    - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
     depends_on:
-      mongo-bootstrap: { condition: service_completed_successfully }
-    networks: [private]
+      mongo-bootstrap:
+        condition: service_completed_successfully
+    networks:
+    - private
     healthcheck:
       test:
-        [
-          'CMD',
-          'node',
-          '-e',
-          "fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
-        ]
+      - CMD
+      - node
+      - -e
+      - fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
       interval: 5s
       timeout: 3s
       retries: 20
     restart: unless-stopped
   appointment-worker:
-    build: { context: ../.., dockerfile: services/appointment/Dockerfile }
-    command: ['npm', 'run', 'worker']
+    build:
+      context: ../..
+      dockerfile: services/appointment/Dockerfile
+    command:
+    - npm
+    - run
+    - worker
     environment:
       NODE_ENV: production
       MONGODB_URI: $APPOINTMENT_MONGO_URI
       AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL with /umc-care vhost}
     depends_on:
-      mongo-bootstrap: { condition: service_completed_successfully }
-      rabbitmq: { condition: service_healthy }
-    networks: [private]
+      mongo-bootstrap:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    networks:
+    - private
     restart: unless-stopped
   patient-worker:
-    build: { context: ../.., dockerfile: services/patient/Dockerfile }
-    command: ['npm', 'run', 'worker']
+    build:
+      context: ../..
+      dockerfile: services/patient/Dockerfile
+    command:
+    - npm
+    - run
+    - worker
     environment:
       NODE_ENV: production
       MONGODB_URI: $PATIENT_MONGO_URI
       AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL with /umc-care vhost}
     depends_on:
-      mongo-bootstrap: { condition: service_completed_successfully }
-      rabbitmq: { condition: service_healthy }
-    networks: [private]
+      mongo-bootstrap:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    networks:
+    - private
     restart: unless-stopped
   pharmacy:
-    build: { context: ../.., dockerfile: services/pharmacy/Dockerfile }
+    build:
+      context: ../..
+      dockerfile: services/pharmacy/Dockerfile
     environment:
       NODE_ENV: production
       PORT: '3000'
@@ -164,253 +215,403 @@ services:
       JWT_ISSUER: umc-care-identity
       JWT_AUDIENCE: umc-care-services
     volumes:
-      - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
+    - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
     depends_on:
-      mongo-bootstrap: { condition: service_completed_successfully }
-    networks: [private]
+      mongo-bootstrap:
+        condition: service_completed_successfully
+    networks:
+    - private
     healthcheck:
       test:
-        [
-          'CMD',
-          'node',
-          '-e',
-          "fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
-        ]
+      - CMD
+      - node
+      - -e
+      - fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
       interval: 5s
       timeout: 3s
       retries: 20
     restart: unless-stopped
   identity:
-    build: { context: ../../services/identity, dockerfile: Dockerfile }
+    build: &id001
+      context: ../../services/identity
+      dockerfile: Dockerfile
     env_file:
-      - ../../services/identity/.env
+    - ../../services/identity/.env
     depends_on:
-      postgres: { condition: service_healthy }
-    networks: [private]
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:8000/health/ready']
-      interval: 5s
-      timeout: 3s
-      retries: 20
-    restart: unless-stopped
-  billing:
-    build: { context: ../../services/billing, dockerfile: Dockerfile }
-    env_file:
-      - ../../services/billing/.env
-    depends_on:
-      postgres: { condition: service_healthy }
-    networks: [private]
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:8000/health/ready']
-      interval: 5s
-      timeout: 3s
-      retries: 20
-    restart: unless-stopped
-  billing-worker:
-    build: { context: ../../services/billing, dockerfile: Dockerfile }
-    command: ['python', 'manage.py', 'run_billing_worker']
-    env_file:
-      - ../../services/billing/.env
-    depends_on:
-      postgres: { condition: service_healthy }
-      rabbitmq: { condition: service_healthy }
-      billing: { condition: service_healthy }
-    networks: [private]
-    restart: unless-stopped
-  notification:
-    build: { context: ../../services/notification, dockerfile: Dockerfile }
-    env_file:
-      - ../../services/notification/.env
-    depends_on:
-      postgres: { condition: service_healthy }
-    networks: [private]
-    healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:8000/health/ready']
-      interval: 5s
-      timeout: 3s
-      retries: 20
-    restart: unless-stopped
-  notification-worker:
-    build: { context: ../../services/notification, dockerfile: Dockerfile }
-    command: ["python", "manage.py", "run_notification_worker"]
-    env_file:
-      - ../../services/notification/.env
-    restart: unless-stopped
-    depends_on:
-      rabbitmq: { condition: service_healthy }
-      notification: { condition: service_healthy }
-    networks: [private]
-  gateway:
-    build: { context: ../../envoy, dockerfile: Dockerfile }
-    ports:
-      - '8080:8080'
-    volumes:
-      - ../../.runtime/jwks.json:/etc/envoy/jwks.json:ro
-    depends_on:
-      identity: { condition: service_healthy }
-      billing: { condition: service_healthy }
-      notification: { condition: service_healthy }
+      postgres:
+        condition: service_healthy
     networks:
-      - private
-      - default
+    - private
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://127.0.0.1:8000/health/ready
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    environment: &id002
+      IDENTITY_DB_HOST: postgres
+      IDENTITY_DB_NAME: identity_db
+      IDENTITY_DB_USER: identity_owner
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:?set owner database password}
+      JWT_PUBLIC_KEY_PATH: /run/config/jwt_public.pem
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: /umc-care
+      JWT_PRIVATE_KEY_PATH: /run/secrets/identity_private.pem
+    volumes: &id003
+    - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
+    - ../../services/identity/jwt_private.pem:/run/secrets/identity_private.pem:ro
+  billing:
+    build:
+      context: ../../services/billing
+      dockerfile: Dockerfile
+    env_file:
+    - ../../services/billing/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+    - private
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://127.0.0.1:8000/health/ready
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    environment:
+      BILLING_DB_HOST: postgres
+      BILLING_DB_NAME: billing_db
+      BILLING_DB_USER: billing_owner
+      BILLING_DB_PASSWORD: ${BILLING_DB_PASSWORD:?set owner database password}
+      JWT_PUBLIC_KEY_PATH: /run/config/jwt_public.pem
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: /umc-care
+    volumes:
+    - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
+  billing-worker:
+    build:
+      context: ../../services/billing
+      dockerfile: Dockerfile
+    command:
+    - python
+    - manage.py
+    - run_billing_worker
+    env_file:
+    - ../../services/billing/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      billing:
+        condition: service_healthy
+    networks:
+    - private
+    restart: unless-stopped
+    environment:
+      BILLING_DB_HOST: postgres
+      BILLING_DB_NAME: billing_db
+      BILLING_DB_USER: billing_owner
+      BILLING_DB_PASSWORD: ${BILLING_DB_PASSWORD:?set owner database password}
+      JWT_PUBLIC_KEY_PATH: /run/config/jwt_public.pem
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: /umc-care
+    volumes:
+    - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
+  notification:
+    build:
+      context: ../../services/notification
+      dockerfile: Dockerfile
+    env_file:
+    - ../../services/notification/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+    - private
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://127.0.0.1:8000/health/ready
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    environment:
+      NOTIFICATION_DB_HOST: postgres
+      NOTIFICATION_DB_NAME: notification_db
+      NOTIFICATION_DB_USER: notification_owner
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?set owner database password}
+      JWT_PUBLIC_KEY_PATH: /run/config/jwt_public.pem
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: /umc-care
+    volumes:
+    - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
+  notification-worker:
+    build:
+      context: ../../services/notification
+      dockerfile: Dockerfile
+    command:
+    - python
+    - manage.py
+    - run_notification_worker
+    env_file:
+    - ../../services/notification/.env
+    restart: unless-stopped
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      notification:
+        condition: service_healthy
+    networks:
+    - private
+    environment:
+      NOTIFICATION_DB_HOST: postgres
+      NOTIFICATION_DB_NAME: notification_db
+      NOTIFICATION_DB_USER: notification_owner
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?set owner database password}
+      JWT_PUBLIC_KEY_PATH: /run/config/jwt_public.pem
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: /umc-care
+    volumes:
+    - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
+  gateway:
+    build:
+      context: ../../envoy
+      dockerfile: Dockerfile
+    ports:
+    - 127.0.0.1:8080:8080
+    volumes:
+    - ../../.runtime/jwks.json:/etc/envoy/jwks.json:ro
+    depends_on:
+      identity:
+        condition: service_healthy
+      billing:
+        condition: service_healthy
+      notification:
+        condition: service_healthy
+    networks:
+    - private
+    - default
     restart: unless-stopped
   pharmacy-worker:
-    build: { context: ../.., dockerfile: services/pharmacy/Dockerfile }
-    command: ['npm', 'run', 'worker']
+    build:
+      context: ../..
+      dockerfile: services/pharmacy/Dockerfile
+    command:
+    - npm
+    - run
+    - worker
     environment:
       MONGODB_URI: $PHARMACY_MONGO_URI
       AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL with /umc-care vhost}
     depends_on:
-      mongo-bootstrap: { condition: service_completed_successfully }
-      rabbitmq: { condition: service_healthy }
-    networks: [private]
-    restart: unless-stopped
-  postgres-huy:
-    image: postgres:18
-    environment:
-      POSTGRES_USER: huy_bootstrap
-      POSTGRES_DB: huy_bootstrap
-      POSTGRES_PASSWORD: ${HUY_POSTGRES_PASSWORD:?set HUY_POSTGRES_PASSWORD}
-      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD:?set CATALOG_DB_PASSWORD}
-      CLINICAL_DB_PASSWORD: ${CLINICAL_DB_PASSWORD:?set CLINICAL_DB_PASSWORD}
-      DIAGNOSTIC_DB_PASSWORD: ${DIAGNOSTIC_DB_PASSWORD:?set DIAGNOSTIC_DB_PASSWORD}
-    volumes:
-      - huy_postgres_data:/var/lib/postgresql
-      - ./postgres/huy/init.sh:/docker-entrypoint-initdb.d/10-huy.sh:ro
-    networks: [private]
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U huy_bootstrap -d huy_bootstrap']
-      interval: 3s
-      timeout: 3s
-      retries: 30
+      mongo-bootstrap:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    networks:
+    - private
     restart: unless-stopped
   redis-catalog:
     image: redis:7.4-alpine
     environment:
       CATALOG_REDIS_PASSWORD: ${CATALOG_REDIS_PASSWORD:?set CATALOG_REDIS_PASSWORD}
-    entrypoint: ['/bin/sh', '-c']
+      APPOINTMENT_REDIS_PASSWORD: ${APPOINTMENT_REDIS_PASSWORD:?set APPOINTMENT_REDIS_PASSWORD}
+    entrypoint:
+    - /bin/sh
+    - -c
     command:
-      - >-
-        printf 'user default on >%s ~umc:catalog:v1:* +hello +auth +ping +get +set +setnx\n' "$${CATALOG_REDIS_PASSWORD}" > /tmp/catalog-users.acl &&
-        exec redis-server --aclfile /tmp/catalog-users.acl --maxmemory 128mb --maxmemory-policy allkeys-lru
-    networks: [private]
+    - printf 'user default off\nuser catalog on >%s ~umc:catalog:v1:* +hello +auth
+      +ping +get +set +setnx\nuser appointment on >%s ~umc:appointment:available:v1:*
+      +hello +auth +ping +get +set +del +scan\n' "$${CATALOG_REDIS_PASSWORD}" "$${APPOINTMENT_REDIS_PASSWORD}"
+      > /tmp/cache-users.acl && exec redis-server --aclfile /tmp/cache-users.acl --maxmemory
+      128mb --maxmemory-policy allkeys-lru
+    networks:
+    - private
     restart: unless-stopped
   catalog-migrate:
     build: ../../services/catalog
     image: umc-care-catalog:local
-    entrypoint: ['/migrate']
+    entrypoint:
+    - /migrate
     environment:
-      DATABASE_URL: postgres://catalog_owner:${CATALOG_DB_PASSWORD}@postgres-huy:5432/catalog_db?sslmode=disable
+      DATABASE_URL: postgres://catalog_owner:${CATALOG_DB_PASSWORD}@postgres:5432/catalog_db?sslmode=disable
     depends_on:
-      postgres-huy: { condition: service_healthy }
-    networks: [private]
+      postgres:
+        condition: service_healthy
+    networks:
+    - private
   catalog:
     image: umc-care-catalog:local
     build: ../../services/catalog
     environment:
-      DATABASE_URL: postgres://catalog_owner:${CATALOG_DB_PASSWORD}@postgres-huy:5432/catalog_db?sslmode=disable
+      DATABASE_URL: postgres://catalog_owner:${CATALOG_DB_PASSWORD}@postgres:5432/catalog_db?sslmode=disable
       LISTEN_ADDR: :8081
       REDIS_ADDR: redis-catalog:6379
-      REDIS_USERNAME: default
+      REDIS_USERNAME: catalog
       REDIS_PASSWORD: ${CATALOG_REDIS_PASSWORD}
       JWT_ISSUER: umc-care-identity
       JWT_AUDIENCE: umc-care-services
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
-    volumes: ['../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro']
+    volumes:
+    - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
     depends_on:
-      catalog-migrate: { condition: service_completed_successfully }
-    networks: [private]
+      catalog-migrate:
+        condition: service_completed_successfully
+    networks:
+    - private
     restart: unless-stopped
   catalog-worker:
     image: umc-care-catalog:local
-    entrypoint: ['/worker']
+    entrypoint:
+    - /worker
     environment:
-      DATABASE_URL: postgres://catalog_owner:${CATALOG_DB_PASSWORD}@postgres-huy:5432/catalog_db?sslmode=disable
+      DATABASE_URL: postgres://catalog_owner:${CATALOG_DB_PASSWORD}@postgres:5432/catalog_db?sslmode=disable
       AMQP_URL: ${UMC_AMQP_URL}
       CATALOG_DECLARE_TOPOLOGY: 'true'
     depends_on:
-      catalog-migrate: { condition: service_completed_successfully }
-      rabbitmq: { condition: service_healthy }
-    networks: [private]
+      catalog-migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    networks:
+    - private
     restart: unless-stopped
   clinical-migrate:
     build: ../../services/clinical
     image: umc-care-clinical:local
-    entrypoint: ['/migrate']
+    entrypoint:
+    - /migrate
     environment:
-      DATABASE_URL: postgres://clinical_owner:${CLINICAL_DB_PASSWORD}@postgres-huy:5432/clinical_db?sslmode=disable
+      DATABASE_URL: postgres://clinical_owner:${CLINICAL_DB_PASSWORD}@postgres:5432/clinical_db?sslmode=disable
     depends_on:
-      postgres-huy: { condition: service_healthy }
-    networks: [private]
+      postgres:
+        condition: service_healthy
+    networks:
+    - private
   clinical:
     image: umc-care-clinical:local
     build: ../../services/clinical
     environment:
-      DATABASE_URL: postgres://clinical_owner:${CLINICAL_DB_PASSWORD}@postgres-huy:5432/clinical_db?sslmode=disable
+      DATABASE_URL: postgres://clinical_owner:${CLINICAL_DB_PASSWORD}@postgres:5432/clinical_db?sslmode=disable
       LISTEN_ADDR: :8082
       JWT_ISSUER: umc-care-identity
       JWT_AUDIENCE: umc-care-services
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
-    volumes: ['../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro']
+    volumes:
+    - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
     depends_on:
-      clinical-migrate: { condition: service_completed_successfully }
-    networks: [private]
+      clinical-migrate:
+        condition: service_completed_successfully
+    networks:
+    - private
     restart: unless-stopped
   clinical-worker:
     image: umc-care-clinical:local
-    entrypoint: ['/worker']
+    entrypoint:
+    - /worker
     environment:
-      DATABASE_URL: postgres://clinical_owner:${CLINICAL_DB_PASSWORD}@postgres-huy:5432/clinical_db?sslmode=disable
+      DATABASE_URL: postgres://clinical_owner:${CLINICAL_DB_PASSWORD}@postgres:5432/clinical_db?sslmode=disable
       RABBITMQ_URL: ${UMC_AMQP_URL}
       CLINICAL_DECLARE_TOPOLOGY: '1'
     depends_on:
-      clinical-migrate: { condition: service_completed_successfully }
-      rabbitmq: { condition: service_healthy }
-    networks: [private]
+      clinical-migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    networks:
+    - private
     restart: unless-stopped
   diagnostic-migrate:
     build: ../../services/diagnostic
     image: umc-care-diagnostic:local
-    entrypoint: ['/migrate']
+    entrypoint:
+    - /migrate
     environment:
-      DATABASE_URL: postgres://diagnostic_owner:${DIAGNOSTIC_DB_PASSWORD}@postgres-huy:5432/diagnostic_db?sslmode=disable
+      DATABASE_URL: postgres://diagnostic_owner:${DIAGNOSTIC_DB_PASSWORD}@postgres:5432/diagnostic_db?sslmode=disable
     depends_on:
-      postgres-huy: { condition: service_healthy }
-    networks: [private]
+      postgres:
+        condition: service_healthy
+    networks:
+    - private
   diagnostic:
     image: umc-care-diagnostic:local
     build: ../../services/diagnostic
     environment:
-      DATABASE_URL: postgres://diagnostic_owner:${DIAGNOSTIC_DB_PASSWORD}@postgres-huy:5432/diagnostic_db?sslmode=disable
+      DATABASE_URL: postgres://diagnostic_owner:${DIAGNOSTIC_DB_PASSWORD}@postgres:5432/diagnostic_db?sslmode=disable
       LISTEN_ADDR: :8083
       JWT_ISSUER: umc-care-identity
       JWT_AUDIENCE: umc-care-services
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
-    volumes: ['../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro']
+    volumes:
+    - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
     depends_on:
-      diagnostic-migrate: { condition: service_completed_successfully }
-    networks: [private]
+      diagnostic-migrate:
+        condition: service_completed_successfully
+    networks:
+    - private
     restart: unless-stopped
   diagnostic-worker:
     image: umc-care-diagnostic:local
-    entrypoint: ['/worker']
+    entrypoint:
+    - /worker
     environment:
-      DATABASE_URL: postgres://diagnostic_owner:${DIAGNOSTIC_DB_PASSWORD}@postgres-huy:5432/diagnostic_db?sslmode=disable
+      DATABASE_URL: postgres://diagnostic_owner:${DIAGNOSTIC_DB_PASSWORD}@postgres:5432/diagnostic_db?sslmode=disable
       RABBITMQ_URL: ${UMC_AMQP_URL}
       DIAGNOSTIC_DECLARE_TOPOLOGY: '1'
     depends_on:
-      diagnostic-migrate: { condition: service_completed_successfully }
-      rabbitmq: { condition: service_healthy }
-    networks: [private]
+      diagnostic-migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    networks:
+    - private
+    restart: unless-stopped
+  identity-worker:
+    build: *id001
+    command:
+    - python
+    - manage.py
+    - run_identity_worker
+    environment: *id002
+    volumes: *id003
+    depends_on:
+      identity:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+    - private
     restart: unless-stopped
 networks:
   private:
     internal: true
 volumes:
-  mongo_data:
-  rabbitmq_data:
-  postgres_data:
-  huy_postgres_data:
+  mongo_data: null
+  rabbitmq_data: null
+  postgres_data: null
+  huy_postgres_data: null
+  postgres_be_data: null
 secrets:
   mongo-keyfile:
     file: ../../mongo/secrets/replica.key

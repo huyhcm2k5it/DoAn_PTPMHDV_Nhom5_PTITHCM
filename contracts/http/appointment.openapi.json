@@ -1,521 +1,3055 @@
 {
   "openapi": "3.1.1",
-  "info": { "title": "UMC Care Appointment API", "version": "5.2" },
+  "info": {
+    "title": "UMC Care Appointment API",
+    "version": "5.2"
+  },
   "paths": {
-    "/api/v1/appointment-holds": {
-      "post": {
-        "operationId": "AP-008",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": { "schema": { "$ref": "#/components/schemas/CreateHold" } }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Hold created",
-            "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/HoldResponse" } }
+    "/api/v1/slots/available": {
+      "get": {
+        "operationId": "AP_004",
+        "security": [],
+        "parameters": [
+          {
+            "name": "doctorId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           },
-          "400": { "$ref": "#/components/responses/Error" },
-          "401": { "$ref": "#/components/responses/Error" },
-          "403": { "$ref": "#/components/responses/Error" },
-          "409": { "$ref": "#/components/responses/Error" },
-          "503": { "$ref": "#/components/responses/Error" }
-        }
-      }
-    },
-    "/api/v1/appointment-holds/{holdId}": {
-      "delete": {
-        "operationId": "AP-009",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "$ref": "#/components/parameters/HoldId" },
-          { "$ref": "#/components/parameters/IdempotencyKey" },
-          { "$ref": "#/components/parameters/ExpectedVersion" }
+          {
+            "name": "serviceId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
         ],
         "responses": {
-          "200": { "$ref": "#/components/responses/HoldReleased" },
-          "400": { "$ref": "#/components/responses/Error" },
-          "401": { "$ref": "#/components/responses/Error" },
-          "403": { "$ref": "#/components/responses/Error" },
-          "404": { "$ref": "#/components/responses/Error" },
-          "409": { "$ref": "#/components/responses/Error" },
-          "503": { "$ref": "#/components/responses/Error" }
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlotsAvailableResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "RATE_LIMITED",
+            "x-error-codes": [
+              "RATE_LIMITED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     },
-    "/api/v1/appointments": {
+    "/api/v1/schedules": {
       "post": {
-        "operationId": "AP-010",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": { "schema": { "$ref": "#/components/schemas/CreateAppointment" } }
+        "operationId": "AP_005",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "STATE_CONFLICT, SCHEDULE_OVERLAP, SCHEDULE_VERSION_CONFLICT, BOOKED_CAPACITY_CONFLICT, SLOT_FULL, PATIENT_TIME_CONFLICT, HOLD_EXPIRED, HOLD_ALREADY_CONSUMED, RESCHEDULE_WINDOW_CLOSED, APPOINTMENT_STATE_CONFLICT, CANCELLATION_WINDOW_CLOSED, APPOINTMENT_NOT_PAID, ALREADY_CHECKED_IN, QUEUE_EMPTY, TICKET_ALREADY_CALLED",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "SCHEDULE_OVERLAP",
+              "SCHEDULE_VERSION_CONFLICT",
+              "BOOKED_CAPACITY_CONFLICT",
+              "SLOT_FULL",
+              "PATIENT_TIME_CONFLICT",
+              "HOLD_EXPIRED",
+              "HOLD_ALREADY_CONSUMED",
+              "RESCHEDULE_WINDOW_CLOSED",
+              "APPOINTMENT_STATE_CONFLICT",
+              "CANCELLATION_WINDOW_CLOSED",
+              "APPOINTMENT_NOT_PAID",
+              "ALREADY_CHECKED_IN",
+              "QUEUE_EMPTY",
+              "TICKET_ALREADY_CALLED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
-        "responses": {
-          "202": { "$ref": "#/components/responses/AppointmentAccepted" },
-          "400": { "$ref": "#/components/responses/Error" },
-          "401": { "$ref": "#/components/responses/Error" },
-          "403": { "$ref": "#/components/responses/Error" },
-          "404": { "$ref": "#/components/responses/Error" },
-          "409": { "$ref": "#/components/responses/Error" },
-          "503": { "$ref": "#/components/responses/Error" }
-        }
-      }
-    },
-    "/api/v1/appointments/{appointmentId}": {
-      "get": {
-        "operationId": "AP-011",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "$ref": "#/components/parameters/AppointmentId" }],
-        "responses": {
-          "200": { "$ref": "#/components/responses/AppointmentDetail" },
-          "401": { "$ref": "#/components/responses/Error" },
-          "403": { "$ref": "#/components/responses/Error" },
-          "404": { "$ref": "#/components/responses/Error" },
-          "503": { "$ref": "#/components/responses/Error" }
-        }
-      }
-    },
-    "/api/v1/appointments/{appointmentId}/reschedule": {
-      "post": {
-        "operationId": "AP-013",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "$ref": "#/components/parameters/AppointmentId" },
-          { "$ref": "#/components/parameters/IdempotencyKey" }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": { "schema": { "$ref": "#/components/schemas/RescheduleAppointment" } }
-          }
-        },
-        "responses": {
-          "200": { "$ref": "#/components/responses/AppointmentChanged" },
-          "400": { "$ref": "#/components/responses/Error" },
-          "401": { "$ref": "#/components/responses/Error" },
-          "403": { "$ref": "#/components/responses/Error" },
-          "404": { "$ref": "#/components/responses/Error" },
-          "409": { "$ref": "#/components/responses/Error" },
-          "503": { "$ref": "#/components/responses/Error" }
-        }
-      }
-    },
-    "/api/v1/appointments/{appointmentId}/cancel": {
-      "post": {
-        "operationId": "AP-014",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "$ref": "#/components/parameters/AppointmentId" },
-          { "$ref": "#/components/parameters/IdempotencyKey" }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": { "schema": { "$ref": "#/components/schemas/CancelAppointment" } }
-          }
-        },
-        "responses": {
-          "200": { "$ref": "#/components/responses/AppointmentChanged" },
-          "400": { "$ref": "#/components/responses/Error" },
-          "401": { "$ref": "#/components/responses/Error" },
-          "403": { "$ref": "#/components/responses/Error" },
-          "404": { "$ref": "#/components/responses/Error" },
-          "409": { "$ref": "#/components/responses/Error" },
-          "503": { "$ref": "#/components/responses/Error" }
-        }
-      }
-    },
-    "/api/v1/appointments/{appointmentId}/check-in": {
-      "post": {
-        "operationId": "AP-015",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "$ref": "#/components/parameters/AppointmentId" },
-          { "$ref": "#/components/parameters/IdempotencyKey" }
-        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["expectedVersion"],
-                "properties": { "expectedVersion": { "type": "integer", "minimum": 1 } }
+                "$ref": "#/components/schemas/CreateSchedule"
               }
             }
           }
-        },
-        "responses": {
-          "200": { "$ref": "#/components/responses/QueueTicket" },
-          "400": { "$ref": "#/components/responses/Error" },
-          "401": { "$ref": "#/components/responses/Error" },
-          "403": { "$ref": "#/components/responses/Error" },
-          "404": { "$ref": "#/components/responses/Error" },
-          "409": { "$ref": "#/components/responses/Error" },
-          "503": { "$ref": "#/components/responses/Error" }
-        }
-      }
-    },
-    "/api/v1/queues/today": {
-      "get": {
-        "operationId": "AP-016",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "date", "in": "query", "schema": { "type": "string", "format": "date" } },
-          {
-            "name": "ticketType",
-            "in": "query",
-            "schema": { "type": "string", "enum": ["FIRST", "RETURN"] }
-          },
-          { "name": "doctorId", "in": "query", "schema": { "type": "string", "format": "uuid" } },
-          { "$ref": "#/components/parameters/Page" },
-          { "$ref": "#/components/parameters/Limit" }
-        ],
-        "responses": {
-          "200": { "$ref": "#/components/responses/QueueList" },
-          "400": { "$ref": "#/components/responses/Error" },
-          "401": { "$ref": "#/components/responses/Error" },
-          "403": { "$ref": "#/components/responses/Error" }
-        }
-      }
-    },
-    "/api/v1/queues/call-next": {
-      "post": {
-        "operationId": "AP-017",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CallNext" } } }
-        },
-        "responses": {
-          "200": { "$ref": "#/components/responses/QueueTicket" },
-          "400": { "$ref": "#/components/responses/Error" },
-          "401": { "$ref": "#/components/responses/Error" },
-          "403": { "$ref": "#/components/responses/Error" },
-          "404": { "$ref": "#/components/responses/Error" }
-        }
-      }
-    },
-    "/api/v1/queues/{ticketId}/no-show": {
-      "post": {
-        "operationId": "AP-018",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "$ref": "#/components/parameters/TicketId" },
-          { "$ref": "#/components/parameters/IdempotencyKey" }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NoShow" } } }
-        },
-        "responses": {
-          "200": { "$ref": "#/components/responses/QueueTicket" },
-          "400": { "$ref": "#/components/responses/Error" },
-          "401": { "$ref": "#/components/responses/Error" },
-          "403": { "$ref": "#/components/responses/Error" },
-          "404": { "$ref": "#/components/responses/Error" },
-          "409": { "$ref": "#/components/responses/Error" }
-        }
-      }
-    },
-    "/api/v1/patients/{patientId}/appointments": {
-      "get": {
-        "operationId": "AP-012",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "$ref": "#/components/parameters/PatientId" },
-          { "$ref": "#/components/parameters/Page" },
-          { "$ref": "#/components/parameters/Limit" },
-          { "name": "state", "in": "query", "schema": { "type": "string" } },
-          { "name": "from", "in": "query", "schema": { "type": "string", "format": "date" } },
-          { "name": "to", "in": "query", "schema": { "type": "string", "format": "date" } }
-        ],
-        "responses": {
-          "200": { "$ref": "#/components/responses/AppointmentList" },
-          "400": { "$ref": "#/components/responses/Error" },
-          "401": { "$ref": "#/components/responses/Error" },
-          "403": { "$ref": "#/components/responses/Error" },
-          "404": { "$ref": "#/components/responses/Error" },
-          "503": { "$ref": "#/components/responses/Error" }
-        }
-      }
-    },
-    "/api/v1/admin/summary": {
-      "get": {
-        "operationId": "AP-019",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "date", "in": "query", "required": true, "schema": { "type": "string", "format": "date" } }],
-        "responses": {
-          "200": { "description": "Daily appointment and queue summary", "content": { "application/json": { "schema": { "type": "object" } } } },
-          "400": { "$ref": "#/components/responses/Error" },
-          "401": { "$ref": "#/components/responses/Error" },
-          "403": { "$ref": "#/components/responses/Error" }
-        }
-      }
-    },
-    "/api/v1/schedules": {
-      "get": {
-        "operationId": "AP-005-LIST",
-        "security": [{ "bearerAuth": [] }],
-        "responses": {
-          "200": { "description": "Schedule list", "content": { "application/json": { "schema": { "type": "object" } } } },
-          "401": { "$ref": "#/components/responses/Error" },
-          "403": { "$ref": "#/components/responses/Error" }
-        }
-      },
-      "post": {
-        "operationId": "AP-005",
-        "security": [{ "bearerAuth": [] }],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["doctorId", "serviceId", "startAt", "endAt", "capacityPerSlot", "slotMinutes"] } } } },
-        "responses": {
-          "201": { "description": "Schedule created", "content": { "application/json": { "schema": { "type": "object" } } } },
-          "400": { "$ref": "#/components/responses/Error" },
-          "401": { "$ref": "#/components/responses/Error" },
-          "403": { "$ref": "#/components/responses/Error" },
-          "409": { "$ref": "#/components/responses/Error" }
         }
       }
     },
     "/api/v1/schedules/{scheduleId}": {
       "patch": {
-        "operationId": "AP-006",
-        "security": [{ "bearerAuth": [] }],
-        "parameters": [{ "name": "scheduleId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["expectedVersion"] } } } },
+        "operationId": "AP_006",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "scheduleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
         "responses": {
-          "200": { "description": "Schedule updated", "content": { "application/json": { "schema": { "type": "object" } } } },
-          "400": { "$ref": "#/components/responses/Error" },
-          "401": { "$ref": "#/components/responses/Error" },
-          "403": { "$ref": "#/components/responses/Error" },
-          "404": { "$ref": "#/components/responses/Error" },
-          "409": { "$ref": "#/components/responses/Error" }
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "x-error-codes": [
+              "NOT_FOUND"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "STATE_CONFLICT, SCHEDULE_OVERLAP, SCHEDULE_VERSION_CONFLICT, BOOKED_CAPACITY_CONFLICT, SLOT_FULL, PATIENT_TIME_CONFLICT, HOLD_EXPIRED, HOLD_ALREADY_CONSUMED, RESCHEDULE_WINDOW_CLOSED, APPOINTMENT_STATE_CONFLICT, CANCELLATION_WINDOW_CLOSED, APPOINTMENT_NOT_PAID, ALREADY_CHECKED_IN, QUEUE_EMPTY, TICKET_ALREADY_CALLED",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "SCHEDULE_OVERLAP",
+              "SCHEDULE_VERSION_CONFLICT",
+              "BOOKED_CAPACITY_CONFLICT",
+              "SLOT_FULL",
+              "PATIENT_TIME_CONFLICT",
+              "HOLD_EXPIRED",
+              "HOLD_ALREADY_CONSUMED",
+              "RESCHEDULE_WINDOW_CLOSED",
+              "APPOINTMENT_STATE_CONFLICT",
+              "CANCELLATION_WINDOW_CLOSED",
+              "APPOINTMENT_NOT_PAID",
+              "ALREADY_CHECKED_IN",
+              "QUEUE_EMPTY",
+              "TICKET_ALREADY_CALLED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSchedule"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/appointment-holds": {
+      "post": {
+        "operationId": "AP_008",
+        "security": [
+          {
+            "BearerAuth": [],
+            "AuthorizationLease": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "x-error-codes": [
+              "NOT_FOUND"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "STATE_CONFLICT, SCHEDULE_OVERLAP, SCHEDULE_VERSION_CONFLICT, BOOKED_CAPACITY_CONFLICT, SLOT_FULL, PATIENT_TIME_CONFLICT, HOLD_EXPIRED, HOLD_ALREADY_CONSUMED, RESCHEDULE_WINDOW_CLOSED, APPOINTMENT_STATE_CONFLICT, CANCELLATION_WINDOW_CLOSED, APPOINTMENT_NOT_PAID, ALREADY_CHECKED_IN, QUEUE_EMPTY, TICKET_ALREADY_CALLED",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "SCHEDULE_OVERLAP",
+              "SCHEDULE_VERSION_CONFLICT",
+              "BOOKED_CAPACITY_CONFLICT",
+              "SLOT_FULL",
+              "PATIENT_TIME_CONFLICT",
+              "HOLD_EXPIRED",
+              "HOLD_ALREADY_CONSUMED",
+              "RESCHEDULE_WINDOW_CLOSED",
+              "APPOINTMENT_STATE_CONFLICT",
+              "CANCELLATION_WINDOW_CLOSED",
+              "APPOINTMENT_NOT_PAID",
+              "ALREADY_CHECKED_IN",
+              "QUEUE_EMPTY",
+              "TICKET_ALREADY_CALLED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-authorization-lease": {
+          "action": "AP-008",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateHold"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/appointment-holds/{holdId}": {
+      "delete": {
+        "operationId": "AP_009",
+        "security": [
+          {
+            "BearerAuth": [],
+            "AuthorizationLease": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "holdId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "expectedVersion",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HoldReleasedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "x-error-codes": [
+              "NOT_FOUND"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "STATE_CONFLICT, SCHEDULE_OVERLAP, SCHEDULE_VERSION_CONFLICT, BOOKED_CAPACITY_CONFLICT, SLOT_FULL, PATIENT_TIME_CONFLICT, HOLD_EXPIRED, HOLD_ALREADY_CONSUMED, RESCHEDULE_WINDOW_CLOSED, APPOINTMENT_STATE_CONFLICT, CANCELLATION_WINDOW_CLOSED, APPOINTMENT_NOT_PAID, ALREADY_CHECKED_IN, QUEUE_EMPTY, TICKET_ALREADY_CALLED",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "SCHEDULE_OVERLAP",
+              "SCHEDULE_VERSION_CONFLICT",
+              "BOOKED_CAPACITY_CONFLICT",
+              "SLOT_FULL",
+              "PATIENT_TIME_CONFLICT",
+              "HOLD_EXPIRED",
+              "HOLD_ALREADY_CONSUMED",
+              "RESCHEDULE_WINDOW_CLOSED",
+              "APPOINTMENT_STATE_CONFLICT",
+              "CANCELLATION_WINDOW_CLOSED",
+              "APPOINTMENT_NOT_PAID",
+              "ALREADY_CHECKED_IN",
+              "QUEUE_EMPTY",
+              "TICKET_ALREADY_CALLED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-authorization-lease": {
+          "action": "AP-009",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
+        }
+      }
+    },
+    "/api/v1/appointments": {
+      "post": {
+        "operationId": "AP_010",
+        "security": [
+          {
+            "BearerAuth": [],
+            "AuthorizationLease": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Success",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentAcceptedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "x-error-codes": [
+              "NOT_FOUND"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "STATE_CONFLICT, SCHEDULE_OVERLAP, SCHEDULE_VERSION_CONFLICT, BOOKED_CAPACITY_CONFLICT, SLOT_FULL, PATIENT_TIME_CONFLICT, HOLD_EXPIRED, HOLD_ALREADY_CONSUMED, RESCHEDULE_WINDOW_CLOSED, APPOINTMENT_STATE_CONFLICT, CANCELLATION_WINDOW_CLOSED, APPOINTMENT_NOT_PAID, ALREADY_CHECKED_IN, QUEUE_EMPTY, TICKET_ALREADY_CALLED",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "SCHEDULE_OVERLAP",
+              "SCHEDULE_VERSION_CONFLICT",
+              "BOOKED_CAPACITY_CONFLICT",
+              "SLOT_FULL",
+              "PATIENT_TIME_CONFLICT",
+              "HOLD_EXPIRED",
+              "HOLD_ALREADY_CONSUMED",
+              "RESCHEDULE_WINDOW_CLOSED",
+              "APPOINTMENT_STATE_CONFLICT",
+              "CANCELLATION_WINDOW_CLOSED",
+              "APPOINTMENT_NOT_PAID",
+              "ALREADY_CHECKED_IN",
+              "QUEUE_EMPTY",
+              "TICKET_ALREADY_CALLED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-authorization-lease": {
+          "action": "AP-010",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAppointment"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/appointments/{appointmentId}": {
+      "get": {
+        "operationId": "AP_011",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentDetailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "x-error-codes": [
+              "NOT_FOUND"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patients/{patientId}/appointments": {
+      "get": {
+        "operationId": "AP_012",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patientId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "x-error-codes": [
+              "NOT_FOUND"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/appointments/{appointmentId}/reschedule": {
+      "post": {
+        "operationId": "AP_013",
+        "security": [
+          {
+            "BearerAuth": [],
+            "AuthorizationLease": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentRescheduledResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "x-error-codes": [
+              "NOT_FOUND"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "STATE_CONFLICT, SCHEDULE_OVERLAP, SCHEDULE_VERSION_CONFLICT, BOOKED_CAPACITY_CONFLICT, SLOT_FULL, PATIENT_TIME_CONFLICT, HOLD_EXPIRED, HOLD_ALREADY_CONSUMED, RESCHEDULE_WINDOW_CLOSED, APPOINTMENT_STATE_CONFLICT, CANCELLATION_WINDOW_CLOSED, APPOINTMENT_NOT_PAID, ALREADY_CHECKED_IN, QUEUE_EMPTY, TICKET_ALREADY_CALLED",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "SCHEDULE_OVERLAP",
+              "SCHEDULE_VERSION_CONFLICT",
+              "BOOKED_CAPACITY_CONFLICT",
+              "SLOT_FULL",
+              "PATIENT_TIME_CONFLICT",
+              "HOLD_EXPIRED",
+              "HOLD_ALREADY_CONSUMED",
+              "RESCHEDULE_WINDOW_CLOSED",
+              "APPOINTMENT_STATE_CONFLICT",
+              "CANCELLATION_WINDOW_CLOSED",
+              "APPOINTMENT_NOT_PAID",
+              "ALREADY_CHECKED_IN",
+              "QUEUE_EMPTY",
+              "TICKET_ALREADY_CALLED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-authorization-lease": {
+          "action": "AP-013",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RescheduleAppointment"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/appointments/{appointmentId}/cancel": {
+      "post": {
+        "operationId": "AP_014",
+        "security": [
+          {
+            "BearerAuth": [],
+            "AuthorizationLease": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppointmentCancelledResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "x-error-codes": [
+              "NOT_FOUND"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "STATE_CONFLICT, SCHEDULE_OVERLAP, SCHEDULE_VERSION_CONFLICT, BOOKED_CAPACITY_CONFLICT, SLOT_FULL, PATIENT_TIME_CONFLICT, HOLD_EXPIRED, HOLD_ALREADY_CONSUMED, RESCHEDULE_WINDOW_CLOSED, APPOINTMENT_STATE_CONFLICT, CANCELLATION_WINDOW_CLOSED, APPOINTMENT_NOT_PAID, ALREADY_CHECKED_IN, QUEUE_EMPTY, TICKET_ALREADY_CALLED",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "SCHEDULE_OVERLAP",
+              "SCHEDULE_VERSION_CONFLICT",
+              "BOOKED_CAPACITY_CONFLICT",
+              "SLOT_FULL",
+              "PATIENT_TIME_CONFLICT",
+              "HOLD_EXPIRED",
+              "HOLD_ALREADY_CONSUMED",
+              "RESCHEDULE_WINDOW_CLOSED",
+              "APPOINTMENT_STATE_CONFLICT",
+              "CANCELLATION_WINDOW_CLOSED",
+              "APPOINTMENT_NOT_PAID",
+              "ALREADY_CHECKED_IN",
+              "QUEUE_EMPTY",
+              "TICKET_ALREADY_CALLED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-authorization-lease": {
+          "action": "AP-014",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelAppointment"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/appointments/{appointmentId}/check-in": {
+      "post": {
+        "operationId": "AP_015",
+        "security": [
+          {
+            "BearerAuth": [],
+            "AuthorizationLease": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "appointmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckInResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "x-error-codes": [
+              "NOT_FOUND"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "STATE_CONFLICT, SCHEDULE_OVERLAP, SCHEDULE_VERSION_CONFLICT, BOOKED_CAPACITY_CONFLICT, SLOT_FULL, PATIENT_TIME_CONFLICT, HOLD_EXPIRED, HOLD_ALREADY_CONSUMED, RESCHEDULE_WINDOW_CLOSED, APPOINTMENT_STATE_CONFLICT, CANCELLATION_WINDOW_CLOSED, APPOINTMENT_NOT_PAID, ALREADY_CHECKED_IN, QUEUE_EMPTY, TICKET_ALREADY_CALLED",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "SCHEDULE_OVERLAP",
+              "SCHEDULE_VERSION_CONFLICT",
+              "BOOKED_CAPACITY_CONFLICT",
+              "SLOT_FULL",
+              "PATIENT_TIME_CONFLICT",
+              "HOLD_EXPIRED",
+              "HOLD_ALREADY_CONSUMED",
+              "RESCHEDULE_WINDOW_CLOSED",
+              "APPOINTMENT_STATE_CONFLICT",
+              "CANCELLATION_WINDOW_CLOSED",
+              "APPOINTMENT_NOT_PAID",
+              "ALREADY_CHECKED_IN",
+              "QUEUE_EMPTY",
+              "TICKET_ALREADY_CALLED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-authorization-lease": {
+          "action": "AP-015",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckInAppointment"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/queues/today": {
+      "get": {
+        "operationId": "AP_016",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticketType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "FIRST",
+                "RETURN"
+              ]
+            }
+          },
+          {
+            "name": "doctorId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/queues/call-next": {
+      "post": {
+        "operationId": "AP_017",
+        "security": [
+          {
+            "BearerAuth": [],
+            "AuthorizationLease": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallNextResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "STATE_CONFLICT, SCHEDULE_OVERLAP, SCHEDULE_VERSION_CONFLICT, BOOKED_CAPACITY_CONFLICT, SLOT_FULL, PATIENT_TIME_CONFLICT, HOLD_EXPIRED, HOLD_ALREADY_CONSUMED, RESCHEDULE_WINDOW_CLOSED, APPOINTMENT_STATE_CONFLICT, CANCELLATION_WINDOW_CLOSED, APPOINTMENT_NOT_PAID, ALREADY_CHECKED_IN, QUEUE_EMPTY, TICKET_ALREADY_CALLED",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "SCHEDULE_OVERLAP",
+              "SCHEDULE_VERSION_CONFLICT",
+              "BOOKED_CAPACITY_CONFLICT",
+              "SLOT_FULL",
+              "PATIENT_TIME_CONFLICT",
+              "HOLD_EXPIRED",
+              "HOLD_ALREADY_CONSUMED",
+              "RESCHEDULE_WINDOW_CLOSED",
+              "APPOINTMENT_STATE_CONFLICT",
+              "CANCELLATION_WINDOW_CLOSED",
+              "APPOINTMENT_NOT_PAID",
+              "ALREADY_CHECKED_IN",
+              "QUEUE_EMPTY",
+              "TICKET_ALREADY_CALLED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-authorization-lease": {
+          "action": "AP-017",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CallNext"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/queues/{ticketId}/no-show": {
+      "post": {
+        "operationId": "AP_018",
+        "security": [
+          {
+            "BearerAuth": [],
+            "AuthorizationLease": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticketId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NoShowResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "NOT_FOUND",
+            "x-error-codes": [
+              "NOT_FOUND"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "STATE_CONFLICT, SCHEDULE_OVERLAP, SCHEDULE_VERSION_CONFLICT, BOOKED_CAPACITY_CONFLICT, SLOT_FULL, PATIENT_TIME_CONFLICT, HOLD_EXPIRED, HOLD_ALREADY_CONSUMED, RESCHEDULE_WINDOW_CLOSED, APPOINTMENT_STATE_CONFLICT, CANCELLATION_WINDOW_CLOSED, APPOINTMENT_NOT_PAID, ALREADY_CHECKED_IN, QUEUE_EMPTY, TICKET_ALREADY_CALLED",
+            "x-error-codes": [
+              "STATE_CONFLICT",
+              "SCHEDULE_OVERLAP",
+              "SCHEDULE_VERSION_CONFLICT",
+              "BOOKED_CAPACITY_CONFLICT",
+              "SLOT_FULL",
+              "PATIENT_TIME_CONFLICT",
+              "HOLD_EXPIRED",
+              "HOLD_ALREADY_CONSUMED",
+              "RESCHEDULE_WINDOW_CLOSED",
+              "APPOINTMENT_STATE_CONFLICT",
+              "CANCELLATION_WINDOW_CLOSED",
+              "APPOINTMENT_NOT_PAID",
+              "ALREADY_CHECKED_IN",
+              "QUEUE_EMPTY",
+              "TICKET_ALREADY_CALLED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-authorization-lease": {
+          "action": "AP-018",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NoShow"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/appointments/summary": {
+      "get": {
+        "operationId": "AP_019",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SummaryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR",
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN",
+            "x-error-codes": [
+              "FORBIDDEN"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE",
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ],
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
         }
       }
     }
   },
   "components": {
-    "securitySchemes": { "bearerAuth": { "type": "http", "scheme": "bearer" } },
-    "parameters": {
-      "IdempotencyKey": {
-        "name": "Idempotency-Key",
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "AuthorizationLease": {
+        "type": "apiKey",
         "in": "header",
-        "required": true,
-        "schema": { "type": "string", "format": "uuid" }
-      },
-      "ExpectedVersion": {
-        "name": "expectedVersion",
-        "in": "query",
-        "required": false,
-        "schema": { "type": "integer", "minimum": 1 }
-      },
-      "HoldId": {
-        "name": "holdId",
-        "in": "path",
-        "required": true,
-        "schema": { "type": "string", "format": "uuid" }
-      },
-      "AppointmentId": {
-        "name": "appointmentId",
-        "in": "path",
-        "required": true,
-        "schema": { "type": "string", "format": "uuid" }
-      },
-      "TicketId": {
-        "name": "ticketId",
-        "in": "path",
-        "required": true,
-        "schema": { "type": "string", "format": "uuid" }
-      },
-      "PatientId": {
-        "name": "patientId",
-        "in": "path",
-        "required": true,
-        "schema": { "type": "string", "format": "uuid" }
-      },
-      "Page": {
-        "name": "page",
-        "in": "query",
-        "schema": { "type": "integer", "minimum": 1, "default": 1 }
-      },
-      "Limit": {
-        "name": "limit",
-        "in": "query",
-        "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 }
+        "name": "X-Authorization-Lease"
       }
     },
     "schemas": {
-      "CreateHold": {
+      "Meta": {
         "type": "object",
-        "additionalProperties": false,
-        "required": ["patientId", "slotId"],
         "properties": {
-          "patientId": { "type": "string", "format": "uuid" },
-          "slotId": { "type": "string", "format": "uuid" }
-        }
-      },
-      "CreateAppointment": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["holdId", "patientId"],
-        "properties": {
-          "holdId": { "type": "string", "format": "uuid" },
-          "patientId": { "type": "string", "format": "uuid" }
-        }
-      },
-      "RescheduleAppointment": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["newSlotId", "expectedVersion"],
-        "properties": {
-          "newSlotId": { "type": "string", "format": "uuid" },
-          "expectedVersion": { "type": "integer", "minimum": 1 }
-        }
-      },
-      "CancelAppointment": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["reasonCode", "expectedVersion"],
-        "properties": {
-          "reasonCode": { "type": "string", "minLength": 1, "maxLength": 100 },
-          "expectedVersion": { "type": "integer", "minimum": 1 }
-        }
-      },
-      "CallNext": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["ticketType"],
-        "properties": {
-          "ticketType": { "type": "string", "enum": ["FIRST", "RETURN"] },
-          "doctorId": { "type": "string", "format": "uuid" }
-        }
-      },
-      "NoShow": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["reasonCode", "expectedVersion"],
-        "properties": {
-          "reasonCode": { "type": "string", "minLength": 1, "maxLength": 100 },
-          "expectedVersion": { "type": "integer", "minimum": 1 }
-        }
-      },
-      "QueueTicketData": {
-        "type": "object",
-        "required": ["ticketId", "appointmentId", "ticketType", "state", "version"],
-        "properties": {
-          "ticketId": { "type": "string", "format": "uuid" },
-          "appointmentId": { "type": "string", "format": "uuid" },
-          "patientId": { "type": "string", "format": "uuid" },
-          "doctorId": { "type": "string", "format": "uuid" },
-          "ticketType": { "type": "string", "enum": ["FIRST", "RETURN"] },
-          "returnRound": { "type": "integer", "minimum": 0 },
-          "state": { "type": "string", "enum": ["WAITING", "CALLED", "CLAIMED", "IN_SERVICE", "NO_SHOW", "DONE"] },
-          "version": { "type": "integer", "minimum": 1 },
-          "calledAt": { "type": ["string", "null"], "format": "date-time" },
-          "noShowReason": { "type": ["string", "null"] }
-        }
-      },
-      "HoldResponse": {
-        "type": "object",
-        "required": ["data"],
-        "properties": {
-          "data": {
-            "type": "object",
-            "required": ["holdId", "expiresAt", "state"],
-            "properties": {
-              "holdId": { "type": "string", "format": "uuid" },
-              "expiresAt": { "type": "string", "format": "date-time" },
-              "state": { "type": "string", "enum": ["HELD", "RELEASED", "EXPIRED"] },
-              "slotId": { "type": "string" },
-              "priceSnapshot": {}
-            }
+          "correlationId": {
+            "type": "string"
           }
-        }
+        },
+        "required": [
+          "correlationId"
+        ],
+        "additionalProperties": false
       },
-      "AppointmentAccepted": {
+      "ErrorResponse": {
         "type": "object",
-        "required": ["data"],
-        "properties": {
-          "data": {
-            "type": "object",
-            "required": ["requestId", "appointmentId", "state", "statusUrl"],
-            "properties": {
-              "requestId": { "type": "string", "format": "uuid" },
-              "appointmentId": { "type": "string", "format": "uuid" },
-              "state": { "const": "PENDING_PAYMENT" },
-              "statusUrl": { "type": "string" }
-            }
-          }
-        }
-      },
-      "Error": {
-        "type": "object",
-        "required": ["error"],
         "properties": {
           "error": {
             "type": "object",
-            "required": ["code", "message"],
-            "properties": { "code": { "type": "string" }, "message": { "type": "string" } }
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
           },
-          "correlationId": { "type": "string" }
-        }
-      }
-    },
-    "responses": {
-      "Error": {
-        "description": "Standard error",
-        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
-      },
-      "HoldReleased": {
-        "description": "Hold released",
-        "content": {
-          "application/json": { "schema": { "$ref": "#/components/schemas/HoldResponse" } }
-        }
-      },
-      "AppointmentAccepted": {
-        "description": "Appointment request committed",
-        "headers": { "Location": { "schema": { "type": "string" } } },
-        "content": {
-          "application/json": { "schema": { "$ref": "#/components/schemas/AppointmentAccepted" } }
-        }
-      },
-      "AppointmentDetail": {
-        "description": "Appointment detail",
-        "content": { "application/json": { "schema": { "type": "object" } } }
-      },
-      "AppointmentList": {
-        "description": "Appointment list",
-        "content": { "application/json": { "schema": { "type": "object" } } }
-      },
-      "AppointmentChanged": {
-        "description": "Appointment rescheduled or cancelled",
-        "content": { "application/json": { "schema": { "type": "object" } } }
-      },
-      "QueueTicket": {
-        "description": "Queue ticket",
-        "content": {
-          "application/json": {
-            "schema": {
-              "type": "object",
-              "required": ["data"],
-              "properties": { "data": { "$ref": "#/components/schemas/QueueTicketData" } }
-            }
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
           }
-        }
+        },
+        "required": [
+          "error",
+          "meta"
+        ],
+        "additionalProperties": false
       },
-      "QueueList": {
-        "description": "Today's queue",
-        "content": { "application/json": { "schema": { "type": "object" } } }
+      "PriceSnapshot": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "priceVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "priceVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "amountVnd": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "VND"
+            ]
+          },
+          "pricingAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "snapshotHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "amountVnd"
+        ],
+        "additionalProperties": true
+      },
+      "Slot": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slotId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "scheduleId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "doctorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "serviceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "room": {
+            "type": "string"
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "capacity": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reserved": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "available": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "slotId",
+          "doctorId",
+          "serviceId",
+          "startAt",
+          "endAt",
+          "available"
+        ],
+        "additionalProperties": true
+      },
+      "Schedule": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "scheduleId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "doctorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "serviceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "room": {
+            "type": "string"
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "slotMinutes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capacityPerSlot": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "doctorId",
+          "serviceId",
+          "room",
+          "startAt",
+          "endAt",
+          "slotMinutes",
+          "capacityPerSlot"
+        ],
+        "additionalProperties": true
+      },
+      "Appointment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "appointmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slotId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "doctorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "serviceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "patientId",
+          "slotId",
+          "state",
+          "version"
+        ],
+        "additionalProperties": true
+      },
+      "ChargePreparationStatus": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string"
+          },
+          "chargeId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "additionalProperties": true
+      },
+      "SlotHistoryItem": {
+        "type": "object",
+        "properties": {
+          "fromSlotId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "toSlotId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "changedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "toSlotId"
+        ],
+        "additionalProperties": true
+      },
+      "QueueTicketData": {
+        "type": "object",
+        "properties": {
+          "ticketId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "appointmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "doctorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ticketType": {
+            "type": "string",
+            "enum": [
+              "FIRST",
+              "RETURN"
+            ]
+          },
+          "returnRound": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "WAITING",
+              "CALLED",
+              "CLAIMED",
+              "IN_SERVICE",
+              "NO_SHOW",
+              "DONE"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "calledAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "noShowReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ticketId",
+          "appointmentId",
+          "ticketType",
+          "state",
+          "version"
+        ],
+        "additionalProperties": true
+      },
+      "CreateSchedule": {
+        "type": "object",
+        "properties": {
+          "doctorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "serviceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "room": {
+            "type": "string",
+            "minLength": 1
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "slotMinutes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "capacityPerSlot": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "doctorId",
+          "serviceId",
+          "room",
+          "startAt",
+          "endAt",
+          "slotMinutes",
+          "capacityPerSlot"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateSchedule": {
+        "type": "object",
+        "properties": {
+          "room": {
+            "type": "string"
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "capacityPerSlot": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "CreateHold": {
+        "type": "object",
+        "properties": {
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slotId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "patientId",
+          "slotId"
+        ],
+        "additionalProperties": false
+      },
+      "CreateAppointment": {
+        "type": "object",
+        "properties": {
+          "holdId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "holdId",
+          "patientId"
+        ],
+        "additionalProperties": false
+      },
+      "RescheduleAppointment": {
+        "type": "object",
+        "properties": {
+          "newSlotId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "newSlotId",
+          "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "CancelAppointment": {
+        "type": "object",
+        "properties": {
+          "reasonCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "reasonCode",
+          "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "CheckInAppointment": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "CallNext": {
+        "type": "object",
+        "properties": {
+          "ticketType": {
+            "type": "string",
+            "enum": [
+              "FIRST",
+              "RETURN"
+            ]
+          },
+          "doctorId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "ticketType"
+        ],
+        "additionalProperties": false
+      },
+      "NoShow": {
+        "type": "object",
+        "properties": {
+          "reasonCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "reasonCode",
+          "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "SlotsAvailableResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Slot"
+                }
+              }
+            },
+            "required": [
+              "items"
+            ],
+            "additionalProperties": false
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "ScheduleResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "schedule": {
+                "$ref": "#/components/schemas/Schedule"
+              }
+            },
+            "required": [
+              "schedule"
+            ],
+            "additionalProperties": false
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "HoldResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "holdId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "HELD",
+                  "RELEASED",
+                  "EXPIRED"
+                ]
+              },
+              "slotId": {
+                "type": "string"
+              },
+              "priceSnapshot": {
+                "$ref": "#/components/schemas/PriceSnapshot"
+              }
+            },
+            "required": [
+              "holdId",
+              "expiresAt",
+              "state"
+            ],
+            "additionalProperties": false
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "HoldReleasedResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "holdId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "holdId",
+              "state"
+            ],
+            "additionalProperties": false
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "AppointmentAcceptedResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "requestId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "appointmentId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "state": {
+                "const": "PENDING_PAYMENT"
+              },
+              "statusUrl": {
+                "type": "string",
+                "format": "uri-reference"
+              }
+            },
+            "required": [
+              "requestId",
+              "appointmentId",
+              "state",
+              "statusUrl"
+            ],
+            "additionalProperties": false
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "AppointmentDetailResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "appointment": {
+                "$ref": "#/components/schemas/Appointment"
+              },
+              "chargeStatus": {
+                "type": "string"
+              },
+              "refundStatus": {
+                "type": "string"
+              },
+              "chargeSync": {
+                "$ref": "#/components/schemas/ChargePreparationStatus"
+              }
+            },
+            "required": [
+              "appointment",
+              "chargeStatus",
+              "refundStatus",
+              "chargeSync"
+            ],
+            "additionalProperties": false
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "AppointmentListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Appointment"
+                }
+              },
+              "total": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "items",
+              "total"
+            ],
+            "additionalProperties": false
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "AppointmentRescheduledResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "appointment": {
+                "$ref": "#/components/schemas/Appointment"
+              },
+              "slotHistory": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/SlotHistoryItem"
+                }
+              }
+            },
+            "required": [
+              "appointment",
+              "slotHistory"
+            ],
+            "additionalProperties": false
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "AppointmentCancelledResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "appointmentId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "state": {
+                "type": "string"
+              },
+              "refundStatus": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "appointmentId",
+              "state",
+              "refundStatus"
+            ],
+            "additionalProperties": false
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "CheckInResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "appointmentId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "state": {
+                "type": "string"
+              },
+              "ticket": {
+                "$ref": "#/components/schemas/QueueTicketData"
+              }
+            },
+            "required": [
+              "appointmentId",
+              "state",
+              "ticket"
+            ],
+            "additionalProperties": false
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "QueueListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/QueueTicketData"
+                }
+              },
+              "total": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "items",
+              "total"
+            ],
+            "additionalProperties": false
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "CallNextResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "ticket": {
+                "$ref": "#/components/schemas/QueueTicketData"
+              }
+            },
+            "required": [
+              "ticket"
+            ],
+            "additionalProperties": false
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "NoShowResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "ticketId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "ticketId",
+              "state"
+            ],
+            "additionalProperties": false
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "SummaryResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "booked": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "cancelled": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "checkedIn": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "completed": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "asOf": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "booked",
+              "cancelled",
+              "checkedIn",
+              "completed",
+              "asOf"
+            ],
+            "additionalProperties": false
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
       }
     }
   }

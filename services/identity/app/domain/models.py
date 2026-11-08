@@ -182,6 +182,7 @@ class IdempotencyRecord(models.Model):
     def __str__(self):
         return f"Idempotency {self.scope}/{self.key}"
 
+
 class IdentityEventOutbox(models.Model):
     """Bảng outbox cho Identity: phát sự kiện IdentityAccessChanged."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -201,3 +202,15 @@ class IdentityEventOutbox(models.Model):
     def __str__(self):
         return f"IdentityEventOutbox {self.event_type} [{self.id}] pub={bool(self.published_at)}"
 
+
+class IdentityOutbox(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    aggregate_id = models.UUIDField()
+    version = models.PositiveBigIntegerField()
+    envelope = models.JSONField()
+    published_at = models.DateTimeField(null=True)
+    attempts = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["aggregate_id", "version"], name="uq_identity_access_version")]

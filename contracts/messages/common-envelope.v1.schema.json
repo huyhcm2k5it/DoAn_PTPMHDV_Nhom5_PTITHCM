@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:umc-care:common-envelope:v1",
+  "title": "UMC Care v1 12-field Message Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "messageId",
+    "messageKind",
+    "messageType",
+    "schemaVersion",
+    "producer",
+    "aggregateId",
+    "aggregateVersion",
+    "correlationId",
+    "causationId",
+    "requestId",
+    "occurredAt",
+    "payload"
+  ],
+  "properties": {
+    "messageId": { "type": "string", "format": "uuid" },
+    "messageKind": { "type": "string", "enum": ["COMMAND", "EVENT"] },
+    "messageType": { "type": "string", "minLength": 1 },
+    "schemaVersion": { "const": 1 },
+    "producer": {
+      "type": "string",
+      "enum": [
+        "identity",
+        "patient",
+        "appointment",
+        "catalog",
+        "clinical",
+        "diagnostic",
+        "pharmacy",
+        "billing",
+        "notification"
+      ]
+    },
+    "aggregateId": { "type": "string", "format": "uuid" },
+    "aggregateVersion": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "correlationId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "causationId": { "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] },
+    "requestId": { "anyOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "payload": { "type": "object" }
+  }
+}

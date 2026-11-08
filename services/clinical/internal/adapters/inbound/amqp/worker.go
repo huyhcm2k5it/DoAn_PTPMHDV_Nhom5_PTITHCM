@@ -88,7 +88,7 @@ func DeclareOwned(ch *amqp.Channel) error {
 			return e
 		}
 	}
-	if _, e := ch.QueueDeclare("evt.clinical.v1", true, false, false, false, nil); e != nil {
+	if _, e := ch.QueueDeclare("evt.clinical.v1", true, false, false, false, amqp.Table{"x-queue-type":"quorum"}); e != nil {
 		return e
 	}
 	for _, binding := range [][2]string{{"umc.events.catalog.v1", "catalog.catalog-changed.v1"}, {"umc.events.diagnostic.v1", "lab.order-resolved.v1"}, {"umc.events.diagnostic.v1", "diagnostic.lab-result-published.v1"}, {"umc.events.diagnostic.v1", "diagnostic.lab-cancelled.v1"}, {"umc.events.appointment.v1", "appointment.queue-ticket-claimed.v1"}, {"umc.events.identity.v1", "identity.identity-access-changed.v1"}, {"umc.events.patient.v1", "patient.patient-access-changed.v1"}} {
@@ -96,7 +96,7 @@ func DeclareOwned(ch *amqp.Channel) error {
 			return e
 		}
 	}
-	if _, e := ch.QueueDeclare("dlq.clinical.v1", true, false, false, false, nil); e != nil {
+	if _, e := ch.QueueDeclare("dlq.clinical.v1", true, false, false, false, amqp.Table{"x-queue-type":"quorum"}); e != nil {
 		return e
 	}
 	return ch.QueueBind("dlq.clinical.v1", "clinical.quarantine.v1", "umc.deadletters.clinical.v1", false, nil)

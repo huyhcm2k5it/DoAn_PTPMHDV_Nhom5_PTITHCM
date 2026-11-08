@@ -1,0 +1,2215 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "UMC Care identity",
+    "version": "v5.2-be-20261108",
+    "description": "Normative API86 baseline reconciled with concrete DTOs. This is a local contract, not evidence that runtime conforms. Recovery adapters remain disabled."
+  },
+  "paths": {
+    "/api/v1/auth/register": {
+      "post": {
+        "operationId": "IA_001",
+        "summary": "Tạo tài khoản PATIENT từ số điện thoại chưa đăng ký và phát OTP xác minh. Tài khoản chưa xác minh không được đăng nhập.",
+        "x-actor-policy": "PATIENT (chưa đăng nhập)",
+        "security": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409."
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Hoàn tất thao tác tạo tài khoản và otp đăng ký. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "userId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "otpExpiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "userId",
+                        "status",
+                        "otpExpiresAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "409": {
+            "description": "PHONE_ALREADY_REGISTERED: Số điện thoại đã có tài khoản.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "PHONE_ALREADY_REGISTERED"
+            ]
+          },
+          "429": {
+            "description": "RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "RATE_LIMITED"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "description": "Số điện thoại dùng định danh hoặc tra cứu tài khoản; server chuẩn hóa trước khi so khớp."
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "Mật khẩu người dùng; chỉ truyền qua HTTPS, không ghi log hoặc trả lại trong response."
+                  }
+                },
+                "required": [
+                  "phone",
+                  "password"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/otp/verify": {
+      "post": {
+        "operationId": "IA_002",
+        "summary": "Kiểm OTP theo purpose, giới hạn thời hạn và số lần thử; đánh dấu đã dùng trước khi kích hoạt tài khoản hoặc cho phép đặt lại mật khẩu.",
+        "x-actor-policy": "PATIENT (chưa đăng nhập)",
+        "security": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hoàn tất thao tác xác minh otp theo purpose. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "verified": {
+                          "type": "boolean"
+                        },
+                        "status": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "verified",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "409": {
+            "description": "OTP_EXPIRED: OTP đã quá hạn.; OTP_ALREADY_USED: OTP đã được dùng.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "OTP_EXPIRED",
+              "OTP_ALREADY_USED"
+            ]
+          },
+          "429": {
+            "description": "RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "RATE_LIMITED"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "description": "Số điện thoại dùng định danh hoặc tra cứu tài khoản; server chuẩn hóa trước khi so khớp."
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "enum": [
+                      "REGISTER",
+                      "RESET"
+                    ],
+                    "description": "Mục đích OTP để server kiểm đúng luồng REGISTER hoặc RESET."
+                  },
+                  "otpCode": {
+                    "type": "string",
+                    "description": "Mã OTP người dùng nhập; chỉ hợp lệ một lần trong thời hạn do Identity quản lý."
+                  }
+                },
+                "required": [
+                  "phone",
+                  "purpose",
+                  "otpCode"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/otp/resend": {
+      "post": {
+        "operationId": "IA_003",
+        "summary": "Gửi lại OTP cho đúng purpose khi hết thời gian chờ; áp dụng rate limit và vô hiệu mã cũ theo chính sách Identity.",
+        "x-actor-policy": "PATIENT (chưa đăng nhập)",
+        "security": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hoàn tất thao tác gửi lại otp có rate limit. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "accepted": {
+                          "type": "boolean"
+                        },
+                        "retryAfterSeconds": {
+                          "type": "integer",
+                          "format": "int32"
+                        }
+                      },
+                      "required": [
+                        "accepted",
+                        "retryAfterSeconds"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "409": {
+            "description": "OTP_NOT_RESENDABLE_YET: Chưa hết thời gian chờ để gửi lại OTP.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "OTP_NOT_RESENDABLE_YET"
+            ]
+          },
+          "429": {
+            "description": "RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "RATE_LIMITED"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "description": "Số điện thoại dùng định danh hoặc tra cứu tài khoản; server chuẩn hóa trước khi so khớp."
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "enum": [
+                      "REGISTER",
+                      "RESET"
+                    ],
+                    "description": "Mục đích OTP để server kiểm đúng luồng REGISTER hoặc RESET."
+                  }
+                },
+                "required": [
+                  "phone",
+                  "purpose"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "IA_004",
+        "summary": "Xác thực tài khoản và mật khẩu, trả access token cùng phiên refresh. Capability của STAFF do Identity cấp theo cấu hình hiện tại.",
+        "x-actor-policy": "chưa đăng nhập; không giới hạn PATIENT",
+        "security": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hoàn tất thao tác đăng nhập cho cả ba actor. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "accessToken": {
+                          "type": "string"
+                        },
+                        "refreshToken": {
+                          "type": "string"
+                        },
+                        "actorType": {
+                          "type": "string"
+                        },
+                        "expiresInSeconds": {
+                          "type": "integer",
+                          "format": "int32"
+                        }
+                      },
+                      "required": [
+                        "accessToken",
+                        "refreshToken",
+                        "actorType",
+                        "expiresInSeconds"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHENTICATED"
+            ]
+          },
+          "429": {
+            "description": "RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "RATE_LIMITED"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "description": "Số điện thoại dùng định danh hoặc tra cứu tài khoản; server chuẩn hóa trước khi so khớp."
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "Mật khẩu người dùng; chỉ truyền qua HTTPS, không ghi log hoặc trả lại trong response."
+                  }
+                },
+                "required": [
+                  "phone",
+                  "password"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "operationId": "IA_005",
+        "summary": "Kiểm refresh token còn hiệu lực, xoay vòng phiên và cấp access token mới; refresh token đã thu hồi phải bị từ chối.",
+        "x-actor-policy": "PATIENT/DOCTOR/STAFF",
+        "security": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hoàn tất thao tác đổi access token. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "accessToken": {
+                          "type": "string"
+                        },
+                        "refreshToken": {
+                          "type": "string"
+                        },
+                        "expiresInSeconds": {
+                          "type": "integer",
+                          "format": "int32"
+                        }
+                      },
+                      "required": [
+                        "accessToken",
+                        "refreshToken",
+                        "expiresInSeconds"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "401": {
+            "description": "INVALID_REFRESH_TOKEN: Refresh token không hợp lệ, hết hạn hoặc đã bị thu hồi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "INVALID_REFRESH_TOKEN"
+            ]
+          },
+          "429": {
+            "description": "RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "RATE_LIMITED"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "refreshToken": {
+                    "type": "string",
+                    "description": "Refresh token còn hiệu lực dùng đổi access token hoặc đăng xuất phiên."
+                  }
+                },
+                "required": [
+                  "refreshToken"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "IA_006",
+        "summary": "Thu hồi phiên refresh của người gọi để không thể dùng lại; client xóa token cục bộ sau phản hồi.",
+        "x-actor-policy": "PATIENT/DOCTOR/STAFF",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hoàn tất thao tác thu hồi phiên. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "revoked": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "revoked"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHENTICATED"
+            ]
+          },
+          "403": {
+            "description": "FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "refreshToken": {
+                    "type": "string",
+                    "description": "Refresh token còn hiệu lực dùng đổi access token hoặc đăng xuất phiên."
+                  }
+                },
+                "required": [
+                  "refreshToken"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password/forgot": {
+      "post": {
+        "operationId": "IA_007",
+        "summary": "Phát OTP cho luồng quên mật khẩu với phản hồi không tiết lộ số điện thoại có tài khoản hay không.",
+        "x-actor-policy": "PATIENT (chưa đăng nhập)",
+        "security": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hoàn tất thao tác xin otp đặt lại mật khẩu. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "accepted": {
+                          "type": "boolean"
+                        },
+                        "retryAfterSeconds": {
+                          "type": "integer",
+                          "format": "int32"
+                        }
+                      },
+                      "required": [
+                        "accepted",
+                        "retryAfterSeconds"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "429": {
+            "description": "RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "RATE_LIMITED"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "description": "Số điện thoại dùng định danh hoặc tra cứu tài khoản; server chuẩn hóa trước khi so khớp."
+                  }
+                },
+                "required": [
+                  "phone"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password/reset": {
+      "post": {
+        "operationId": "IA_008",
+        "summary": "Kiểm OTP đặt lại mật khẩu, tiêu thụ mã một lần và lưu mật khẩu mới bằng bộ băm an toàn.",
+        "x-actor-policy": "PATIENT (chưa đăng nhập)",
+        "security": [],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hoàn tất thao tác đặt lại bằng otp. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "changed": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "changed"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "409": {
+            "description": "OTP_EXPIRED: OTP đã quá hạn.; OTP_ALREADY_USED: OTP đã được dùng.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "OTP_EXPIRED",
+              "OTP_ALREADY_USED"
+            ]
+          },
+          "429": {
+            "description": "RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "RATE_LIMITED"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "description": "Số điện thoại dùng định danh hoặc tra cứu tài khoản; server chuẩn hóa trước khi so khớp."
+                  },
+                  "otpCode": {
+                    "type": "string",
+                    "description": "Mã OTP người dùng nhập; chỉ hợp lệ một lần trong thời hạn do Identity quản lý."
+                  },
+                  "newPassword": {
+                    "type": "string",
+                    "description": "Mật khẩu mới sau xác minh OTP hoặc mật khẩu hiện tại."
+                  }
+                },
+                "required": [
+                  "phone",
+                  "otpCode",
+                  "newPassword"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password": {
+      "put": {
+        "operationId": "IA_009",
+        "summary": "Kiểm mật khẩu hiện tại rồi đổi sang mật khẩu mới; thu hồi các phiên theo chính sách Identity.",
+        "x-actor-policy": "PATIENT/DOCTOR/STAFF",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hoàn tất thao tác đổi mật khẩu. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "changed": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "changed"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHENTICATED"
+            ]
+          },
+          "403": {
+            "description": "FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "409": {
+            "description": "CURRENT_PASSWORD_MISMATCH: Mật khẩu hiện tại không khớp.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "CURRENT_PASSWORD_MISMATCH"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "currentPassword": {
+                    "type": "string",
+                    "description": "Mật khẩu hiện tại để xác nhận người đang đổi mật khẩu."
+                  },
+                  "newPassword": {
+                    "type": "string",
+                    "description": "Mật khẩu mới sau xác minh OTP hoặc mật khẩu hiện tại."
+                  }
+                },
+                "required": [
+                  "currentPassword",
+                  "newPassword"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/session": {
+      "get": {
+        "operationId": "IA_010",
+        "summary": "Trả actor, userId, capability và scope hiện tại cho client; authorization lease ngắn dùng cho thao tác nhạy cảm.",
+        "x-actor-policy": "PATIENT/DOCTOR/STAFF",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Hoàn tất thao tác phiên/quyền và authorization lease ký tối đa 30 giây cho thao tác nhạy cảm. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "userId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "actorType": {
+                          "type": "string"
+                        },
+                        "capabilities": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/CapabilityAssignment"
+                          }
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "authorizationLease": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "userId",
+                        "actorType",
+                        "capabilities",
+                        "expiresAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHENTICATED"
+            ]
+          },
+          "403": {
+            "description": "FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    },
+    "/api/v1/admin/staff": {
+      "get": {
+        "operationId": "IA_011",
+        "summary": "ADMIN phân trang danh sách tài khoản STAFF cùng capability và scope để quản lý phân quyền.",
+        "x-actor-policy": "STAFF[ADMIN]",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "description": "Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema."
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "description": "Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema."
+            }
+          },
+          {
+            "name": "departmentId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "ID khoa dùng lọc bác sĩ, dịch vụ hoặc tài khoản theo ngữ cảnh API."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hoàn tất thao tác danh sách nhân viên và scope. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/StaffAccount"
+                          }
+                        },
+                        "total": {
+                          "type": "integer",
+                          "format": "int32"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "total"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHENTICATED"
+            ]
+          },
+          "403": {
+            "description": "FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    },
+    "/api/v1/admin/staff/{staffId}/roles": {
+      "put": {
+        "operationId": "IA_012",
+        "summary": "ADMIN cập nhật capability/scope của một STAFF theo expectedVersion; cấm thu hồi ADMIN cuối cùng và ghi audit.",
+        "x-actor-policy": "STAFF[ADMIN]",
+        "security": [
+          {
+            "BearerAuth": [],
+            "AuthorizationLease": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "staffId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "ID tài khoản nhân viên cần xem hoặc cập nhật quyền."
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hoàn tất thao tác gán vai trò và khoa. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "staffId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "version": {
+                          "type": "integer",
+                          "format": "int32"
+                        },
+                        "capabilities": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/CapabilityAssignment"
+                          }
+                        }
+                      },
+                      "required": [
+                        "staffId",
+                        "version",
+                        "capabilities"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ]
+          },
+          "403": {
+            "description": "FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "404": {
+            "description": "NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "NOT_FOUND"
+            ]
+          },
+          "409": {
+            "description": "STAFF_VERSION_CONFLICT: Quyền STAFF đã đổi kể từ phiên bản client đọc.; LAST_ADMIN_REQUIRED: Không được thu hồi ADMIN cuối cùng.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "STAFF_VERSION_CONFLICT",
+              "LAST_ADMIN_REQUIRED"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        },
+        "x-authorization-lease": {
+          "action": "IA-012",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "capabilities": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/CapabilityAssignment"
+                    },
+                    "description": "Danh sách capability được cấp/thu hồi cho STAFF; mỗi phần tử có capability, scopeKey, enabled."
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "format": "int32",
+                    "description": "Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409."
+                  }
+                },
+                "required": [
+                  "capabilities",
+                  "expectedVersion"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/audit": {
+      "get": {
+        "operationId": "IA_013",
+        "summary": "ADMIN tra cứu nhật ký thao tác nhạy cảm theo thời gian, actor và hành động; chỉ trả dữ liệu được phép xem.",
+        "x-actor-policy": "STAFF[ADMIN]",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Mốc bắt đầu khoảng tra cứu theo thời gian của API, bao gồm mốc này."
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Mốc kết thúc khoảng tra cứu theo thời gian của API, không bao gồm mốc này."
+            }
+          },
+          {
+            "name": "actorUserId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "ID người thực hiện được lọc trong nhật ký kiểm toán."
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Tên hành động cần lọc trong nhật ký kiểm toán."
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "description": "Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema."
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "description": "Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hoàn tất thao tác tra cứu thao tác nhạy cảm. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/AuditEvent"
+                          }
+                        },
+                        "total": {
+                          "type": "integer",
+                          "format": "int32"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "total"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHENTICATED"
+            ]
+          },
+          "403": {
+            "description": "FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    },
+    "/api/v1/internal/users/resolve": {
+      "get": {
+        "operationId": "IA_014",
+        "summary": "Adapter phục hồi nội bộ phân giải userId theo số điện thoại khi tái tạo projection; tắt khỏi Gateway và demo chính.",
+        "x-actor-policy": "SERVICE[Patient]; luồng quầy chuẩn dùng account projection/proof, không gọi chuỗi HTTP",
+        "security": [
+          {
+            "ServiceAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "phone",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Số điện thoại dùng định danh hoặc tra cứu tài khoản; server chuẩn hóa trước khi so khớp."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hoàn tất thao tác adapter phục hồi tắt mặc định. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "userId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "verified": {
+                          "type": "boolean"
+                        },
+                        "status": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "userId",
+                        "verified",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHENTICATED"
+            ]
+          },
+          "403": {
+            "description": "FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        },
+        "x-enabled-by-default": false,
+        "x-visibility": "private",
+        "x-owner-evidence-required": true
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "error",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "Meta": {
+        "type": "object",
+        "properties": {
+          "correlationId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "correlationId"
+        ],
+        "additionalProperties": false
+      },
+      "AuditEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actorUserId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "action": {
+            "type": "string"
+          },
+          "targetId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "detail": {
+            "$ref": "#/components/schemas/AuditDetail"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "actorUserId",
+          "action",
+          "targetId",
+          "detail",
+          "correlationId",
+          "at"
+        ],
+        "additionalProperties": false,
+        "x-schema-source": "Actual service DTOs/models; API86 v5.2 field-level CSV and ERD v5. See local HTTP contract evidence."
+      },
+      "AuditDetail": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "type": "string"
+          },
+          "via": {
+            "type": "string"
+          },
+          "actorType": {
+            "type": "string"
+          },
+          "failedAttempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CapabilityAssignment"
+            }
+          }
+        },
+        "required": [],
+        "additionalProperties": false,
+        "x-schema-source": "Actual service DTOs/models; API86 v5.2 field-level CSV and ERD v5. See local HTTP contract evidence."
+      },
+      "CapabilityAssignment": {
+        "type": "object",
+        "properties": {
+          "capability": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "RECEPTION",
+              "CASHIER",
+              "LAB_TECH",
+              "LAB_REVIEW",
+              "PHARMACY"
+            ]
+          },
+          "scopeKey": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "capability",
+          "scopeKey",
+          "enabled"
+        ],
+        "additionalProperties": false,
+        "x-schema-source": "Actual service DTOs/models; API86 v5.2 field-level CSV and ERD v5. See local HTTP contract evidence."
+      },
+      "StaffAccount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "actorType": {
+            "type": "string",
+            "enum": [
+              "STAFF"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CapabilityAssignment"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "phone",
+          "actorType",
+          "status",
+          "version",
+          "capabilities"
+        ],
+        "additionalProperties": false,
+        "x-schema-source": "Actual service DTOs/models; API86 v5.2 field-level CSV and ERD v5. See local HTTP contract evidence."
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "x-token-type": "access"
+      },
+      "ServiceAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "x-token-type": "service"
+      },
+      "AuthorizationLease": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Authorization-Lease",
+        "description": "Signed lease bound to canonical API-ID, maximum 30 seconds; no expiration leeway."
+      }
+    }
+  }
+}

@@ -40,7 +40,7 @@
         "security": [],
         "responses": {
           "400": {
-            "description": "Invalid input",
+            "description": "VALIDATION_ERROR: Invalid input",
             "headers": {
               "X-Correlation-ID": {
                 "description": "Correlation ID for this response",
@@ -58,7 +58,7 @@
             }
           },
           "503": {
-            "description": "Database or required Identity verification unavailable",
+            "description": "SERVICE_UNAVAILABLE: Database or required Identity verification unavailable",
             "headers": {
               "X-Correlation-ID": {
                 "description": "Correlation ID for this response",
@@ -153,7 +153,7 @@
         "security": [],
         "responses": {
           "400": {
-            "description": "Invalid input",
+            "description": "VALIDATION_ERROR: Invalid input",
             "headers": {
               "X-Correlation-ID": {
                 "description": "Correlation ID for this response",
@@ -171,7 +171,7 @@
             }
           },
           "503": {
-            "description": "Database or required Identity verification unavailable",
+            "description": "SERVICE_UNAVAILABLE: Database or required Identity verification unavailable",
             "headers": {
               "X-Correlation-ID": {
                 "description": "Correlation ID for this response",
@@ -252,7 +252,7 @@
         "security": [],
         "responses": {
           "400": {
-            "description": "Invalid input",
+            "description": "VALIDATION_ERROR: Invalid input",
             "headers": {
               "X-Correlation-ID": {
                 "description": "Correlation ID for this response",
@@ -270,7 +270,7 @@
             }
           },
           "503": {
-            "description": "Database or required Identity verification unavailable",
+            "description": "SERVICE_UNAVAILABLE: Database or required Identity verification unavailable",
             "headers": {
               "X-Correlation-ID": {
                 "description": "Correlation ID for this response",
@@ -346,7 +346,7 @@
         ],
         "responses": {
           "400": {
-            "description": "Invalid input",
+            "description": "VALIDATION_ERROR: Invalid input",
             "headers": {
               "X-Correlation-ID": {
                 "description": "Correlation ID for this response",
@@ -364,7 +364,7 @@
             }
           },
           "503": {
-            "description": "Database or required Identity verification unavailable",
+            "description": "SERVICE_UNAVAILABLE: Database or required Identity verification unavailable",
             "headers": {
               "X-Correlation-ID": {
                 "description": "Correlation ID for this response",
@@ -382,7 +382,7 @@
             }
           },
           "401": {
-            "description": "Missing, invalid or expired bearer",
+            "description": "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: Missing, invalid or expired bearer or lease",
             "headers": {
               "X-Correlation-ID": {
                 "description": "Correlation ID for this response",
@@ -400,7 +400,7 @@
             }
           },
           "403": {
-            "description": "Insufficient current permission or authorization lease",
+            "description": "FORBIDDEN: Insufficient current permission or authorization lease",
             "headers": {
               "X-Correlation-ID": {
                 "description": "Correlation ID for this response",
@@ -453,6 +453,13 @@
               }
             }
           }
+        },
+        "x-authorization-lease": {
+          "action": "CA-004",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
         },
         "requestBody": {
           "required": true,
@@ -523,7 +530,7 @@
         ],
         "responses": {
           "400": {
-            "description": "Invalid input",
+            "description": "VALIDATION_ERROR: Invalid input",
             "headers": {
               "X-Correlation-ID": {
                 "description": "Correlation ID for this response",
@@ -541,7 +548,7 @@
             }
           },
           "503": {
-            "description": "Database or required Identity verification unavailable",
+            "description": "SERVICE_UNAVAILABLE: Database or required Identity verification unavailable",
             "headers": {
               "X-Correlation-ID": {
                 "description": "Correlation ID for this response",
@@ -559,7 +566,7 @@
             }
           },
           "401": {
-            "description": "Missing, invalid or expired bearer",
+            "description": "UNAUTHENTICATED: Missing, invalid or expired bearer",
             "headers": {
               "X-Correlation-ID": {
                 "description": "Correlation ID for this response",
@@ -577,7 +584,7 @@
             }
           },
           "403": {
-            "description": "Insufficient current permission or authorization lease",
+            "description": "FORBIDDEN: Insufficient current permission or authorization lease",
             "headers": {
               "X-Correlation-ID": {
                 "description": "Correlation ID for this response",
@@ -665,7 +672,7 @@
         ],
         "responses": {
           "400": {
-            "description": "Invalid input",
+            "description": "VALIDATION_ERROR: Invalid input",
             "headers": {
               "X-Correlation-ID": {
                 "description": "Correlation ID for this response",
@@ -683,7 +690,7 @@
             }
           },
           "503": {
-            "description": "Database or required Identity verification unavailable",
+            "description": "SERVICE_UNAVAILABLE: Database or required Identity verification unavailable",
             "headers": {
               "X-Correlation-ID": {
                 "description": "Correlation ID for this response",
@@ -701,7 +708,7 @@
             }
           },
           "401": {
-            "description": "Missing, invalid or expired bearer",
+            "description": "UNAUTHENTICATED: Missing, invalid or expired bearer",
             "headers": {
               "X-Correlation-ID": {
                 "description": "Correlation ID for this response",
@@ -719,7 +726,7 @@
             }
           },
           "403": {
-            "description": "Insufficient current permission or authorization lease",
+            "description": "FORBIDDEN: Insufficient current permission or authorization lease",
             "headers": {
               "X-Correlation-ID": {
                 "description": "Correlation ID for this response",

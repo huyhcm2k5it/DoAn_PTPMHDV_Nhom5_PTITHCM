@@ -1,0 +1,2605 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "UMC Care billing",
+    "version": "v5.2-be-20261108",
+    "description": "Normative API86 baseline reconciled with concrete DTOs. This is a local contract, not evidence that runtime conforms. Recovery adapters remain disabled."
+  },
+  "paths": {
+    "/api/v1/charges": {
+      "post": {
+        "operationId": "BI_001",
+        "summary": "Adapter phục hồi nội bộ dựng charge từ nguồn đã đối soát; luồng chính nhận RequestCharge qua RabbitMQ.",
+        "x-actor-policy": "SERVICE owner nguồn; luồng chuẩn dùng RequestCharge và ChargePrepared",
+        "security": [
+          {
+            "ServiceAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409."
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Hoàn tất thao tác adapter phục hồi tắt mặc định. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "charge": {
+                          "$ref": "#/components/schemas/Charge"
+                        }
+                      },
+                      "required": [
+                        "charge"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHENTICATED"
+            ]
+          },
+          "403": {
+            "description": "FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "404": {
+            "description": "NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "NOT_FOUND"
+            ]
+          },
+          "409": {
+            "description": "STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "STATE_CONFLICT"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        },
+        "x-enabled-by-default": false,
+        "x-visibility": "private",
+        "x-owner-evidence-required": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sourceType": {
+                    "type": "string",
+                    "enum": [
+                      "APPOINTMENT",
+                      "LAB_ORDER",
+                      "MED_HOLD"
+                    ],
+                    "description": "Loại nguồn charge: APPOINTMENT, LAB_ORDER hoặc MED_HOLD."
+                  },
+                  "sourceId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "ID tài nguyên nguồn của charge hoặc refund, không phải ID bản ghi Billing."
+                  },
+                  "sourceRevision": {
+                    "type": "integer",
+                    "format": "int32",
+                    "description": "Revision/attempt của nguồn để khóa giao dịch và chống áp dụng tiền cho phiên bản cũ."
+                  },
+                  "amountVnd": {
+                    "type": "integer",
+                    "format": "int64",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Số tiền nguyên VND của giá, charge hoặc refund theo operation; không dùng số thực."
+                  },
+                  "priceSnapshot": {
+                    "$ref": "#/components/schemas/RecoveryPriceSnapshot",
+                    "description": "Snapshot giá đã được owner nguồn xác nhận; adapter nội bộ tắt trong luồng demo chuẩn."
+                  },
+                  "patientId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "ID hồ sơ bệnh nhân; server kiểm quyền chủ sở hữu hoặc capability tương ứng."
+                  }
+                },
+                "required": [
+                  "sourceType",
+                  "sourceId",
+                  "sourceRevision",
+                  "amountVnd",
+                  "priceSnapshot",
+                  "patientId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "BI_013",
+        "summary": "CASHIER xem charge theo trạng thái và ngày để xử lý thu tại quầy, tránh bỏ sót khoản còn chờ.",
+        "x-actor-policy": "STAFF[CASHIER]",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Trạng thái dùng lọc danh sách; giá trị phải thuộc state machine của tài nguyên."
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Mốc bắt đầu khoảng tra cứu theo thời gian của API, bao gồm mốc này."
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Mốc kết thúc khoảng tra cứu theo thời gian của API, không bao gồm mốc này."
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "description": "Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema."
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "description": "Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hoàn tất thao tác hàng chờ thu theo trạng thái/ngày. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Charge"
+                          }
+                        },
+                        "total": {
+                          "type": "integer",
+                          "format": "int32"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "total"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHENTICATED"
+            ]
+          },
+          "403": {
+            "description": "FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    },
+    "/api/v1/charges/{chargeId}": {
+      "get": {
+        "operationId": "BI_002",
+        "summary": "Billing trả charge cùng latestPayment, saga và refundState; chỉ coi đã thu khi payment SUCCEEDED.",
+        "x-actor-policy": "PATIENT/STAFF[CASHIER]",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chargeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "ID khoản thu do Billing sở hữu."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hoàn tất thao tác khoản thu cùng latestpayment/saga/refundstate theo quyền. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "charge": {
+                          "$ref": "#/components/schemas/Charge"
+                        },
+                        "latestPayment": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/Payment"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "saga": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/components/schemas/SettlementSagaStatus"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "refundState": {
+                          "type": "string"
+                        },
+                        "receiptId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "charge",
+                        "latestPayment",
+                        "saga",
+                        "refundState",
+                        "receiptId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHENTICATED"
+            ]
+          },
+          "403": {
+            "description": "FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "404": {
+            "description": "NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "NOT_FOUND"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    },
+    "/api/v1/patients/{patientId}/charges": {
+      "get": {
+        "operationId": "BI_003",
+        "summary": "Trả các khoản thu của hồ sơ theo quyền để người bệnh xem phí khám, xét nghiệm và thuốc.",
+        "x-actor-policy": "PATIENT/STAFF[CASHIER]",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "patientId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "ID hồ sơ bệnh nhân; server kiểm quyền chủ sở hữu hoặc capability tương ứng."
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Trạng thái dùng lọc danh sách; giá trị phải thuộc state machine của tài nguyên."
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "description": "Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema."
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "description": "Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hoàn tất thao tác các khoản thu của hồ sơ. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Charge"
+                          }
+                        },
+                        "total": {
+                          "type": "integer",
+                          "format": "int32"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "total"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHENTICATED"
+            ]
+          },
+          "403": {
+            "description": "FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "404": {
+            "description": "NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "NOT_FOUND"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    },
+    "/api/v1/payments/simulate": {
+      "post": {
+        "operationId": "BI_004",
+        "summary": "Tạo payment PENDING và saga REQUESTED; 202 chưa phải thu thành công. Poll BI-002 tới SUCCEEDED/FAILED hoặc tiếp tục IN_DOUBT.",
+        "x-actor-policy": "PATIENT",
+        "security": [
+          {
+            "BearerAuth": [],
+            "AuthorizationLease": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409."
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Đã nhận lệnh và commit local/outbox; kết quả liên service còn chờ. Client đọc Location hoặc data.statusUrl để theo dõi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "paymentId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "state": {
+                          "type": "string"
+                        },
+                        "statusUrl": {
+                          "type": "string",
+                          "format": "uri-reference"
+                        }
+                      },
+                      "required": [
+                        "requestId",
+                        "paymentId",
+                        "state",
+                        "statusUrl"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "description": "Local status resource; acceptance is not settlement success.",
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference",
+                  "pattern": "^/api/v1/"
+                }
+              }
+            },
+            "x-local-commit-only": true
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ]
+          },
+          "403": {
+            "description": "FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "404": {
+            "description": "NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "NOT_FOUND"
+            ]
+          },
+          "409": {
+            "description": "CHARGE_NOT_PAYABLE: Charge không còn ở trạng thái có thể thanh toán.; DUPLICATE_TRANSACTION: transactionId đã được dùng cho giao dịch khác.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "CHARGE_NOT_PAYABLE",
+              "DUPLICATE_TRANSACTION"
+            ]
+          },
+          "429": {
+            "description": "RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "RATE_LIMITED"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        },
+        "x-authorization-lease": {
+          "action": "BI-004",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "chargeId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "ID khoản thu do Billing sở hữu."
+                  },
+                  "transactionId": {
+                    "type": "string",
+                    "description": "Mã giao dịch bên ngoài hoặc mô phỏng; retry cùng giao dịch không được thu hai lần."
+                  }
+                },
+                "required": [
+                  "chargeId",
+                  "transactionId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/payments/counter": {
+      "post": {
+        "operationId": "BI_005",
+        "summary": "Thu tại quầy theo cùng saga, transactionId chống thu lặp; 202 chưa phải biên nhận thành công.",
+        "x-actor-policy": "STAFF[CASHIER]",
+        "security": [
+          {
+            "BearerAuth": [],
+            "AuthorizationLease": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409."
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Đã nhận lệnh và commit local/outbox; kết quả liên service còn chờ. Client đọc Location hoặc data.statusUrl để theo dõi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "requestId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "paymentId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "state": {
+                          "type": "string"
+                        },
+                        "statusUrl": {
+                          "type": "string",
+                          "format": "uri-reference"
+                        }
+                      },
+                      "required": [
+                        "requestId",
+                        "paymentId",
+                        "state",
+                        "statusUrl"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "description": "Local status resource; acceptance is not settlement success.",
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference",
+                  "pattern": "^/api/v1/"
+                }
+              }
+            },
+            "x-local-commit-only": true
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ]
+          },
+          "403": {
+            "description": "FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "404": {
+            "description": "NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "NOT_FOUND"
+            ]
+          },
+          "409": {
+            "description": "CHARGE_NOT_PAYABLE: Charge không còn ở trạng thái có thể thanh toán.; DUPLICATE_TRANSACTION: transactionId đã được dùng cho giao dịch khác.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "CHARGE_NOT_PAYABLE",
+              "DUPLICATE_TRANSACTION"
+            ]
+          },
+          "429": {
+            "description": "RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "RATE_LIMITED"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        },
+        "x-authorization-lease": {
+          "action": "BI-005",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "chargeId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "ID khoản thu do Billing sở hữu."
+                  },
+                  "transactionId": {
+                    "type": "string",
+                    "description": "Mã giao dịch bên ngoài hoặc mô phỏng; retry cùng giao dịch không được thu hai lần."
+                  },
+                  "counterReference": {
+                    "type": "string",
+                    "description": "Mã tham chiếu giao dịch tại quầy do CASHIER ghi."
+                  }
+                },
+                "required": [
+                  "chargeId",
+                  "transactionId",
+                  "counterReference"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/receipts/{receiptId}": {
+      "get": {
+        "operationId": "BI_006",
+        "summary": "Đọc biên nhận đã phát hành cho giao dịch thanh toán thành công; bệnh nhân chỉ xem biên nhận của mình, nhân viên CASHIER xem theo quyền tác vụ.",
+        "x-actor-policy": "PATIENT/STAFF[CASHIER]",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "receiptId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "ID biên nhận đã phát hành cần đọc."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hoàn tất thao tác biên nhận. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "receipt": {
+                          "$ref": "#/components/schemas/Receipt"
+                        }
+                      },
+                      "required": [
+                        "receipt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHENTICATED"
+            ]
+          },
+          "403": {
+            "description": "FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "404": {
+            "description": "NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "NOT_FOUND"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    },
+    "/api/v1/refunds": {
+      "post": {
+        "operationId": "BI_007",
+        "summary": "Tạo yêu cầu hoàn có căn cứ và kiểm tổng hoàn không vượt tiền đã thu.",
+        "x-actor-policy": "SERVICE/STAFF[CASHIER]",
+        "security": [
+          {
+            "BearerAuth": [],
+            "AuthorizationLease": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409."
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Hoàn tất thao tác yêu cầu hoàn theo căn cứ. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "refund": {
+                          "$ref": "#/components/schemas/Refund"
+                        }
+                      },
+                      "required": [
+                        "refund"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ]
+          },
+          "403": {
+            "description": "FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "404": {
+            "description": "NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "NOT_FOUND"
+            ]
+          },
+          "409": {
+            "description": "REFUND_NOT_ELIGIBLE: Không có căn cứ hoặc trạng thái phù hợp để hoàn tiền.; REFUND_EXCEEDS_PAID: Tổng hoàn dự kiến vượt số tiền thực đã thu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "REFUND_NOT_ELIGIBLE",
+              "REFUND_EXCEEDS_PAID"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        },
+        "x-authorization-lease": {
+          "action": "BI-007",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "chargeId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "ID khoản thu do Billing sở hữu."
+                  },
+                  "sourceId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Cancellation ID (C03), verified against source-owner cancellation evidence."
+                  },
+                  "reasonCode": {
+                    "type": "string",
+                    "description": "Mã lý do nghiệp vụ cho thao tác hủy, từ chối hoặc hoàn; được ghi vào audit."
+                  },
+                  "amountVnd": {
+                    "type": "integer",
+                    "format": "int64",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Số tiền nguyên VND của giá, charge hoặc refund theo operation; không dùng số thực."
+                  }
+                },
+                "required": [
+                  "chargeId",
+                  "sourceId",
+                  "reasonCode",
+                  "amountVnd"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "BI_014",
+        "summary": "CASHIER xem các yêu cầu hoàn theo trạng thái và ngày để đối soát và thực hiện hoàn mô phỏng.",
+        "x-actor-policy": "STAFF[CASHIER]",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Trạng thái dùng lọc danh sách; giá trị phải thuộc state machine của tài nguyên."
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Mốc bắt đầu khoảng tra cứu theo thời gian của API, bao gồm mốc này."
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Mốc kết thúc khoảng tra cứu theo thời gian của API, không bao gồm mốc này."
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "description": "Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema."
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "description": "Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hoàn tất thao tác hàng chờ hoàn theo trạng thái/ngày. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Refund"
+                          }
+                        },
+                        "total": {
+                          "type": "integer",
+                          "format": "int32"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "total"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHENTICATED"
+            ]
+          },
+          "403": {
+            "description": "FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    },
+    "/api/v1/refunds/{refundId}/execute": {
+      "post": {
+        "operationId": "BI_008",
+        "summary": "Adapter hoàn tiền mô phỏng trả thành công/thất bại có transactionId; không ghi SUCCEEDED khi thiếu bằng chứng.",
+        "x-actor-policy": "STAFF[CASHIER]",
+        "security": [
+          {
+            "BearerAuth": [],
+            "AuthorizationLease": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "refundId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "ID yêu cầu hoàn tiền do Billing sở hữu."
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hoàn tất thao tác thực hiện hoàn mô phỏng. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "refund": {
+                          "$ref": "#/components/schemas/Refund"
+                        }
+                      },
+                      "required": [
+                        "refund"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHENTICATED",
+              "AUTHZ_LEASE_EXPIRED"
+            ]
+          },
+          "403": {
+            "description": "FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "404": {
+            "description": "NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "NOT_FOUND"
+            ]
+          },
+          "409": {
+            "description": "REFUND_ALREADY_EXECUTED: Yêu cầu hoàn đã được thực hiện.; REFUND_EXCEEDS_PAID: Tổng hoàn dự kiến vượt số tiền thực đã thu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "REFUND_ALREADY_EXECUTED",
+              "REFUND_EXCEEDS_PAID"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        },
+        "x-authorization-lease": {
+          "action": "BI-008",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "transactionId": {
+                    "type": "string",
+                    "description": "Mã giao dịch bên ngoài hoặc mô phỏng; retry cùng giao dịch không được thu hai lần."
+                  },
+                  "scenario": {
+                    "type": "string",
+                    "enum": [
+                      "SUCCESS",
+                      "FAIL"
+                    ],
+                    "description": "Kết quả mô phỏng adapter hoàn tiền: SUCCESS hoặc FAIL."
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "format": "int32",
+                    "description": "Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409."
+                  }
+                },
+                "required": [
+                  "transactionId",
+                  "scenario",
+                  "expectedVersion"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/refunds/{refundId}": {
+      "get": {
+        "operationId": "BI_009",
+        "summary": "Trả yêu cầu hoàn cùng trạng thái và bằng chứng thực hiện để người bệnh hoặc CASHIER theo dõi.",
+        "x-actor-policy": "PATIENT/STAFF[CASHIER]",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "refundId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "ID yêu cầu hoàn tiền do Billing sở hữu."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hoàn tất thao tác trạng thái hoàn. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "refund": {
+                          "$ref": "#/components/schemas/Refund"
+                        }
+                      },
+                      "required": [
+                        "refund"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHENTICATED"
+            ]
+          },
+          "403": {
+            "description": "FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "404": {
+            "description": "NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "NOT_FOUND"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    },
+    "/api/v1/admin/reports/summary": {
+      "get": {
+        "operationId": "BI_010",
+        "summary": "ADMIN xem tổng tiền thu, hoàn và các trạng thái chưa chốt theo kỳ; response có asOf để nhận biết độ mới.",
+        "x-actor-policy": "STAFF[ADMIN]",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Mốc bắt đầu khoảng tra cứu theo thời gian của API, bao gồm mốc này."
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "description": "Mốc kết thúc khoảng tra cứu theo thời gian của API, không bao gồm mốc này."
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hoàn tất thao tác báo cáo thu/hoàn. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "receivedVnd": {
+                          "type": "integer",
+                          "format": "int64",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "refundedVnd": {
+                          "type": "integer",
+                          "format": "int64",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "asOf": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "receivedVnd",
+                        "refundedVnd",
+                        "asOf"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "meta"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "VALIDATION_ERROR"
+            ]
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "UNAUTHENTICATED"
+            ]
+          },
+          "403": {
+            "description": "FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "FORBIDDEN"
+            ]
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "x-error-codes": [
+              "SERVICE_UNAVAILABLE"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "error",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "Meta": {
+        "type": "object",
+        "properties": {
+          "correlationId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "correlationId"
+        ],
+        "additionalProperties": false
+      },
+      "Refund": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "chargeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cancellationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "amountVnd": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "REQUESTED",
+              "SUCCEEDED",
+              "FAILED"
+            ]
+          },
+          "attempts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefundAttempt"
+            }
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "chargeId",
+          "cancellationId",
+          "reasonCode",
+          "amountVnd",
+          "state",
+          "attempts",
+          "version",
+          "updatedAt"
+        ],
+        "additionalProperties": false,
+        "x-schema-source": "Actual service DTOs/models; API86 v5.2 field-level CSV and ERD v5. See local HTTP contract evidence."
+      },
+      "RefundAttempt": {
+        "type": "object",
+        "properties": {
+          "transactionId": {
+            "type": "string"
+          },
+          "scenario": {
+            "type": "string",
+            "enum": [
+              "SUCCESS",
+              "FAIL"
+            ]
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "SUCCEEDED",
+              "FAILED"
+            ]
+          },
+          "executedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "transactionId",
+          "scenario",
+          "result",
+          "executedAt"
+        ],
+        "additionalProperties": false,
+        "x-schema-source": "Actual service DTOs/models; API86 v5.2 field-level CSV and ERD v5. See local HTTP contract evidence."
+      },
+      "Receipt": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "receiptNo": {
+            "type": "string"
+          },
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "chargeId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amountVnd": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "issuedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "receiptNo",
+          "paymentId",
+          "chargeId",
+          "amountVnd",
+          "issuedAt"
+        ],
+        "additionalProperties": false,
+        "x-schema-source": "Actual service DTOs/models; API86 v5.2 field-level CSV and ERD v5. See local HTTP contract evidence."
+      },
+      "Charge": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "patientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceType": {
+            "type": "string",
+            "enum": [
+              "APPOINTMENT",
+              "LAB_ORDER",
+              "MED_HOLD"
+            ]
+          },
+          "sourceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "amountVnd": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "PAID",
+              "VOID"
+            ]
+          },
+          "settlementState": {
+            "type": "string"
+          },
+          "createdAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "priceSnapshot": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PriceLine"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "patientId",
+          "sourceType",
+          "sourceId",
+          "sourceRevision",
+          "amountVnd",
+          "state",
+          "settlementState",
+          "createdAt"
+        ],
+        "additionalProperties": false,
+        "x-schema-source": "Actual service DTOs/models; API86 v5.2 field-level CSV and ERD v5. See local HTTP contract evidence."
+      },
+      "PriceLine": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/AppointmentPriceSnapshot"
+          },
+          {
+            "$ref": "#/components/schemas/LabPriceLine"
+          },
+          {
+            "$ref": "#/components/schemas/MedicationPriceLine"
+          }
+        ],
+        "x-schema-source": "Actual service DTOs/models; API86 v5.2 field-level CSV and ERD v5. See local HTTP contract evidence."
+      },
+      "MedicationPriceLine": {
+        "type": "object",
+        "properties": {
+          "medicineId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "medicineCode": {
+            "type": "string"
+          },
+          "nameSnapshot": {
+            "type": "string"
+          },
+          "doseText": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "instruction": {
+            "type": "string"
+          },
+          "unitAmountVnd": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "priceVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "priceVersion": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "medicineId",
+          "medicineCode",
+          "quantity",
+          "unitAmountVnd",
+          "priceVersionId",
+          "priceVersion"
+        ],
+        "additionalProperties": false,
+        "x-schema-source": "Actual service DTOs/models; API86 v5.2 field-level CSV and ERD v5. See local HTTP contract evidence."
+      },
+      "LabPriceLine": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "unitPriceVnd": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "priceVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "itemId",
+          "code",
+          "name",
+          "quantity",
+          "unitPriceVnd",
+          "priceVersionId",
+          "revision"
+        ],
+        "additionalProperties": false,
+        "x-schema-source": "Actual service DTOs/models; API86 v5.2 field-level CSV and ERD v5. See local HTTP contract evidence."
+      },
+      "AppointmentPriceSnapshot": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "priceVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "priceVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "amountVnd": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "VND"
+            ]
+          },
+          "pricingAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "snapshotHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "itemId",
+          "priceVersionId",
+          "priceVersion",
+          "amountVnd",
+          "currency",
+          "pricingAt",
+          "expiresAt",
+          "snapshotHash"
+        ],
+        "additionalProperties": false,
+        "x-schema-source": "Actual service DTOs/models; API86 v5.2 field-level CSV and ERD v5. See local HTTP contract evidence."
+      },
+      "SettlementSagaStatus": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string"
+          },
+          "fence": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "fence"
+        ],
+        "additionalProperties": false,
+        "x-schema-source": "Actual service DTOs/models; API86 v5.2 field-level CSV and ERD v5. See local HTTP contract evidence."
+      },
+      "Payment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "receiptId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "transactionId": {
+            "type": "string"
+          },
+          "amountVnd": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "SUCCEEDED",
+              "FAILED",
+              "IN_DOUBT"
+            ]
+          },
+          "method": {
+            "type": "string"
+          },
+          "paidAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "receiptId",
+          "transactionId",
+          "amountVnd",
+          "state",
+          "method",
+          "paidAt"
+        ],
+        "additionalProperties": false,
+        "x-schema-source": "Actual service DTOs/models; API86 v5.2 field-level CSV and ERD v5. See local HTTP contract evidence."
+      },
+      "RecoveryPriceSnapshot": {
+        "type": "object",
+        "description": "Concrete reconciled recovery price snapshot carrying verified owner linesSnapshot and immutable 64-hex snapshotHash. Disabled by default (C08/C09).",
+        "properties": {
+          "linesSnapshot": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/PriceLine"
+            }
+          },
+          "amountVnd": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "snapshotHash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "linesSnapshot",
+          "snapshotHash"
+        ],
+        "additionalProperties": false,
+        "x-schema-source": "Actual service DTOs/models; API86 v5.2 field-level CSV and ERD v5. See local HTTP contract evidence."
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "x-token-type": "access"
+      },
+      "ServiceAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "x-token-type": "service"
+      },
+      "AuthorizationLease": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Authorization-Lease",
+        "description": "Signed lease bound to canonical API-ID, maximum 30 seconds; no expiration leeway."
+      }
+    }
+  }
+}

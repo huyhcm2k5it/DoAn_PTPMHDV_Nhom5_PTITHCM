@@ -127,7 +127,7 @@ async function createAppointment({
             message_kind: 'COMMAND',
             message_type: 'RequestCharge',
             schema_version: 1,
-            producer: 'Appointment',
+            producer: 'appointment',
             aggregate_id: appointmentId,
             aggregate_version: 1,
             correlation_id: correlationId,
@@ -408,7 +408,7 @@ async function rescheduleAppointment({
             message_kind: 'EVENT',
             message_type: 'AppointmentChanged',
             schema_version: 1,
-            producer: 'Appointment',
+            producer: 'appointment',
             aggregate_id: appointmentId,
             aggregate_version: nextVersion,
             correlation_id: correlationId,
@@ -551,7 +551,7 @@ async function cancelAppointment({
             message_kind: 'EVENT',
             message_type: 'AppointmentChanged',
             schema_version: 1,
-            producer: 'Appointment',
+            producer: 'appointment',
             aggregate_id: appointmentId,
             aggregate_version: nextVersion,
             correlation_id: correlationId,
@@ -563,6 +563,7 @@ async function cancelAppointment({
               patientId: appointment.patientId,
               recipientUserId: appointment.principalId,
               sourceRevision: appointment.sourceRevision + 1,
+              cancelledSourceRevision: appointment.sourceRevision,
               state: 'CANCELLED',
               changeType: 'CANCELLED',
               version: nextVersion,
@@ -611,3 +612,8 @@ module.exports = {
   rescheduleAppointment,
   cancelAppointment,
 };
+
+// Cache invalidation runs after successful transaction commit.
+module.exports.createAppointment = async (...args) => { const result = await createAppointment(...args); await require('../services/slot-cache.service').getSlotCache().invalidate(); return result; };
+module.exports.rescheduleAppointment = async (...args) => { const result = await rescheduleAppointment(...args); await require('../services/slot-cache.service').getSlotCache().invalidate(); return result; };
+module.exports.cancelAppointment = async (...args) => { const result = await cancelAppointment(...args); await require('../services/slot-cache.service').getSlotCache().invalidate(); return result; };

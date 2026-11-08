@@ -8,6 +8,7 @@ function createAuthContext({ verifyBearerToken } = {}) {
       const claims = await verifyBearerToken(match[1]);
       if (!claims || typeof claims.sub !== 'string' || !claims.sub.trim())
         throw new ApiError(401, 'UNAUTHENTICATED', 'Invalid token claims.');
+      if (claims.action || claims.tokenType === 'LEASE') throw new ApiError(401, 'UNAUTHENTICATED', 'Access token required.');
       const actorType = String(claims.actorType || '').toUpperCase();
       if (!['PATIENT', 'DOCTOR', 'STAFF'].includes(actorType))
         throw new ApiError(401, 'UNAUTHENTICATED', 'Invalid actor type.');

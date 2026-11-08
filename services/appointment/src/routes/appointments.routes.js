@@ -1,3 +1,4 @@
+const { requireLease } = require('../auth/lease.middleware');
 const express = require('express');
 const { createAuthContext } = require('../auth/auth.middleware.js');
 const { createAppointmentsController } = require('../controllers/appointments.controller.js');
@@ -7,10 +8,10 @@ function appointmentsRoutes(dependencies) {
   const authenticate = createAuthContext({ verifyBearerToken: dependencies.verifyBearerToken });
   const controller = createAppointmentsController(dependencies);
   const queueController = createQueueController(dependencies);
-  router.post('/', authenticate, controller.create);
-  router.post('/:appointmentId/check-in', authenticate, queueController.checkIn);
-  router.post('/:appointmentId/reschedule', authenticate, controller.reschedule);
-  router.post('/:appointmentId/cancel', authenticate, controller.cancel);
+  router.post('/', authenticate, requireLease(dependencies, 'AP-010'), controller.create);
+  router.post('/:appointmentId/check-in', authenticate, requireLease(dependencies, 'AP-015'), queueController.checkIn);
+  router.post('/:appointmentId/reschedule', authenticate, requireLease(dependencies, 'AP-013'), controller.reschedule);
+  router.post('/:appointmentId/cancel', authenticate, requireLease(dependencies, 'AP-014'), controller.cancel);
   router.get('/:appointmentId', authenticate, controller.getById);
   return router;
 }

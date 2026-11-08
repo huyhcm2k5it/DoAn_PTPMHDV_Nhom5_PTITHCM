@@ -23,6 +23,7 @@ function leaseFor(principal, action, overrides = {}) {
     aud: 'umc-care-services',
     sub: principal,
     action,
+    tokenType: 'LEASE',
     tokenVersion: 1,
     iat: now.getTime() / 1000,
     exp: now.getTime() / 1000 + 30,
@@ -119,18 +120,18 @@ async function api(t) {
   return async (path, token, init = {}) => {
     const method = init.method || 'GET';
     const action = path.startsWith('/stock/receipts')
-      ? 'PH002'
+      ? 'PH-002'
       : path.startsWith('/prescriptions/queue')
-        ? 'PH003'
+        ? 'PH-003'
         : path.startsWith('/prescriptions/')
           ? method === 'POST'
-            ? 'PH005'
-            : 'PH004'
+            ? 'PH-005'
+            : 'PH-004'
           : path.includes('/dispense')
-            ? 'PH008'
+            ? 'PH-008'
             : path.includes('/commit')
-              ? 'PH007'
-              : 'PH006';
+              ? 'PH-007'
+              : 'PH-006';
     const response = await fetch(
       'http://127.0.0.1:' + server.address().port + '/api/v1/pharmacy' + path,
       {
@@ -153,15 +154,15 @@ test('Pharmacy requires a signed lease bound to action subject version and a str
   const path = '/prescriptions/' + rx;
   for (const token of [
     '',
-    leaseFor(owner, 'PH008'),
-    leaseFor(staff, 'PH004'),
-    leaseFor(owner, 'PH004', { tokenVersion: 2 }),
-    leaseFor(owner, 'PH004', { iat: now.getTime() / 1000 - 30, exp: now.getTime() / 1000 }),
-    leaseFor(owner, 'PH004', { exp: now.getTime() / 1000 + 31 }),
+    leaseFor(owner, 'PH-008'),
+    leaseFor(staff, 'PH-004'),
+    leaseFor(owner, 'PH-004', { tokenVersion: 2 }),
+    leaseFor(owner, 'PH-004', { iat: now.getTime() / 1000 - 30, exp: now.getTime() / 1000 }),
+    leaseFor(owner, 'PH-004', { exp: now.getTime() / 1000 + 31 }),
   ]) {
     assert.equal(
       (await request(path, 'owner', { headers: { 'x-authorization-lease': token } })).status,
-      403,
+      token && JSON.parse(Buffer.from(token.split('.')[1], 'base64url')).exp <= now.getTime()/1000 ? 401 : 403,
     );
   }
   assert.equal((await request(path, 'owner')).status, 200);
@@ -278,7 +279,7 @@ test('PH-003 and PH-005..008 use actual HTTP responses validated against OpenAPI
           settlementId: hold.settlementId,
           fence: hold.fence,
           amountHash: hold.snapshotHash,
-          attemptVersion: hold.version,
+          attemptVersion: type === 'ReserveSettlement' ? (extra.settlementId && extra.settlementId !== hold.settlementId ? (hold.reserveAttemptVersion || 0) + 1 : (hold.reserveAttemptVersion || 1)) : hold.version,
           amountVnd: hold.amountVnd,
           ...extra,
         },

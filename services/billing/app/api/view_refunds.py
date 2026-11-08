@@ -7,6 +7,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from app.api import idempotency
+from app.auth.lease import require_lease, check_lease
 from app.api.querying import parse_date_param, vn_day_window
 from app.auth.jwt_auth import (
     authenticated,
@@ -80,6 +81,9 @@ def refunds_list_or_create_view(request):
     """BI-007 (POST): tạo yêu cầu hoàn tiền. BI-014 (GET): CASHIER xem hàng chờ hoàn."""
     principal = request.principal
     if request.method == "POST":
+        failure = check_lease(request, "BI-007")
+        if failure is not None:
+            return failure
         if principal.actor_type not in ("SERVICE", "STAFF"):
             return Response({
                 "error": {
@@ -156,7 +160,7 @@ def create_refund(request):
             request, "Định dạng UUID hoặc số tiền amountVnd (>=0) không hợp lệ."
         )
 
-    scope = "BI-007"
+    scope = "BI-007:" + uuid.uuid5(uuid.NAMESPACE_URL, request.principal.user_id).hex
     payload = {
         "chargeId": str(charge_uuid),
         "sourceId": str(cancellation_uuid),
@@ -223,6 +227,15 @@ def create_refund(request):
                 "data": {"refund": serialize_refund(existing_locked_refund)},
                 "meta": {"correlationId": correlation_id}
             }, status=201)
+
+        from app.domain.models import CancellationEvidence
+        evidence = CancellationEvidence.objects.filter(cancellation_id=cancellation_uuid,
+            source_type=charge.source_type, source_id=charge.source_id,
+            source_revision=charge.source_revision).first()
+        if not evidence:
+            return Response({"error": {"code": "CANCELLATION_EVIDENCE_REQUIRED",
+                "message": "Owner cancellation evidence has not synchronized."},
+                "meta": {"correlationId": correlation_id}}, status=409)
 
         # Ràng buộc 1: Chỉ cho phép hoàn khi khoản thu đã thanh toán thành công (PAID)
         if charge.state != "PAID":
@@ -338,6 +351,7 @@ def list_refunds(request):
 
 @api_view(["POST"])
 @require_staff("CASHIER")
+@require_lease("BI-008")
 def execute_refund_view(request, refund_id):
     """BI-008: Thực hiện hoàn tiền mô phỏng (SUCCESS hoặc FAIL)."""
     correlation_id = get_correlation_id(request)
@@ -367,7 +381,7 @@ def execute_refund_view(request, refund_id):
     except (ValueError, TypeError):
         return validation_error(request, "Trường expectedVersion phải là số nguyên hợp lệ.")
 
-    scope = "BI-008"
+    scope = "BI-008:" + uuid.uuid5(uuid.NAMESPACE_URL, request.principal.user_id + str(refund_id)).hex
     payload = {
         "transactionId": transaction_id,
         "scenario": scenario,
@@ -412,7 +426,7 @@ def execute_refund_view(request, refund_id):
             }, status=409)
 
         # Reject execution unless refund.state is REQUESTED (e.g. FAILED cannot later succeed)
-        if refund.state != "REQUESTED":
+        if refund.state not in ("REQUESTED", "FAILED"):
             return Response({
                 "error": {
                     "code": "REFUND_NOT_EXECUTABLE",
@@ -422,7 +436,7 @@ def execute_refund_view(request, refund_id):
             }, status=409)
 
         # Reject execution unless refund.state is REQUESTED (e.g. FAILED cannot later succeed)
-        if refund.state != "REQUESTED":
+        if refund.state not in ("REQUESTED", "FAILED"):
             return Response({
                 "error": {
                     "code": "REFUND_NOT_EXECUTABLE",
@@ -477,19 +491,17 @@ def execute_refund_view(request, refund_id):
             refund.version += 1
             refund.save()
 
-            BillingEventOutbox.objects.create(
-                event_type="RefundSucceeded",
-                exchange="billing.events.v1",
-                routing_key="billing.refund-succeeded.v1",
-                payload={
-                    "refundId": str(refund.id),
-                    "chargeId": str(charge.id),
-                    "cancellationId": str(refund.cancellation_id),
-                    "amountVnd": refund.amount_vnd,
-                    "transactionId": transaction_id,
-                    "settledAt": timezone.now().isoformat()
-                }
-            )
+            from app.infrastructure.message_delivery import make_envelope
+            charge.version += 1
+            charge.save(update_fields=["version", "updated_at"])
+            status_payload = {"chargeId": str(charge.id), "recipientUserId": str(charge.recipient_user_id) if charge.recipient_user_id else None,
+                "refundId": str(refund.id), "state": "REFUNDED", "version": charge.version,
+                "sourceType": charge.source_type, "sourceId": str(charge.source_id),
+                "refundStatus": refund.state, "asOf": timezone.now().isoformat()}
+            BillingEventOutbox.objects.create(event_type="BillingStatusChanged",
+                exchange="umc.events.billing.v1", routing_key="billing.billing-status-changed.v1",
+                payload=make_envelope("BillingStatusChanged",status_payload,charge.id,refund.version))
+
         else:
             refund.state = "FAILED"
             refund.attempts.append({

@@ -10,7 +10,7 @@ async function publishPatientOutboxBatch({
   workerId = randomUUID(),
 }) {
   if (!channel || typeof channel.publish !== 'function') throw new Error('RabbitMQ confirm channel is required.');
-  const records = await connection.collection('outbox').find({ message_type: 'PatientAccessChanged', published_at: null, $or: [{ claim_lease_until: null }, { claim_lease_until: { $lte: now } }] }).sort({ occurred_at: 1 }).limit(limit).toArray();
+  const records = await connection.collection('outbox').find({ message_type: 'PatientAccessChanged', published_at: null, $and: [{ $or: [{ next_attempt_at: null }, { next_attempt_at: { $lte: now } }] }], $or: [{ claim_lease_until: null }, { claim_lease_until: { $lte: now } }] }).sort({ occurred_at: 1 }).limit(limit).toArray();
   await channel.assertExchange(exchange, 'topic', { durable: true });
   let published = 0;
   for (const record of records) {
@@ -26,6 +26,8 @@ async function publishPatientOutboxBatch({
       aggregateId: record.aggregate_id,
       aggregateVersion: record.aggregate_version,
       correlationId: record.correlation_id,
+      requestId: record.request_id || record.payload?.requestId || record.message_id,
+      causationId: record.causation_id || record.request_id || record.message_id,
       occurredAt: record.occurred_at,
       payload: record.payload,
     }));

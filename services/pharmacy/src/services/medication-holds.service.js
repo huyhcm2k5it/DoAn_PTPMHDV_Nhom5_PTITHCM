@@ -128,7 +128,7 @@ async function createMedicationHold(args) {
         now,
         payload: {
           requestId,
-          sourceType: 'PHARMACY',
+          sourceType: 'MED_HOLD',
           sourceId: id,
           sourceRevision: attemptNo,
           actorId: principalId,

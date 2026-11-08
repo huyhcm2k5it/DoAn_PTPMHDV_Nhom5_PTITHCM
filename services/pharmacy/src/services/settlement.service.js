@@ -21,7 +21,7 @@ async function maybeCommit(connection, session, hold, now) {
 }
 async function handleBillingMessage({ connection, message, now = new Date() }) {
   const type = message?.messageType;
-  const supported = ['ChargePrepared', 'ReserveSettlement', 'SettlementDecision', 'ChargePaid'];
+  const supported = ['ChargePrepared', 'ReserveSettlement', 'SettlementDecision', 'ChargePaid', 'BillingStatusChanged'];
   if (
     !supported.includes(type) ||
     !['billing', 'Billing'].includes(message.producer) ||
@@ -33,7 +33,16 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
     async (session) => {
       const p = message.payload;
       const coll = connection.collection('medication_holds');
-      const hold = await coll.findOne({ id: p.sourceId }, { session });
+      const hold = await coll.findOne(type === 'BillingStatusChanged' ? { chargeId: p.chargeId } : { id: p.sourceId }, { session });
+      if (type === 'BillingStatusChanged') {
+        if (!hold) throw failure(503, 'SOURCE_PENDING_SYNC', 'Charge is not synchronized.');
+        integer(p.version, 'version');
+        if (p.sourceId && p.sourceId !== hold.id) throw failure(409, 'SOURCE_MISMATCH', 'Billing source differs.');
+        if ((hold.billingStatusVersion || 0) < p.version)
+          await coll.updateOne({ id: hold.id }, { $set: { billingStatusVersion: p.version,
+            refundStatus: p.refundStatus || hold.refundStatus, billingAsOf: p.asOf || now.toISOString() } }, { session });
+        return { state: 'APPLIED' };
+      }
       const rejectReserve = async (reasonCode) => {
         uuid(p.sourceId, 'sourceId');
         uuid(p.settlementId, 'settlementId');
@@ -57,15 +66,15 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
       };
       if (
         type === 'ReserveSettlement' &&
-        p.sourceType === 'PHARMACY' &&
+        ['MED_HOLD', 'PHARMACY'].includes(p.sourceType) &&
         (!hold || p.sourceRevision !== hold.attemptNo)
       )
         return rejectReserve('SOURCE_MISMATCH');
       if (
         !hold ||
         (type === 'SettlementDecision'
-          ? p.sourceType && p.sourceType !== 'PHARMACY'
-          : p.sourceType !== 'PHARMACY') ||
+          ? p.sourceType && !['MED_HOLD', 'PHARMACY'].includes(p.sourceType)
+          : !['MED_HOLD', 'PHARMACY'].includes(p.sourceType)) ||
         p.sourceRevision !== hold.attemptNo
       )
         throw failure(409, 'SOURCE_MISMATCH', 'Billing source/attempt differs.');
@@ -140,7 +149,7 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
           p.chargeId !== hold.chargeId ||
           p.amountHash !== hold.snapshotHash ||
           !Number.isInteger(p.attemptVersion) ||
-          p.attemptVersion !== (replayingLock ? hold.reserveAttemptVersion : hold.version)
+          p.attemptVersion !== (replayingLock ? hold.reserveAttemptVersion : (hold.reserveAttemptVersion || 0) + 1)
         )
           return rejectReserve('SETTLEMENT_MISMATCH');
         if (replayingLock) {
@@ -179,7 +188,7 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
           correlationId: message.correlationId,
           now,
           payload: {
-            sourceType: 'PHARMACY',
+            sourceType: 'MED_HOLD',
             sourceId: hold.id,
             sourceRevision: hold.attemptNo,
             settlementId: p.settlementId,
@@ -391,7 +400,7 @@ async function queryUnresolvedSettlements({ connection, now = new Date(), interv
         payload: {
           requestId,
           settlementId: hold.settlementId,
-          sourceType: 'PHARMACY',
+          sourceType: 'MED_HOLD',
           sourceId: hold.id,
           sourceRevision: hold.attemptNo,
         },

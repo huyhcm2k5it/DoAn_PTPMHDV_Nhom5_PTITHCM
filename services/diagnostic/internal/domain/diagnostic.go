@@ -119,6 +119,7 @@ func (i CreateInput) Validate() error {
 }
 
 type Order struct {
+	RefundStatus    string         `json:"refundStatus,omitempty"`
 	ID              string         `json:"id"`
 	RequestID       string         `json:"requestId"`
 	RequestHash     string         `json:"-"`

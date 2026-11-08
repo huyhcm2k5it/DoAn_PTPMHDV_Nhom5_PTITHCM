@@ -88,16 +88,28 @@ func DeclareOwned(ch *amqp.Channel) error {
 			return e
 		}
 	}
-	if _, e := ch.QueueDeclare("evt.diagnostic.v1", true, false, false, false, nil); e != nil {
-		return e
+	for _, queue := range []string{"evt.diagnostic.v1", "cmd.diagnostic.v1"} {
+		if _, e := ch.QueueDeclare(queue, true, false, false, false, amqp.Table{"x-queue-type": "quorum"}); e != nil {
+			return e
+		}
 	}
-	for _, binding := range [][2]string{{"umc.commands.clinical.v1", "diagnostic.create-lab-order.v1"}, {"umc.commands.billing.v1", "diagnostic.reserve-settlement.v1"}, {"umc.events.billing.v1", "#"}, {"umc.events.catalog.v1", "#"}, {"umc.events.identity.v1", "identity.identity-access-changed.v1"}, {"umc.events.patient.v1", "patient.patient-access-changed.v1"}} {
-		if e := ch.QueueBind("evt.diagnostic.v1", binding[1], binding[0], false, nil); e != nil {
+	for _, binding := range [][3]string{
+		{"umc.commands.clinical.v1", "diagnostic.create-lab-order.v1", "cmd.diagnostic.v1"},
+		{"umc.commands.billing.v1", "diagnostic.reserve-settlement.v1", "cmd.diagnostic.v1"},
+		{"umc.events.billing.v1", "billing.charge-prepared.v1", "evt.diagnostic.v1"},
+		{"umc.events.billing.v1", "billing.charge-paid.v1", "evt.diagnostic.v1"},
+		{"umc.events.billing.v1", "billing.settlement-decision.v1", "evt.diagnostic.v1"},
+		{"umc.events.billing.v1", "billing.billing-status-changed.v1", "evt.diagnostic.v1"},
+		{"umc.events.catalog.v1", "catalog.catalog-changed.v1", "evt.diagnostic.v1"},
+		{"umc.events.identity.v1", "identity.identity-access-changed.v1", "evt.diagnostic.v1"},
+		{"umc.events.patient.v1", "patient.patient-access-changed.v1", "evt.diagnostic.v1"},
+	} {
+		if e := ch.QueueBind(binding[2], binding[1], binding[0], false, nil); e != nil {
 			return e
 		}
 	}
 
-	if _, e := ch.QueueDeclare("dlq.diagnostic.v1", true, false, false, false, nil); e != nil {
+	if _, e := ch.QueueDeclare("dlq.diagnostic.v1", true, false, false, false, amqp.Table{"x-queue-type": "quorum"}); e != nil {
 		return e
 	}
 	return ch.QueueBind("dlq.diagnostic.v1", "diagnostic.quarantine.v1", "umc.deadletters.diagnostic.v1", false, nil)
@@ -134,6 +146,11 @@ func Run(ctx context.Context, url string, store Store, receiver Receiver, declar
 	if e != nil {
 		return e
 	}
+	commands, e := inCh.ConsumeWithContext(ctx, "cmd.diagnostic.v1", "", false, false, false, false, nil)
+	if e != nil {
+		return e
+	}
+	deliveries = mergeDeliveries(ctx, deliveries, commands)
 	ticker := time.NewTicker(250 * time.Millisecond)
 	defer ticker.Stop()
 	nextPublish := time.Time{}
@@ -197,4 +214,35 @@ func Run(ctx context.Context, url string, store Store, receiver Receiver, declar
 			}
 		}
 	}
+}
+
+func mergeDeliveries(ctx context.Context, events, commands <-chan amqp.Delivery) <-chan amqp.Delivery {
+	out := make(chan amqp.Delivery)
+	go func() {
+		defer close(out)
+		for events != nil || commands != nil {
+			var delivery amqp.Delivery
+			var ok bool
+			select {
+			case <-ctx.Done():
+				return
+			case delivery, ok = <-events:
+				if !ok {
+					events = nil
+					continue
+				}
+			case delivery, ok = <-commands:
+				if !ok {
+					commands = nil
+					continue
+				}
+			}
+			select {
+			case out <- delivery:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return out
 }

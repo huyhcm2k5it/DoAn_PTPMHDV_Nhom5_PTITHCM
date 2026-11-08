@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 	"umccare/diagnostic/internal/application/ports"
 	"umccare/diagnostic/internal/domain"
@@ -20,6 +21,46 @@ type settlementDecision struct {
 
 func (s *Service) billing(ctx context.Context, t ports.Tx, m domain.Envelope) error {
 	switch m.MessageType {
+	case "BillingStatusChanged":
+		var p struct {
+			ChargeID, RecipientUserID, PaymentID, State, RefundID, SourceType, SourceID, RefundStatus, AsOf string
+			Version                                                                                         int
+		}
+		if strictJSON(m.Payload, &p) != nil || !domain.ValidID(p.ChargeID) || !domain.ValidID(p.SourceID) || p.SourceType != "LAB_ORDER" || p.Version < 1 {
+			return domain.Fail("INVALID_MESSAGE", "Invalid Billing status")
+		}
+		o, err := orders(ctx, t, p.SourceID)
+		if err != nil {
+			return domain.Fail("SERVICE_UNAVAILABLE", "Order not synchronized")
+		}
+		if o.ChargeID != p.ChargeID {
+			return domain.Fail("INVALID_MESSAGE", "Billing charge mismatch")
+		}
+		var prior struct {
+			Version int
+			Hash    string
+		}
+		err = load(ctx, t, "billing_status", o.ID, &prior)
+		if err != nil && domain.Code(err) != "NOT_FOUND" {
+			return err
+		}
+		if prior.Version > p.Version {
+			return nil
+		}
+		if prior.Version == p.Version {
+			if prior.Hash != domain.Hash(p) {
+				return domain.Fail("INVALID_MESSAGE", "Billing status version conflict")
+			}
+			return nil
+		}
+		o.RefundStatus = p.RefundStatus
+		if err = t.SaveOrder(ctx, o); err != nil {
+			return err
+		}
+		return t.Put(ctx, "billing_status", o.ID, struct {
+			Version int
+			Hash    string
+		}{p.Version, domain.Hash(p)})
 	case "ChargePrepared":
 		var p struct {
 			RequestID, SourceType, SourceID, ChargeID, State, ReasonCode string
@@ -164,7 +205,7 @@ func (s *Service) billing(ctx context.Context, t ports.Tx, m domain.Envelope) er
 			AmountVND                                                   int64
 			PaidAt                                                      time.Time
 		}
-		if strictJSON(m.Payload, &p) != nil || p.SourceType != "LAB_ORDER" || !domain.ValidID(p.ChargeID) || !domain.ValidID(p.SourceID) || !domain.ValidID(p.SettlementID) || !domain.ValidID(p.TransactionID) || p.PaidAt.IsZero() {
+		if strictJSON(m.Payload, &p) != nil || p.SourceType != "LAB_ORDER" || !domain.ValidID(p.ChargeID) || !domain.ValidID(p.SourceID) || !domain.ValidID(p.SettlementID) || (strings.TrimSpace(p.TransactionID) == "" || len(p.TransactionID) > 100) || p.PaidAt.IsZero() {
 			return domain.Fail("INVALID_MESSAGE", "Invalid paid evidence")
 		}
 		o, e := orders(ctx, t, p.SourceID)

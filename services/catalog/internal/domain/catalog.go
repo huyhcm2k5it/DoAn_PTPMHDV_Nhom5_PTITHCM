@@ -125,7 +125,7 @@ func (p PriceInput) Validate(now time.Time) error {
 	if p.EffectiveFrom.Nanosecond()%1000 != 0 || (p.EffectiveTo != nil && p.EffectiveTo.Nanosecond()%1000 != 0) {
 		return Fail("VALIDATION_ERROR", "Price timestamps support at most microsecond precision")
 	}
-	if !ValidID(p.ItemID) || !Has([]string{"EXAM", "LAB", "MEDICINE"}, p.ItemType) || p.AmountVND < 0 || p.EffectiveFrom.IsZero() {
+	if !ValidID(p.ItemID) || !Has([]string{"EXAM", "LAB", "MEDICINE"}, p.ItemType) || p.AmountVND < 0 || p.AmountVND > 9007199254740991 || p.EffectiveFrom.IsZero() {
 		return Fail("VALIDATION_ERROR", "Invalid price fields")
 	}
 	if p.EffectiveFrom.Before(now.Add(5 * time.Minute)) {

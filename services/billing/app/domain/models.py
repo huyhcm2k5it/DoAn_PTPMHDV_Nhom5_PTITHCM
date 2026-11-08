@@ -12,6 +12,8 @@ class Charge(models.Model):
     state = models.CharField(max_length=20, default="OPEN", help_text="OPEN, PAID, VOID")
     price_snapshot = models.JSONField(default=dict, blank=True)
     snapshot_hash = models.CharField(max_length=64, blank=True)
+    recipient_user_id = models.UUIDField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
     settlement_id = models.UUIDField(null=True, blank=True)
     settlement_state = models.CharField(max_length=20, default="NONE")
     settlement_saga_id = models.UUIDField(null=True, blank=True)
@@ -58,6 +60,7 @@ class SettlementSaga(models.Model):
 
     class Meta:
         db_table = "settlement_sagas"
+        constraints = [models.UniqueConstraint(fields=["charge"], condition=models.Q(state__in=["REQUESTED", "RESERVED", "IN_DOUBT"]), name="uq_billing_active_saga")]
 
     def __str__(self):
         return f"Saga {self.id} for Charge {self.charge.id} ({self.state})"
@@ -204,3 +207,44 @@ class BillingAuditEvent(models.Model):
 
     def __str__(self):
         return f"BillingAudit {self.action} at {self.at}"
+
+
+class MessageInbox(models.Model):
+    message_id = models.UUIDField(primary_key=True)
+    handler = models.CharField(max_length=80)
+    body_hash = models.CharField(max_length=64)
+    state = models.CharField(max_length=30, default="APPLIED")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class PatientAccessProjection(models.Model):
+    patient_id = models.UUIDField(primary_key=True)
+    owner_user_id = models.UUIDField()
+    version = models.PositiveBigIntegerField()
+    active = models.BooleanField(default=True)
+    body_hash = models.CharField(max_length=64)
+
+
+class CancellationEvidence(models.Model):
+    cancellation_id = models.UUIDField(primary_key=True)
+    source_type = models.CharField(max_length=50)
+    source_id = models.UUIDField()
+    source_revision = models.PositiveIntegerField()
+    source_version = models.PositiveBigIntegerField()
+    body_hash = models.CharField(max_length=64)
+
+
+
+class BillingRetryJob(models.Model):
+    message_id = models.CharField(max_length=64, unique=True)
+    envelope = models.JSONField()
+    attempts = models.PositiveSmallIntegerField(default=1)
+    due_at = models.DateTimeField(db_index=True)
+
+
+class BillingDeadLetter(models.Model):
+    message_id = models.CharField(max_length=64, unique=True)
+    envelope = models.JSONField()
+    reason = models.CharField(max_length=80)
+    published_at = models.DateTimeField(null=True)
+    created_at = models.DateTimeField(auto_now_add=True)

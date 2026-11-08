@@ -19,7 +19,7 @@ def get_correlation_id(request):
     return request.headers.get("X-Correlation-Id", str(uuid.uuid4()))
 
 
-def parse_pagination(request) -> tuple[int, int, None] | tuple[None, None, Response]:
+def parse_pagination(request):
     """Trả về (page, limit, None) hoặc (None, None, response lỗi 400)."""
     try:
         page = int(request.query_params.get("page", 1))
@@ -127,7 +127,6 @@ def charges_list_view(request):
     parsed_from, parsed_to, error = parse_window(request)
     if error:
         return error
-    assert page is not None and limit is not None
 
     queryset = Charge.objects.all().order_by("-created_at")
     if state:
@@ -224,7 +223,6 @@ def patient_charges_list_view(request, patient_id):
     state, error = parse_state(request, CHARGE_STATES)
     if error:
         return error
-    assert page is not None and limit is not None
 
     if not can_read_patient_resource(request.principal, patient_id):
         return patient_scope_error(request)

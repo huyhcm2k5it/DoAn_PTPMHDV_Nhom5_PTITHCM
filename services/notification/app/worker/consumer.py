@@ -1,169 +1,138 @@
+"""Durable, idempotent notification delivery. Medical values never enter DTO payloads."""
+import hashlib
 import json
 import logging
+import random
 import time
-from django.db import transaction
-from app.domain.models import Notification
-from app.worker.event_bus import (
-    get_rabbitmq_connection,
-    NOTIFICATION_QUEUE,
-    BINDINGS,
-)
+import uuid
+from datetime import timedelta
+from django.db import transaction, OperationalError
+from django.utils import timezone
+from app.domain.models import Notification, MessageInbox, RetryJob, DeadLetter
+from app.worker.event_bus import get_rabbitmq_connection, NOTIFICATION_QUEUE, BINDINGS
 
 logger = logging.getLogger(__name__)
+ROUTES = {
+    "appointment.appointment-changed.v1": ("AppointmentChanged", "appointment", "APPOINTMENT", "Lịch khám có cập nhật"),
+    "billing.billing-status-changed.v1": ("BillingStatusChanged", "billing", "BILLING", "Viện phí có cập nhật"),
+    "diagnostic.lab-result-published.v1": ("LabResultPublished", "diagnostic", "DIAGNOSTIC", "Có kết quả xét nghiệm mới"),
+    "pharmacy.medication-dispensed.v1": ("MedicationDispensed", "pharmacy", "PHARMACY", "Đã cấp phát đơn thuốc"),
+}
+SAFE_FIELDS = ("appointmentId", "chargeId", "paymentId", "refundId", "orderId", "holdId",
+               "prescriptionId", "revision", "attemptNo", "state", "changeType", "version",
+               "dispensedAt", "publishedAt")
+REQUIRED = {"messageId", "messageKind", "messageType", "schemaVersion", "producer",
+            "aggregateId", "aggregateVersion", "correlationId", "causationId",
+            "requestId", "occurredAt", "payload"}
 
-def handle_appointment_changed(payload: dict):
-    """Sự kiện appointment.appointment-changed.v1: Đặt, đổi, hủy lịch khám."""
-    recipient_user_id = payload.get("recipientUserId")
-    if not recipient_user_id:
+
+def digest(value):
+    return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(",",":")).encode()).hexdigest()
+
+
+@transaction.atomic
+def route_event(routing_key, envelope):
+    route = ROUTES.get(routing_key)
+    if not route or not isinstance(envelope,dict) or set(envelope) != REQUIRED:
+        raise ValueError("Unknown notification routing key or invalid envelope")
+    kind, producer, notification_kind, title = route
+    if (envelope["messageKind"] != "EVENT" or envelope["messageType"] != kind
+            or envelope["producer"] != producer or type(envelope["schemaVersion"]) is not int
+            or envelope["schemaVersion"] != 1):
+        raise ValueError("Untrusted notification event")
+    uuid.UUID(str(envelope["messageId"]))
+    uuid.UUID(str(envelope["aggregateId"]))
+    if type(envelope["aggregateVersion"]) is not int or envelope["aggregateVersion"] < 1:
+        raise ValueError("Invalid aggregate version")
+    body_hash = digest(envelope)
+    prior = MessageInbox.objects.filter(message_id=envelope["messageId"]).first()
+    if prior:
+        if prior.body_hash != body_hash:
+            raise ValueError("Duplicate message content conflict")
+        return "REPLAYED"
+    payload = envelope["payload"]
+    if not isinstance(payload,dict):
+        raise ValueError("Object payload required")
+    recipient = uuid.UUID(str(payload["recipientUserId"]))
+    key = digest([producer,kind,envelope["aggregateId"],envelope["aggregateVersion"],str(recipient)])
+    Notification.objects.get_or_create(dedupe_key=key, defaults={
+        "user_id":recipient, "kind":notification_kind, "title":title,
+        "body":"Mở ứng dụng để xem trạng thái đã được hệ thống xác nhận.",
+        "payload":{k:payload[k] for k in SAFE_FIELDS if k in payload},
+    })
+    MessageInbox.objects.create(message_id=envelope["messageId"], body_hash=body_hash)
+    return "APPLIED"
+
+
+@transaction.atomic
+def record_failure(routing_key, envelope, transient, attempt=0):
+    message_id = str(envelope.get("messageId","")) if isinstance(envelope,dict) else ""
+    # Raw bodies live only in the protected error store, never ordinary logs.
+    if transient and attempt < 3:
+        job, _ = RetryJob.objects.get_or_create(message_id=message_id or digest(envelope),
+            defaults={"routing_key":routing_key,"envelope":envelope,
+                      "attempts":attempt+1,"due_at":timezone.now()+timedelta(seconds=(5,15,60)[attempt]+random.uniform(0,1))})
+        if job.attempts <= attempt:
+            job.attempts = attempt+1
+            job.due_at = timezone.now()+timedelta(seconds=(5,15,60)[attempt]+random.uniform(0,1))
+            job.save(update_fields=["attempts","due_at"])
         return
+    DeadLetter.objects.get_or_create(message_id=message_id or digest(envelope),
+        defaults={"routing_key":routing_key,"envelope":envelope,"reason":"RETRY_EXHAUSTED" if transient else "INVALID_MESSAGE"})
+    RetryJob.objects.filter(message_id=message_id).delete()
 
-    change_type = payload.get("changeType", "UPDATED")
-    if change_type == "BOOKED":
-        title = "Đặt lịch khám thành công"
-        body = "Lịch hẹn khám bệnh của bạn đã được xác nhận. Vui lòng có mặt đúng giờ."
-    elif change_type == "CANCELLED":
-        title = "Lịch khám đã được hủy"
-        body = "Lịch hẹn khám bệnh của bạn đã được hủy thành công."
-    elif change_type == "RESCHEDULED":
-        title = "Lịch khám đã được dời giờ"
-        body = "Thời gian khám bệnh của bạn đã được cập nhật sang khung giờ mới."
-    else:
-        title = "Trạng thái lịch khám thay đổi"
-        body = f"Lịch khám của bạn có cập nhật mới ({change_type})."
 
-    Notification.objects.create(
-        user_id=recipient_user_id,
-        kind="APPOINTMENT",
-        title=title,
-        body=body,
-        payload=payload
-    )
-    logger.info(f"Đã tạo thông báo APPOINTMENT cho user {recipient_user_id}")
+def process_due_retries():
+    for job_id in RetryJob.objects.filter(due_at__lte=timezone.now()).values_list("id",flat=True)[:50]:
+        with transaction.atomic():
+            job = RetryJob.objects.select_for_update().filter(id=job_id).first()
+            if not job:
+                continue
+            try:
+                with transaction.atomic():
+                    route_event(job.routing_key,job.envelope)
+            except OperationalError:
+                record_failure(job.routing_key,job.envelope,True,job.attempts)
+            except (ValueError,KeyError,TypeError):
+                record_failure(job.routing_key,job.envelope,False,job.attempts)
+            else:
+                job.delete()
 
-def handle_billing_status_changed(payload: dict):
-    """Sự kiện billing.billing-status-changed.v1: Thu tiền hoặc hoàn tiền."""
-    recipient_user_id = payload.get("recipientUserId")
-    if not recipient_user_id:
-        return
-
-    state = payload.get("state", "")
-    if state == "PAID":
-        title = "Thanh toán viện phí thành công"
-        body = "Khoản viện phí của bạn đã được thanh toán thành công và ghi nhận biên nhận điện tử."
-    elif state == "REFUNDED":
-        title = "Hoàn tiền viện phí hoàn tất"
-        body = "Yêu cầu hoàn tiền viện phí của bạn đã được xử lý thành công."
-    elif state == "EXPIRED":
-        title = "Khoản thu viện phí đã hết hạn"
-        body = "Phiên thanh toán viện phí của bạn đã hết hạn xử lý."
-    else:
-        title = "Cập nhật viện phí"
-        body = f"Khoản viện phí của bạn đã chuyển sang trạng thái {state}."
-
-    Notification.objects.create(
-        user_id=recipient_user_id,
-        kind="BILLING",
-        title=title,
-        body=body,
-        payload=payload
-    )
-    logger.info(f"Đã tạo thông báo BILLING cho user {recipient_user_id}")
-
-def handle_lab_result_published(payload: dict):
-    """Sự kiện diagnostic.lab-result-published.v1: Kết quả XN được công bố.
-    Quy tắc an toàn: Không mang giá trị chỉ số y tế vào Notification.
-    """
-    recipient_user_id = payload.get("recipientUserId")
-    if not recipient_user_id:
-        return
-
-    Notification.objects.create(
-        user_id=recipient_user_id,
-        kind="DIAGNOSTIC",
-        title="Có kết quả xét nghiệm mới",
-        body="Kết quả xét nghiệm cận lâm sàng của bạn đã được bác sĩ trưởng khoa phê duyệt và công bố.",
-        payload=payload
-    )
-    logger.info(f"Đã tạo thông báo DIAGNOSTIC cho user {recipient_user_id}")
-
-def handle_medication_dispensed(payload: dict):
-    """Sự kiện pharmacy.medication-dispensed.v1: Thuốc đã cấp phát.
-    Quy tắc an toàn: Không để lộ tên thuốc trong nội dung thông báo.
-    """
-    recipient_user_id = payload.get("recipientUserId")
-    if not recipient_user_id:
-        return
-
-    Notification.objects.create(
-        user_id=recipient_user_id,
-        kind="PHARMACY",
-        title="Đã cấp phát đơn thuốc",
-        body="Toa thuốc của bạn đã được dược sĩ kiểm tra và cấp phát tại quầy thuốc bệnh viện.",
-        payload=payload
-    )
-    logger.info(f"Đã tạo thông báo PHARMACY cho user {recipient_user_id}")
-
-def route_event(routing_key: str, payload: dict):
-    """Định tuyến sự kiện về đúng hàm nghiệp vụ."""
-    with transaction.atomic():
-        if routing_key == "appointment.appointment-changed.v1":
-            handle_appointment_changed(payload)
-        elif routing_key == "billing.billing-status-changed.v1":
-            handle_billing_status_changed(payload)
-        elif routing_key == "diagnostic.lab-result-published.v1":
-            handle_lab_result_published(payload)
-        elif routing_key == "pharmacy.medication-dispensed.v1":
-            handle_medication_dispensed(payload)
-        else:
-            logger.warning(f"Bỏ qua routing key không nằm trong danh sách xử lý: {routing_key}")
-
-from django.db import DatabaseError, OperationalError
 
 def start_consumer():
-    """Vòng lặp lắng nghe message trên hàng đợi RabbitMQ với exponential backoff."""
-    retry_delay = 2
-    max_delay = 30
+    delay = 1
     while True:
         conn = None
         try:
-            logger.info("Notification Consumer đang kết nối RabbitMQ...")
             conn = get_rabbitmq_connection()
             channel = conn.channel()
-
-            # Khai báo queue chung bền vững
-            channel.queue_declare(queue=NOTIFICATION_QUEUE, durable=True)
-
-            # Binding các exchange với queue
-            for exchange, routing_key in BINDINGS:
-                channel.exchange_declare(exchange=exchange, exchange_type="topic", durable=True)
-                channel.queue_bind(exchange=exchange, queue=NOTIFICATION_QUEUE, routing_key=routing_key)
-
-            def on_message(ch, method, properties, body):
+            channel.queue_declare(queue=NOTIFICATION_QUEUE,durable=True,arguments={"x-queue-type":"quorum"})
+            for exchange,key in BINDINGS:
+                channel.exchange_declare(exchange=exchange,exchange_type="topic",durable=True)
+                channel.queue_bind(exchange=exchange,queue=NOTIFICATION_QUEUE,routing_key=key)
+            def received(ch,method,properties,body):
                 try:
-                    payload = json.loads(body.decode("utf-8"))
-                    logger.info(f"Nhận event [{method.routing_key}]: {payload}")
-                    route_event(method.routing_key, payload)
-                    ch.basic_ack(delivery_tag=method.delivery_tag)
-                except (DatabaseError, OperationalError) as db_err:
-                    logger.error(f"Lỗi database tạm thời ({db_err}), requeue lại message...")
-                    ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
-                except Exception as err:
-                    logger.error(f"Lỗi không thể phục hồi khi xử lý event notification: {err}")
-                    ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
-
+                    envelope = json.loads(body)
+                except (ValueError,UnicodeDecodeError):
+                    envelope = {"messageId":str(uuid.uuid4()),"invalidUtf8BodyHash":hashlib.sha256(body).hexdigest()}
+                try:
+                    route_event(method.routing_key,envelope)
+                except OperationalError:
+                    record_failure(method.routing_key,envelope,True)
+                except (ValueError,KeyError,TypeError):
+                    record_failure(method.routing_key,envelope,False)
+                # A failed persistence operation escapes without ack; reconnect redelivers.
+                ch.basic_ack(delivery_tag=method.delivery_tag)
             channel.basic_qos(prefetch_count=10)
-            channel.basic_consume(queue=NOTIFICATION_QUEUE, on_message_callback=on_message)
-            logger.info(f"Notification Consumer đang chờ sự kiện trên [{NOTIFICATION_QUEUE}]...")
-            retry_delay = 2  # Reset delay khi đã kết nối và lắng nghe thành công
-            channel.start_consuming()
-
-        except Exception as exc:
-            logger.warning(f"Mất kết nối RabbitMQ ({exc}). Thử lại sau {retry_delay} giây...")
-            time.sleep(retry_delay)
-            retry_delay = min(retry_delay * 2, max_delay)
+            channel.basic_consume(queue=NOTIFICATION_QUEUE,on_message_callback=received)
+            delay=1
+            while conn.is_open:
+                conn.process_data_events(time_limit=1)
+                process_due_retries()
+        except Exception:
+            logger.warning("Notification dependency unavailable; reconnect scheduled")
+            time.sleep(delay+random.uniform(0,0.5))
+            delay=min(delay*2,15)
         finally:
             if conn and conn.is_open:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
+                conn.close()

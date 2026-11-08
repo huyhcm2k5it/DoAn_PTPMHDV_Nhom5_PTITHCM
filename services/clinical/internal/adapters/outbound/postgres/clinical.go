@@ -44,11 +44,14 @@ func (p *Probe) Migrate(ctx context.Context) error {
 	if err := migrateLabTerminal(ctx, tx); err != nil {
 		return err
 	}
+	if err := migrateLabResubmit(ctx, tx); err != nil {
+		return err
+	}
 	return tx.Commit(ctx)
 }
 func (p *Probe) BusinessReady(ctx context.Context) error {
 	var ok bool
-	if e := p.pool.QueryRow(ctx, `SELECT count(*)=4 FROM schema_migrations WHERE version IN ('000001_clinical','000002_treatment','000003_catalog_stream','000004_lab_terminal')`).Scan(&ok); e != nil || !ok {
+	if e := p.pool.QueryRow(ctx, `SELECT count(*)=5 FROM schema_migrations WHERE version IN ('000001_clinical','000002_treatment','000003_catalog_stream','000004_lab_terminal','000005_lab_resubmit')`).Scan(&ok); e != nil || !ok {
 		return domain.Fail("SERVICE_UNAVAILABLE", "Clinical migrations are required")
 	}
 	return nil
@@ -69,6 +72,9 @@ func (p *Probe) Within(ctx context.Context, lock string, fn func(ports.ClinicalT
 	}
 	if e = fn(clinicalTx{tx}); e != nil {
 		return e
+	}
+	if err := migrateLabResubmit(ctx, tx); err != nil {
+		return err
 	}
 	return tx.Commit(ctx)
 }
@@ -286,4 +292,20 @@ func (t clinicalTx) UpdatePatientAccess(ctx context.Context, a domain.PatientAcc
 		return domain.Fail("INVALID_MESSAGE", "Patient access projection version has conflicting content")
 	}
 	return nil
+}
+
+func migrateLabResubmit(ctx context.Context, tx pgx.Tx) error {
+	var exists bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version='000005_lab_resubmit')`).Scan(&exists); err != nil || exists {
+		return err
+	}
+	raw, err := migrations.Files.ReadFile("000005_lab_resubmit.up.sql")
+	if err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, string(raw)); err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO schema_migrations(version) VALUES('000005_lab_resubmit')`)
+	return err
 }

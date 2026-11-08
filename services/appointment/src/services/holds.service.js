@@ -308,3 +308,8 @@ async function expireHolds({ connection, now = new Date(), batchSize = 100 }) {
 }
 
 module.exports = { createHold, releaseHold, expireHolds, requestHash, stableJson };
+
+// Cache invalidation runs after successful transaction commit.
+module.exports.createHold = async (...args) => { const result = await createHold(...args); await require('../services/slot-cache.service').getSlotCache().invalidate(); return result; };
+module.exports.releaseHold = async (...args) => { const result = await releaseHold(...args); await require('../services/slot-cache.service').getSlotCache().invalidate(); return result; };
+module.exports.expireHolds = async (...args) => { const result = await expireHolds(...args); await require('../services/slot-cache.service').getSlotCache().invalidate(); return result; };

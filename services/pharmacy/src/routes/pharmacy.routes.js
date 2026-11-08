@@ -7,18 +7,18 @@ function pharmacyRoutes(dependencies) {
   const staff = requirePharmacy(dependencies.connection);
   router.use(createAuthContext(dependencies));
   router.get('/stock', staff, c.stock);
-  router.post('/stock/receipts', staff, requireLease(dependencies, 'PH002'), c.receive);
-  router.get('/prescriptions/queue', staff, requireLease(dependencies, 'PH003'), c.queue);
-  router.get('/prescriptions/:prescriptionId', requireLease(dependencies, 'PH004'), c.detail);
+  router.post('/stock/receipts', staff, requireLease(dependencies, 'PH-002'), c.receive);
+  router.get('/prescriptions/queue', staff, requireLease(dependencies, 'PH-003'), c.queue);
+  router.get('/prescriptions/:prescriptionId', requireLease(dependencies, 'PH-004'), c.detail);
   router.post(
     '/prescriptions/:prescriptionId/holds',
     staff,
-    requireLease(dependencies, 'PH005'),
+    requireLease(dependencies, 'PH-005'),
     c.hold,
   );
-  router.delete('/holds/:holdId', staff, requireLease(dependencies, 'PH006'), c.release);
-  router.post('/holds/:holdId/commit', staff, requireLease(dependencies, 'PH007'), c.reconcile);
-  router.post('/holds/:holdId/dispense', staff, requireLease(dependencies, 'PH008'), c.dispense);
+  router.delete('/holds/:holdId', staff, requireLease(dependencies, 'PH-006'), c.release);
+  router.post('/holds/:holdId/commit', staff, requireLease(dependencies, 'PH-007'), c.reconcile);
+  router.post('/holds/:holdId/dispense', staff, requireLease(dependencies, 'PH-008'), c.dispense);
   return router;
 }
 module.exports = { pharmacyRoutes };

@@ -1,4 +1,4 @@
-const { randomUUID } = require('node:crypto');
+const { createHash, randomUUID } = require('node:crypto');
 const { withMongoTransaction } = require('../../../../mongo/transaction.js');
 const { ApiError } = require('../core/errors.js');
 
@@ -40,7 +40,31 @@ function validateProfile(body) {
   };
 }
 
-async function createPatient({ connection, Patient, authContext, body, createId = randomUUID, now = new Date() }) {
+async function mutatePatient({ connection, authContext, idempotencyKey, route, input, now }, work) {
+  assertUuid(idempotencyKey, 'Idempotency-Key');
+  const records = connection.collection('idempotency_records');
+  const identity = { principal_id: authContext.userId, route, key: idempotencyKey };
+  const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
+  const fingerprint = createHash('sha256').update(JSON.stringify(canonical(input))).digest('hex');
+  const replay = async session => {
+    const row = await records.findOne(identity, { session });
+    if (!row) return null;
+    if (row.request_hash !== fingerprint) throw new ApiError(409, 'IDEMPOTENCY_KEY_REUSED', 'Key identifies another request.');
+    return row.response;
+  };
+  try {
+    return await withMongoTransaction(connection, async session => {
+      const projection = await connection.collection('user_access_projection').findOne({ userId: authContext.userId }, { session });
+      assertProjection(authContext, projection);
+      const old = await replay(session); if (old) return old;
+      const response = await work(session);
+      await records.insertOne({ ...identity, request_hash: fingerprint, response, created_at: now }, { session });
+      return response;
+    });
+  } catch (error) { if (error.code === 11000) { const old = await replay(); if (old) return old; } throw error; }
+}
+
+async function createPatient({ connection, Patient, authContext, body, idempotencyKey, requestId = randomUUID(), correlationId = requestId, createId = randomUUID, now = new Date() }) {
   const projection = await connection.collection('user_access_projection').findOne({ userId: authContext.userId });
   assertProjection(authContext, projection);
   const isReception = authContext.actorType === 'STAFF' && projection.capabilities?.includes('RECEPTION');
@@ -49,6 +73,11 @@ async function createPatient({ connection, Patient, authContext, body, createId 
   const profile = validateProfile(body);
   const ownerUserId = isReception ? body.ownerUserId : authContext.userId;
   assertUuid(ownerUserId, 'ownerUserId');
+  if (!isReception && body.ownerUserId && body.ownerUserId !== authContext.userId) throw new ApiError(403, 'FORBIDDEN', 'Owner comes from authenticated identity.');
+  if (isReception) {
+    const owner = await connection.collection('user_access_projection').findOne({ userId: ownerUserId });
+    if (!owner || owner.status !== 'ACTIVE' || owner.actorType !== 'PATIENT') throw new ApiError(403, 'ACCOUNT_PROOF_REQUIRED', 'A verified active patient account is required.');
+  }
   const patient = {
     id: createId(),
     ownerUserId,
@@ -59,17 +88,19 @@ async function createPatient({ connection, Patient, authContext, body, createId 
     createdAt: now,
     updatedAt: now,
   };
-  return withMongoTransaction(connection, async (session) => {
+  return mutatePatient({ connection, authContext, idempotencyKey, route: 'POST /api/v1/patients', input: body, now }, async (session) => {
     await Patient.create([patient], { session });
     await connection.collection('outbox').insertOne({
       message_id: createId(),
       message_kind: 'EVENT',
       message_type: 'PatientAccessChanged',
       schema_version: 1,
-      producer: 'Patient',
+      producer: 'patient',
       aggregate_id: patient.id,
       aggregate_version: 1,
-      correlation_id: createId(),
+      correlation_id: correlationId,
+      request_id: requestId,
+      causation_id: requestId,
       occurred_at: now,
       payload: {
         patientId: patient.id,
@@ -78,11 +109,12 @@ async function createPatient({ connection, Patient, authContext, body, createId 
         policyVersion: 1,
       },
     }, { session });
+    await connection.collection('profile_audit').insertOne({ id: randomUUID(), patientId: patient.id, actorUserId: authContext.userId, action: 'CREATED', version: 1, at: now }, { session });
     return cleanPatient(patient);
   });
 }
 
-async function updatePatient({ connection, Patient, authContext, patientId, body, expectedVersion, now = new Date() }) {
+async function updatePatient({ connection, Patient, authContext, patientId, body, expectedVersion, idempotencyKey, requestId = randomUUID(), correlationId = requestId, now = new Date() }) {
   assertUuid(patientId, 'patientId');
   if (!Number.isInteger(Number(expectedVersion)) || Number(expectedVersion) < 1)
     throw new ApiError(400, 'VALIDATION_ERROR', 'expectedVersion must be a positive integer.');
@@ -91,7 +123,7 @@ async function updatePatient({ connection, Patient, authContext, patientId, body
   const isReception = authContext.actorType === 'STAFF' && projection.capabilities?.includes('RECEPTION');
   if (!['PATIENT', 'STAFF'].includes(authContext.actorType) || (authContext.actorType === 'STAFF' && !isReception))
     throw new ApiError(403, 'FORBIDDEN', 'Actor cannot update patient profiles.');
-  return withMongoTransaction(connection, async (session) => {
+  return mutatePatient({ connection, authContext, idempotencyKey, route: 'PATCH /api/v1/patients/' + patientId, input: { body, expectedVersion }, now }, async (session) => {
     const current = await Patient.findOne({ id: patientId, active: { $ne: false } }).session(session).lean();
     if (!current) throw new ApiError(404, 'NOT_FOUND', 'Patient record not found.');
     if (!isReception && current.ownerUserId !== authContext.userId)
@@ -110,10 +142,12 @@ async function updatePatient({ connection, Patient, authContext, patientId, body
       message_kind: 'EVENT',
       message_type: 'PatientAccessChanged',
       schema_version: 1,
-      producer: 'Patient',
+      producer: 'patient',
       aggregate_id: patientId,
       aggregate_version: next.policyVersion,
-      correlation_id: randomUUID(),
+      correlation_id: correlationId,
+      request_id: requestId,
+      causation_id: requestId,
       occurred_at: now,
       payload: {
         patientId,
@@ -122,6 +156,7 @@ async function updatePatient({ connection, Patient, authContext, patientId, body
         policyVersion: next.policyVersion,
       },
     }, { session });
+    await connection.collection('profile_audit').insertOne({ id: randomUUID(), patientId, actorUserId: authContext.userId, action: 'UPDATED', version: next.version, at: now }, { session });
     return cleanPatient(next);
   });
 }

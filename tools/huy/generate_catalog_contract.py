@@ -54,15 +54,17 @@ department = parameter("departmentId", uuid)
 headers = {"X-Correlation-ID": {"description": "Correlation ID for this response", "schema": string}}
 
 def operation(code, summary, response, description, params=None, protected=False, create=False):
-    errors = {400: "Invalid input", 503: "Database or required Identity verification unavailable"}
+    errors = {400: "VALIDATION_ERROR: Invalid input", 503: "SERVICE_UNAVAILABLE: Database or required Identity verification unavailable"}
     if protected:
-        errors.update({401: "Missing, invalid or expired bearer", 403: "Insufficient current permission or authorization lease"})
+        errors.update({401: "UNAUTHENTICATED: Missing, invalid or expired bearer", 403: "FORBIDDEN: Insufficient current permission or authorization lease"})
     if create:
+        errors[401] = "UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED: Missing, invalid or expired bearer or lease"
         errors[409] = "OVERLAPPING_PRICE_PERIOD or IDEMPOTENCY_CONFLICT"
     responses = {str(k): {"description": v, "headers": headers, "content": {"application/json": {"schema": ref("Error")}}} for k, v in errors.items()}
     responses["201" if create else "200"] = {"description": "Created (also on an idempotent replay)" if create else "Success", "headers": headers, "content": {"application/json": {"schema": ref(response)}}}
     result = {"operationId": code, "summary": summary, "description": description, "tags": ["Catalog"], "parameters": [correlation, *(params or [])], "security": [{"bearerAuth": [], **({"authorizationLease": []} if create else {})}] if protected else [], "responses": responses}
     if create:
+        result["x-authorization-lease"] = {"action": code.replace("_", "-"), "maxAgeSeconds": 30, "expiryLeewaySeconds": 0, "expiredStatus": 401, "expiredCode": "AUTHZ_LEASE_EXPIRED"}
         result["requestBody"] = {"required": True, "content": {"application/json": {"schema": ref("PriceInput"), "example": {"itemType": "EXAM", "itemId": "00000000-0000-4000-8000-000000000201", "amountVnd": 150000, "effectiveFrom": "2026-11-10T02:00:00Z", "effectiveTo": "2026-11-11T02:00:00Z"}}}}
     return result
 

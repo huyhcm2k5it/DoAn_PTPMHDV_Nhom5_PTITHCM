@@ -25,7 +25,11 @@ const schemas = {
   Meta: object({ correlationId: { type: 'string' } }),
   ErrorResponse: object({
     error: object(
-      { code: { type: 'string' }, message: { type: 'string' }, details: { type: 'object' } },
+      {
+        code: { type: 'string' },
+        message: { type: 'string' },
+        details: { type: 'object', additionalProperties: { type: ['string', 'number', 'integer', 'boolean', 'null'] } },
+      },
       ['code', 'message'],
     ),
     meta: ref('Meta'),
@@ -212,6 +216,14 @@ const definitions = [
     [],
   ],
 ];
+const errorCodes = {
+  400: ['VALIDATION_ERROR'],
+  401: ['UNAUTHENTICATED', 'AUTHZ_LEASE_EXPIRED'],
+  403: ['FORBIDDEN'],
+  404: ['NOT_FOUND'],
+  409: ['STATE_CONFLICT', 'INSUFFICIENT_STOCK', 'PRESCRIPTION_REVISION_CONFLICT', 'HOLD_EXPIRED', 'SETTLEMENT_NOT_CONFIRMED', 'ALREADY_DISPENSED'],
+  503: ['SERVICE_UNAVAILABLE'],
+};
 const paths = {};
 for (const [operationId, method, suffix, status, response, body, params] of definitions) {
   const route = '/api/v1/pharmacy' + suffix;
@@ -232,9 +244,20 @@ for (const [operationId, method, suffix, status, response, body, params] of defi
     });
   paths[route] ||= {};
   paths[route][method] = {
-    operationId,
+    operationId: operationId.replace('-', '_'),
     tags: ['Pharmacy'],
-    security: [{ bearerAuth: [] }],
+    security: [{ bearerAuth: [], ...(operationId !== 'PH-001' ? { authorizationLease: [] } : {}) }],
+    ...(operationId !== 'PH-001'
+      ? {
+          'x-authorization-lease': {
+            action: operationId,
+            maxAgeSeconds: 30,
+            expiryLeewaySeconds: 0,
+            expiredStatus: 401,
+            expiredCode: 'AUTHZ_LEASE_EXPIRED',
+          },
+        }
+      : {}),
     parameters,
     ...(body
       ? { requestBody: { required: true, content: { 'application/json': { schema: body } } } }
@@ -243,7 +266,8 @@ for (const [operationId, method, suffix, status, response, body, params] of defi
       [status, 400, 401, 403, 404, 409, 503].map((code) => [
         code,
         {
-          description: code === status ? 'Operation result' : 'Operation rejected or unavailable',
+          description: code === status ? 'Operation result' : (errorCodes[code] || []).join(', ') + ': Operation rejected or unavailable',
+          ...(code !== status ? { 'x-error-codes': errorCodes[code] || [] } : {}),
           ...(code === 202 ? { headers: { Location: { schema: { type: 'string' } } } } : {}),
           content: {
             'application/json': {
@@ -260,7 +284,10 @@ const spec = {
   info: { title: 'UMC Care Pharmacy PH-001..008', version: '5.2.0' },
   paths,
   components: {
-    securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } },
+    securitySchemes: {
+      bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+      authorizationLease: { type: 'apiKey', in: 'header', name: 'X-Authorization-Lease' },
+    },
     schemas,
   },
 };
