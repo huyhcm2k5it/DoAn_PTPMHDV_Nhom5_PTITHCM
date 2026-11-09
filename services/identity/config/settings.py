@@ -36,6 +36,7 @@ if DB_NAME:
             "PASSWORD": os.getenv("IDENTITY_DB_PASSWORD", "postgres"),
             "HOST": os.getenv("IDENTITY_DB_HOST", "localhost"),
             "PORT": os.getenv("IDENTITY_DB_PORT", "5432"),
+            "OPTIONS": {"sslmode": os.getenv("IDENTITY_DB_SSLMODE", "prefer")},
         }
     }
 else:

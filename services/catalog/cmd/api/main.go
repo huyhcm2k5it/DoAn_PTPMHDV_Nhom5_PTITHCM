@@ -33,7 +33,7 @@ func main() {
 	}
 }
 func run() error {
-	cfg, err := config.Load("catalog", "127.0.0.1:8081")
+	cfg, err := config.Load("catalog", "127.0.0.1:8007")
 	if err != nil {
 		return err
 	}

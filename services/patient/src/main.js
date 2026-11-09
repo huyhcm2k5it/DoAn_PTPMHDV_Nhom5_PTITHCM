@@ -4,7 +4,7 @@ const { createJwtVerifier } = require('./auth/jwt-verifier.js');
 async function main() {
   const connection = await connectDatabase(process.env.MONGODB_URI);
   const app = createApp({ connection, verifyBearerToken: createJwtVerifier(), verifyAuthorizationLease: createJwtVerifier() });
-  const server = app.listen(Number(process.env.PORT || 3000), '0.0.0.0');
+  const server = app.listen(Number(process.env.PORT || 8001), '0.0.0.0');
   let shuttingDown = false;
   async function shutdown(signal) {
     if (shuttingDown) return; shuttingDown = true;

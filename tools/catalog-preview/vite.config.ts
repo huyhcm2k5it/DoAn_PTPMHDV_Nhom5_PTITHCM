@@ -14,7 +14,7 @@ export default defineConfig({
   },
   server: {
     fs: { allow: [fileURLToPath(new URL("../..", import.meta.url))] },
-    proxy: { "/api": "http://127.0.0.1:8081" },
+    proxy: { "/api": "http://127.0.0.1:8007" },
   },
   test: {
     environment: "jsdom",

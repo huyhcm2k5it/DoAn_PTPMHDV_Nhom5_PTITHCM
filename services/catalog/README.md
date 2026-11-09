@@ -11,8 +11,8 @@ Từ gốc repo, copy `env/huy.env.example` sang `env/huy.env`, điền năm pas
 docker compose --env-file env/huy.env -f infra/compose/huy.catalog.yml up --build -d
 # Seed chỉ dành cho demo, chạy chủ động sau migration:
 docker compose --env-file env/huy.env -f infra/compose/huy.catalog.yml run --rm catalog-migrate -seed
-Invoke-RestMethod http://127.0.0.1:8081/health/ready
-Invoke-RestMethod http://127.0.0.1:8081/api/v1/medical-services
+Invoke-RestMethod http://127.0.0.1:8007/health/ready
+Invoke-RestMethod http://127.0.0.1:8007/api/v1/medical-services
 ```
 
 Compose bind API/DB/Redis vào loopback. Redis giới hạn 128 MiB với `allkeys-lru`; ACL giới hạn user Catalog vào prefix `umc:catalog:v1:*`. Không mở rộng init script sang DB có sẵn. Không xóa volume để sửa migration.
@@ -31,7 +31,7 @@ $env:REDIS_PASSWORD='YOUR_CATALOG_REDIS_PASSWORD'
 .\tools\huy\go.ps1 -Service catalog run ./cmd/api
 ```
 
-Helper đặt cache/temp vào `.runtime/` để tránh lỗi quyền Windows. Trên Linux/macOS chạy Go trực tiếp trong `services/catalog`. API mặc định chỉ nghe `127.0.0.1:8081`; container dùng `LISTEN_ADDR=:8081`.
+Helper đặt cache/temp vào `.runtime/` để tránh lỗi quyền Windows. Trên Linux/macOS chạy Go trực tiếp trong `services/catalog`. API mặc định chỉ nghe `127.0.0.1:8007`; container dùng `LISTEN_ADDR=:8007`.
 
 Public không cần Identity. Protected không có JWT config thì fail closed: thiếu bearer → 401, có bearer nhưng verifier chưa cấu hình → 503. Không có auth bypass. Xem `contracts/http/catalog-integration.md` để cấu hình key/lease và đối chiếu với Hưng trước tích hợp.
 

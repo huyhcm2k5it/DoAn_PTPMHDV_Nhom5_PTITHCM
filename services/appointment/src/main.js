@@ -6,7 +6,7 @@ async function main() {
   const connection = await connectDatabase(process.env.MONGODB_URI);
   await require('./configs/redis').configureSlotCache();
   const app = createApp({ connection, verifyBearerToken: createJwtVerifier(), verifyAuthorizationLease: createJwtVerifier(), resolvePriceSnapshot: createCatalogPriceResolver(connection) });
-  const server = app.listen(Number(process.env.PORT || 3000), '0.0.0.0');
+  const server = app.listen(Number(process.env.PORT || 8002), '0.0.0.0');
   let shuttingDown = false;
   async function shutdown(signal) {
     if (shuttingDown) return; shuttingDown = true;

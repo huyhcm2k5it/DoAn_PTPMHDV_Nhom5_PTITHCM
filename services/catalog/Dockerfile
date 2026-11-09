@@ -9,6 +9,6 @@ COPY --from=build /out/api /api
 COPY --from=build /out/migrate /migrate
 COPY --from=build /out/worker /worker
 COPY --from=build /out/snapshot /snapshot
-ENV LISTEN_ADDR=:8081
-EXPOSE 8081
+ENV LISTEN_ADDR=:8007
+EXPOSE 8007
 ENTRYPOINT ["/api"]

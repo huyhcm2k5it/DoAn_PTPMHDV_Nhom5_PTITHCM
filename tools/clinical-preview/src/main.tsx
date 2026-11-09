@@ -60,8 +60,8 @@ function Preview() {
           <input value={userId} onChange={(event) => setUserId(event.target.value)} />
         </label>
         <p>
-          Token và lease chỉ giữ trong bộ nhớ. Clinical chạy trên 8082, Diagnostic 8083, Catalog
-          8081. Vé fixture giữ PENDING tới khi Appointment phản hồi thật.
+          Token và lease chỉ giữ trong bộ nhớ. Clinical chạy trên 8008, Diagnostic 8009, Catalog
+          8007. Vé fixture giữ PENDING tới khi Appointment phản hồi thật.
         </p>
       </details>
       {screen === 'doctor' ? (

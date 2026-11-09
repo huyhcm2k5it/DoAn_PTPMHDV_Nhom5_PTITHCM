@@ -32,6 +32,7 @@ if DB_NAME:
             "PASSWORD": os.getenv("NOTIFICATION_DB_PASSWORD", "postgres"),
             "HOST": os.getenv("NOTIFICATION_DB_HOST", "localhost"),
             "PORT": os.getenv("NOTIFICATION_DB_PORT", "5432"),
+            "OPTIONS": {"sslmode": os.getenv("NOTIFICATION_DB_SSLMODE", "prefer")},
         }
     }
 else:

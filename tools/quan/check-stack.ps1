@@ -4,8 +4,8 @@ Push-Location $repoRoot
 try {
   $probe = @'
 (async () => {
-  const targets = { patient:3000, appointment:3000, pharmacy:3000, identity:8000,
-    billing:8000, notification:8000, catalog:8081, clinical:8082, diagnostic:8083 };
+  const targets = { patient:8001, appointment:8002, pharmacy:8003, identity:8004,
+    billing:8005, notification:8006, catalog:8007, clinical:8008, diagnostic:8009 };
   let failed = false;
   for (const [service, port] of Object.entries(targets)) {
     try {

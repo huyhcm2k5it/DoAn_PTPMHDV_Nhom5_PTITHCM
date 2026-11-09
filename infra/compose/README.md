@@ -21,7 +21,7 @@ Bản cấu hình đã qua Compose structural validation. Build image, health c�
 4. Đặt public key Identity thật vào infra/certs/jwt_public.pem và chạy
    `node tools/quan/prepare-gateway-key.js`. Envoy cần JWKS JSON, không đọc PEM như JWKS.
    Private key chỉ ở owner Identity, không commit.
-5. `env/quan.env` có `UMC_AMQP_URL`, các Mongo owner URI và Appointment Redis; `env/huy.env` có năm secret Go/Redis.
+5. `env/quan.env` có Mongo owner URI, AMQP URL/host/cổng và Appointment Redis; `env/huy.env` có ba PostgreSQL DSN và `HUY_AMQP_URL`; `env/hung.env` có DB host/cổng/SSL mode cùng `HUNG_AMQP_URL`. Bảng cổng service 8001–8009 và quy định bổ sung env nằm trong [env README](../../env/README.md).
    Dùng mật khẩu URL-safe. Giá trị phải khớp user đã khởi tạo trong volume cũ;
    init scripts không tự thay mật khẩu DB cũ.
 6. Với broker cũ, xem migration quorum trong tests/e2e/recovery.md trước khi bật worker mới.

@@ -15,10 +15,10 @@ export default defineConfig({
   server: {
     fs: { allow: [fileURLToPath(new URL('../..', import.meta.url))] },
     proxy: {
-      '/api/v1/catalog': 'http://127.0.0.1:8081',
-      '/api/v1/diagnostic-orders': 'http://127.0.0.1:8083',
-      '/api/v1/specimens': 'http://127.0.0.1:8083',
-      '/api': 'http://127.0.0.1:8082',
+      '/api/v1/catalog': 'http://127.0.0.1:8007',
+      '/api/v1/diagnostic-orders': 'http://127.0.0.1:8009',
+      '/api/v1/specimens': 'http://127.0.0.1:8009',
+      '/api': 'http://127.0.0.1:8008',
     },
   },
   test: {

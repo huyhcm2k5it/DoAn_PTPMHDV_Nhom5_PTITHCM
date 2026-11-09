@@ -53,7 +53,7 @@ function Preview() {
           fontFamily: "Segoe UI,sans-serif",
         }}
       >
-        <summary>Chế độ phát triển — kết nối Catalog local :8081</summary>
+        <summary>Chế độ phát triển — kết nối Catalog local :8007</summary>
         <p>
           Giao diện W03 của Huy để ghép vào shell chung. Danh mục công khai
           không cần đăng nhập. API có quyền cần token và access projection thật;

@@ -20,6 +20,15 @@ def get_rabbitmq_connection():
     còn import được cho unit test và cho các lệnh không cần broker
     (migrate, test, kiểm tra cấu hình).
     """
+    url = os.getenv("UMC_AMQP_URL")
+    if url:
+        parameters = pika.URLParameters(url)
+        parameters.heartbeat = 60
+        parameters.blocked_connection_timeout = 3
+        parameters.socket_timeout = 3
+        parameters.stack_timeout = 3
+        parameters.connection_attempts = 1
+        return pika.BlockingConnection(parameters)
     user = os.getenv("RABBITMQ_USER")
     password = os.getenv("RABBITMQ_PASSWORD")
     if not user or not password:

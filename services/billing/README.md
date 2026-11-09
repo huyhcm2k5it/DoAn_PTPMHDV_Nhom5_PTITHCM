@@ -9,7 +9,7 @@ Hưng điền `env/hung.env` theo [mẫu chung](../../env/README.md); Quân cung
 ```powershell
 python -m pip install -r requirements.txt
 python manage.py migrate
-python manage.py runserver 127.0.0.1:8000
+python manage.py runserver 127.0.0.1:8005
 ```
 
 Chạy `python manage.py run_billing_worker` riêng để nhận command/event và phát outbox. Compose đã tách API và worker. `/health/ready` không chứng minh saga thanh toán xuyên service đã xong.

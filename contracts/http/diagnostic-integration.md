@@ -10,7 +10,7 @@ Billing must send `ChargePrepared`, perform `ReserveSettlement`/`SettlementReser
 
 LAB_TECH can collect, reject with reason/version, and recollect. Recollection retains the order/charge and increments the specimen sequence; barcodes are unique. LAB_REVIEW reads the queue/detail. DOCTOR detail requires a current Appointment-owned visit grant; this projection is not yet supplied, so doctor detail currently fails closed with 503. Patient access is excluded from these staff endpoints.
 
-The web feature accepts the team's authenticated transport. Route registration and session management remain in their existing owner modules. The standalone preview proxies Diagnostic to localhost:8083; it does not create accepted claims or successful payments.
+The web feature accepts the team's authenticated transport. Route registration and session management remain in their existing owner modules. The standalone preview proxies Diagnostic to localhost:8009; it does not create accepted claims or successful payments.
 
 Run `tools/huy/test_diagnostic_postgres.py` for the isolated native PostgreSQL suite. CI runs PostgreSQL plus RabbitMQ adapter tests. Shared Gate 3 additionally requires the actual Identity, Appointment and Billing services, Gateway routes, broker ACLs and a clean Compose journey; local fixtures do not establish that whole-group result.
 

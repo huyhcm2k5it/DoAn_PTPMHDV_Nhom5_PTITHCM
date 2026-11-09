@@ -15,6 +15,14 @@ ROUTING_KEY_IDENTITY_ACCESS_CHANGED = "identity.identity-access-changed.v1"
 
 def get_rabbitmq_connection():
     """Tạo kết nối tới RabbitMQ Broker cho Identity service."""
+    url = os.getenv("UMC_AMQP_URL")
+    if url:
+        parameters = pika.URLParameters(url)
+        parameters.heartbeat = 60
+        parameters.blocked_connection_timeout = 300
+        parameters.connection_attempts = 1
+        parameters.socket_timeout = 5.0
+        return pika.BlockingConnection(parameters)
     user = os.getenv("RABBITMQ_USER")
     password = os.getenv("RABBITMQ_PASSWORD")
     if not user or not password:

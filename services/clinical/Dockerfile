@@ -14,6 +14,6 @@ COPY --from=build /out/worker /worker
 COPY --from=build /out/migrate /migrate
 COPY --from=build /out/import-tickets /import-tickets
 COPY --from=build /out/import-catalog /import-catalog
-ENV LISTEN_ADDR=:8082
-EXPOSE 8082
+ENV LISTEN_ADDR=:8008
+EXPOSE 8008
 ENTRYPOINT ["/api"]

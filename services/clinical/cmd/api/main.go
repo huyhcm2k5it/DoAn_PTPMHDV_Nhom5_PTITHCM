@@ -35,7 +35,7 @@ func run() error {
 	defer db.Close()
 	addr := os.Getenv("LISTEN_ADDR")
 	if addr == "" {
-		addr = "127.0.0.1:8082"
+		addr = "127.0.0.1:8008"
 	}
 	issuer, audience, keyPath := os.Getenv("JWT_ISSUER"), os.Getenv("JWT_AUDIENCE"), os.Getenv("JWT_PUBLIC_KEY_FILE")
 	var key *rsa.PublicKey

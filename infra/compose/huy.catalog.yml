@@ -45,13 +45,13 @@ services:
   catalog:
     build: ../../services/catalog
     image: umc-huy-catalog:local
-    ports: ["127.0.0.1:8081:8081"]
+    ports: ["127.0.0.1:8007:8007"]
     environment:
       DATABASE_URL: postgres://catalog_owner:${CATALOG_DB_PASSWORD:?set CATALOG_DB_PASSWORD}@postgres-huy:5432/catalog_db?sslmode=disable
       REDIS_ADDR: redis-huy:6379
       REDIS_USERNAME: default
       REDIS_PASSWORD: ${CATALOG_REDIS_PASSWORD:?set CATALOG_REDIS_PASSWORD}
-      LISTEN_ADDR: :8081
+      LISTEN_ADDR: :8007
     depends_on:
       catalog-migrate: {condition: service_completed_successfully}
       redis-huy: {condition: service_healthy}
@@ -66,10 +66,10 @@ services:
   clinical:
     build: ../../services/clinical
     image: umc-huy-clinical:local
-    ports: ["127.0.0.1:8082:8082"]
+    ports: ["127.0.0.1:8008:8008"]
     environment:
       DATABASE_URL: postgres://clinical_owner:${CLINICAL_DB_PASSWORD:?set CLINICAL_DB_PASSWORD}@postgres-huy:5432/clinical_db?sslmode=disable
-      LISTEN_ADDR: :8082
+      LISTEN_ADDR: :8008
     depends_on:
       clinical-migrate: {condition: service_completed_successfully}
   diagnostic-migrate:
@@ -83,10 +83,10 @@ services:
   diagnostic:
     build: ../../services/diagnostic
     image: umc-huy-diagnostic:local
-    ports: ["127.0.0.1:8083:8083"]
+    ports: ["127.0.0.1:8009:8009"]
     environment:
       DATABASE_URL: postgres://diagnostic_owner:${DIAGNOSTIC_DB_PASSWORD:?set DIAGNOSTIC_DB_PASSWORD}@postgres-huy:5432/diagnostic_db?sslmode=disable
-      LISTEN_ADDR: :8083
+      LISTEN_ADDR: :8009
     depends_on:
       diagnostic-migrate: {condition: service_completed_successfully}
 volumes:

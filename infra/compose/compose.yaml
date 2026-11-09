@@ -112,7 +112,7 @@ services:
       dockerfile: services/patient/Dockerfile
     environment:
       NODE_ENV: production
-      PORT: '3000'
+      PORT: ${PATIENT_PORT:?set PATIENT_PORT}
       MONGODB_URI: $PATIENT_MONGO_URI
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
       JWT_ISSUER: umc-care-identity
@@ -129,7 +129,7 @@ services:
       - CMD
       - node
       - -e
-      - fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      - fetch('http://127.0.0.1:' + process.env.PORT + '/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
       interval: 5s
       timeout: 3s
       retries: 20
@@ -140,7 +140,7 @@ services:
       dockerfile: services/appointment/Dockerfile
     environment:
       NODE_ENV: production
-      PORT: '3000'
+      PORT: ${APPOINTMENT_PORT:?set APPOINTMENT_PORT}
       MONGODB_URI: $APPOINTMENT_MONGO_URI
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
       JWT_ISSUER: umc-care-identity
@@ -158,7 +158,7 @@ services:
       - CMD
       - node
       - -e
-      - fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      - fetch('http://127.0.0.1:' + process.env.PORT + '/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
       interval: 5s
       timeout: 3s
       retries: 20
@@ -209,7 +209,7 @@ services:
       dockerfile: services/pharmacy/Dockerfile
     environment:
       NODE_ENV: production
-      PORT: '3000'
+      PORT: ${PHARMACY_PORT:?set PHARMACY_PORT}
       MONGODB_URI: $PHARMACY_MONGO_URI
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
       JWT_ISSUER: umc-care-identity
@@ -226,7 +226,7 @@ services:
       - CMD
       - node
       - -e
-      - fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      - fetch('http://127.0.0.1:' + process.env.PORT + '/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
       interval: 5s
       timeout: 3s
       retries: 20
@@ -247,21 +247,20 @@ services:
       - CMD
       - curl
       - -f
-      - http://127.0.0.1:8000/health/ready
+      - http://127.0.0.1:8004/health/ready
       interval: 5s
       timeout: 3s
       retries: 20
     restart: unless-stopped
     environment: &id002
-      IDENTITY_DB_HOST: postgres
-      IDENTITY_DB_NAME: identity_db
-      IDENTITY_DB_USER: identity_owner
-      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:?set owner database password}
+      PORT: ${IDENTITY_PORT:?set IDENTITY_PORT}
       JWT_PUBLIC_KEY_PATH: /run/config/jwt_public.pem
-      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
       RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
-      RABBITMQ_VHOST: /umc-care
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/umc-care}
+      UMC_AMQP_URL: ${HUNG_AMQP_URL:?set Hung AMQP URL}
       JWT_PRIVATE_KEY_PATH: /run/secrets/identity_private.pem
     volumes: &id003
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
@@ -282,21 +281,20 @@ services:
       - CMD
       - curl
       - -f
-      - http://127.0.0.1:8000/health/ready
+      - http://127.0.0.1:8005/health/ready
       interval: 5s
       timeout: 3s
       retries: 20
     restart: unless-stopped
     environment:
-      BILLING_DB_HOST: postgres
-      BILLING_DB_NAME: billing_db
-      BILLING_DB_USER: billing_owner
-      BILLING_DB_PASSWORD: ${BILLING_DB_PASSWORD:?set owner database password}
+      PORT: ${BILLING_PORT:?set BILLING_PORT}
       JWT_PUBLIC_KEY_PATH: /run/config/jwt_public.pem
-      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
       RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
-      RABBITMQ_VHOST: /umc-care
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/umc-care}
+      UMC_AMQP_URL: ${HUNG_AMQP_URL:?set Hung AMQP URL}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
   billing-worker:
@@ -320,15 +318,14 @@ services:
     - private
     restart: unless-stopped
     environment:
-      BILLING_DB_HOST: postgres
-      BILLING_DB_NAME: billing_db
-      BILLING_DB_USER: billing_owner
-      BILLING_DB_PASSWORD: ${BILLING_DB_PASSWORD:?set owner database password}
+      PORT: ${BILLING_PORT:?set BILLING_PORT}
       JWT_PUBLIC_KEY_PATH: /run/config/jwt_public.pem
-      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
       RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
-      RABBITMQ_VHOST: /umc-care
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/umc-care}
+      UMC_AMQP_URL: ${HUNG_AMQP_URL:?set Hung AMQP URL}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
   notification:
@@ -347,21 +344,20 @@ services:
       - CMD
       - curl
       - -f
-      - http://127.0.0.1:8000/health/ready
+      - http://127.0.0.1:8006/health/ready
       interval: 5s
       timeout: 3s
       retries: 20
     restart: unless-stopped
     environment:
-      NOTIFICATION_DB_HOST: postgres
-      NOTIFICATION_DB_NAME: notification_db
-      NOTIFICATION_DB_USER: notification_owner
-      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?set owner database password}
+      PORT: ${NOTIFICATION_PORT:?set NOTIFICATION_PORT}
       JWT_PUBLIC_KEY_PATH: /run/config/jwt_public.pem
-      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
       RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
-      RABBITMQ_VHOST: /umc-care
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/umc-care}
+      UMC_AMQP_URL: ${HUNG_AMQP_URL:?set Hung AMQP URL}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
   notification-worker:
@@ -383,15 +379,14 @@ services:
     networks:
     - private
     environment:
-      NOTIFICATION_DB_HOST: postgres
-      NOTIFICATION_DB_NAME: notification_db
-      NOTIFICATION_DB_USER: notification_owner
-      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?set owner database password}
+      PORT: ${NOTIFICATION_PORT:?set NOTIFICATION_PORT}
       JWT_PUBLIC_KEY_PATH: /run/config/jwt_public.pem
-      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
       RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
-      RABBITMQ_VHOST: /umc-care
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/umc-care}
+      UMC_AMQP_URL: ${HUNG_AMQP_URL:?set Hung AMQP URL}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
   gateway:
@@ -399,7 +394,7 @@ services:
       context: ../../envoy
       dockerfile: Dockerfile
     ports:
-    - 127.0.0.1:8080:8080
+    - 127.0.0.1:${GATEWAY_HOST_PORT:-8080}:8080
     volumes:
     - ../../.runtime/jwks.json:/etc/envoy/jwks.json:ro
     depends_on:
@@ -455,7 +450,7 @@ services:
     entrypoint:
     - /migrate
     environment:
-      DATABASE_URL: postgres://catalog_owner:${CATALOG_DB_PASSWORD}@postgres:5432/catalog_db?sslmode=disable
+      DATABASE_URL: ${CATALOG_DATABASE_URL:?set Catalog PostgreSQL URL}
     depends_on:
       postgres:
         condition: service_healthy
@@ -465,8 +460,8 @@ services:
     image: umc-care-catalog:local
     build: ../../services/catalog
     environment:
-      DATABASE_URL: postgres://catalog_owner:${CATALOG_DB_PASSWORD}@postgres:5432/catalog_db?sslmode=disable
-      LISTEN_ADDR: :8081
+      DATABASE_URL: ${CATALOG_DATABASE_URL:?set Catalog PostgreSQL URL}
+      LISTEN_ADDR: :${CATALOG_PORT:?set CATALOG_PORT}
       REDIS_ADDR: redis-catalog:6379
       REDIS_USERNAME: catalog
       REDIS_PASSWORD: ${CATALOG_REDIS_PASSWORD}
@@ -486,8 +481,8 @@ services:
     entrypoint:
     - /worker
     environment:
-      DATABASE_URL: postgres://catalog_owner:${CATALOG_DB_PASSWORD}@postgres:5432/catalog_db?sslmode=disable
-      AMQP_URL: ${UMC_AMQP_URL}
+      DATABASE_URL: ${CATALOG_DATABASE_URL:?set Catalog PostgreSQL URL}
+      AMQP_URL: ${HUY_AMQP_URL:?set Huy AMQP URL}
       CATALOG_DECLARE_TOPOLOGY: 'true'
     depends_on:
       catalog-migrate:
@@ -503,7 +498,7 @@ services:
     entrypoint:
     - /migrate
     environment:
-      DATABASE_URL: postgres://clinical_owner:${CLINICAL_DB_PASSWORD}@postgres:5432/clinical_db?sslmode=disable
+      DATABASE_URL: ${CLINICAL_DATABASE_URL:?set Clinical PostgreSQL URL}
     depends_on:
       postgres:
         condition: service_healthy
@@ -513,8 +508,8 @@ services:
     image: umc-care-clinical:local
     build: ../../services/clinical
     environment:
-      DATABASE_URL: postgres://clinical_owner:${CLINICAL_DB_PASSWORD}@postgres:5432/clinical_db?sslmode=disable
-      LISTEN_ADDR: :8082
+      DATABASE_URL: ${CLINICAL_DATABASE_URL:?set Clinical PostgreSQL URL}
+      LISTEN_ADDR: :${CLINICAL_PORT:?set CLINICAL_PORT}
       JWT_ISSUER: umc-care-identity
       JWT_AUDIENCE: umc-care-services
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
@@ -531,8 +526,8 @@ services:
     entrypoint:
     - /worker
     environment:
-      DATABASE_URL: postgres://clinical_owner:${CLINICAL_DB_PASSWORD}@postgres:5432/clinical_db?sslmode=disable
-      RABBITMQ_URL: ${UMC_AMQP_URL}
+      DATABASE_URL: ${CLINICAL_DATABASE_URL:?set Clinical PostgreSQL URL}
+      RABBITMQ_URL: ${HUY_AMQP_URL:?set Huy AMQP URL}
       CLINICAL_DECLARE_TOPOLOGY: '1'
     depends_on:
       clinical-migrate:
@@ -548,7 +543,7 @@ services:
     entrypoint:
     - /migrate
     environment:
-      DATABASE_URL: postgres://diagnostic_owner:${DIAGNOSTIC_DB_PASSWORD}@postgres:5432/diagnostic_db?sslmode=disable
+      DATABASE_URL: ${DIAGNOSTIC_DATABASE_URL:?set Diagnostic PostgreSQL URL}
     depends_on:
       postgres:
         condition: service_healthy
@@ -558,8 +553,8 @@ services:
     image: umc-care-diagnostic:local
     build: ../../services/diagnostic
     environment:
-      DATABASE_URL: postgres://diagnostic_owner:${DIAGNOSTIC_DB_PASSWORD}@postgres:5432/diagnostic_db?sslmode=disable
-      LISTEN_ADDR: :8083
+      DATABASE_URL: ${DIAGNOSTIC_DATABASE_URL:?set Diagnostic PostgreSQL URL}
+      LISTEN_ADDR: :${DIAGNOSTIC_PORT:?set DIAGNOSTIC_PORT}
       JWT_ISSUER: umc-care-identity
       JWT_AUDIENCE: umc-care-services
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
@@ -576,8 +571,8 @@ services:
     entrypoint:
     - /worker
     environment:
-      DATABASE_URL: postgres://diagnostic_owner:${DIAGNOSTIC_DB_PASSWORD}@postgres:5432/diagnostic_db?sslmode=disable
-      RABBITMQ_URL: ${UMC_AMQP_URL}
+      DATABASE_URL: ${DIAGNOSTIC_DATABASE_URL:?set Diagnostic PostgreSQL URL}
+      RABBITMQ_URL: ${HUY_AMQP_URL:?set Huy AMQP URL}
       DIAGNOSTIC_DECLARE_TOPOLOGY: '1'
     depends_on:
       diagnostic-migrate:

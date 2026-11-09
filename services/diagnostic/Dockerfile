@@ -8,4 +8,5 @@ FROM alpine:3.23
 RUN adduser -D -u 10001 app
 COPY --from=build /api /worker /migrate /import-projections /import-catalog /
 USER app
+EXPOSE 8009
 ENTRYPOINT ["/api"]

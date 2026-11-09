@@ -9,7 +9,7 @@ Hưng điền `env/hung.env` theo [mẫu chung](../../env/README.md). Compose n�
 ```powershell
 python -m pip install -r requirements.txt
 python manage.py migrate
-python manage.py runserver 127.0.0.1:8000
+python manage.py runserver 127.0.0.1:8004
 ```
 
 Chạy `python manage.py run_identity_worker` trong tiến trình riêng khi dùng RabbitMQ. `/health/live` kiểm tiến trình; `/health/ready` kiểm dependency, chưa xác nhận consumer khác đã cập nhật projection. `ALLOW_DEV_OTP` chỉ dành cho môi trường phát triển.

@@ -19,6 +19,11 @@ if (-not (Test-Path -LiteralPath $envPath)) {
   $rabbitPassword = New-SecretHex 32
   $appointmentRedisPassword = New-SecretHex 32
   $lines = @(
+    "GATEWAY_HOST_PORT=8080"
+    "PATIENT_PORT=8001"
+    "APPOINTMENT_PORT=8002"
+    "PHARMACY_PORT=8003"
+    "RABBITMQ_PORT=5672"
     "MONGO_ROOT_USER=local-root"
     "MONGO_ROOT_PASSWORD=$rootPassword"
     "PATIENT_DB_PASSWORD=$patientPassword"
@@ -30,6 +35,8 @@ if (-not (Test-Path -LiteralPath $envPath)) {
     "RABBITMQ_DEFAULT_USER=local-worker"
     "RABBITMQ_DEFAULT_PASS=$rabbitPassword"
     "RABBITMQ_DEFAULT_VHOST=/umc-care"
+    "RABBITMQ_HOST=rabbitmq"
+    "RABBITMQ_VHOST=/umc-care"
     "RABBITMQ_USER=local-worker"
     "RABBITMQ_PASSWORD=$rabbitPassword"
     "UMC_AMQP_URL=amqp://local-worker:$rabbitPassword@rabbitmq:5672/%2Fumc-care"

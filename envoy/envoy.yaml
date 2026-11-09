@@ -1039,7 +1039,7 @@ static_resources:
             address:
               socket_address:
                 address: identity
-                port_value: 8000
+                port_value: 8004
   - name: patient_service
     connect_timeout: 2s
     type: STRICT_DNS
@@ -1052,7 +1052,7 @@ static_resources:
             address:
               socket_address:
                 address: patient
-                port_value: 3000
+                port_value: 8001
   - name: appointment_service
     connect_timeout: 2s
     type: STRICT_DNS
@@ -1065,7 +1065,7 @@ static_resources:
             address:
               socket_address:
                 address: appointment
-                port_value: 3000
+                port_value: 8002
   - name: catalog_service
     connect_timeout: 2s
     type: STRICT_DNS
@@ -1078,7 +1078,7 @@ static_resources:
             address:
               socket_address:
                 address: catalog
-                port_value: 8081
+                port_value: 8007
   - name: pharmacy_service
     connect_timeout: 2s
     type: STRICT_DNS
@@ -1091,7 +1091,7 @@ static_resources:
             address:
               socket_address:
                 address: pharmacy
-                port_value: 3000
+                port_value: 8003
   - name: clinical_service
     connect_timeout: 2s
     type: STRICT_DNS
@@ -1104,7 +1104,7 @@ static_resources:
             address:
               socket_address:
                 address: clinical
-                port_value: 8082
+                port_value: 8008
   - name: diagnostic_service
     connect_timeout: 2s
     type: STRICT_DNS
@@ -1117,7 +1117,7 @@ static_resources:
             address:
               socket_address:
                 address: diagnostic
-                port_value: 8083
+                port_value: 8009
   - name: billing_service
     connect_timeout: 2s
     type: STRICT_DNS
@@ -1130,7 +1130,7 @@ static_resources:
             address:
               socket_address:
                 address: billing
-                port_value: 8000
+                port_value: 8005
   - name: notification_service
     connect_timeout: 2s
     type: STRICT_DNS
@@ -1143,7 +1143,7 @@ static_resources:
             address:
               socket_address:
                 address: notification
-                port_value: 8000
+                port_value: 8006
 admin:
   address:
     socket_address:

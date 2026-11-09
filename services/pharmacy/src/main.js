@@ -9,7 +9,7 @@ async function main() {
     verifyBearerToken: verifier,
     verifyAuthorizationLease: verifier,
   });
-  const server = app.listen(Number(process.env.PORT || 3000), '0.0.0.0');
+  const server = app.listen(Number(process.env.PORT || 8003), '0.0.0.0');
   let shuttingDown = false;
   async function shutdown(signal) {
     if (shuttingDown) return;

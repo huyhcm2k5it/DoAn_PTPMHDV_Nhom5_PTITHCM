@@ -17,11 +17,16 @@ class Command(BaseCommand):
         while True:
             conn=None
             try:
-                params=pika.ConnectionParameters(
+                params=pika.URLParameters(os.environ["UMC_AMQP_URL"]) if os.environ.get("UMC_AMQP_URL") else pika.ConnectionParameters(
                     host=os.environ.get("RABBITMQ_HOST","rabbitmq"),
+                    port=int(os.environ.get("RABBITMQ_PORT","5672")),
                     virtual_host=os.environ.get("RABBITMQ_VHOST","/umc-care"),
                     credentials=pika.PlainCredentials(os.environ["RABBITMQ_USER"],os.environ["RABBITMQ_PASSWORD"]),
                     heartbeat=60,socket_timeout=3,blocked_connection_timeout=3,connection_attempts=1)
+                params.heartbeat=60
+                params.socket_timeout=3
+                params.blocked_connection_timeout=3
+                params.connection_attempts=1
                 conn=pika.BlockingConnection(params)
                 channel=conn.channel()
                 channel.exchange_declare(exchange="umc.events.identity.v1",exchange_type="topic",durable=True)
