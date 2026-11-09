@@ -63,7 +63,7 @@ services:
     image: rabbitmq:4.3.6-management
     hostname: rabbitmq
     env_file:
-    - ../../rabbitmq/.env
+    - ../../env/quan.env
     volumes:
     - rabbitmq_data:/var/lib/rabbitmq
     networks:
@@ -236,7 +236,7 @@ services:
       context: ../../services/identity
       dockerfile: Dockerfile
     env_file:
-    - ../../services/identity/.env
+    - ../../env/hung.env
     depends_on:
       postgres:
         condition: service_healthy
@@ -271,7 +271,7 @@ services:
       context: ../../services/billing
       dockerfile: Dockerfile
     env_file:
-    - ../../services/billing/.env
+    - ../../env/hung.env
     depends_on:
       postgres:
         condition: service_healthy
@@ -308,7 +308,7 @@ services:
     - manage.py
     - run_billing_worker
     env_file:
-    - ../../services/billing/.env
+    - ../../env/hung.env
     depends_on:
       postgres:
         condition: service_healthy
@@ -336,7 +336,7 @@ services:
       context: ../../services/notification
       dockerfile: Dockerfile
     env_file:
-    - ../../services/notification/.env
+    - ../../env/hung.env
     depends_on:
       postgres:
         condition: service_healthy
@@ -373,7 +373,7 @@ services:
     - manage.py
     - run_notification_worker
     env_file:
-    - ../../services/notification/.env
+    - ../../env/hung.env
     restart: unless-stopped
     depends_on:
       rabbitmq:

@@ -18,6 +18,6 @@ try {
   process.exitCode = failed ? 1 : 0;
 })().catch(() => { process.exitCode = 1; });
 '@
-  docker compose --env-file .env -f infra/compose/compose.yaml exec -T appointment node -e $probe
+  docker compose --env-file env/quan.env --env-file env/huy.env --env-file env/hung.env -f infra/compose/compose.yaml exec -T appointment node -e $probe
   if ($LASTEXITCODE -ne 0) { throw "Nine-service readiness gate failed." }
 } finally { Pop-Location }

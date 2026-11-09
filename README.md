@@ -1,6 +1,12 @@
 # UMC Care
 
-UMC Care uses nine independently owned services. Quân’s Patient, Appointment and Pharmacy services use Node.js, Express, Mongoose and JavaScript CommonJS. The quan branch now includes Pharmacy PH-001..008, its web workspace, transactional stock/settlement workflows and integration tooling.
+UMC Care là đồ án 9 microservice. Mỗi service sở hữu database, migration, API và worker của mình. Các thao tác liên service dùng RabbitMQ và local projection; Envoy là cổng HTTP chung cho web và Android.
+
+| Người phụ trách | Service | Công nghệ |
+| --- | --- | --- |
+| Huy | Catalog, Clinical, Diagnostic | Go, PostgreSQL; Catalog dùng Redis cache |
+| Quân | Patient, Appointment, Pharmacy | Node.js CommonJS, MongoDB |
+| Hưng | Identity, Billing, Notification | Django, PostgreSQL |
 
 ## GitHub workflow
 
@@ -17,7 +23,11 @@ UMC Care uses nine independently owned services. Quân’s Patient, Appointment 
 - tests: contract and integration tests.
 - docs: project source documentation.
 
-Each service owns its database. Patient, Appointment and Pharmacy use separate Mongo databases and credentials. Their containers are private to the Compose network. Envoy routes, JWT/JWKS and shared Compose are configured; actual Identity/Billing interoperability and nine-service acceptance remain pending owner verification.
+Mỗi service dùng credential riêng và không đọc database của service khác. Xem [env theo ba owner](env/README.md) và [Compose README](infra/compose/README.md) để chuẩn bị JWT key, database, RabbitMQ và Gateway. Chạy migration trước API; chạy worker riêng để phát outbox/nhận event. Chỉ bật HTTP API không hoàn thành luồng bất đồng bộ.
+
+**Chia sẻ giữa các máy:** source + `docker compose up --build` đủ để dựng image local; Docker Hub không đồng bộ PostgreSQL/MongoDB volumes hay RabbitMQ queue. Nhóm phải thống nhất DB/broker chung hoặc chuyển dữ liệu bằng backup/restore/seed. Compose mặc định dùng DB local và chỉ Gateway mở cổng host; xem mục đầu của [Compose README](infra/compose/README.md).
+
+Hợp đồng giao tiếp gồm [9 OpenAPI/86 operation](contracts/http/), [message schema](contracts/messages/) và [baseline manifest](contracts/be-baseline-manifest.json). HTTP `202` nghĩa là yêu cầu đã được nhận; client cần đọc `statusUrl` để biết trạng thái cuối.
 
 ## Mongo storage and HTTP tests
 
@@ -27,6 +37,6 @@ The isolated Mongo test package is in tests/mongo. It starts temporary replica s
 powershell -File tools/quan/verify-local.ps1
 ```
 
-Setup/migration/seed instructions: [shared Compose README](infra/compose/README.md).
-Current implementation and unresolved receiver gates: [Quân week 4 handoff](docs/ban-giao-umc-care/quan-week4-pharmacy.md), [week 5 release preparation](docs/ban-giao-umc-care/quan-week5-release.md), [24-task tracker](docs/ban-giao-umc-care/quan-week4-5-status.csv).
-Local tests passing does not mean live E2E, remote CI, Android or release acceptance has completed.
+Kiểm tra contract tĩnh bằng `python tools/be/check_api_matrix.py` và `python tools/be/check_baseline.py`; kiểm tra một phần topology bằng `python tools/be/test_topology.py`. Lệnh chạy riêng của từng service nằm trong README của service đó. [Bộ test chung](tests/README.md) và [hồ sơ bàn giao](docs/ban-giao-umc-care/README.md) ghi rõ bằng chứng đã có và phần còn chờ.
+
+**Giới hạn hiện tại:** Clinical cần feed ticket trước khi claim từ Appointment; một số API bác sĩ của Clinical/Diagnostic cần projection quyền hiện hành. Contract test, dữ liệu seed hoặc health check không chứng minh hành trình 9 service đã chạy end-to-end.

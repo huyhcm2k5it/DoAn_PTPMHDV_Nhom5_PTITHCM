@@ -16,34 +16,29 @@ function New-Password {
   return [System.BitConverter]::ToString($buffer).Replace("-", "").ToLowerInvariant()
 }
 & (Join-Path $repoRoot "scripts/dev/bootstrap-local.ps1")
-$envFile = Join-Path $repoRoot ".env"
-$values = Read-Environment $envFile
-foreach ($key in @("HUY_POSTGRES_PASSWORD", "CATALOG_DB_PASSWORD", "CLINICAL_DB_PASSWORD", "DIAGNOSTIC_DB_PASSWORD", "CATALOG_REDIS_PASSWORD")) {
-  if (-not $values.ContainsKey($key)) {
-    [System.IO.File]::AppendAllText($envFile, [Environment]::NewLine + $key + "=" + (New-Password), [System.Text.UTF8Encoding]::new($false))
-  }
+$quanFile = Join-Path $repoRoot "env/quan.env"
+$huyFile = Join-Path $repoRoot "env/huy.env"
+$hungFile = Join-Path $repoRoot "env/hung.env"
+$quan = Read-Environment $quanFile
+foreach ($key in @("RABBITMQ_DEFAULT_USER", "RABBITMQ_DEFAULT_PASS", "RABBITMQ_DEFAULT_VHOST", "RABBITMQ_USER", "RABBITMQ_PASSWORD", "UMC_AMQP_URL", "APPOINTMENT_REDIS_PASSWORD")) {
+  if (-not $quan[$key]) { throw "env/quan.env is missing $key" }
 }
-$rabbitFile = Join-Path $repoRoot "rabbitmq/.env"
-if (-not (Test-Path -LiteralPath $rabbitFile)) {
-  $password = New-Password
-  [System.IO.File]::WriteAllLines($rabbitFile, @("RABBITMQ_DEFAULT_USER=local-worker",
-    "RABBITMQ_DEFAULT_PASS=$password", "RABBITMQ_DEFAULT_VHOST=/umc-care"), [System.Text.UTF8Encoding]::new($false))
+if ($quan["RABBITMQ_DEFAULT_USER"] -ne $quan["RABBITMQ_USER"] -or $quan["RABBITMQ_DEFAULT_PASS"] -ne $quan["RABBITMQ_PASSWORD"]) {
+  throw "RabbitMQ broker and worker credentials differ in env/quan.env"
 }
-$rabbit = Read-Environment $rabbitFile
-if (-not $values.ContainsKey("UMC_AMQP_URL")) {
-  foreach ($key in @("RABBITMQ_DEFAULT_USER", "RABBITMQ_DEFAULT_PASS", "RABBITMQ_DEFAULT_VHOST")) {
-    if (-not $rabbit[$key]) { throw "RabbitMQ env is incomplete: $key" }
+if (-not (Test-Path -LiteralPath $huyFile)) {
+  $lines = foreach ($key in @("HUY_POSTGRES_PASSWORD", "CATALOG_DB_PASSWORD", "CLINICAL_DB_PASSWORD", "DIAGNOSTIC_DB_PASSWORD", "CATALOG_REDIS_PASSWORD")) {
+    "$key=$(New-Password)"
   }
-  $userPart = [Uri]::EscapeDataString($rabbit["RABBITMQ_DEFAULT_USER"])
-  $passPart = [Uri]::EscapeDataString($rabbit["RABBITMQ_DEFAULT_PASS"])
-  $vhostPart = [Uri]::EscapeDataString($rabbit["RABBITMQ_DEFAULT_VHOST"])
-  $url = "amqp://" + $userPart + ":" + $passPart + "@rabbitmq:5672/" + $vhostPart
-  [System.IO.File]::AppendAllText($envFile, [Environment]::NewLine + "UMC_AMQP_URL=" + $url + [Environment]::NewLine,
-    [System.Text.UTF8Encoding]::new($false))
+  [System.IO.File]::WriteAllLines($huyFile, $lines, [System.Text.UTF8Encoding]::new($false))
+  Write-Output "Created env/huy.env with local-only generated secrets."
+}
+if (-not (Test-Path -LiteralPath $hungFile)) {
+  throw "Create env/hung.env from env/hung.env.example with Hưng's values before starting Compose."
 }
 Push-Location $repoRoot
 try {
   node tools/quan/prepare-gateway-key.js
   if ($LASTEXITCODE -ne 0) { throw "Configure Identity public key before preparing Gateway JWKS." }
 } finally { Pop-Location }
-Write-Output "Prepared missing local values; existing values were preserved. Configure Identity/Billing/Notification owner env before starting Compose."
+Write-Output "Prepared three-owner env layout. Existing owner values were preserved."

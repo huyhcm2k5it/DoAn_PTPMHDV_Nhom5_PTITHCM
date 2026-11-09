@@ -5,12 +5,12 @@ Sáu HTTP operation CA-001–006, CatalogChanged v1 snapshot/checkpoint stream, 
 
 ## Chạy với Compose riêng của Catalog
 
-Từ gốc repo, copy `infra/compose/huy.env.example` sang `infra/compose/.env.local`, điền năm password khác nhau (ký tự URL-safe). Cần Docker engine chạy:
+Từ gốc repo, copy `env/huy.env.example` sang `env/huy.env`, điền năm password khác nhau (ký tự URL-safe). Cần Docker engine chạy:
 
 ```powershell
-docker compose --env-file infra/compose/.env.local -f infra/compose/huy.catalog.yml up --build -d
+docker compose --env-file env/huy.env -f infra/compose/huy.catalog.yml up --build -d
 # Seed chỉ dành cho demo, chạy chủ động sau migration:
-docker compose --env-file infra/compose/.env.local -f infra/compose/huy.catalog.yml run --rm catalog-migrate -seed
+docker compose --env-file env/huy.env -f infra/compose/huy.catalog.yml run --rm catalog-migrate -seed
 Invoke-RestMethod http://127.0.0.1:8081/health/ready
 Invoke-RestMethod http://127.0.0.1:8081/api/v1/medical-services
 ```
@@ -19,7 +19,7 @@ Compose bind API/DB/Redis vào loopback. Redis giới hạn 128 MiB với `allke
 
 ## Chạy Go native
 
-Tạo một DB riêng thuộc Catalog, set `DATABASE_URL` theo `.env.example`; không dùng DB service khác. Từ repo:
+Tạo một DB riêng thuộc Catalog, set `DATABASE_URL` từ credential trong `env/huy.env`; không dùng DB service khác. Từ repo:
 
 ```powershell
 $env:DATABASE_URL='postgres://catalog_owner:YOUR_URL_SAFE_PASSWORD@127.0.0.1:55432/catalog_db?sslmode=disable'
@@ -82,4 +82,4 @@ python tools/huy/check_architecture.py
 
 Linux/CI có PostgreSQL riêng: set `TEST_DATABASE_URL` vào DB bắt đầu `umc_huy_test`, chạy `go test -tags=integration -count=1 -v ./internal/adapters/outbound/postgres`. Test không tự skip nếu thiếu DB. Unit test thường không được tính thay integration. Bộ DB test chứng minh seed lặp, nullable giá, concurrent key/overlap, rollback khi outbox lỗi, quyền bị thu hồi và cả 6 route qua RSA JWT thật trong fixture test. File response test thật dùng cho JSON Schema validation.
 
-Web feature và preview: `apps/web/src/features/catalog/README.md`, `tools/catalog-preview/README.md`. CI definition trong `.github/workflows/huy-go.yml`; chưa chạy trên GitHub vì chưa push.
+Web feature và preview: `apps/web/src/features/catalog/README.md`, `tools/catalog-preview/README.md`. CI definition trong `.github/workflows/huy-go.yml`; xem kết quả của commit trên GitHub để biết job đã chạy hay chưa.

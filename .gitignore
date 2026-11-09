@@ -10,7 +10,7 @@ coverage/
 # Keep local environment values and secrets out of Git; commit only examples.
 .env
 .env.*
-!.env.example
+env/*.env
 
 *.exe
 *.test

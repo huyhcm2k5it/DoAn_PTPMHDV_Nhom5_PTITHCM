@@ -1,22 +1,27 @@
 # Stack chung UMC Care — bàn giao tuần 4–5
 
-Bản cấu hình đã qua Compose structural validation. Chưa xác nhận build image/9 health hoặc E2E live
-trên máy hiện tại vì Docker engine không chạy. Cấu hình Go API/worker/migrate đã ghép vào cùng private network.
+## Docker image, dữ liệu và máy của từng thành viên
+
+`docker compose --env-file env/quan.env --env-file env/huy.env --env-file env/hung.env -f infra/compose/compose.yaml up -d --build` tải base image (MongoDB, PostgreSQL, RabbitMQ, Redis) nếu máy chưa có và **build image ứng dụng từ source tại máy**. Không cần push image ứng dụng lên Docker Hub để chạy Compose local. Chỉ cần registry/push/pull nếu nhóm chọn phân phối image đã build thay cho việc build từ source.
+
+Docker Hub lưu image, **không chứa dữ liệu trong named volumes** `mongo_data`, `postgres_be_data`, `rabbitmq_data`. Mỗi máy chạy Compose riêng sẽ có database và broker riêng, nên dữ liệu/event không tự xuất hiện trên máy người khác. Muốn cùng thấy dữ liệu, nhóm phải dùng chung DB/broker có địa chỉ truy cập được và credential thống nhất, hoặc thực hiện backup/restore/seed vào từng môi trường. Dữ liệu Huy đã nhập trên Neon chỉ có ở database Neon tương ứng; Compose mặc định vẫn trỏ Catalog/Clinical/Diagnostic về PostgreSQL container local.
+
+Compose hiện không publish cổng RabbitMQ `5672`/`15672` ra host. Tên `rabbitmq` trong `UMC_AMQP_URL` chỉ phân giải bên trong Compose network. Để service ở máy khác kết nối cùng broker, owner hạ tầng phải cung cấp host/port truy cập được, vhost `/umc-care`, user/password và ACL tương ứng, import `rabbitmq/definitions.json`, rồi cấu hình URL của từng worker. Ba file thật trong `env/` không có trong Git; xem [mẫu theo owner](../../env/README.md).
+
+Bản cấu hình đã qua Compose structural validation. Build image, health của 9 service và E2E live phải được xác nhận trên máy có Docker engine chạy. Go API/worker/migrate đã có trong cùng private network; health thành công vẫn chưa chứng minh hành trình nghiệp vụ.
 
 ## Chuẩn bị trên máy local
 
 1. Cài dependencies theo lockfile: npm ci ở services/patient, services/appointment, services/pharmacy,
    tests/mongo và apps/web. Node theo CI là 24.14.0.
-2. Chạy từ repository root:
-   `powershell -NoProfile -ExecutionPolicy Bypass -File tools/quan/prepare-stack.ps1`.
-   Script tạo biến còn thiếu và giữ giá trị hiện có; không rotate mật khẩu DB/volume đang dùng.
-3. Hưng chuẩn bị services/identity/.env, services/billing/.env và services/notification/.env
-   theo .env.example của từng owner: DB host postgres, broker host rabbitmq và đúng vhost/credentials.
+2. Mỗi owner tạo file của mình từ `env/quan.env.example`, `env/huy.env.example`, `env/hung.env.example`.
+   Quân có thể dùng `scripts/dev/bootstrap-local.ps1` để tạo `env/quan.env` và Mongo keyfile local; `tools/quan/prepare-stack.ps1` tạo `env/huy.env` nếu thiếu, giữ file đã có và yêu cầu `env/hung.env` do Hưng chuẩn bị.
+3. Hưng điền `env/hung.env`: DB host trong Compose là `postgres`, broker host là `rabbitmq` và đúng vhost/credentials từ `env/quan.env`.
    Đối chiếu infra/compose/postgres/hung/init.sql; không dùng mật khẩu placeholder để nghiệm thu.
 4. Đặt public key Identity thật vào infra/certs/jwt_public.pem và chạy
    `node tools/quan/prepare-gateway-key.js`. Envoy cần JWKS JSON, không đọc PEM như JWKS.
    Private key chỉ ở owner Identity, không commit.
-5. .env root có UMC_AMQP_URL, các Mongo owner URI và năm secret Go/Redis.
+5. `env/quan.env` có `UMC_AMQP_URL`, các Mongo owner URI và Appointment Redis; `env/huy.env` có năm secret Go/Redis.
    Dùng mật khẩu URL-safe. Giá trị phải khớp user đã khởi tạo trong volume cũ;
    init scripts không tự thay mật khẩu DB cũ.
 6. Với broker cũ, xem migration quorum trong tests/e2e/recovery.md trước khi bật worker mới.
@@ -26,8 +31,8 @@ trên máy hiện tại vì Docker engine không chạy. Cấu hình Go API/work
 ## Dựng và kiểm tra
 
 ```powershell
-docker compose --env-file .env -f infra/compose/compose.yaml config --quiet
-docker compose --env-file .env -f infra/compose/compose.yaml up -d --build
+docker compose --env-file env/quan.env --env-file env/huy.env --env-file env/hung.env -f infra/compose/compose.yaml config --quiet
+docker compose --env-file env/quan.env --env-file env/huy.env --env-file env/hung.env -f infra/compose/compose.yaml up -d --build
 powershell -File tools/quan/check-stack.ps1
 powershell -File tools/quan/verify-local.ps1
 ```
@@ -35,7 +40,7 @@ powershell -File tools/quan/verify-local.ps1
 Mongo bootstrap tạo replica/user trước Node API. Go migrations chạy trước Go API/worker.
 Publisher/expiry/reconcile chạy trong worker riêng; chỉ bật API không làm outbox tự drain.
 Gateway chỉ public port 8080; Postgres của Huy và Redis ở private network.
-Postgres của Hưng hiện còn bind localhost:5432 theo baseline, cần owner review trước môi trường ngoài máy local.
+Trong Compose chung này, PostgreSQL không publish cổng ra host; cấu hình chạy riêng của từng owner cần được kiểm tra độc lập.
 Health thành công chỉ chứng minh dependency sẵn sàng, không chứng minh hành trình nghiệp vụ.
 
 ## Pharmacy migration và seed
@@ -43,10 +48,10 @@ Health thành công chỉ chứng minh dependency sẵn sàng, không chứng mi
 Trong container pharmacy, MONGODB_URI đã chọn pharmacy_db:
 
 ```powershell
-docker compose --env-file .env -f infra/compose/compose.yaml exec -T pharmacy node scripts/migrate-storage.js
-docker compose --env-file .env -f infra/compose/compose.yaml exec -T pharmacy node scripts/migrate-storage.js --apply
-docker compose --env-file .env -f infra/compose/compose.yaml exec -T pharmacy node scripts/seed-demo.js --dry-run
-docker compose --env-file .env -f infra/compose/compose.yaml exec -T pharmacy node scripts/seed-demo.js
+docker compose --env-file env/quan.env --env-file env/huy.env --env-file env/hung.env -f infra/compose/compose.yaml exec -T pharmacy node scripts/migrate-storage.js
+docker compose --env-file env/quan.env --env-file env/huy.env --env-file env/hung.env -f infra/compose/compose.yaml exec -T pharmacy node scripts/migrate-storage.js --apply
+docker compose --env-file env/quan.env --env-file env/huy.env --env-file env/hung.env -f infra/compose/compose.yaml exec -T pharmacy node scripts/seed-demo.js --dry-run
+docker compose --env-file env/quan.env --env-file env/huy.env --env-file env/hung.env -f infra/compose/compose.yaml exec -T pharmacy node scripts/seed-demo.js
 ```
 
 Migration mặc định chỉ report; active legacy hold thiếu attemptNo phải được owner đối soát.
