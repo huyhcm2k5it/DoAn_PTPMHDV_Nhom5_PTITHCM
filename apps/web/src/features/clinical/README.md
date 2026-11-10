@@ -4,13 +4,14 @@ Owner: Huy. Covers CL-001–010: own visits, asynchronous start status, draft no
 
 ```tsx
 const api = createClinicalApi(runtime.transport, {
-  authorizationLease: (action, resourceId) => runtime.getAuthorizationLease(action, resourceId),
+  authorizationLease: (action, resourceId) =>
+    runtime.getAuthorizationLease(action, resourceId),
 });
 <ClinicalFeature
   api={api}
-  session={{ userId: authenticatedSubject, actorType: "DOCTOR" }}
+  session={{ userId: authenticatedSubject, actorType: 'DOCTOR' }}
   selectedTicket={{ ticketId, doctorId, expectedTicketVersion }}
-/>
+/>;
 ```
 
 Hưng supplies the authenticated JWT subject and Gateway transport, including credentials and the 401 redirect. No tokens are stored by the feature. Use a stable transport that obtains current credentials. The session userId is required so a subject change unmounts all draft/operation state. Quân supplies selectedTicket from the trusted queue UI; the component does not ask patients to type internal IDs or send patientId in CL-002.

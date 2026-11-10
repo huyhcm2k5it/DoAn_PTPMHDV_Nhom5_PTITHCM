@@ -1,0 +1,5 @@
+# Keep Quan's Node services and web consistent with Linux CI.
+services/patient/** text=auto eol=lf
+services/appointment/** text=auto eol=lf
+services/pharmacy/** text=auto eol=lf
+apps/web/** text=auto eol=lf

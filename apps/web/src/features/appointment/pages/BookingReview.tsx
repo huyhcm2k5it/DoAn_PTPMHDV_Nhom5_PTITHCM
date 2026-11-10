@@ -15,8 +15,13 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
     setState('loading');
     setError(undefined);
     try {
-      const result = await api.createAppointment({ patientId, holdId }, idempotencyKey.current);
-      navigate(`/patient/appointments/${encodeURIComponent(result.appointmentId)}`);
+      const result = await api.createAppointment(
+        { patientId, holdId },
+        idempotencyKey.current,
+      );
+      navigate(
+        `/patient/appointments/${encodeURIComponent(result.appointmentId)}`,
+      );
     } catch (caught) {
       setState('error');
       setError(caught);
@@ -38,7 +43,10 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
         <div>
           <p className="eyebrow">XÁC NHẬN LỊCH KHÁM</p>
           <h1 id="review-heading">Xác nhận giữ chỗ</h1>
-          <p>Giữ chỗ có thời hạn. Sau khi xác nhận, lịch ở trạng thái chờ thanh toán.</p>
+          <p>
+            Giữ chỗ có thời hạn. Sau khi xác nhận, lịch ở trạng thái chờ thanh
+            toán.
+          </p>
         </div>
         <span className="status-pill">HELD · 10 phút</span>
       </div>
@@ -56,7 +64,11 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
         {state === 'loading' && <Loading label="Đang tạo lịch hẹn" />}
         {state === 'error' && <ErrorPanel error={error} onRetry={confirm} />}
         {state !== 'loading' && (
-          <button className="button button-primary" type="button" onClick={confirm}>
+          <button
+            className="button button-primary"
+            type="button"
+            onClick={confirm}
+          >
             Xác nhận tạo lịch
           </button>
         )}

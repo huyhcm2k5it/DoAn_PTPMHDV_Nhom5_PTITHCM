@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import type { DependencyList } from "react";
+import { useEffect, useState } from 'react';
+import type { DependencyList } from 'react';
 import type {
   CatalogApi,
   Department,
@@ -9,12 +9,12 @@ import type {
   LabTest,
   Price,
   Session,
-} from "./types";
-import { can } from "./types";
-import { errorMessage } from "./api";
-import { PriceForm } from "./PriceForm";
-import type { PriceChoice } from "./PriceForm";
-import "./catalog.css";
+} from './types';
+import { can } from './types';
+import { errorMessage } from './api';
+import { PriceForm } from './PriceForm';
+import type { PriceChoice } from './PriceForm';
+import './catalog.css';
 
 function useLoad<T>(
   load: (signal: AbortSignal) => Promise<T>,
@@ -45,12 +45,12 @@ function useLoad<T>(
   return state;
 }
 export function formatPrice(price: Price | null) {
-  if (!price) return "Chưa có giá hiệu lực";
+  if (!price) return 'Chưa có giá hiệu lực';
   if (!Number.isSafeInteger(price.amountVnd))
-    return "Giá vượt giới hạn hiển thị an toàn";
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
+    return 'Giá vượt giới hạn hiển thị an toàn';
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
     maximumFractionDigits: 0,
   }).format(price.amountVnd);
 }
@@ -69,22 +69,22 @@ export function CatalogPage({
   onChooseDoctor?: (id: string) => void;
   onChooseService?: (id: string) => void;
 }) {
-  const [department, setDepartment] = useState("");
+  const [department, setDepartment] = useState('');
   const [page, setPage] = useState(1);
-  const [tab, setTab] = useState<"public" | "medicines" | "lab">("public");
-  const [q, setQ] = useState("");
-  const [search, setSearch] = useState("");
+  const [tab, setTab] = useState<'public' | 'medicines' | 'lab'>('public');
+  const [q, setQ] = useState('');
+  const [search, setSearch] = useState('');
   const [refresh, setRefresh] = useState(0);
-  const admin = can(session, "ADMIN");
+  const admin = can(session, 'ADMIN');
   const medicineAllowed =
-    session?.actorType === "DOCTOR" || can(session, "PHARMACY", "ADMIN");
+    session?.actorType === 'DOCTOR' || can(session, 'PHARMACY', 'ADMIN');
   const labAllowed =
-    session?.actorType === "DOCTOR" ||
-    can(session, "LAB_TECH", "LAB_REVIEW", "ADMIN");
+    session?.actorType === 'DOCTOR' ||
+    can(session, 'LAB_TECH', 'LAB_REVIEW', 'ADMIN');
   // Session is owned by the shell; role changes must clear restricted data immediately.
   const allowedTab =
-    (tab === "medicines" && !medicineAllowed) || (tab === "lab" && !labAllowed)
-      ? "public"
+    (tab === 'medicines' && !medicineAllowed) || (tab === 'lab' && !labAllowed)
+      ? 'public'
       : tab;
   const departments = useLoad<Department[]>(
     (signal) => api.departments(signal),
@@ -102,32 +102,32 @@ export function CatalogPage({
   );
   const privateData = useLoad<(Medicine | LabTest)[]>(
     async (signal) =>
-      allowedTab === "medicines"
+      allowedTab === 'medicines'
         ? api.medicines(search, signal)
-        : allowedTab === "lab"
+        : allowedTab === 'lab'
           ? api.labTests(search, signal)
           : [],
     [api, allowedTab, search, refresh, session],
   );
   const data = publicData.data;
   const restricted = privateData.data ?? [];
-  const active = allowedTab === "public" ? publicData : privateData;
+  const active = allowedTab === 'public' ? publicData : privateData;
   const choices: PriceChoice[] =
-    allowedTab === "public"
+    allowedTab === 'public'
       ? (data?.services ?? []).map((x) => ({
-          type: "EXAM",
+          type: 'EXAM',
           id: x.id,
           name: x.name,
         }))
       : restricted.map((x) => ({
-          type: allowedTab === "medicines" ? "MEDICINE" : "LAB",
+          type: allowedTab === 'medicines' ? 'MEDICINE' : 'LAB',
           id: x.id,
           name: x.name,
         }));
   function changeTab(value: typeof tab) {
     setTab(value);
-    setQ("");
-    setSearch("");
+    setQ('');
+    setSearch('');
   }
   return (
     <section className="umc-catalog" aria-labelledby="catalog-heading">
@@ -162,16 +162,16 @@ export function CatalogPage({
         <div role="tablist" aria-label="Nhóm danh mục">
           <button
             role="tab"
-            aria-selected={allowedTab === "public"}
-            onClick={() => changeTab("public")}
+            aria-selected={allowedTab === 'public'}
+            onClick={() => changeTab('public')}
           >
             Bác sĩ & dịch vụ
           </button>
           {medicineAllowed && (
             <button
               role="tab"
-              aria-selected={allowedTab === "medicines"}
-              onClick={() => changeTab("medicines")}
+              aria-selected={allowedTab === 'medicines'}
+              onClick={() => changeTab('medicines')}
             >
               Thuốc
             </button>
@@ -179,8 +179,8 @@ export function CatalogPage({
           {labAllowed && (
             <button
               role="tab"
-              aria-selected={allowedTab === "lab"}
-              onClick={() => changeTab("lab")}
+              aria-selected={allowedTab === 'lab'}
+              onClick={() => changeTab('lab')}
             >
               Xét nghiệm
             </button>
@@ -192,7 +192,7 @@ export function CatalogPage({
           Không tải được chuyên khoa. {errorMessage(departments.error)}
         </p>
       )}
-      {allowedTab !== "public" && (
+      {allowedTab !== 'public' && (
         <form
           className="catalog-search"
           onSubmit={(e) => {
@@ -218,7 +218,7 @@ export function CatalogPage({
           <p>{errorMessage(active.error)}</p>
           <button onClick={() => setRefresh((x) => x + 1)}>Thử lại</button>
         </div>
-      ) : allowedTab === "public" ? (
+      ) : allowedTab === 'public' ? (
         <>
           <div className="catalog-section-title">
             <h2>Bác sĩ theo chuyên khoa</h2>
@@ -234,7 +234,7 @@ export function CatalogPage({
                   <h3>{d.displayName}</h3>
                   <p>
                     {departments.data?.find((x) => x.id === d.departmentId)
-                      ?.name ?? "Chuyên khoa"}
+                      ?.name ?? 'Chuyên khoa'}
                   </p>
                 </div>
                 {onChooseDoctor && (
@@ -304,9 +304,9 @@ export function CatalogPage({
       ) : (
         <>
           <h2>
-            {allowedTab === "medicines"
-              ? "Danh mục thuốc"
-              : "Danh mục xét nghiệm"}
+            {allowedTab === 'medicines'
+              ? 'Danh mục thuốc'
+              : 'Danh mục xét nghiệm'}
           </h2>
           <div className="catalog-grid">
             {restricted.map((x) => (
@@ -315,7 +315,7 @@ export function CatalogPage({
                   <small>{x.code}</small>
                   <h3>{x.name}</h3>
                   <p>
-                    {"specimenType" in x
+                    {'specimenType' in x
                       ? `Mẫu: ${x.specimenType}`
                       : `Đơn vị: ${x.unit}`}
                   </p>
@@ -326,9 +326,9 @@ export function CatalogPage({
           </div>
           {!restricted.length && (
             <p className="catalog-empty">
-              {allowedTab === "medicines"
-                ? "Chưa có thuốc phù hợp."
-                : "Chưa có xét nghiệm phù hợp."}
+              {allowedTab === 'medicines'
+                ? 'Chưa có thuốc phù hợp.'
+                : 'Chưa có xét nghiệm phù hợp.'}
             </p>
           )}
         </>

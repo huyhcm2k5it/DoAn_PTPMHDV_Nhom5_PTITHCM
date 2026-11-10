@@ -22,7 +22,13 @@ function api(overrides: Partial<AppointmentApi> = {}): AppointmentApi {
       chargeStatus: 'PAID',
     }),
     listAppointments: vi.fn().mockResolvedValue({
-      items: [{ appointmentId: 'apt-1', state: 'PENDING_PAYMENT', chargeSync: 'PENDING' }],
+      items: [
+        {
+          appointmentId: 'apt-1',
+          state: 'PENDING_PAYMENT',
+          chargeSync: 'PENDING',
+        },
+      ],
       total: 1,
     }),
     ...overrides,
@@ -34,7 +40,9 @@ describe('appointment booking screens', () => {
     const appointmentApi = api();
     render(
       <MemoryRouter
-        initialEntries={['/patient/appointments/review?patientId=patient-1&holdId=hold-1']}
+        initialEntries={[
+          '/patient/appointments/review?patientId=patient-1&holdId=hold-1',
+        ]}
       >
         <BookingReview api={appointmentApi} />
       </MemoryRouter>,

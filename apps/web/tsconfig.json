@@ -10,5 +10,10 @@
     "noEmit": true,
     "types": ["vite/client", "vitest/globals"]
   },
-  "include": ["src", "tests", "vite.config.ts", "../../apps/web/src/features/catalog"]
+  "include": [
+    "src",
+    "tests",
+    "vite.config.ts",
+    "../../apps/web/src/features/catalog"
+  ]
 }

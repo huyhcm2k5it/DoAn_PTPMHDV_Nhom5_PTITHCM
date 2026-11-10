@@ -98,7 +98,10 @@ export function TreatmentPanel({
       if (alive.current) setBusy(false);
     }
   }
-  function act(run: (key: string) => Promise<unknown>, success: (result: any) => void) {
+  function act(
+    run: (key: string) => Promise<unknown>,
+    success: (result: any) => void,
+  ) {
     if (busy || attempt.current) return;
     attempt.current = { key: crypto.randomUUID(), run, success };
     void execute();
@@ -106,7 +109,9 @@ export function TreatmentPanel({
   const locked = busy || uncertain || conflict;
   const unresolved =
     pending ||
-    detail.labRequests.some((r) => !['REJECTED', 'CANCELLED', 'PUBLISHED'].includes(r.state));
+    detail.labRequests.some(
+      (r) => !['REJECTED', 'CANCELLED', 'PUBLISHED'].includes(r.state),
+    );
   function savePrescription(e: React.FormEvent) {
     e.preventDefault();
     const input = { lines: lines.map((x) => ({ ...x })) };
@@ -138,7 +143,11 @@ export function TreatmentPanel({
         <div role="alert">
           {errorMessage(error)}
           {uncertain && (
-            <button type="button" disabled={busy} onClick={() => void execute()}>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void execute()}
+            >
               Thử lại thao tác
             </button>
           )}
@@ -168,8 +177,8 @@ export function TreatmentPanel({
               <ul>
                 {p.lines.map((line, i) => (
                   <li key={i}>
-                    {line.nameSnapshot || line.medicineCode} — {line.doseText} · số lượng{' '}
-                    {line.quantity} · {line.instruction}
+                    {line.nameSnapshot || line.medicineCode} — {line.doseText} ·
+                    số lượng {line.quantity} · {line.instruction}
                   </li>
                 ))}
               </ul>
@@ -182,7 +191,11 @@ export function TreatmentPanel({
                         disabled={locked}
                         onClick={() => {
                           setEditing(p);
-                          setLines(p.lines.length ? p.lines.map((x) => ({ ...x })) : [emptyLine()]);
+                          setLines(
+                            p.lines.length
+                              ? p.lines.map((x) => ({ ...x }))
+                              : [emptyLine()],
+                          );
                           setNotice('');
                         }}
                       >
@@ -193,7 +206,12 @@ export function TreatmentPanel({
                         disabled={locked}
                         onClick={() =>
                           act(
-                            (key) => apiRef.current.deletePrescription(p.id, p.version, key),
+                            (key) =>
+                              apiRef.current.deletePrescription(
+                                p.id,
+                                p.version,
+                                key,
+                              ),
                             () => setNotice('Đã xóa toa nháp.'),
                           )
                         }
@@ -238,7 +256,9 @@ export function TreatmentPanel({
                     value={line.medicineCode}
                     onChange={(e) =>
                       setLines(
-                        lines.map((x, n) => (n === i ? { ...x, medicineCode: e.target.value } : x)),
+                        lines.map((x, n) =>
+                          n === i ? { ...x, medicineCode: e.target.value } : x,
+                        ),
                       )
                     }
                   >
@@ -259,7 +279,9 @@ export function TreatmentPanel({
                     value={line.doseText}
                     onChange={(e) =>
                       setLines(
-                        lines.map((x, n) => (n === i ? { ...x, doseText: e.target.value } : x)),
+                        lines.map((x, n) =>
+                          n === i ? { ...x, doseText: e.target.value } : x,
+                        ),
                       )
                     }
                   />
@@ -276,7 +298,9 @@ export function TreatmentPanel({
                     onChange={(e) =>
                       setLines(
                         lines.map((x, n) =>
-                          n === i ? { ...x, quantity: Number(e.target.value) } : x,
+                          n === i
+                            ? { ...x, quantity: Number(e.target.value) }
+                            : x,
                         ),
                       )
                     }
@@ -289,13 +313,18 @@ export function TreatmentPanel({
                     value={line.instruction ?? ''}
                     onChange={(e) =>
                       setLines(
-                        lines.map((x, n) => (n === i ? { ...x, instruction: e.target.value } : x)),
+                        lines.map((x, n) =>
+                          n === i ? { ...x, instruction: e.target.value } : x,
+                        ),
                       )
                     }
                   />
                 </label>
                 {lines.length > 1 && (
-                  <button type="button" onClick={() => setLines(lines.filter((_, n) => n !== i))}>
+                  <button
+                    type="button"
+                    onClick={() => setLines(lines.filter((_, n) => n !== i))}
+                  >
                     Bỏ dòng {i + 1}
                   </button>
                 )}
@@ -359,11 +388,14 @@ export function TreatmentPanel({
                     .map((t) => ({ testId: t.id, revision: t.revision })),
                 };
                 act(
-                  (key) => apiRef.current.requestLab(detail.visit.id, input, key),
+                  (key) =>
+                    apiRef.current.requestLab(detail.visit.id, input, key),
                   () => {
                     setPending(true);
                     setSelectedTests([]);
-                    setNotice('Đã nhận chỉ định, đang chờ tạo order. Chưa có xác nhận xét nghiệm.');
+                    setNotice(
+                      'Đã nhận chỉ định, đang chờ tạo order. Chưa có xác nhận xét nghiệm.',
+                    );
                   },
                 );
               }}
@@ -384,7 +416,9 @@ export function TreatmentPanel({
                   ),
                 () => {
                   setSigned(true);
-                  setNotice('Đã ký kết luận khám. Toa thuốc cần được ký riêng.');
+                  setNotice(
+                    'Đã ký kết luận khám. Toa thuốc cần được ký riêng.',
+                  );
                 },
               )
             }
@@ -393,8 +427,8 @@ export function TreatmentPanel({
           </button>
           {unresolved && (
             <p>
-              Chỉ ký khám khi tất cả chỉ định đã được giải quyết và xét nghiệm hoàn tất hoặc hủy hợp
-              lệ.
+              Chỉ ký khám khi tất cả chỉ định đã được giải quyết và xét nghiệm
+              hoàn tất hoặc hủy hợp lệ.
             </p>
           )}
         </>

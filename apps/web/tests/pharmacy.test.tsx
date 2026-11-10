@@ -1,10 +1,19 @@
-import { fireEvent, render, screen, waitFor, cleanup } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  cleanup,
+} from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { createPharmacyApi } from '../src/features/pharmacy/api';
 import { StockPage } from '../src/features/pharmacy/pages/StockPage';
 import { PrescriptionDetail } from '../src/features/pharmacy/pages/PrescriptionDetail';
-import type { PharmacyApi, PrescriptionDetail as Detail } from '../src/features/pharmacy/types';
+import type {
+  PharmacyApi,
+  PrescriptionDetail as Detail,
+} from '../src/features/pharmacy/types';
 afterEach(cleanup);
 const held: Detail = {
   prescriptionId: 'rx',
@@ -65,10 +74,16 @@ describe('pharmacy UI and transport', () => {
     const lease = vi.fn().mockResolvedValue('signed-lease');
     const client = createPharmacyApi(transport, { authorizationLease: lease });
     await client.hold('rx', 2, 'stable-key');
-    expect(transport.mock.calls[0][1].headers['idempotency-key']).toBe('stable-key');
-    expect(transport.mock.calls[0][1].headers['x-authorization-lease']).toBe('signed-lease');
+    expect(transport.mock.calls[0][1].headers['idempotency-key']).toBe(
+      'stable-key',
+    );
+    expect(transport.mock.calls[0][1].headers['x-authorization-lease']).toBe(
+      'signed-lease',
+    );
     expect(lease).toHaveBeenCalledWith('PH005');
-    expect(JSON.parse(transport.mock.calls[0][1].body)).toEqual({ prescriptionRevision: 2 });
+    expect(JSON.parse(transport.mock.calls[0][1].body)).toEqual({
+      prescriptionRevision: 2,
+    });
     transport.mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -84,14 +99,20 @@ describe('pharmacy UI and transport', () => {
     });
   });
   it('retains the same receipt key when an ambiguous request is retried', async () => {
-    const client = api({ receiveStock: vi.fn().mockRejectedValue(new Error('Network timeout')) });
+    const client = api({
+      receiveStock: vi.fn().mockRejectedValue(new Error('Network timeout')),
+    });
     render(
       <MemoryRouter>
         <StockPage api={client} />
       </MemoryRouter>,
     );
-    fireEvent.change(screen.getByLabelText('Mã thuốc (UUID)'), { target: { value: 'medicine' } });
-    fireEvent.change(screen.getByLabelText('Số lượng nhập'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('Mã thuốc (UUID)'), {
+      target: { value: 'medicine' },
+    });
+    fireEvent.change(screen.getByLabelText('Số lượng nhập'), {
+      target: { value: '2' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Nhập tồn' }));
     await waitFor(() => expect(client.receiveStock).toHaveBeenCalledTimes(1));
     await screen.findByText('Network timeout');
@@ -108,7 +129,9 @@ describe('pharmacy UI and transport', () => {
       </MemoryRouter>,
     );
     await screen.findByText('Đang giữ thuốc');
-    expect(screen.queryByRole('button', { name: 'Xác nhận cấp phát' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Xác nhận cấp phát' }),
+    ).toBeNull();
     expect(screen.getByText(/chờ xác nhận thanh toán/i)).toBeTruthy();
   });
   it('dispense submits the version actually returned by server', async () => {
@@ -119,16 +142,26 @@ describe('pharmacy UI and transport', () => {
     };
     const client = api({
       detail: vi.fn().mockResolvedValue(detail),
-      dispense: vi.fn().mockResolvedValue({ dispenseId: 'd', holdId: 'hold', state: 'DISPENSED' }),
+      dispense: vi.fn().mockResolvedValue({
+        dispenseId: 'd',
+        holdId: 'hold',
+        state: 'DISPENSED',
+      }),
     });
     render(
       <MemoryRouter>
         <PrescriptionDetail api={client} prescriptionId="rx" />
       </MemoryRouter>,
     );
-    fireEvent.click(await screen.findByRole('button', { name: 'Xác nhận cấp phát' }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Xác nhận cấp phát' }),
+    );
     await waitFor(() =>
-      expect(client.dispense).toHaveBeenCalledWith('hold', 7, expect.any(String)),
+      expect(client.dispense).toHaveBeenCalledWith(
+        'hold',
+        7,
+        expect.any(String),
+      ),
     );
   });
   it('aborts polling on unmount', async () => {

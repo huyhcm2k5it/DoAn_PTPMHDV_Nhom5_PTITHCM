@@ -4,9 +4,12 @@ Component React/TypeScript độc lập với router và auth provider. Không s
 
 ```tsx
 const catalog = createCatalogApi(sharedTransport); // (url, RequestInit) => Promise<Response>
-<CatalogPage api={catalog} session={session}
-  onChooseDoctor={doctorId => navigateToSlots({ doctorId })}
-  onChooseService={medicalServiceId => navigateToSlots({ medicalServiceId })} />
+<CatalogPage
+  api={catalog}
+  session={session}
+  onChooseDoctor={(doctorId) => navigateToSlots({ doctorId })}
+  onChooseService={(medicalServiceId) => navigateToSlots({ medicalServiceId })}
+/>;
 ```
 
 Giữ `api`/`session` ổn định bằng useMemo/provider. Shared transport thêm bearer và lease CA-004 hiện tại vào POST; phải trả Response nguyên bản, không bóc envelope trước adapter. Không tự retry POST với key mới. Router/menu/app shell do owner ghép sau.

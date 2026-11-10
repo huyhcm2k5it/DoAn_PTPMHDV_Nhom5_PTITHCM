@@ -12,11 +12,13 @@
       "files": [
         "services/patient/**/*.{js,json,md}",
         "services/appointment/**/*.{js,json,md}",
-        "services/pharmacy/**/*.{js,json,md}"
+        "services/pharmacy/**/*.{js,json,md}",
+        "apps/web/**/*.{ts,tsx,js,json,css,html,md}"
       ],
       "options": {
         "printWidth": 80,
-        "objectWrap": "preserve"
+        "objectWrap": "preserve",
+        "endOfLine": "lf"
       }
     }
   ]

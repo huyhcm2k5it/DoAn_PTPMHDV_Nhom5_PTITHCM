@@ -11,7 +11,9 @@ function MedicationStatus({ api, id }: { api: PharmacyApi; id: string }) {
   return (
     <div className="state-card">
       <h2 role="status">{statusLabel[data.latestHoldState]}</h2>
-      {data.dispensedAt && <p>Đã cấp lúc {new Date(data.dispensedAt).toLocaleString('vi-VN')}.</p>}
+      {data.dispensedAt && (
+        <p>Đã cấp lúc {new Date(data.dispensedAt).toLocaleString('vi-VN')}.</p>
+      )}
       <button className="button button-secondary" onClick={reload}>
         Tải lại
       </button>
@@ -39,7 +41,11 @@ export function PatientMedicationStatus({ api }: { api: PharmacyApi }) {
       >
         <label>
           Mã toa thuốc
-          <input required value={draft} onChange={(e) => setDraft(e.target.value)} />
+          <input
+            required
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+          />
         </label>
         <button className="button button-primary">Xem trạng thái</button>
       </form>

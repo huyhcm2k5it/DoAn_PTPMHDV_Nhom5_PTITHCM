@@ -1,6 +1,6 @@
 # Format code Node.js của Quân
 
-Áp dụng cho `services/patient`, `services/appointment`, `services/pharmacy`.
+Áp dụng cho `services/patient`, `services/appointment`, `services/pharmacy`, `apps/web`.
 Prettier được pin cùng phiên bản trong devDependencies và package-lock của cả ba service.
 Không cần package.json hoặc node_modules ở thư mục gốc.
 
@@ -27,7 +27,7 @@ npm run format --prefix services/pharmacy
 VS Code: cài extension được workspace đề xuất `esbenp.prettier-vscode`.
 Workspace bật Format on Save cho JavaScript. Prettier dùng cấu hình gốc,
 riêng ba service này ưu tiên độ dài dòng 80 ký tự, thụt lề 2 spaces,
-single quotes, dấu chấm phẩy và CRLF theo quy ước hiện tại.
+single quotes, dấu chấm phẩy và LF theo quy ước hiện tại.
 80 ký tự là hướng dẫn ngắt dòng; chuỗi dài có thể vẫn vượt giới hạn.
 Các object ngắn vẫn có thể ở một dòng. Các object đã viết nhiều dòng
 được giữ nhiều dòng. Các câu lệnh được tách dòng theo Prettier.
@@ -42,3 +42,7 @@ bởi formatter. CI chỉ kiểm tra format, không tự sửa source.
 
 Đợt cập nhật này lấy `origin/develop` tại `d0b2f96` vào `quan`, giữ nguyên
 thay đổi env mới của nhánh develop. Không đổi logic nghiệp vụ.
+
+## Windows and Linux CI
+
+Git attributes, EditorConfig and Prettier use LF for the three Node services and web. This avoids core.autocrlf making a Windows-only format check pass while Linux CI fails. The web job also checks TS/TSX/CSS/HTML formatting before typecheck, tests and build.

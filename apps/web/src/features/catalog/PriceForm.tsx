@@ -1,7 +1,7 @@
-import { useRef, useState } from "react";
-import type { FormEvent } from "react";
-import type { CatalogApi, ItemType, PriceInput } from "./types";
-import { errorMessage } from "./api";
+import { useRef, useState } from 'react';
+import type { FormEvent } from 'react';
+import type { CatalogApi, ItemType, PriceInput } from './types';
+import { errorMessage } from './api';
 export type PriceChoice = { type: ItemType; id: string; name: string };
 function localDate(date: Date) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
@@ -17,22 +17,22 @@ export function PriceForm({
   choices: PriceChoice[];
   onSaved: () => void;
 }) {
-  const [selected, setSelected] = useState("");
-  const [amount, setAmount] = useState("");
+  const [selected, setSelected] = useState('');
+  const [amount, setAmount] = useState('');
   const [from, setFrom] = useState(() =>
     localDate(new Date(Date.now() + 10 * 60000)),
   );
-  const [to, setTo] = useState("");
+  const [to, setTo] = useState('');
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
-  const [saved, setSaved] = useState("");
+  const [error, setError] = useState('');
+  const [saved, setSaved] = useState('');
   const busy = useRef(false);
-  const intent = useRef({ fingerprint: "", key: "" });
+  const intent = useRef({ fingerprint: '', key: '' });
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (busy.current) return;
-    setError("");
-    setSaved("");
+    setError('');
+    setSaved('');
     const choice =
       choices.find((c) => `${c.type}:${c.id}` === selected) ??
       (!selected ? choices[0] : undefined);
@@ -48,7 +48,7 @@ export function PriceForm({
       (end && (!Number.isFinite(end.getTime()) || end <= start))
     ) {
       setError(
-        "Chọn danh mục hợp lệ; tiền VND là số nguyên không âm trong giới hạn an toàn; thời gian bắt đầu sau ít nhất 5 phút và kết thúc sau bắt đầu.",
+        'Chọn danh mục hợp lệ; tiền VND là số nguyên không âm trong giới hạn an toàn; thời gian bắt đầu sau ít nhất 5 phút và kết thúc sau bắt đầu.',
       );
       return;
     }
@@ -66,7 +66,7 @@ export function PriceForm({
       intent.current.fingerprint !== fingerprint &&
       start.getTime() < Date.now() + 5 * 60000
     ) {
-      setError("Phiên bản giá mới phải có hiệu lực sau ít nhất 5 phút.");
+      setError('Phiên bản giá mới phải có hiệu lực sau ít nhất 5 phút.');
       return;
     }
     if (intent.current.fingerprint !== fingerprint)
@@ -76,7 +76,7 @@ export function PriceForm({
     try {
       const result = await api.createPrice(input, intent.current.key);
       setSaved(
-        `Đã tạo phiên bản giá #${result.revision}. Hiệu lực từ ${new Date(result.effectiveFrom).toLocaleString("vi-VN")}.`,
+        `Đã tạo phiên bản giá #${result.revision}. Hiệu lực từ ${new Date(result.effectiveFrom).toLocaleString('vi-VN')}.`,
       );
       onSaved();
     } catch (err) {
@@ -103,7 +103,7 @@ export function PriceForm({
           <select
             value={
               selected ||
-              (choices[0] ? `${choices[0].type}:${choices[0].id}` : "")
+              (choices[0] ? `${choices[0].type}:${choices[0].id}` : '')
             }
             onChange={(e) => setSelected(e.target.value)}
           >
@@ -142,7 +142,7 @@ export function PriceForm({
           />
         </label>
         <button type="submit" disabled={pending}>
-          {pending ? "Đang lưu…" : "Tạo phiên bản giá"}
+          {pending ? 'Đang lưu…' : 'Tạo phiên bản giá'}
         </button>
       </fieldset>
       {error && (
