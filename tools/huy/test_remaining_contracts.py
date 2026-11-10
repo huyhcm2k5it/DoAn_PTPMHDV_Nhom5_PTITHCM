@@ -16,7 +16,10 @@ diagnostic, diagnostic_ops = operations("contracts/http/diagnostic.openapi.json"
 
 assert "CL_011" in clinical_ops, "CL-011 medical records contract is missing"
 assert set(f"DI_{n:03}" for n in range(2, 14)) <= set(diagnostic_ops), "DI-007..013 result, cancellation, and published-results contracts are missing"
-assert "post" not in diagnostic["paths"]["/api/v1/diagnostic-orders"], "DI-001 recovery must stay disabled in the public contract"
+recovery = diagnostic["paths"]["/api/v1/diagnostic-orders"].get("post", {})
+assert recovery.get("operationId") == "DI_001", "DI-001 recovery contract is missing"
+assert recovery.get("x-enabled-by-default") is False, "DI-001 recovery must stay disabled by default"
+assert recovery.get("x-visibility") == "private", "DI-001 recovery must stay private"
 
 expected_routes = {
     "DI_007": ("/api/v1/diagnostic-orders/{orderId}/results", "post"),

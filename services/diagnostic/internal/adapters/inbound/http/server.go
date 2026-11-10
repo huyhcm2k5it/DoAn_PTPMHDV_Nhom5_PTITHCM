@@ -17,9 +17,9 @@ type Authenticator interface {
 }
 type Options struct {
 	Recovery RecoveryBoundary
-App   ports.Diagnostic
-	Auth  Authenticator
-	Ready func(context.Context) error
+	App      ports.Diagnostic
+	Auth     Authenticator
+	Ready    func(context.Context) error
 }
 
 var correlationPattern = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,128}$`)
@@ -105,7 +105,7 @@ func New(p ports.Readiness, options ...Options) *echo.Echo {
 		return c.JSON(200, map[string]string{"status": "ready", "scope": scope})
 	})
 	registerDiagnostic(e, opts)
-registerRecovery(e, opts)
+	registerRecovery(e, opts)
 	registerResults(e, opts)
 	return e
 }

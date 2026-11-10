@@ -93,8 +93,8 @@ func TestWeek2Postgres(t *testing.T) {
 	}
 	var count int
 	if err = db.pool.QueryRow(ctx, `SELECT count(*) FROM visits WHERE appointment_id=$1`, ticket.AppointmentID).Scan(&count); err != nil {
-        t.Fatal(err)
-    }
+		t.Fatal(err)
+	}
 	if count != 0 {
 		t.Fatal("visit exists before claim")
 	}

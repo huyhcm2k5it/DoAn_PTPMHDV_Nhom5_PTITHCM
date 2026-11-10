@@ -5,9 +5,9 @@ package postgres
 import (
 	"context"
 	"encoding/json"
-    "net/url"
-    "os"
-    "strings"
+	"net/url"
+	"os"
+	"strings"
 	"testing"
 	"time"
 	"umccare/clinical/internal/application/usecase"
@@ -64,21 +64,30 @@ func TestRejectedLabRequiresRevisionedResubmit(t *testing.T) {
 	}
 }
 
-
 func isolatedJourneyDB(t *testing.T) *Probe {
-    t.Helper()
-    bootstrap := testDB(t) // validates the isolated database allowlist.
-    schema := "journey_" + strings.ReplaceAll(domain.NewID(), "-", "")
-    if _, err := bootstrap.pool.Exec(context.Background(), "CREATE SCHEMA "+schema); err != nil { t.Fatal(err) }
-    u, err := url.Parse(os.Getenv("TEST_DATABASE_URL"))
-    if err != nil { t.Fatal(err) }
-    q := u.Query()
-    q.Set("search_path",schema)
-    u.RawQuery=q.Encode()
-    db, err := New(context.Background(),u.String())
-    if err != nil { t.Fatal(err) }
-    t.Cleanup(db.Close)
-    if err=db.Migrate(context.Background());err != nil {t.Fatal(err)}
-    if _,err=db.pool.Exec(context.Background(),`UPDATE catalog_stream_state SET sequence=1,highest_observed=1,checkpoint_at=now() WHERE singleton=true`);err != nil {t.Fatal(err)}
-    return db
+	t.Helper()
+	bootstrap := testDB(t) // validates the isolated database allowlist.
+	schema := "journey_" + strings.ReplaceAll(domain.NewID(), "-", "")
+	if _, err := bootstrap.pool.Exec(context.Background(), "CREATE SCHEMA "+schema); err != nil {
+		t.Fatal(err)
+	}
+	u, err := url.Parse(os.Getenv("TEST_DATABASE_URL"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := u.Query()
+	q.Set("search_path", schema)
+	u.RawQuery = q.Encode()
+	db, err := New(context.Background(), u.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(db.Close)
+	if err = db.Migrate(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.pool.Exec(context.Background(), `UPDATE catalog_stream_state SET sequence=1,highest_observed=1,checkpoint_at=now() WHERE singleton=true`); err != nil {
+		t.Fatal(err)
+	}
+	return db
 }
