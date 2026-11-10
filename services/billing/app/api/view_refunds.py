@@ -494,13 +494,23 @@ def execute_refund_view(request, refund_id):
             from app.infrastructure.message_delivery import make_envelope
             charge.version += 1
             charge.save(update_fields=["version", "updated_at"])
-            status_payload = {"chargeId": str(charge.id), "recipientUserId": str(charge.recipient_user_id) if charge.recipient_user_id else None,
-                "refundId": str(refund.id), "state": "REFUNDED", "version": charge.version,
-                "sourceType": charge.source_type, "sourceId": str(charge.source_id),
-                "refundStatus": refund.state, "asOf": timezone.now().isoformat()}
-            BillingEventOutbox.objects.create(event_type="BillingStatusChanged",
-                exchange="umc.events.billing.v1", routing_key="billing.billing-status-changed.v1",
-                payload=make_envelope("BillingStatusChanged",status_payload,charge.id,refund.version))
+            if charge.recipient_user_id:
+                status_payload = {
+                    "chargeId": str(charge.id),
+                    "recipientUserId": str(charge.recipient_user_id),
+                    "refundId": str(refund.id),
+                    "sourceId": str(charge.source_id),
+                    "sourceType": charge.source_type,
+                    "refundStatus": refund.state,
+                    "state": "REFUNDED",
+                    "version": charge.version,
+                }
+                BillingEventOutbox.objects.create(
+                    event_type="BillingStatusChanged",
+                    exchange="umc.events.billing.v1",
+                    routing_key="billing.billing-status-changed.v1",
+                    payload=make_envelope("BillingStatusChanged", status_payload, charge.id, refund.version),
+                )
 
         else:
             refund.state = "FAILED"

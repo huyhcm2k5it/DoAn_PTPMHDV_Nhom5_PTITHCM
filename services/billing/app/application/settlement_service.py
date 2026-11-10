@@ -98,6 +98,21 @@ def apply_settlement_reserved(envelope):
                 event_type="ChargePaid", exchange="umc.events.billing.v1",
                 routing_key="billing.charge-paid.v1",
                 payload=make_envelope("ChargePaid",paid,saga.id,saga.decision_version,cause=envelope))
+            if charge.recipient_user_id:
+                status_payload = {
+                    "chargeId": str(charge.id),
+                    "recipientUserId": str(charge.recipient_user_id),
+                    "paymentId": str(payment.id),
+                    "sourceId": str(charge.source_id),
+                    "sourceType": charge.source_type,
+                    "state": "PAID",
+                    "version": charge.version + 1,
+                }
+                BillingEventOutbox.objects.create(
+                    event_type="BillingStatusChanged",
+                    exchange="umc.events.billing.v1",
+                    routing_key="billing.billing-status-changed.v1",
+                    payload=make_envelope("BillingStatusChanged", status_payload, charge.id, charge.version + 1, cause=envelope))
         saga.save(update_fields=["fence","state","updated_at","decision_version"])
         charge.version += 1
         charge.save(update_fields=["state","settlement_state","settlement_id","updated_at","version"])
