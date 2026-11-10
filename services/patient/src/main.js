@@ -3,15 +3,27 @@ const { connectDatabase } = require('./configs/database.js');
 const { createJwtVerifier } = require('./auth/jwt-verifier.js');
 async function main() {
   const connection = await connectDatabase(process.env.MONGODB_URI);
-  const app = createApp({ connection, verifyBearerToken: createJwtVerifier(), verifyAuthorizationLease: createJwtVerifier() });
+  const app = createApp({
+    connection,
+    verifyBearerToken: createJwtVerifier(),
+    verifyAuthorizationLease: createJwtVerifier(),
+  });
   const server = app.listen(Number(process.env.PORT || 8001), '0.0.0.0');
   let shuttingDown = false;
   async function shutdown(signal) {
-    if (shuttingDown) return; shuttingDown = true;
+    if (shuttingDown) return;
+    shuttingDown = true;
     console.log(signal + ': shutting down patient-service');
-    server.close(async (error) => { await connection.close(); process.exitCode = error ? 1 : 0; });
+    server.close(async (error) => {
+      await connection.close();
+      process.exitCode = error ? 1 : 0;
+    });
     setTimeout(() => process.exit(1), 10000).unref();
   }
-  process.on('SIGTERM', () => shutdown('SIGTERM')); process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
-main().catch((error) => { console.error('patient-service startup failed:', error.message); process.exitCode = 1; });
+main().catch((error) => {
+  console.error('patient-service startup failed:', error.message);
+  process.exitCode = 1;
+});

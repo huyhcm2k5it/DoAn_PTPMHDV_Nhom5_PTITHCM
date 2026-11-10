@@ -1,5 +1,14 @@
 const { randomUUID } = require('node:crypto');
-const { consume, mutate, uuid, integer, failure, hash, outbox, pending } = require('./common');
+const {
+  consume,
+  mutate,
+  uuid,
+  integer,
+  failure,
+  hash,
+  outbox,
+  pending,
+} = require('./common');
 const { returnReservation } = require('./medication-holds.service');
 
 async function maybeCommit(connection, session, hold, now) {
@@ -16,12 +25,20 @@ async function maybeCommit(connection, session, hold, now) {
     updatedAt: now,
     version: hold.version + 1,
   };
-  await connection.collection('medication_holds').replaceOne({ id: hold.id }, next, { session });
+  await connection
+    .collection('medication_holds')
+    .replaceOne({ id: hold.id }, next, { session });
   return next;
 }
 async function handleBillingMessage({ connection, message, now = new Date() }) {
   const type = message?.messageType;
-  const supported = ['ChargePrepared', 'ReserveSettlement', 'SettlementDecision', 'ChargePaid', 'BillingStatusChanged'];
+  const supported = [
+    'ChargePrepared',
+    'ReserveSettlement',
+    'SettlementDecision',
+    'ChargePaid',
+    'BillingStatusChanged',
+  ];
   if (
     !supported.includes(type) ||
     !['billing', 'Billing'].includes(message.producer) ||
@@ -33,14 +50,34 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
     async (session) => {
       const p = message.payload;
       const coll = connection.collection('medication_holds');
-      const hold = await coll.findOne(type === 'BillingStatusChanged' ? { chargeId: p.chargeId } : { id: p.sourceId }, { session });
+      const hold = await coll.findOne(
+        type === 'BillingStatusChanged'
+          ? { chargeId: p.chargeId }
+          : { id: p.sourceId },
+        { session },
+      );
       if (type === 'BillingStatusChanged') {
-        if (!hold) throw failure(503, 'SOURCE_PENDING_SYNC', 'Charge is not synchronized.');
+        if (!hold)
+          throw failure(
+            503,
+            'SOURCE_PENDING_SYNC',
+            'Charge is not synchronized.',
+          );
         integer(p.version, 'version');
-        if (p.sourceId && p.sourceId !== hold.id) throw failure(409, 'SOURCE_MISMATCH', 'Billing source differs.');
+        if (p.sourceId && p.sourceId !== hold.id)
+          throw failure(409, 'SOURCE_MISMATCH', 'Billing source differs.');
         if ((hold.billingStatusVersion || 0) < p.version)
-          await coll.updateOne({ id: hold.id }, { $set: { billingStatusVersion: p.version,
-            refundStatus: p.refundStatus || hold.refundStatus, billingAsOf: p.asOf || now.toISOString() } }, { session });
+          await coll.updateOne(
+            { id: hold.id },
+            {
+              $set: {
+                billingStatusVersion: p.version,
+                refundStatus: p.refundStatus || hold.refundStatus,
+                billingAsOf: p.asOf || now.toISOString(),
+              },
+            },
+            { session },
+          );
         return { state: 'APPLIED' };
       }
       const rejectReserve = async (reasonCode) => {
@@ -77,7 +114,11 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
           : !['MED_HOLD', 'PHARMACY'].includes(p.sourceType)) ||
         p.sourceRevision !== hold.attemptNo
       )
-        throw failure(409, 'SOURCE_MISMATCH', 'Billing source/attempt differs.');
+        throw failure(
+          409,
+          'SOURCE_MISMATCH',
+          'Billing source/attempt differs.',
+        );
       if (type === 'ChargePrepared') {
         if (!['CREATED', 'REJECTED'].includes(p.state))
           throw failure(400, 'INVALID_MESSAGE', 'Invalid preparation state.');
@@ -85,9 +126,17 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
           throw failure(409, 'SOURCE_MISMATCH', 'Charge request differs.');
         if (p.state === 'CREATED') uuid(p.chargeId, 'chargeId');
         if (hold.chargeId && hold.chargeId !== p.chargeId)
-          throw failure(409, 'MESSAGE_CONFLICT', 'Charge identity is immutable.');
+          throw failure(
+            409,
+            'MESSAGE_CONFLICT',
+            'Charge identity is immutable.',
+          );
         if (hold.chargeSync === 'REJECTED' && p.state === 'CREATED')
-          throw failure(409, 'MESSAGE_CONFLICT', 'Rejected charge cannot be resurrected.');
+          throw failure(
+            409,
+            'MESSAGE_CONFLICT',
+            'Rejected charge cannot be resurrected.',
+          );
         await coll.updateOne(
           { id: hold.id },
           {
@@ -99,7 +148,10 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
           },
           { session },
         );
-        if (['RELEASED', 'EXPIRED'].includes(hold.status) && p.state === 'CREATED') {
+        if (
+          ['RELEASED', 'EXPIRED'].includes(hold.status) &&
+          p.state === 'CREATED'
+        ) {
           await outbox(connection, session, {
             type: 'MedicationHoldChanged',
             aggregateId: hold.id,
@@ -119,23 +171,23 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
       }
       uuid(p.settlementId, 'settlementId');
       if (type === 'ReserveSettlement') {
-        const failed = await connection.collection('settlement_decisions').findOne(
-          {
-            sourceId: hold.id,
-            sourceRevision: hold.attemptNo,
-            settlementId: p.settlementId,
-            state: 'FAILED',
-          },
-          { session },
-        );
+        const failed = await connection
+          .collection('settlement_decisions')
+          .findOne(
+            {
+              sourceId: hold.id,
+              sourceRevision: hold.attemptNo,
+              settlementId: p.settlementId,
+              state: 'FAILED',
+            },
+            { session },
+          );
         if (failed || hold.status !== 'HELD' || new Date(hold.expiresAt) <= now)
-          if (
-            !(
-              hold.status === 'SETTLEMENT_LOCKED' &&
-              hold.settlementId === p.settlementId &&
-              !failed
-            )
-          )
+          if (!(
+            hold.status === 'SETTLEMENT_LOCKED' &&
+            hold.settlementId === p.settlementId &&
+            !failed
+          ))
             return rejectReserve('STATE_CONFLICT');
         if (!hold.chargeId && hold.chargeSync !== 'REJECTED')
           throw failure(
@@ -144,12 +196,16 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
             'ChargePrepared has not reached this owner yet.',
           );
         const replayingLock =
-          hold.status === 'SETTLEMENT_LOCKED' && hold.settlementId === p.settlementId;
+          hold.status === 'SETTLEMENT_LOCKED' &&
+          hold.settlementId === p.settlementId;
         if (
           p.chargeId !== hold.chargeId ||
           p.amountHash !== hold.snapshotHash ||
           !Number.isInteger(p.attemptVersion) ||
-          p.attemptVersion !== (replayingLock ? hold.reserveAttemptVersion : (hold.reserveAttemptVersion || 0) + 1)
+          p.attemptVersion !==
+            (replayingLock
+              ? hold.reserveAttemptVersion
+              : (hold.reserveAttemptVersion || 0) + 1)
         )
           return rejectReserve('SETTLEMENT_MISMATCH');
         if (replayingLock) {
@@ -200,14 +256,19 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
           },
         });
         await coll.replaceOne({ id: hold.id }, locked, { session });
-        return { state: 'ACCEPTED', fence, responseMessageId: locked.reserveResponseId };
+        return {
+          state: 'ACCEPTED',
+          fence,
+          responseMessageId: locked.reserveResponseId,
+        };
       }
       // A terminal failure can arrive before the reserve command. Persist it without
       // changing another settlement's lock; late reserves consult this tombstone.
       if (
         type === 'SettlementDecision' &&
         p.state === 'FAILED' &&
-        (hold.status !== 'SETTLEMENT_LOCKED' || p.settlementId !== hold.settlementId)
+        (hold.status !== 'SETTLEMENT_LOCKED' ||
+          p.settlementId !== hold.settlementId)
       ) {
         integer(p.decisionVersion, 'decisionVersion');
         const decisions = connection.collection('settlement_decisions');
@@ -219,7 +280,11 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
         };
         const previous = await decisions.findOne(identity, { session });
         if (previous && previous.payloadHash !== hash(p))
-          throw failure(409, 'MESSAGE_CONFLICT', 'Same decision version differs.');
+          throw failure(
+            409,
+            'MESSAGE_CONFLICT',
+            'Same decision version differs.',
+          );
         const terminal = await decisions.findOne(
           {
             sourceId: hold.id,
@@ -231,27 +296,45 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
         );
         if (
           terminal ||
-          (p.settlementId === hold.settlementId && ['COMMITTED', 'DISPENSED'].includes(hold.status))
+          (p.settlementId === hold.settlementId &&
+            ['COMMITTED', 'DISPENSED'].includes(hold.status))
         )
-          throw failure(409, 'MESSAGE_CONFLICT', 'Terminal settlement decision cannot change.');
+          throw failure(
+            409,
+            'MESSAGE_CONFLICT',
+            'Terminal settlement decision cannot change.',
+          );
         if (!previous)
           await decisions.insertOne(
-            { ...identity, state: 'FAILED', payloadHash: hash(p), createdAt: now },
+            {
+              ...identity,
+              state: 'FAILED',
+              payloadHash: hash(p),
+              createdAt: now,
+            },
             { session },
           );
         return { state: hold.status };
       }
       const unknownWithoutFence =
-        type === 'SettlementDecision' && p.state === 'UNKNOWN' && p.fence == null;
+        type === 'SettlementDecision' &&
+        p.state === 'UNKNOWN' &&
+        p.fence == null;
       if (
         (!unknownWithoutFence &&
-          (!Number.isInteger(p.fence) || p.fence < 1 || p.fence !== hold.fence)) ||
+          (!Number.isInteger(p.fence) ||
+            p.fence < 1 ||
+            p.fence !== hold.fence)) ||
         p.settlementId !== hold.settlementId ||
         (type === 'ChargePaid'
           ? p.chargeId !== hold.chargeId
           : p.chargeId && p.chargeId !== hold.chargeId)
       )
-        throw failure(409, 'SETTLEMENT_MISMATCH', 'Evidence does not match the locked attempt.');
+        throw failure(
+          409,
+          'SETTLEMENT_MISMATCH',
+          'Evidence does not match the locked attempt.',
+        );
       if (type === 'ChargePaid') {
         if (p.amountVnd !== hold.amountVnd)
           throw failure(409, 'AMOUNT_MISMATCH', 'Payment amount differs.');
@@ -278,12 +361,22 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
         };
         if (hold.paidEvidence && hash(hold.paidEvidence) !== hash(evidence))
           throw failure(409, 'MESSAGE_CONFLICT', 'Payment evidence changed.');
-        if (['COMMITTED', 'DISPENSED'].includes(hold.status)) return { state: hold.status };
-        if (hold.status !== 'SETTLEMENT_LOCKED' || hold.settlementState === 'FAILED')
-          throw failure(409, 'STATE_CONFLICT', 'A terminal source cannot receive payment.');
+        if (['COMMITTED', 'DISPENSED'].includes(hold.status))
+          return { state: hold.status };
+        if (
+          hold.status !== 'SETTLEMENT_LOCKED' ||
+          hold.settlementState === 'FAILED'
+        )
+          throw failure(
+            409,
+            'STATE_CONFLICT',
+            'A terminal source cannot receive payment.',
+          );
         const changed = { ...hold, paidEvidence: evidence, updatedAt: now };
         await coll.replaceOne({ id: hold.id }, changed, { session });
-        return { state: (await maybeCommit(connection, session, changed, now)).status };
+        return {
+          state: (await maybeCommit(connection, session, changed, now)).status,
+        };
       }
       integer(p.decisionVersion, 'decisionVersion');
       if (!['SUCCEEDED', 'FAILED', 'UNKNOWN'].includes(p.state))
@@ -304,7 +397,11 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
       const current = await decisions.findOne(query, { session });
       const fingerprint = hash(p);
       if (current && current.payloadHash !== fingerprint)
-        throw failure(409, 'MESSAGE_CONFLICT', 'Same decision version differs.');
+        throw failure(
+          409,
+          'MESSAGE_CONFLICT',
+          'Same decision version differs.',
+        );
       if (!current)
         await decisions.insertOne(
           {
@@ -317,15 +414,25 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
           },
           { session },
         );
-      if (p.decisionVersion <= (hold.settlementVersion || 0)) return { state: hold.status };
+      if (p.decisionVersion <= (hold.settlementVersion || 0))
+        return { state: hold.status };
       if (
         ['SUCCEEDED', 'FAILED'].includes(hold.settlementState) &&
         hold.settlementState !== p.state
       )
-        throw failure(409, 'MESSAGE_CONFLICT', 'Terminal settlement decision cannot change.');
-      if (['COMMITTED', 'DISPENSED'].includes(hold.status)) return { state: hold.status };
+        throw failure(
+          409,
+          'MESSAGE_CONFLICT',
+          'Terminal settlement decision cannot change.',
+        );
+      if (['COMMITTED', 'DISPENSED'].includes(hold.status))
+        return { state: hold.status };
       if (hold.status !== 'SETTLEMENT_LOCKED')
-        throw failure(409, 'STATE_CONFLICT', 'Settlement source is not locked.');
+        throw failure(
+          409,
+          'STATE_CONFLICT',
+          'Settlement source is not locked.',
+        );
       if (p.state === 'SUCCEEDED') uuid(p.paymentId, 'paymentId');
       let changed = {
         ...hold,
@@ -334,16 +441,29 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
         updatedAt: now,
       };
       if (p.state === 'FAILED') {
-        changed = { ...changed, status: 'HELD', version: hold.version + 1, paidEvidence: null };
+        changed = {
+          ...changed,
+          status: 'HELD',
+          version: hold.version + 1,
+          paidEvidence: null,
+        };
         await coll.replaceOne({ id: hold.id }, changed, { session });
         if (new Date(changed.expiresAt) <= now) {
-          await returnReservation({ connection, session, hold: changed, state: 'EXPIRED', now });
+          await returnReservation({
+            connection,
+            session,
+            hold: changed,
+            state: 'EXPIRED',
+            now,
+          });
           return { state: 'EXPIRED' };
         }
         return { state: 'HELD' };
       }
       await coll.replaceOne({ id: hold.id }, changed, { session });
-      return { state: (await maybeCommit(connection, session, changed, now)).status };
+      return {
+        state: (await maybeCommit(connection, session, changed, now)).status,
+      };
     },
   );
 }
@@ -367,7 +487,11 @@ async function reconcileMedicationHold(args) {
     },
   );
 }
-async function queryUnresolvedSettlements({ connection, now = new Date(), intervalMs = 30000 }) {
+async function queryUnresolvedSettlements({
+  connection,
+  now = new Date(),
+  intervalMs = 30000,
+}) {
   const { withMongoTransaction } = require('../../../../mongo/transaction');
   const rows = await connection
     .collection('medication_holds')
@@ -418,4 +542,8 @@ async function queryUnresolvedSettlements({ connection, now = new Date(), interv
   }
   return count;
 }
-module.exports = { handleBillingMessage, reconcileMedicationHold, queryUnresolvedSettlements };
+module.exports = {
+  handleBillingMessage,
+  reconcileMedicationHold,
+  queryUnresolvedSettlements,
+};

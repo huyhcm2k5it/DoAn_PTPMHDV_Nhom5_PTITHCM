@@ -15,12 +15,17 @@
     "expire:holds": "node scripts/expire-holds.js",
     "expire:appointments": "node scripts/expire-appointments.js",
     "test:integration": "node --test --test-concurrency=1 ../../tests/mongo/booking.test.js ../../tests/mongo/access-projection.test.js",
-    "test": "node --test --test-concurrency=1 tests/*.test.js"
+    "test": "node --test --test-concurrency=1 tests/*.test.js",
+    "format": "prettier --ignore-path ../../.prettierignore --write .",
+    "format:check": "prettier --ignore-path ../../.prettierignore --check ."
   },
   "dependencies": {
     "amqplib": "^0.10.7",
     "express": "^5.1.0",
     "mongoose": "9.11.4",
     "redis": "^5.10.0"
+  },
+  "devDependencies": {
+    "prettier": "3.9.10"
   }
 }

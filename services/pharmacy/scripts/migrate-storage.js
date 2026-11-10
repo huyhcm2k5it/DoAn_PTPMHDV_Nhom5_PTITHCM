@@ -2,7 +2,9 @@ const { withMongoTransaction } = require('../../../mongo/transaction');
 async function migrateLegacyPharmacy(connection, { dryRun = true } = {}) {
   const holds = connection.collection('medication_holds');
   const legacy = await holds.find({ attemptNo: { $exists: false } }).toArray();
-  const active = legacy.filter((row) => !['RELEASED', 'EXPIRED'].includes(row.status));
+  const active = legacy.filter(
+    (row) => !['RELEASED', 'EXPIRED'].includes(row.status),
+  );
   if (!dryRun && active.length)
     throw new Error(
       'LEGACY_DATA_REQUIRES_REVIEW: active holds need verified stock/payment evidence.',
@@ -11,7 +13,11 @@ async function migrateLegacyPharmacy(connection, { dryRun = true } = {}) {
     await withMongoTransaction(connection, async (session) => {
       for (const row of legacy)
         await holds.updateOne(
-          { id: row.id, attemptNo: { $exists: false }, status: { $in: ['RELEASED', 'EXPIRED'] } },
+          {
+            id: row.id,
+            attemptNo: { $exists: false },
+            status: { $in: ['RELEASED', 'EXPIRED'] },
+          },
           {
             $set: {
               attemptNo: 1,
@@ -31,7 +37,9 @@ if (require.main === module) {
     try {
       console.log(
         JSON.stringify(
-          await migrateLegacyPharmacy(connection, { dryRun: !process.argv.includes('--apply') }),
+          await migrateLegacyPharmacy(connection, {
+            dryRun: !process.argv.includes('--apply'),
+          }),
         ),
       );
     } finally {

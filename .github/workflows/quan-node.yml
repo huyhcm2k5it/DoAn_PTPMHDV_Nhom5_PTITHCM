@@ -16,6 +16,9 @@ on:
       - 'envoy/**'
       - 'infra/compose/**'
       - '.github/workflows/quan-node.yml'
+      - '.prettierrc.json'
+      - '.prettierignore'
+      - '.editorconfig'
   pull_request:
     paths:
       - 'services/appointment/**'
@@ -31,6 +34,9 @@ on:
       - 'envoy/**'
       - 'infra/compose/**'
       - '.github/workflows/quan-node.yml'
+      - '.prettierrc.json'
+      - '.prettierignore'
+      - '.editorconfig'
 
 permissions:
   contents: read
@@ -52,6 +58,7 @@ jobs:
           cache: npm
           cache-dependency-path: services/${{ matrix.service }}/package-lock.json
       - run: npm ci
+      - run: npm run format:check
       - run: npm run check
       - run: npm test
 

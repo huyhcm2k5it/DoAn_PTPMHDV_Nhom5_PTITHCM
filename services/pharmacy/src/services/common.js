@@ -4,14 +4,20 @@ const { hash, failure } = require('../../../../mongo/catalog-projection');
 const INT_MAX = 2147483647;
 function uuid(value, name = 'id') {
   if (
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value || '')
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value || '',
+    )
   )
     throw failure(400, 'VALIDATION_ERROR', name + ' must be a UUID.');
   return value;
 }
 function integer(value, name, max = INT_MAX) {
   if (!Number.isSafeInteger(value) || value < 1 || value > max)
-    throw failure(400, 'VALIDATION_ERROR', name + ' must be a positive integer.');
+    throw failure(
+      400,
+      'VALIDATION_ERROR',
+      name + ' must be a positive integer.',
+    );
   return value;
 }
 async function staffAccess(connection, principalId, session, tokenVersion) {
@@ -19,7 +25,11 @@ async function staffAccess(connection, principalId, session, tokenVersion) {
     .collection('user_access_projection')
     .findOne({ userId: principalId }, { session });
   if (!user)
-    throw failure(503, 'SERVICE_UNAVAILABLE', 'Identity access projection is unavailable.');
+    throw failure(
+      503,
+      'SERVICE_UNAVAILABLE',
+      'Identity access projection is unavailable.',
+    );
   if (
     user.status !== 'ACTIVE' ||
     user.actorType !== 'STAFF' ||
@@ -30,7 +40,15 @@ async function staffAccess(connection, principalId, session, tokenVersion) {
   return user;
 }
 async function mutate(
-  { connection, principalId, tokenVersion, idempotencyKey, route, input, now = new Date() },
+  {
+    connection,
+    principalId,
+    tokenVersion,
+    idempotencyKey,
+    route,
+    input,
+    now = new Date(),
+  },
   work,
 ) {
   uuid(idempotencyKey, 'Idempotency-Key');
@@ -42,16 +60,28 @@ async function mutate(
     const previous = await records.findOne(query, { session });
     if (!previous) return null;
     if (previous.request_hash !== request_hash)
-      throw failure(409, 'IDEMPOTENCY_KEY_REUSED', 'Key already identifies a different request.');
+      throw failure(
+        409,
+        'IDEMPOTENCY_KEY_REUSED',
+        'Key already identifies a different request.',
+      );
     return previous.response;
   };
   try {
     return await withMongoTransaction(connection, async (session) => {
-      const user = await staffAccess(connection, principalId, session, tokenVersion);
+      const user = await staffAccess(
+        connection,
+        principalId,
+        session,
+        tokenVersion,
+      );
       const replay = await readReplay(session);
       if (replay) return replay;
       const response = await work(session, user);
-      await records.insertOne({ ...query, request_hash, response, created_at: now }, { session });
+      await records.insertOne(
+        { ...query, request_hash, response, created_at: now },
+        { session },
+      );
       return response;
     });
   } catch (error) {
@@ -97,7 +127,10 @@ async function outbox(
   );
   return id;
 }
-async function consume({ connection, message, consumerName, now = new Date() }, work) {
+async function consume(
+  { connection, message, consumerName, now = new Date() },
+  work,
+) {
   if (!message?.messageId || !message.payload || message.schemaVersion !== 1)
     throw failure(400, 'INVALID_MESSAGE', 'Invalid versioned envelope.');
   const query = { message_id: message.messageId, consumer_name: consumerName };
@@ -111,7 +144,11 @@ async function consume({ connection, message, consumerName, now = new Date() }, 
   const replay = async (session) => {
     const prior = await inbox.findOne(query, { session });
     if (prior && prior.payload_hash !== payload_hash)
-      throw failure(409, 'MESSAGE_CONFLICT', 'Message id identifies different content.');
+      throw failure(
+        409,
+        'MESSAGE_CONFLICT',
+        'Message id identifies different content.',
+      );
     return prior;
   };
   try {
@@ -129,7 +166,10 @@ async function consume({ connection, message, consumerName, now = new Date() }, 
         return { duplicate: true, ...previous.result };
       }
       const result = await work(session);
-      await inbox.insertOne({ ...query, payload_hash, result, received_at: now }, { session });
+      await inbox.insertOne(
+        { ...query, payload_hash, result, received_at: now },
+        { session },
+      );
       return { duplicate: false, ...result };
     });
   } catch (error) {

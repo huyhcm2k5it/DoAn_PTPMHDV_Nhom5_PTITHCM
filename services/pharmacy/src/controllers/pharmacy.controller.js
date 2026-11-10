@@ -1,6 +1,9 @@
 const { integer, failure } = require('../services/common');
 const { receiveStock, listStock } = require('../services/stock.service');
-const { listPrescriptions, prescriptionDetail } = require('../services/prescriptions.service');
+const {
+  listPrescriptions,
+  prescriptionDetail,
+} = require('../services/prescriptions.service');
 const {
   createMedicationHold,
   releaseMedicationHold,
@@ -34,7 +37,9 @@ function createPharmacyController({ connection, now = () => new Date() }) {
   const send = (req, res, data, status = 200) => {
     res.set('Cache-Control', 'no-store');
     if (status === 202) res.set('Location', data.statusUrl);
-    res.status(status).json({ data, meta: { correlationId: req.correlationId } });
+    res
+      .status(status)
+      .json({ data, meta: { correlationId: req.correlationId } });
   };
   const paged = (req) => ({
     page: queryNumber(req.query.page, 1, 'page'),
@@ -50,14 +55,22 @@ function createPharmacyController({ connection, now = () => new Date() }) {
       send(
         req,
         res,
-        await listStock({ connection, ...paged(req), code: req.query.code, name: req.query.name }),
+        await listStock({
+          connection,
+          ...paged(req),
+          code: req.query.code,
+          name: req.query.name,
+        }),
       );
     },
     receive: async (req, res) =>
       send(
         req,
         res,
-        await receiveStock({ ...args(req), ...body(req, ['medicineId', 'quantity', 'batchRef']) }),
+        await receiveStock({
+          ...args(req),
+          ...body(req, ['medicineId', 'quantity', 'batchRef']),
+        }),
         201,
       ),
     queue: async (req, res) =>
@@ -92,7 +105,11 @@ function createPharmacyController({ connection, now = () => new Date() }) {
         await releaseMedicationHold({
           ...args(req),
           holdId: req.params.holdId,
-          expectedVersion: queryNumber(req.query.expectedVersion, undefined, 'expectedVersion'),
+          expectedVersion: queryNumber(
+            req.query.expectedVersion,
+            undefined,
+            'expectedVersion',
+          ),
         }),
       ),
     reconcile: async (req, res) =>

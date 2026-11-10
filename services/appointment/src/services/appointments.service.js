@@ -22,12 +22,18 @@ function responseForAppointment(appointment) {
 }
 function assertUuid(value, field) {
   if (
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value || '')
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value || '',
+    )
   )
     throw new ApiError(400, 'VALIDATION_ERROR', field + ' must be a UUID.');
 }
 async function existingIdempotency(Idempotency, principalId, route, key, hash) {
-  const row = await Idempotency.findOne({ principal_id: principalId, route, key }).lean();
+  const row = await Idempotency.findOne({
+    principal_id: principalId,
+    route,
+    key,
+  }).lean();
   if (!row) return null;
   if (row.request_hash !== hash)
     throw new ApiError(
@@ -62,12 +68,19 @@ async function createAppointment({
   const Appointment = getAppointmentModel(connection);
   const Idempotency = getIdempotencyModel(connection);
   const Outbox = getOutboxModel(connection);
-  const replay = await existingIdempotency(Idempotency, principalId, route, idempotencyKey, hash);
+  const replay = await existingIdempotency(
+    Idempotency,
+    principalId,
+    route,
+    idempotencyKey,
+    hash,
+  );
   if (replay) return replay;
   try {
     return await withMongoTransaction(connection, async (session) => {
       const hold = await Hold.findOne({ id: holdId }).session(session).lean();
-      if (!hold) throw new ApiError(404, 'HOLD_NOT_FOUND', 'Hold không tồn tại.');
+      if (!hold)
+        throw new ApiError(404, 'HOLD_NOT_FOUND', 'Hold không tồn tại.');
       if (hold.principalId !== principalId || hold.patientId !== patientId)
         throw new ApiError(403, 'FORBIDDEN', 'Không có quyền trên hold này.');
       if (hold.status !== 'HELD')
@@ -76,24 +89,41 @@ async function createAppointment({
           hold.status === 'EXPIRED' ? 'HOLD_EXPIRED' : 'HOLD_ALREADY_CONSUMED',
           'Hold không còn hiệu lực.',
         );
-      if (hold.expiresAt <= now) throw new ApiError(409, 'HOLD_EXPIRED', 'Hold đã hết hạn.');
+      if (hold.expiresAt <= now)
+        throw new ApiError(409, 'HOLD_EXPIRED', 'Hold đã hết hạn.');
       if (
         !hold.priceSnapshot ||
         hold.priceSnapshot.amountVnd == null ||
         !hold.priceSnapshot.snapshotHash
       )
-        throw new ApiError(503, 'PRICE_PROJECTION_STALE', 'Chưa có giá đã xác nhận để tạo lịch.');
+        throw new ApiError(
+          503,
+          'PRICE_PROJECTION_STALE',
+          'Chưa có giá đã xác nhận để tạo lịch.',
+        );
       const appointmentId = createId();
       const requestId = createId();
       const changed = await Hold.updateOne(
-        { id: holdId, status: 'HELD', version: hold.version, expiresAt: { $gt: now } },
+        {
+          id: holdId,
+          status: 'HELD',
+          version: hold.version,
+          expiresAt: { $gt: now },
+        },
         { $set: { status: 'CONSUMED' }, $inc: { version: 1 } },
         { session },
       );
       if (!changed.modifiedCount)
-        throw new ApiError(409, 'HOLD_EXPIRED', 'Hold đã hết hạn hoặc đã được tiêu thụ.');
-      const slot = await Slot.findOne({ id: hold.slotId }).session(session).lean();
-      if (!slot) throw new ApiError(404, 'SLOT_NOT_FOUND', 'Slot không tồn tại.');
+        throw new ApiError(
+          409,
+          'HOLD_EXPIRED',
+          'Hold đã hết hạn hoặc đã được tiêu thụ.',
+        );
+      const slot = await Slot.findOne({ id: hold.slotId })
+        .session(session)
+        .lean();
+      if (!slot)
+        throw new ApiError(404, 'SLOT_NOT_FOUND', 'Slot không tồn tại.');
       const appointment = {
         id: appointmentId,
         requestId,
@@ -183,7 +213,8 @@ async function getAppointment({ connection, appointmentId, principalId }) {
     id: appointmentId,
     ...(principalId ? { principalId } : {}),
   }).lean();
-  if (!appointment) throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy lịch hẹn.');
+  if (!appointment)
+    throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy lịch hẹn.');
   return {
     appointment,
     chargeStatus: appointment.chargeStatus || 'PENDING',
@@ -234,7 +265,11 @@ async function listPatientAppointments({
 function assertExpectedVersion(value) {
   const version = Number(value);
   if (!Number.isInteger(version) || version < 1)
-    throw new ApiError(400, 'VALIDATION_ERROR', 'expectedVersion must be a positive integer.');
+    throw new ApiError(
+      400,
+      'VALIDATION_ERROR',
+      'expectedVersion must be a positive integer.',
+    );
   return version;
 }
 
@@ -262,7 +297,13 @@ async function rescheduleAppointment({
   resolvePriceSnapshot = async () => null,
   createId = randomUUID,
 }) {
-  if (!appointmentId || !principalId || !patientId || !newSlotId || !idempotencyKey)
+  if (
+    !appointmentId ||
+    !principalId ||
+    !patientId ||
+    !newSlotId ||
+    !idempotencyKey
+  )
     throw new ApiError(
       400,
       'VALIDATION_ERROR',
@@ -277,14 +318,24 @@ async function rescheduleAppointment({
   const Lock = getPatientTimeLockModel(connection);
   const Idempotency = getIdempotencyModel(connection);
   const Outbox = getOutboxModel(connection);
-  const replay = await existingIdempotency(Idempotency, principalId, route, idempotencyKey, hash);
+  const replay = await existingIdempotency(
+    Idempotency,
+    principalId,
+    route,
+    idempotencyKey,
+    hash,
+  );
   if (replay) return replay;
   try {
     return await withMongoTransaction(connection, async (session) => {
-      const appointment = await Appointment.findOne({ id: appointmentId, patientId })
+      const appointment = await Appointment.findOne({
+        id: appointmentId,
+        patientId,
+      })
         .session(session)
         .lean();
-      if (!appointment) throw new ApiError(404, 'NOT_FOUND', 'Appointment not found.');
+      if (!appointment)
+        throw new ApiError(404, 'NOT_FOUND', 'Appointment not found.');
       if (appointment.version !== version)
         throw new ApiError(409, 'VERSION_CONFLICT', 'Appointment changed.');
       if (appointment.state !== 'CONFIRMED')
@@ -300,10 +351,20 @@ async function rescheduleAppointment({
           'Rescheduling closes two hours before the appointment.',
         );
       if (newSlotId === appointment.slotId)
-        throw new ApiError(409, 'SLOT_UNAVAILABLE', 'The new slot must differ from the current slot.');
-      const slot = await Slot.findOne({ id: newSlotId }).session(session).lean();
-      if (!slot) throw new ApiError(404, 'SLOT_NOT_FOUND', 'New slot not found.');
-      const schedule = await Schedule.findOne({ id: slot.scheduleId, status: 'OPEN' })
+        throw new ApiError(
+          409,
+          'SLOT_UNAVAILABLE',
+          'The new slot must differ from the current slot.',
+        );
+      const slot = await Slot.findOne({ id: newSlotId })
+        .session(session)
+        .lean();
+      if (!slot)
+        throw new ApiError(404, 'SLOT_NOT_FOUND', 'New slot not found.');
+      const schedule = await Schedule.findOne({
+        id: slot.scheduleId,
+        status: 'OPEN',
+      })
         .session(session)
         .lean();
       if (
@@ -311,15 +372,34 @@ async function rescheduleAppointment({
         schedule.doctorId !== appointment.doctorId ||
         schedule.serviceId !== appointment.serviceId
       )
-        throw new ApiError(409, 'SLOT_DOCTOR_OR_SERVICE_MISMATCH', 'New slot must keep doctor and service.');
-      const priceSnapshot = await resolvePriceSnapshot({ slot, schedule, now, session });
+        throw new ApiError(
+          409,
+          'SLOT_DOCTOR_OR_SERVICE_MISMATCH',
+          'New slot must keep doctor and service.',
+        );
+      const priceSnapshot = await resolvePriceSnapshot({
+        slot,
+        schedule,
+        now,
+        session,
+      });
       if (!priceSnapshot)
-        throw new ApiError(503, 'PRICE_PROJECTION_STALE', 'New slot price projection is unavailable.');
+        throw new ApiError(
+          503,
+          'PRICE_PROJECTION_STALE',
+          'New slot price projection is unavailable.',
+        );
       if (
-        priceSnapshot.snapshotHash !== appointment.priceSnapshot?.snapshotHash ||
-        Number(priceSnapshot.amountVnd) !== Number(appointment.priceSnapshot?.amountVnd)
+        priceSnapshot.snapshotHash !==
+          appointment.priceSnapshot?.snapshotHash ||
+        Number(priceSnapshot.amountVnd) !==
+          Number(appointment.priceSnapshot?.amountVnd)
       )
-        throw new ApiError(409, 'PRICE_CHANGED', 'New slot does not have the accepted price snapshot.');
+        throw new ApiError(
+          409,
+          'PRICE_CHANGED',
+          'New slot does not have the accepted price snapshot.',
+        );
       if (slot.startAt <= now)
         throw new ApiError(409, 'SLOT_UNAVAILABLE', 'New slot is in the past.');
       await Lock.updateOne(
@@ -341,7 +421,15 @@ async function rescheduleAppointment({
         Appointment.findOne({
           patientId,
           id: { $ne: appointmentId },
-          state: { $in: ['PENDING_PAYMENT', 'SETTLEMENT_LOCKED', 'CONFIRMED', 'CHECKED_IN', 'IN_SERVICE'] },
+          state: {
+            $in: [
+              'PENDING_PAYMENT',
+              'SETTLEMENT_LOCKED',
+              'CONFIRMED',
+              'CHECKED_IN',
+              'IN_SERVICE',
+            ],
+          },
           startAt: { $lt: slot.endAt },
           endAt: { $gt: slot.startAt },
         })
@@ -349,13 +437,23 @@ async function rescheduleAppointment({
           .lean(),
       ]);
       if (activeHold || activeAppointment)
-        throw new ApiError(409, 'PATIENT_TIME_CONFLICT', 'New slot overlaps another patient booking.');
+        throw new ApiError(
+          409,
+          'PATIENT_TIME_CONFLICT',
+          'New slot overlaps another patient booking.',
+        );
       const reserved = await Slot.updateOne(
-        { id: newSlotId, $expr: { $lt: [{ $add: ['$heldCount', '$confirmedCount'] }, '$capacity'] } },
+        {
+          id: newSlotId,
+          $expr: {
+            $lt: [{ $add: ['$heldCount', '$confirmedCount'] }, '$capacity'],
+          },
+        },
         { $inc: { confirmedCount: 1 } },
         { session },
       );
-      if (!reserved.modifiedCount) throw new ApiError(409, 'SLOT_FULL', 'New slot is full.');
+      if (!reserved.modifiedCount)
+        throw new ApiError(409, 'SLOT_FULL', 'New slot is full.');
       const nextVersion = version + 1;
       const slotHistory = [
         ...(appointment.slotHistory || []),
@@ -382,14 +480,19 @@ async function rescheduleAppointment({
         },
         { session },
       );
-      if (!changed.modifiedCount) throw new ApiError(409, 'VERSION_CONFLICT', 'Appointment changed.');
+      if (!changed.modifiedCount)
+        throw new ApiError(409, 'VERSION_CONFLICT', 'Appointment changed.');
       const released = await Slot.updateOne(
         { id: appointment.slotId, confirmedCount: { $gt: 0 } },
         { $inc: { confirmedCount: -1 } },
         { session },
       );
       if (!released.modifiedCount)
-        throw new ApiError(500, 'CAPACITY_INVARIANT_BROKEN', 'Old slot cannot be released.');
+        throw new ApiError(
+          500,
+          'CAPACITY_INVARIANT_BROKEN',
+          'Old slot cannot be released.',
+        );
       const updated = {
         ...appointment,
         slotId: newSlotId,
@@ -473,7 +576,13 @@ async function cancelAppointment({
   now = new Date(),
   createId = randomUUID,
 }) {
-  if (!appointmentId || !principalId || !patientId || !reasonCode || !idempotencyKey)
+  if (
+    !appointmentId ||
+    !principalId ||
+    !patientId ||
+    !reasonCode ||
+    !idempotencyKey
+  )
     throw new ApiError(
       400,
       'VALIDATION_ERROR',
@@ -486,14 +595,24 @@ async function cancelAppointment({
   const Slot = getSlotModel(connection);
   const Idempotency = getIdempotencyModel(connection);
   const Outbox = getOutboxModel(connection);
-  const replay = await existingIdempotency(Idempotency, principalId, route, idempotencyKey, hash);
+  const replay = await existingIdempotency(
+    Idempotency,
+    principalId,
+    route,
+    idempotencyKey,
+    hash,
+  );
   if (replay) return replay;
   try {
     return await withMongoTransaction(connection, async (session) => {
-      const appointment = await Appointment.findOne({ id: appointmentId, patientId })
+      const appointment = await Appointment.findOne({
+        id: appointmentId,
+        patientId,
+      })
         .session(session)
         .lean();
-      if (!appointment) throw new ApiError(404, 'NOT_FOUND', 'Appointment not found.');
+      if (!appointment)
+        throw new ApiError(404, 'NOT_FOUND', 'Appointment not found.');
       if (appointment.version !== version)
         throw new ApiError(409, 'VERSION_CONFLICT', 'Appointment changed.');
       if (!['PENDING_PAYMENT', 'CONFIRMED'].includes(appointment.state))
@@ -509,17 +628,29 @@ async function cancelAppointment({
           'Cancellation closes two hours before the appointment.',
         );
       const cancellationId = createId();
-      const refundStatus = appointment.chargeStatus === 'PAID' ? 'REQUESTED' : 'NONE';
+      const refundStatus =
+        appointment.chargeStatus === 'PAID' ? 'REQUESTED' : 'NONE';
       const released = await Slot.updateOne(
         {
           id: appointment.slotId,
-          [appointment.state === 'CONFIRMED' ? 'confirmedCount' : 'heldCount']: { $gt: 0 },
+          [appointment.state === 'CONFIRMED' ? 'confirmedCount' : 'heldCount']:
+            { $gt: 0 },
         },
-        { $inc: { [appointment.state === 'CONFIRMED' ? 'confirmedCount' : 'heldCount']: -1 } },
+        {
+          $inc: {
+            [appointment.state === 'CONFIRMED'
+              ? 'confirmedCount'
+              : 'heldCount']: -1,
+          },
+        },
         { session },
       );
       if (!released.modifiedCount)
-        throw new ApiError(500, 'CAPACITY_INVARIANT_BROKEN', 'Slot cannot be released.');
+        throw new ApiError(
+          500,
+          'CAPACITY_INVARIANT_BROKEN',
+          'Slot cannot be released.',
+        );
       const nextVersion = version + 1;
       const changed = await Appointment.updateOne(
         { id: appointmentId, state: appointment.state, version },
@@ -536,7 +667,8 @@ async function cancelAppointment({
         },
         { session },
       );
-      if (!changed.modifiedCount) throw new ApiError(409, 'VERSION_CONFLICT', 'Appointment changed.');
+      if (!changed.modifiedCount)
+        throw new ApiError(409, 'VERSION_CONFLICT', 'Appointment changed.');
       const response = responseForChange({
         ...appointment,
         state: 'CANCELLED',
@@ -614,6 +746,18 @@ module.exports = {
 };
 
 // Cache invalidation runs after successful transaction commit.
-module.exports.createAppointment = async (...args) => { const result = await createAppointment(...args); await require('../services/slot-cache.service').getSlotCache().invalidate(); return result; };
-module.exports.rescheduleAppointment = async (...args) => { const result = await rescheduleAppointment(...args); await require('../services/slot-cache.service').getSlotCache().invalidate(); return result; };
-module.exports.cancelAppointment = async (...args) => { const result = await cancelAppointment(...args); await require('../services/slot-cache.service').getSlotCache().invalidate(); return result; };
+module.exports.createAppointment = async (...args) => {
+  const result = await createAppointment(...args);
+  await require('../services/slot-cache.service').getSlotCache().invalidate();
+  return result;
+};
+module.exports.rescheduleAppointment = async (...args) => {
+  const result = await rescheduleAppointment(...args);
+  await require('../services/slot-cache.service').getSlotCache().invalidate();
+  return result;
+};
+module.exports.cancelAppointment = async (...args) => {
+  const result = await cancelAppointment(...args);
+  await require('../services/slot-cache.service').getSlotCache().invalidate();
+  return result;
+};

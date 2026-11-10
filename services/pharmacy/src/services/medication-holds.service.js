@@ -1,13 +1,32 @@
 const { randomUUID } = require('node:crypto');
 const { withMongoTransaction } = require('../../../../mongo/transaction');
 const { resolveCatalogPrice } = require('../../../../mongo/catalog-projection');
-const { uuid, integer, mutate, outbox, pending, hash, failure } = require('./common');
+const {
+  uuid,
+  integer,
+  mutate,
+  outbox,
+  pending,
+  hash,
+  failure,
+} = require('./common');
 async function createMedicationHold(args) {
-  const { connection, prescriptionId, prescriptionRevision, principalId, now = new Date() } = args;
+  const {
+    connection,
+    prescriptionId,
+    prescriptionRevision,
+    principalId,
+    now = new Date(),
+  } = args;
   uuid(prescriptionId);
   integer(prescriptionRevision, 'prescriptionRevision');
   return mutate(
-    { ...args, now, route: 'PH-005:' + prescriptionId, input: { prescriptionRevision } },
+    {
+      ...args,
+      now,
+      route: 'PH-005:' + prescriptionId,
+      input: { prescriptionRevision },
+    },
     async (session, user) => {
       const latest = await connection
         .collection('prescription_projection')
@@ -15,58 +34,105 @@ async function createMedicationHold(args) {
         .sort({ revision: -1 })
         .limit(1)
         .next();
-      if (!latest) throw failure(503, 'SERVICE_UNAVAILABLE', 'FINAL prescription not projected.');
+      if (!latest)
+        throw failure(
+          503,
+          'SERVICE_UNAVAILABLE',
+          'FINAL prescription not projected.',
+        );
       if (latest.revision !== prescriptionRevision)
-        throw failure(409, 'PRESCRIPTION_REVISION_CONFLICT', 'Prescription revision changed.');
+        throw failure(
+          409,
+          'PRESCRIPTION_REVISION_CONFLICT',
+          'Prescription revision changed.',
+        );
       const holdColl = connection.collection('medication_holds');
       const old = await holdColl.findOne(
         { prescriptionId, revision: prescriptionRevision },
         { session },
       );
       if (old && !['RELEASED', 'EXPIRED'].includes(old.status))
-        throw failure(409, 'STATE_CONFLICT', 'An active or completed hold exists.');
-      const access = await connection.collection('patient_access_projection').findOne(
-        {
-          patientId: latest.patientId,
-          active: true,
-        },
-        { session },
-      );
-      if (!access)
-        throw failure(503, 'SERVICE_UNAVAILABLE', 'Patient ownership projection is unavailable.');
-      const items = [];
-      let amountVnd = 0;
-      for (const line of latest.itemsSnapshot) {
-        const medicine = await connection.collection('catalog_projection').findOne(
+        throw failure(
+          409,
+          'STATE_CONFLICT',
+          'An active or completed hold exists.',
+        );
+      const access = await connection
+        .collection('patient_access_projection')
+        .findOne(
           {
-            entityType: 'MEDICINE',
+            patientId: latest.patientId,
             active: true,
-            'fullSnapshot.code': line.medicineCode,
           },
           { session },
         );
+      if (!access)
+        throw failure(
+          503,
+          'SERVICE_UNAVAILABLE',
+          'Patient ownership projection is unavailable.',
+        );
+      const items = [];
+      let amountVnd = 0;
+      for (const line of latest.itemsSnapshot) {
+        const medicine = await connection
+          .collection('catalog_projection')
+          .findOne(
+            {
+              entityType: 'MEDICINE',
+              active: true,
+              'fullSnapshot.code': line.medicineCode,
+            },
+            { session },
+          );
         if (!medicine || medicine.fullSnapshot.status !== 'ACTIVE')
-          throw failure(503, 'SERVICE_UNAVAILABLE', 'Medicine projection is unavailable.');
-        const price = await resolveCatalogPrice(connection, medicine.entityId, { now, session });
-        if (!price) throw failure(503, 'SERVICE_UNAVAILABLE', 'Current price feed is unavailable.');
+          throw failure(
+            503,
+            'SERVICE_UNAVAILABLE',
+            'Medicine projection is unavailable.',
+          );
+        const price = await resolveCatalogPrice(connection, medicine.entityId, {
+          now,
+          session,
+        });
+        if (!price)
+          throw failure(
+            503,
+            'SERVICE_UNAVAILABLE',
+            'Current price feed is unavailable.',
+          );
         const changed = await connection.collection('inventory').updateOne(
           {
             medicineId: medicine.entityId,
-            $expr: { $gte: [{ $subtract: ['$onHand', '$reserved'] }, line.quantity] },
+            $expr: {
+              $gte: [{ $subtract: ['$onHand', '$reserved'] }, line.quantity],
+            },
           },
           { $inc: { reserved: line.quantity, version: 1 } },
           { session },
         );
         if (!changed.modifiedCount)
           throw Object.assign(
-            failure(409, 'INSUFFICIENT_STOCK', 'Full prescription cannot be reserved.'),
+            failure(
+              409,
+              'INSUFFICIENT_STOCK',
+              'Full prescription cannot be reserved.',
+            ),
             {
-              details: { shortages: [{ medicineId: medicine.entityId, requested: line.quantity }] },
+              details: {
+                shortages: [
+                  { medicineId: medicine.entityId, requested: line.quantity },
+                ],
+              },
             },
           );
         amountVnd += price.amountVnd * line.quantity;
         if (!Number.isSafeInteger(amountVnd))
-          throw failure(400, 'VALIDATION_ERROR', 'Prescription amount exceeds safe integer.');
+          throw failure(
+            400,
+            'VALIDATION_ERROR',
+            'Prescription amount exceeds safe integer.',
+          );
         items.push({
           ...line,
           medicineId: medicine.entityId,
@@ -115,10 +181,14 @@ async function createMedicationHold(args) {
             ]
           : [],
       };
-      await holdColl.replaceOne({ prescriptionId, revision: prescriptionRevision }, value, {
-        session,
-        upsert: true,
-      });
+      await holdColl.replaceOne(
+        { prescriptionId, revision: prescriptionRevision },
+        value,
+        {
+          session,
+          upsert: true,
+        },
+      );
       await outbox(connection, session, {
         type: 'RequestCharge',
         kind: 'COMMAND',
@@ -159,16 +229,21 @@ async function returnReservation({ connection, session, hold, state, now }) {
       { session },
     );
     if (!changed.modifiedCount)
-      throw failure(500, 'STOCK_INVARIANT_BROKEN', 'Reserved stock cannot be returned.');
+      throw failure(
+        500,
+        'STOCK_INVARIANT_BROKEN',
+        'Reserved stock cannot be returned.',
+      );
   }
   const cancellationId = randomUUID();
-  await connection
-    .collection('medication_holds')
-    .updateOne(
-      { id: hold.id, version: hold.version, status: 'HELD' },
-      { $set: { status: state, cancellationId, updatedAt: now }, $inc: { version: 1 } },
-      { session },
-    );
+  await connection.collection('medication_holds').updateOne(
+    { id: hold.id, version: hold.version, status: 'HELD' },
+    {
+      $set: { status: state, cancellationId, updatedAt: now },
+      $inc: { version: 1 },
+    },
+    { session },
+  );
   await outbox(connection, session, {
     type: 'MedicationHoldChanged',
     aggregateId: hold.id,
@@ -197,12 +272,22 @@ async function releaseMedicationHold(args) {
       if (!hold) throw failure(404, 'NOT_FOUND', 'Hold not found.');
       if (hold.status !== 'HELD' || hold.version !== expectedVersion)
         throw failure(409, 'STATE_CONFLICT', 'Hold cannot be released.');
-      await returnReservation({ connection, session, hold, state: 'RELEASED', now });
+      await returnReservation({
+        connection,
+        session,
+        hold,
+        state: 'RELEASED',
+        now,
+      });
       return { holdId, state: 'RELEASED' };
     },
   );
 }
-async function expireMedicationHolds({ connection, now = new Date(), batchSize = 100 }) {
+async function expireMedicationHolds({
+  connection,
+  now = new Date(),
+  batchSize = 100,
+}) {
   const candidates = await connection
     .collection('medication_holds')
     .find({
@@ -224,7 +309,13 @@ async function expireMedicationHolds({ connection, now = new Date(), batchSize =
         { session },
       );
       if (!hold) return false;
-      await returnReservation({ connection, session, hold, state: 'EXPIRED', now });
+      await returnReservation({
+        connection,
+        session,
+        hold,
+        state: 'EXPIRED',
+        now,
+      });
       return true;
     });
     if (changed) expired++;

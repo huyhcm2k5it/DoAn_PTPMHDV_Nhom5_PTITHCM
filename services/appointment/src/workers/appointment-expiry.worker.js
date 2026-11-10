@@ -24,10 +24,20 @@ async function expirePendingAppointments({
   for (const candidate of candidates) {
     await withMongoTransaction(connection, async (session) => {
       const changed = await Appointment.updateOne(
-        { id: candidate.id, state: 'PENDING_PAYMENT', version: candidate.version },
+        {
+          id: candidate.id,
+          state: 'PENDING_PAYMENT',
+          version: candidate.version,
+        },
         {
           $set: { state: 'EXPIRED', updatedAt: now, chargeStatus: 'EXPIRED' },
-          $push: { stateHistory: { state: 'EXPIRED', at: now, reasonCode: 'PAYMENT_TIMEOUT' } },
+          $push: {
+            stateHistory: {
+              state: 'EXPIRED',
+              at: now,
+              reasonCode: 'PAYMENT_TIMEOUT',
+            },
+          },
           $inc: { version: 1 },
         },
         { session },
@@ -73,4 +83,8 @@ async function expirePendingAppointments({
 module.exports = { expirePendingAppointments };
 
 // Cache invalidation runs after successful transaction commit.
-module.exports.expirePendingAppointments = async (...args) => { const result = await expirePendingAppointments(...args); await require('../services/slot-cache.service').getSlotCache().invalidate(); return result; };
+module.exports.expirePendingAppointments = async (...args) => {
+  const result = await expirePendingAppointments(...args);
+  await require('../services/slot-cache.service').getSlotCache().invalidate();
+  return result;
+};

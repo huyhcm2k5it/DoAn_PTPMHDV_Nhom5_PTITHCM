@@ -1,8 +1,14 @@
-const { getAppointmentModel, getQueueTicketModel } = require('../models/appointment.model.js');
+const {
+  getAppointmentModel,
+  getQueueTicketModel,
+} = require('../models/appointment.model.js');
 const { ApiError } = require('../core/errors.js');
 
 function assertAdmin(authContext) {
-  if (authContext?.actorType !== 'STAFF' || !authContext.capabilities?.includes('ADMIN'))
+  if (
+    authContext?.actorType !== 'STAFF' ||
+    !authContext.capabilities?.includes('ADMIN')
+  )
     throw new ApiError(403, 'FORBIDDEN', 'ADMIN capability is required.');
 }
 
@@ -25,20 +31,37 @@ async function getAdminSummary({ connection, authContext, date }) {
   const metrics = { booked: 0, cancelled: 0, checkedIn: 0, completed: 0 };
   for (const appointment of appointments) {
     byState[appointment.state] = (byState[appointment.state] || 0) + 1;
-    const history = Array.isArray(appointment.stateHistory) && appointment.stateHistory.length
-      ? appointment.stateHistory
-      : [{ state: appointment.state, at: appointment.updatedAt || appointment.createdAt }];
+    const history =
+      Array.isArray(appointment.stateHistory) && appointment.stateHistory.length
+        ? appointment.stateHistory
+        : [
+            {
+              state: appointment.state,
+              at: appointment.updatedAt || appointment.createdAt,
+            },
+          ];
     const states = new Set(history.map((entry) => entry.state));
-    if (states.has('PENDING_PAYMENT') || states.has('SETTLEMENT_LOCKED') || states.has('CONFIRMED')) metrics.booked += 1;
+    if (
+      states.has('PENDING_PAYMENT') ||
+      states.has('SETTLEMENT_LOCKED') ||
+      states.has('CONFIRMED')
+    )
+      metrics.booked += 1;
     if (states.has('CANCELLED')) metrics.cancelled += 1;
-    if (states.has('CHECKED_IN') || appointment.checkedInAt) metrics.checkedIn += 1;
+    if (states.has('CHECKED_IN') || appointment.checkedInAt)
+      metrics.checkedIn += 1;
     if (states.has('COMPLETED')) metrics.completed += 1;
   }
-  const queueByState = Object.fromEntries(queueRows.map((row) => [row._id, row.count]));
+  const queueByState = Object.fromEntries(
+    queueRows.map((row) => [row._id, row.count]),
+  );
   return {
     date,
     appointments: { total: appointments.length, byState, metrics },
-    queue: { total: queueRows.reduce((sum, row) => sum + row.count, 0), byState: queueByState },
+    queue: {
+      total: queueRows.reduce((sum, row) => sum + row.count, 0),
+      byState: queueByState,
+    },
   };
 }
 

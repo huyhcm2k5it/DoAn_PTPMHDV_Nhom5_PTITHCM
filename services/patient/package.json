@@ -12,11 +12,16 @@
     "check": "node scripts/check-js.js",
     "seed:demo": "node scripts/seed-demo.js",
     "seed:dry-run": "node scripts/seed-demo.js --dry-run",
-    "test": "node --test --test-concurrency=1 tests/*.test.js"
+    "test": "node --test --test-concurrency=1 tests/*.test.js",
+    "format": "prettier --ignore-path ../../.prettierignore --write .",
+    "format:check": "prettier --ignore-path ../../.prettierignore --check ."
   },
   "dependencies": {
     "amqplib": "^0.10.7",
     "express": "^5.1.0",
     "mongoose": "9.11.4"
+  },
+  "devDependencies": {
+    "prettier": "3.9.10"
   }
 }
