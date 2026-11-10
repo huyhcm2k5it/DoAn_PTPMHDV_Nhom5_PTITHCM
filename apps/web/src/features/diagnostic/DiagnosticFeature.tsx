@@ -41,15 +41,23 @@ export function DiagnosticFeature({
     />
   );
 }
-function Queue({ api, canCollect }: { api: DiagnosticApi; canCollect: boolean }) {
+function Queue({
+  api,
+  canCollect,
+}: {
+  api: DiagnosticApi;
+  canCollect: boolean;
+}) {
   const [state, setState] = useState(''),
     [page, setPage] = useState(1),
     [reload, setReload] = useState(0),
     [selected, setSelected] = useState('');
-  const [list, setList] = useState<{ items: DiagnosticOrder[]; total: number }>({
-      items: [],
-      total: 0,
-    }),
+  const [list, setList] = useState<{ items: DiagnosticOrder[]; total: number }>(
+      {
+        items: [],
+        total: 0,
+      },
+    ),
     [loading, setLoading] = useState(true),
     [error, setError] = useState<unknown>();
   useEffect(() => {
@@ -80,7 +88,9 @@ function Queue({ api, canCollect }: { api: DiagnosticApi; canCollect: boolean })
           <p>Không gian nhân viên LAB</p>
           <h1>Phòng xét nghiệm</h1>
         </div>
-        <button onClick={() => setReload((n) => n + 1)}>Làm mới hàng chờ</button>
+        <button onClick={() => setReload((n) => n + 1)}>
+          Làm mới hàng chờ
+        </button>
       </header>
       <label>
         Trạng thái order
@@ -115,13 +125,18 @@ function Queue({ api, canCollect }: { api: DiagnosticApi; canCollect: boolean })
                   <strong>{o.id.slice(0, 8)}</strong>
                   <span>{states[o.state] ?? o.state}</span>
                   <span>Phí: {o.chargeState}</span>
-                  <button onClick={() => setSelected(o.id)}>Mở order {o.id.slice(0, 8)}</button>
+                  <button onClick={() => setSelected(o.id)}>
+                    Mở order {o.id.slice(0, 8)}
+                  </button>
                 </li>
               ))}
             </ul>
           )}
           <nav aria-label="Phân trang LAB">
-            <button disabled={page <= 1 || loading} onClick={() => setPage((n) => n - 1)}>
+            <button
+              disabled={page <= 1 || loading}
+              onClick={() => setPage((n) => n - 1)}
+            >
               Trang trước
             </button>
             <span>Trang {page}</span>
@@ -172,9 +187,10 @@ function Order({
     [uncertain, setUncertain] = useState(false),
     [notice, setNotice] = useState('');
   const alive = useRef(true),
-    attempt = useRef<{ key: string; run: (key: string) => Promise<{ specimen: Specimen }> } | null>(
-      null,
-    );
+    attempt = useRef<{
+      key: string;
+      run: (key: string) => Promise<{ specimen: Specimen }>;
+    } | null>(null);
   useEffect(() => {
     alive.current = true;
     return () => {
@@ -221,7 +237,10 @@ function Order({
     } catch (e) {
       if (alive.current) {
         setMutationError(e);
-        if (e instanceof DiagnosticError && [400, 401, 403, 404, 409, 422].includes(e.status)) {
+        if (
+          e instanceof DiagnosticError &&
+          [400, 401, 403, 404, 409, 422].includes(e.status)
+        ) {
           attempt.current = null;
           setUncertain(false);
         } else setUncertain(true);
@@ -251,7 +270,8 @@ function Order({
     <section className="diagnostic-order" aria-label="Chi tiết order">
       <h2>Order {id.slice(0, 8)}</h2>
       <p>
-        {states[detail.order.state] ?? detail.order.state} · Phiên bản {detail.order.version}
+        {states[detail.order.state] ?? detail.order.state} · Phiên bản{' '}
+        {detail.order.version}
       </p>
       <p>Hồ sơ {detail.order.patientId}</p>
       <p>
@@ -260,7 +280,8 @@ function Order({
       </p>
       {!paid && (
         <p role="status">
-          Chờ đồng bộ thanh toán. Chỉ lấy mẫu khi máy chủ có bằng chứng thanh toán hợp lệ.
+          Chờ đồng bộ thanh toán. Chỉ lấy mẫu khi máy chủ có bằng chứng thanh
+          toán hợp lệ.
         </p>
       )}
       {notice && <p role="status">{notice}</p>}
@@ -291,7 +312,9 @@ function Order({
           {detail.specimens.length === 0 && (
             <button
               disabled={disabled || !paid || detail.order.state !== 'PAID'}
-              onClick={() => act((key) => apiRef.current.collect(id, specimenInput, key))}
+              onClick={() =>
+                act((key) => apiRef.current.collect(id, specimenInput, key))
+              }
             >
               Lấy mẫu
             </button>
@@ -299,7 +322,9 @@ function Order({
           {detail.order.state === 'SPECIMEN_REJECTED' && (
             <button
               disabled={disabled || !paid}
-              onClick={() => act((key) => apiRef.current.recollect(id, specimenInput, key))}
+              onClick={() =>
+                act((key) => apiRef.current.recollect(id, specimenInput, key))
+              }
             >
               Lấy lại mẫu
             </button>
@@ -320,7 +345,8 @@ function Order({
                 {s.state} · phiên bản {s.version}
               </p>
               <p>
-                Người lấy: {s.collectedBy} · {new Date(s.collectedAt).toLocaleString('vi-VN')}
+                Người lấy: {s.collectedBy} ·{' '}
+                {new Date(s.collectedAt).toLocaleString('vi-VN')}
               </p>
               {s.reasonCode && <p>Lý do từ chối: {s.reasonCode}</p>}
               {canCollect && s.state === 'COLLECTED' && (
@@ -338,7 +364,10 @@ function Order({
                   <button
                     disabled={disabled || !reason.trim()}
                     onClick={() => {
-                      const input = { reasonCode: reason.trim(), expectedVersion: s.version };
+                      const input = {
+                        reasonCode: reason.trim(),
+                        expectedVersion: s.version,
+                      };
                       act((key) => apiRef.current.reject(s.id, input, key));
                     }}
                   >

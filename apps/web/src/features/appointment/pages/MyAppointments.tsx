@@ -47,9 +47,14 @@ export function MyAppointments({ api }: { api: AppointmentApi }) {
         </button>
       </form>
       {loading && <Loading label="Đang tải lịch hẹn" />}
-      {!loading && error != null && <ErrorPanel error={error} onRetry={() => load()} />}
+      {!loading && error != null && (
+        <ErrorPanel error={error} onRetry={() => load()} />
+      )}
       {!loading && items?.length === 0 && (
-        <EmptyState title="Chưa có lịch hẹn" description="Các lịch đã tạo sẽ xuất hiện ở đây." />
+        <EmptyState
+          title="Chưa có lịch hẹn"
+          description="Các lịch đã tạo sẽ xuất hiện ở đây."
+        />
       )}
       {!loading && (items?.length ?? 0) > 0 && (
         <div className="profile-grid">

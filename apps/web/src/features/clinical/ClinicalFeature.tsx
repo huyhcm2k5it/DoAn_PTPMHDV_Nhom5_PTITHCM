@@ -26,7 +26,11 @@ const labels: Record<string, string> = {
   SIGNED: 'Đã ký',
 };
 
-export function ClinicalFeature({ api, session, selectedTicket }: ClinicalFeatureProps) {
+export function ClinicalFeature({
+  api,
+  session,
+  selectedTicket,
+}: ClinicalFeatureProps) {
   if (!session || session.actorType !== 'DOCTOR')
     return (
       <section className="clinical-feature">
@@ -34,9 +38,17 @@ export function ClinicalFeature({ api, session, selectedTicket }: ClinicalFeatur
         <p role="alert">Màn hình này chỉ dành cho bác sĩ đã đăng nhập.</p>
       </section>
     );
-  return <Workbench key={session.userId} api={api} selectedTicket={selectedTicket} />;
+  return (
+    <Workbench key={session.userId} api={api} selectedTicket={selectedTicket} />
+  );
 }
-function Workbench({ api, selectedTicket }: { api: ClinicalApi; selectedTicket?: StartInput }) {
+function Workbench({
+  api,
+  selectedTicket,
+}: {
+  api: ClinicalApi;
+  selectedTicket?: StartInput;
+}) {
   const apiRef = useRef(api);
   apiRef.current = api;
   const [date, setDate] = useState('');
@@ -114,7 +126,8 @@ function Workbench({ api, selectedTicket }: { api: ClinicalApi; selectedTicket?:
       controller.abort();
     };
   }, [selected, detailReload]);
-  const hasPendingLab = detail?.labRequests.some((request) => request.state === 'PENDING') ?? false;
+  const hasPendingLab =
+    detail?.labRequests.some((request) => request.state === 'PENDING') ?? false;
   useEffect(() => {
     if (!selected || !hasPendingLab || detailLoading) return;
     const controller = new AbortController();
@@ -149,18 +162,29 @@ function Workbench({ api, selectedTicket }: { api: ClinicalApi; selectedTicket?:
     const id = operation.operationId;
     const poll = async () => {
       try {
-        const data = await apiRef.current.worklist({ operationId: id }, controller.signal);
+        const data = await apiRef.current.worklist(
+          { operationId: id },
+          controller.signal,
+        );
         if (!active) return;
         const result = data.startRequest;
         if (!result || result.operationId !== id)
-          throw new ApiError(502, 'INVALID_RESPONSE', 'Chưa đọc được trạng thái nhận lượt');
+          throw new ApiError(
+            502,
+            'INVALID_RESPONSE',
+            'Chưa đọc được trạng thái nhận lượt',
+          );
         setStartError(undefined);
         if (result.state === 'PENDING') {
           timer = setTimeout(poll, 1000);
           return;
         }
         if (result.state === 'ACCEPTED' && !result.visitId)
-          throw new ApiError(502, 'INVALID_RESPONSE', 'Lượt khám chưa có mã hợp lệ');
+          throw new ApiError(
+            502,
+            'INVALID_RESPONSE',
+            'Lượt khám chưa có mã hợp lệ',
+          );
         setOperation(result);
         intent.current = null;
         if (result.state === 'ACCEPTED' && result.visitId) {
@@ -170,7 +194,10 @@ function Workbench({ api, selectedTicket }: { api: ClinicalApi; selectedTicket?:
       } catch (error) {
         if (!active) return;
         setStartError(error);
-        if (!(error instanceof ApiError) || ![401, 403, 404].includes(error.status))
+        if (
+          !(error instanceof ApiError) ||
+          ![401, 403, 404].includes(error.status)
+        )
           timer = setTimeout(poll, 2000);
       }
     };
@@ -192,14 +219,20 @@ function Workbench({ api, selectedTicket }: { api: ClinicalApi; selectedTicket?:
     setStarting(true);
     setStartError(undefined);
     try {
-      const result = await apiRef.current.start(intent.current.input, intent.current.key);
+      const result = await apiRef.current.start(
+        intent.current.input,
+        intent.current.key,
+      );
       if (alive.current) setOperation(result);
     } catch (error) {
       if (alive.current) {
         // These responses definitively rejected the request before 202. A
         // corrected queue selection starts a new intention; ambiguous failures
         // preserve the original body/key so a committed start can be replayed.
-        if (error instanceof ApiError && [400, 401, 403, 404, 409, 422].includes(error.status)) {
+        if (
+          error instanceof ApiError &&
+          [400, 401, 403, 404, 409, 422].includes(error.status)
+        ) {
           intent.current = null;
         }
         setStartError(error);
@@ -232,7 +265,9 @@ function Workbench({ api, selectedTicket }: { api: ClinicalApi; selectedTicket?:
         <button
           type="button"
           disabled={
-            starting || operation?.state === 'PENDING' || (!selectedTicket && !intent.current)
+            starting ||
+            operation?.state === 'PENDING' ||
+            (!selectedTicket && !intent.current)
           }
           onClick={() => void start()}
         >
@@ -244,12 +279,15 @@ function Workbench({ api, selectedTicket }: { api: ClinicalApi; selectedTicket?:
         </button>
       </div>
       {operation?.state === 'PENDING' && (
-        <p role="status">Đang chờ xác nhận vé. Lượt khám sẽ mở khi hàng chờ xác nhận thành công.</p>
+        <p role="status">
+          Đang chờ xác nhận vé. Lượt khám sẽ mở khi hàng chờ xác nhận thành
+          công.
+        </p>
       )}
       {operation?.state === 'REJECTED' && (
         <p role="alert">
-          Không nhận được lượt: {operation.reasonCode ?? 'CLAIM_REJECTED'}. Hãy kiểm tra lại vé hàng
-          chờ.
+          Không nhận được lượt: {operation.reasonCode ?? 'CLAIM_REJECTED'}. Hãy
+          kiểm tra lại vé hàng chờ.
         </p>
       )}
       {startError !== undefined && (
@@ -307,7 +345,9 @@ function Workbench({ api, selectedTicket }: { api: ClinicalApi; selectedTicket?:
             <ul>
               {list.items.map((v) => (
                 <li key={v.id}>
-                  <span className="clinical-state">{labels[v.state] ?? v.state}</span>
+                  <span className="clinical-state">
+                    {labels[v.state] ?? v.state}
+                  </span>
                   <strong>Lượt {v.id.slice(0, 8)}</strong>
                   <span>Hồ sơ {v.patientId}</span>
                   <time dateTime={v.startedAt}>

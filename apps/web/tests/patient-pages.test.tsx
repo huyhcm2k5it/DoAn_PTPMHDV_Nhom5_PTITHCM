@@ -24,7 +24,9 @@ function patientApi(overrides: Partial<PatientApi> = {}): PatientApi {
 
 describe('patient profile screens', () => {
   it('shows loading and then the empty state for an account without profiles', async () => {
-    const api = patientApi({ list: vi.fn().mockResolvedValue({ items: [], total: 0 }) });
+    const api = patientApi({
+      list: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+    });
     render(
       <MemoryRouter>
         <ProfileList api={api} />
@@ -35,14 +37,18 @@ describe('patient profile screens', () => {
   });
 
   it('renders a permission message for a 403 profile detail response', async () => {
-    const api = patientApi({ getById: vi.fn().mockRejectedValue({ status: 403 }) });
+    const api = patientApi({
+      getById: vi.fn().mockRejectedValue({ status: 403 }),
+    });
     render(
       <MemoryRouter>
         <ProfileDetail api={api} patientId={profile.id} />
       </MemoryRouter>,
     );
     expect(
-      await screen.findByText('Tài khoản hiện tại không có quyền xem nội dung này.'),
+      await screen.findByText(
+        'Tài khoản hiện tại không có quyền xem nội dung này.',
+      ),
     ).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Thử tải lại' })).toBeNull();
   });
@@ -68,9 +74,18 @@ describe('available slot screen', () => {
     const catalog = {
       departments: vi
         .fn()
-        .mockResolvedValue([{ id: 'dep-1', code: 'CARD', name: 'Tim mạch', status: 'ACTIVE' }]),
+        .mockResolvedValue([
+          { id: 'dep-1', code: 'CARD', name: 'Tim mạch', status: 'ACTIVE' },
+        ]),
       doctors: vi.fn().mockResolvedValue({
-        items: [{ id: 'doc-1', departmentId: 'dep-1', displayName: 'BS. An', status: 'ACTIVE' }],
+        items: [
+          {
+            id: 'doc-1',
+            departmentId: 'dep-1',
+            displayName: 'BS. An',
+            status: 'ACTIVE',
+          },
+        ],
         total: 1,
       }),
       services: vi.fn().mockResolvedValue([
@@ -99,10 +114,18 @@ describe('available slot screen', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.change(await screen.findByLabelText('Chuyên khoa'), { target: { value: 'dep-1' } });
-    fireEvent.change(await screen.findByLabelText('Bác sĩ'), { target: { value: 'doc-1' } });
-    fireEvent.change(await screen.findByLabelText('Dịch vụ khám'), { target: { value: 'svc-1' } });
-    fireEvent.change(screen.getByLabelText('Ngày khám'), { target: { value: '2026-11-02' } });
+    fireEvent.change(await screen.findByLabelText('Chuyên khoa'), {
+      target: { value: 'dep-1' },
+    });
+    fireEvent.change(await screen.findByLabelText('Bác sĩ'), {
+      target: { value: 'doc-1' },
+    });
+    fireEvent.change(await screen.findByLabelText('Dịch vụ khám'), {
+      target: { value: 'svc-1' },
+    });
+    fireEvent.change(screen.getByLabelText('Ngày khám'), {
+      target: { value: '2026-11-02' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Tìm lịch trống' }));
 
     expect(await screen.findByText('Không có khung giờ phù hợp')).toBeTruthy();
@@ -116,7 +139,9 @@ describe('available slot screen', () => {
 describe('shared auth redirect boundary', () => {
   it('hands a 401 response back to the shared Identity adapter', async () => {
     const onUnauthorized = vi.fn();
-    const transport = vi.fn().mockResolvedValue(new Response('{}', { status: 401 }));
+    const transport = vi
+      .fn()
+      .mockResolvedValue(new Response('{}', { status: 401 }));
     const response = await withAuthRedirect(
       transport,
       onUnauthorized,

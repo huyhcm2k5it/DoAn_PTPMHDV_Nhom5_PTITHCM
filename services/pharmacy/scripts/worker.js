@@ -1,9 +1,15 @@
 const amqp = require('amqplib');
 const { connectDatabase } = require('../src/configs/database');
 const { startPharmacyWorker } = require('../src/workers/amqp-runtime');
-const { publishPharmacyOutboxBatch } = require('../src/workers/outbox-publisher.worker');
-const { expireMedicationHolds } = require('../src/services/medication-holds.service');
-const { queryUnresolvedSettlements } = require('../src/services/settlement.service');
+const {
+  publishPharmacyOutboxBatch,
+} = require('../src/workers/outbox-publisher.worker');
+const {
+  expireMedicationHolds,
+} = require('../src/services/medication-holds.service');
+const {
+  queryUnresolvedSettlements,
+} = require('../src/services/settlement.service');
 const { startBackgroundJobs } = require('../../../mongo/background-jobs');
 async function main() {
   const connection = await connectDatabase(process.env.MONGODB_URI);
@@ -19,7 +25,8 @@ async function main() {
       () => expireMedicationHolds({ connection }),
       () => queryUnresolvedSettlements({ connection }),
     ],
-    onError: (error) => console.error('pharmacy job failed:', error.code || error.name),
+    onError: (error) =>
+      console.error('pharmacy job failed:', error.code || error.name),
   });
   let closing = false;
   const close = async (code) => {

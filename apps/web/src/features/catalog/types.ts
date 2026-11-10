@@ -1,5 +1,5 @@
-export type Status = "ACTIVE" | "INACTIVE";
-export type ItemType = "EXAM" | "MEDICINE" | "LAB";
+export type Status = 'ACTIVE' | 'INACTIVE';
+export type ItemType = 'EXAM' | 'MEDICINE' | 'LAB';
 export type Department = {
   id: string;
   code: string;
@@ -55,7 +55,7 @@ export type PriceResult = {
   effectiveFrom: string;
 };
 export type Session = {
-  actorType: "PATIENT" | "DOCTOR" | "STAFF";
+  actorType: 'PATIENT' | 'DOCTOR' | 'STAFF';
   capabilities: string[];
 };
 export interface CatalogApi {
@@ -74,5 +74,5 @@ export interface CatalogApi {
   createPrice(input: PriceInput, idempotencyKey: string): Promise<PriceResult>;
 }
 export const can = (session: Session | undefined, ...capabilities: string[]) =>
-  session?.actorType === "STAFF" &&
+  session?.actorType === 'STAFF' &&
   capabilities.some((c) => session.capabilities.includes(c));

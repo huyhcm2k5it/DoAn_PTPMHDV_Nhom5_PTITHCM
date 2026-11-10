@@ -14,7 +14,11 @@ async function seed({ connection, dryRun = true } = {}) {
     if (!connection) throw new Error('Owner database connection required.');
     await connection
       .collection('inventory')
-      .updateOne({ medicineId: ids.medicine }, { $setOnInsert: record }, { upsert: true });
+      .updateOne(
+        { medicineId: ids.medicine },
+        { $setOnInsert: record },
+        { upsert: true },
+      );
   }
   // No fabricated FINAL/PAID/Identity projections: actual owners must publish them.
   return {
@@ -32,7 +36,9 @@ if (require.main === module) {
     const dryRun = process.argv.includes('--dry-run');
     const connection = dryRun
       ? undefined
-      : await require('../src/configs/database').connectDatabase(process.env.MONGODB_URI);
+      : await require('../src/configs/database').connectDatabase(
+          process.env.MONGODB_URI,
+        );
     try {
       console.log(JSON.stringify(await seed({ connection, dryRun })));
     } finally {

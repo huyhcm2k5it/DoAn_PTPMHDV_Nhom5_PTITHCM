@@ -64,20 +64,36 @@ export type PharmacyApi = {
   receiveStock: (
     input: { medicineId: string; quantity: number; batchRef?: string },
     key: string,
-  ) => Promise<{ stockReceiptId: string; medicineId: string; onHand: number; available: number }>;
-  queue: (page?: number, signal?: AbortSignal) => Promise<{ items: Prescription[]; total: number }>;
+  ) => Promise<{
+    stockReceiptId: string;
+    medicineId: string;
+    onHand: number;
+    available: number;
+  }>;
+  queue: (
+    page?: number,
+    signal?: AbortSignal,
+  ) => Promise<{ items: Prescription[]; total: number }>;
   detail: (
     prescriptionId: string,
     revision?: number,
     signal?: AbortSignal,
   ) => Promise<PrescriptionDetail>;
-  hold: (prescriptionId: string, prescriptionRevision: number, key: string) => Promise<PendingHold>;
+  hold: (
+    prescriptionId: string,
+    prescriptionRevision: number,
+    key: string,
+  ) => Promise<PendingHold>;
   release: (
     holdId: string,
     expectedVersion: number,
     key: string,
   ) => Promise<{ holdId: string; state: HoldState }>;
-  reconcile: (holdId: string, expectedAttemptNo: number, key: string) => Promise<PendingHold>;
+  reconcile: (
+    holdId: string,
+    expectedAttemptNo: number,
+    key: string,
+  ) => Promise<PendingHold>;
   dispense: (
     holdId: string,
     expectedVersion: number,

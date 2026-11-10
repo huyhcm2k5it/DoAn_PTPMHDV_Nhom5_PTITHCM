@@ -8,9 +8,14 @@ function requireAccess(dependencies, req, patientId) {
       'Chưa có chính sách truy cập hồ sơ từ Identity.',
     );
   return dependencies
-    .authorizePatientAccess({ authContext: req.authContext, patientId, action: 'APPOINTMENT_BOOK' })
+    .authorizePatientAccess({
+      authContext: req.authContext,
+      patientId,
+      action: 'APPOINTMENT_BOOK',
+    })
     .then((allowed) => {
-      if (!allowed) throw new ApiError(403, 'FORBIDDEN', 'Không có quyền trên hồ sơ này.');
+      if (!allowed)
+        throw new ApiError(403, 'FORBIDDEN', 'Không có quyền trên hồ sơ này.');
     });
 }
 function createHoldsController(dependencies) {
@@ -29,7 +34,9 @@ function createHoldsController(dependencies) {
           createId: dependencies.createId,
           resolvePriceSnapshot: dependencies.resolvePriceSnapshot,
         });
-        res.status(201).json({ data, meta: { correlationId: req.correlationId } });
+        res
+          .status(201)
+          .json({ data, meta: { correlationId: req.correlationId } });
       } catch (error) {
         next(error);
       }
@@ -45,7 +52,9 @@ function createHoldsController(dependencies) {
           now: dependencies.now?.() || new Date(),
           createId: dependencies.createId,
         });
-        res.status(200).json({ data, meta: { correlationId: req.correlationId } });
+        res
+          .status(200)
+          .json({ data, meta: { correlationId: req.correlationId } });
       } catch (error) {
         next(error);
       }

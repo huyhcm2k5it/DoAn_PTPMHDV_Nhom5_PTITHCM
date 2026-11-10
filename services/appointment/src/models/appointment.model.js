@@ -17,7 +17,10 @@ function getScheduleModel(connection) {
     },
     { collection: 'schedules', versionKey: false, strict: 'throw' },
   );
-  schema.index({ doctorId: 1, startAt: 1 }, { name: 'ix_schedules_doctor_start' });
+  schema.index(
+    { doctorId: 1, startAt: 1 },
+    { name: 'ix_schedules_doctor_start' },
+  );
   return connection.model('Schedule', schema);
 }
 function getSlotModel(connection) {
@@ -34,7 +37,10 @@ function getSlotModel(connection) {
     },
     { collection: 'slots', versionKey: false, strict: 'throw' },
   );
-  schema.index({ scheduleId: 1, startAt: 1 }, { unique: true, name: 'uq_slot_schedule_start' });
+  schema.index(
+    { scheduleId: 1, startAt: 1 },
+    { unique: true, name: 'uq_slot_schedule_start' },
+  );
   return connection.model('Slot', schema);
 }
 function getHoldModel(connection) {
@@ -53,11 +59,18 @@ function getHoldModel(connection) {
       scheduleId: { type: String, required: true },
       slotStartAt: { type: Date, required: true },
       slotEndAt: { type: Date, required: true },
-      status: { type: String, required: true, enum: ['HELD', 'CONSUMED', 'RELEASED', 'EXPIRED'] },
+      status: {
+        type: String,
+        required: true,
+        enum: ['HELD', 'CONSUMED', 'RELEASED', 'EXPIRED'],
+      },
       expiresAt: { type: Date, required: true },
       createdAt: { type: Date, required: true },
       releasedAt: Date,
-      priceSnapshot: { type: connection.base.Schema.Types.Mixed, default: null },
+      priceSnapshot: {
+        type: connection.base.Schema.Types.Mixed,
+        default: null,
+      },
       version: { type: Number, default: 1 },
     },
     { collection: 'holds', versionKey: false, strict: 'throw' },
@@ -102,13 +115,20 @@ function getAppointmentModel(connection) {
           'COMPLETED',
         ],
       },
-      chargeSync: { type: String, required: true, enum: ['PENDING', 'CREATED', 'REJECTED'] },
+      chargeSync: {
+        type: String,
+        required: true,
+        enum: ['PENDING', 'CREATED', 'REJECTED'],
+      },
       chargeId: String,
       chargeStatus: String,
       refundStatus: String,
       cancellationId: String,
       cancelledAt: Date,
-      priceSnapshot: { type: connection.base.Schema.Types.Mixed, default: null },
+      priceSnapshot: {
+        type: connection.base.Schema.Types.Mixed,
+        default: null,
+      },
       slotHistory: { type: [connection.base.Schema.Types.Mixed], default: [] },
       stateHistory: { type: [connection.base.Schema.Types.Mixed], default: [] },
       paymentDueAt: Date,
@@ -131,7 +151,10 @@ function getAppointmentModel(connection) {
     { collection: 'appointments', versionKey: false, strict: 'throw' },
   );
   schema.index({ holdId: 1 }, { unique: true, name: 'uq_appointment_hold' });
-  schema.index({ patientId: 1, startAt: 1 }, { name: 'ix_appointment_patient_start' });
+  schema.index(
+    { patientId: 1, startAt: 1 },
+    { name: 'ix_appointment_patient_start' },
+  );
   return connection.model('Appointment', schema);
 }
 function getQueueTicketModel(connection) {
@@ -183,7 +206,8 @@ function getQueueTicketModel(connection) {
   return connection.model('QueueTicket', schema);
 }
 function getPatientTimeLockModel(connection) {
-  if (connection.models.PatientTimeLock) return connection.models.PatientTimeLock;
+  if (connection.models.PatientTimeLock)
+    return connection.models.PatientTimeLock;
   const schema = new connection.base.Schema(
     {
       patientId: { type: String, required: true },
@@ -192,11 +216,15 @@ function getPatientTimeLockModel(connection) {
     },
     { collection: 'patient_time_locks', versionKey: false, strict: 'throw' },
   );
-  schema.index({ patientId: 1 }, { unique: true, name: 'uq_patient_time_lock' });
+  schema.index(
+    { patientId: 1 },
+    { unique: true, name: 'uq_patient_time_lock' },
+  );
   return connection.model('PatientTimeLock', schema);
 }
 function getIdempotencyModel(connection) {
-  if (connection.models.IdempotencyRecord) return connection.models.IdempotencyRecord;
+  if (connection.models.IdempotencyRecord)
+    return connection.models.IdempotencyRecord;
   const schema = new connection.base.Schema(
     {
       principal_id: { type: String, required: true },
@@ -259,7 +287,8 @@ function getInboxModel(connection) {
   return connection.model('InboxMessage', schema);
 }
 function getSettlementDecisionModel(connection) {
-  if (connection.models.SettlementDecision) return connection.models.SettlementDecision;
+  if (connection.models.SettlementDecision)
+    return connection.models.SettlementDecision;
   const schema = new connection.base.Schema(
     {
       id: { type: String, required: true },
@@ -267,7 +296,11 @@ function getSettlementDecisionModel(connection) {
       sourceId: { type: String, required: true },
       sourceRevision: { type: Number, required: true },
       decisionVersion: { type: Number, required: true },
-      state: { type: String, required: true, enum: ['SUCCEEDED', 'FAILED', 'UNKNOWN'] },
+      state: {
+        type: String,
+        required: true,
+        enum: ['SUCCEEDED', 'FAILED', 'UNKNOWN'],
+      },
       fence: Number,
       paymentId: String,
       reasonCode: String,

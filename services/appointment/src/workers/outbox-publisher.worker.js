@@ -3,12 +3,18 @@ const { getOutboxModel } = require('../models/appointment.model.js');
 
 function routingKeyFor(message) {
   if (message.destination_key) return message.destination_key;
-  if (message.message_type === 'QuerySettlement') return 'billing.query-settlement.v1';
-  if (message.message_type === 'RequestCharge') return 'billing.request-charge.v1';
-  if (message.message_type === 'ReserveSettlement') return 'billing.reserve-settlement.v1';
-  if (message.message_type === 'AppointmentChanged') return 'appointment.appointment-changed.v1';
-  if (message.message_type === 'SettlementReserved') return 'appointment.settlement-reserved.v1';
-  if (message.message_type === 'QueueTicketClaimed') return 'appointment.queue-ticket-claimed.v1';
+  if (message.message_type === 'QuerySettlement')
+    return 'billing.query-settlement.v1';
+  if (message.message_type === 'RequestCharge')
+    return 'billing.request-charge.v1';
+  if (message.message_type === 'ReserveSettlement')
+    return 'billing.reserve-settlement.v1';
+  if (message.message_type === 'AppointmentChanged')
+    return 'appointment.appointment-changed.v1';
+  if (message.message_type === 'SettlementReserved')
+    return 'appointment.settlement-reserved.v1';
+  if (message.message_type === 'QueueTicketClaimed')
+    return 'appointment.queue-ticket-claimed.v1';
   return null;
 }
 function exchangeFor(message, commandExchange, eventExchange) {
@@ -34,7 +40,12 @@ async function publishOutboxBatch({
     published_at: null,
     $and: [
       { $or: [{ next_attempt_at: null }, { next_attempt_at: { $lte: now } }] },
-      { $or: [{ claim_lease_until: null }, { claim_lease_until: { $lte: now } }] },
+      {
+        $or: [
+          { claim_lease_until: null },
+          { claim_lease_until: { $lte: now } },
+        ],
+      },
     ],
   })
     .sort({ occurred_at: 1 })
@@ -44,19 +55,25 @@ async function publishOutboxBatch({
   for (const record of records) {
     const routingKey = routingKeyFor(record);
     if (!routingKey) continue;
-    const destinationExchange = exchange || exchangeFor(record, commandExchange, eventExchange);
+    const destinationExchange =
+      exchange || exchangeFor(record, commandExchange, eventExchange);
     if (!destinationExchange) continue;
     const leaseUntil = new Date(now.getTime() + 30 * 1000);
     const claimed = await Outbox.updateOne(
       {
         message_id: record.message_id,
         published_at: null,
-        $or: [{ claim_lease_until: null }, { claim_lease_until: { $lte: now } }],
+        $or: [
+          { claim_lease_until: null },
+          { claim_lease_until: { $lte: now } },
+        ],
       },
       { $set: { claim_worker_id: workerId, claim_lease_until: leaseUntil } },
     );
     if (!claimed.modifiedCount) continue;
-    await channel.assertExchange(destinationExchange, 'topic', { durable: true });
+    await channel.assertExchange(destinationExchange, 'topic', {
+      durable: true,
+    });
     const body = Buffer.from(
       JSON.stringify({
         messageId: record.message_id,
@@ -67,7 +84,8 @@ async function publishOutboxBatch({
         aggregateId: record.aggregate_id,
         aggregateVersion: record.aggregate_version,
         correlationId: record.correlation_id,
-        requestId: record.request_id || record.payload?.requestId || record.message_id,
+        requestId:
+          record.request_id || record.payload?.requestId || record.message_id,
         causationId: record.causation_id || record.message_id,
         occurredAt: record.occurred_at,
         payload: record.payload,
@@ -75,7 +93,10 @@ async function publishOutboxBatch({
     );
     let returned = false;
     const onReturn = (message) => {
-      if (message?.properties?.messageId === (record.original_message_id || record.message_id))
+      if (
+        message?.properties?.messageId ===
+        (record.original_message_id || record.message_id)
+      )
         returned = true;
     };
     channel.on?.('return', onReturn);
@@ -96,7 +117,11 @@ async function publishOutboxBatch({
       if (returned) throw new Error('OUTBOX_UNROUTABLE');
     } catch (error) {
       await Outbox.updateOne(
-        { message_id: record.message_id, claim_worker_id: workerId, published_at: null },
+        {
+          message_id: record.message_id,
+          claim_worker_id: workerId,
+          published_at: null,
+        },
         {
           $set: {
             claim_worker_id: null,
@@ -109,10 +134,15 @@ async function publishOutboxBatch({
       throw error;
     } finally {
       if (channel.off) channel.off('return', onReturn);
-      else if (channel.removeListener) channel.removeListener('return', onReturn);
+      else if (channel.removeListener)
+        channel.removeListener('return', onReturn);
     }
     const result = await Outbox.updateOne(
-      { message_id: record.message_id, claim_worker_id: workerId, published_at: null },
+      {
+        message_id: record.message_id,
+        claim_worker_id: workerId,
+        published_at: null,
+      },
       {
         $set: {
           published_at: now,

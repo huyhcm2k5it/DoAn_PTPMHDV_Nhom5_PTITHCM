@@ -4,7 +4,10 @@ Huy owns this feature. It exports `DiagnosticFeature`, `createDiagnosticApi` and
 
 ```tsx
 const api = createDiagnosticApi(runtime.transport);
-<DiagnosticFeature api={api} session={{ userId, actorType: 'STAFF', capabilities }} />;
+<DiagnosticFeature
+  api={api}
+  session={{ userId, actorType: 'STAFF', capabilities }}
+/>;
 ```
 
 The host passes the authenticated Identity subject and current capabilities. LAB_TECH can collect, reject with a reason and expectedVersion, and recollect on the same order. LAB_REVIEW can read this increment. Patients and other actors do not load the queue. Backend authorization remains authoritative.

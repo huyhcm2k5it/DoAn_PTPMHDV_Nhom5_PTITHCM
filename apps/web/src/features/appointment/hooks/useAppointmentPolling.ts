@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AppointmentApi, AppointmentSummary } from '../types';
 
-const TERMINAL_STATES = new Set(['CONFIRMED', 'EXPIRED', 'CANCELLED', 'COMPLETED']);
+const TERMINAL_STATES = new Set([
+  'CONFIRMED',
+  'EXPIRED',
+  'CANCELLED',
+  'COMPLETED',
+]);
 
 export function useAppointmentPolling(
   api: AppointmentApi,
@@ -29,7 +34,10 @@ export function useAppointmentPolling(
     };
     const run = async () => {
       try {
-        const result = await api.getAppointment(appointmentId, controller.signal);
+        const result = await api.getAppointment(
+          appointmentId,
+          controller.signal,
+        );
         if (disposed) return;
         setData(result);
         setLoading(false);

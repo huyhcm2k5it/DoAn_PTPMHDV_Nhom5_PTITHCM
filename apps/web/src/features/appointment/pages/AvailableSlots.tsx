@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import type { CatalogApi, Department, Doctor, MedicalService } from '../../catalog/types';
+import type {
+  CatalogApi,
+  Department,
+  Doctor,
+  MedicalService,
+} from '../../catalog/types';
 import type { AppointmentApi, AvailableSlot } from '../types';
 import { Loading } from '../../../shared/ui/Loading';
 import { EmptyState } from '../../../shared/ui/EmptyState';
@@ -33,12 +38,19 @@ export function AvailableSlots({
   const [departments, setDepartments] = useState<Department[]>([]);
   const [departmentId, setDepartmentId] = useState('');
   const [doctorId, setDoctorId] = useState(searchParams.get('doctorId') ?? '');
-  const [serviceId, setServiceId] = useState(searchParams.get('serviceId') ?? '');
+  const [serviceId, setServiceId] = useState(
+    searchParams.get('serviceId') ?? '',
+  );
   const [date, setDate] = useState(localDateToday);
-  const [patientId, setPatientId] = useState(searchParams.get('patientId') ?? '');
+  const [patientId, setPatientId] = useState(
+    searchParams.get('patientId') ?? '',
+  );
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [services, setServices] = useState<MedicalService[]>([]);
-  const [catalogState, setCatalogState] = useState<{ loading: boolean; error?: unknown }>({
+  const [catalogState, setCatalogState] = useState<{
+    loading: boolean;
+    error?: unknown;
+  }>({
     loading: true,
   });
   const [catalogRetry, setCatalogRetry] = useState(0);
@@ -63,7 +75,8 @@ export function AvailableSlots({
         setCatalogState({ loading: false });
       },
       (error) => {
-        if (current && !controller.signal.aborted) setCatalogState({ loading: false, error });
+        if (current && !controller.signal.aborted)
+          setCatalogState({ loading: false, error });
       },
     );
     return () => {
@@ -99,7 +112,8 @@ export function AvailableSlots({
         setCatalogState({ loading: false });
       },
       (error) => {
-        if (current && !controller.signal.aborted) setCatalogState({ loading: false, error });
+        if (current && !controller.signal.aborted)
+          setCatalogState({ loading: false, error });
       },
     );
     return () => {
@@ -118,7 +132,8 @@ export function AvailableSlots({
         if (current) setSlotState({ loading: false, items });
       },
       (error) => {
-        if (current && !controller.signal.aborted) setSlotState({ loading: false, error });
+        if (current && !controller.signal.aborted)
+          setSlotState({ loading: false, error });
       },
     );
     return () => {
@@ -136,7 +151,10 @@ export function AvailableSlots({
     setHoldError(undefined);
     setHoldingSlot(slot.slotId);
     try {
-      const hold = await api.createHold({ patientId, slotId: slot.slotId }, crypto.randomUUID());
+      const hold = await api.createHold(
+        { patientId, slotId: slot.slotId },
+        crypto.randomUUID(),
+      );
       navigate(
         `/patient/appointments/review?patientId=${encodeURIComponent(patientId)}&holdId=${encodeURIComponent(hold.holdId)}`,
       );

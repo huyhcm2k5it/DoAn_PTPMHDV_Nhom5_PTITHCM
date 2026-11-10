@@ -13,3 +13,15 @@ trim_trailing_whitespace = false
 
 [*.json]
 indent_size = 2
+
+[services/patient/**]
+end_of_line = lf
+
+[services/appointment/**]
+end_of_line = lf
+
+[services/pharmacy/**]
+end_of_line = lf
+
+[apps/web/**]
+end_of_line = lf

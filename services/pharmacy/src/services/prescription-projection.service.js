@@ -1,13 +1,22 @@
 const { consume, uuid, integer, failure, hash } = require('./common');
-async function applyPrescriptionFinalized({ connection, message, now = new Date() }) {
+async function applyPrescriptionFinalized({
+  connection,
+  message,
+  now = new Date(),
+}) {
   if (
     message?.messageType !== 'PrescriptionFinalized' ||
     message.messageKind !== 'EVENT' ||
     message.producer !== 'clinical'
   )
-    throw failure(400, 'INVALID_MESSAGE', 'Trusted Clinical FINAL event required.');
+    throw failure(
+      400,
+      'INVALID_MESSAGE',
+      'Trusted Clinical FINAL event required.',
+    );
   const p = message.payload || {};
-  for (const field of ['prescriptionId', 'patientId', 'visitId']) uuid(p[field], field);
+  for (const field of ['prescriptionId', 'patientId', 'visitId'])
+    uuid(p[field], field);
   integer(p.revision, 'revision');
   if (
     message.aggregateId !== p.prescriptionId ||
@@ -37,7 +46,11 @@ async function applyPrescriptionFinalized({ connection, message, now = new Date(
       const query = { prescriptionId: p.prescriptionId, revision: p.revision };
       const current = await coll.findOne(query, { session });
       if (current && current.payloadHash !== hash(p))
-        throw failure(409, 'PROJECTION_CONFLICT', 'FINAL revision cannot be changed.');
+        throw failure(
+          409,
+          'PROJECTION_CONFLICT',
+          'FINAL revision cannot be changed.',
+        );
       if (!current)
         await coll.insertOne(
           {

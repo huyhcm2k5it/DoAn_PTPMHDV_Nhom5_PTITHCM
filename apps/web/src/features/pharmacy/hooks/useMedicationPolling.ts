@@ -1,6 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import type { PharmacyApi, PrescriptionDetail } from '../types';
-export function useMedicationPolling(api: PharmacyApi, prescriptionId: string, revision?: number) {
+export function useMedicationPolling(
+  api: PharmacyApi,
+  prescriptionId: string,
+  revision?: number,
+) {
   const identity = prescriptionId + ':' + (revision || '');
   const [generation, setGeneration] = useState(0);
   const [result, setResult] = useState<{
@@ -16,13 +20,18 @@ export function useMedicationPolling(api: PharmacyApi, prescriptionId: string, r
     setResult({ identity });
     async function load() {
       try {
-        const data = await api.detail(prescriptionId, revision, controller.signal);
+        const data = await api.detail(
+          prescriptionId,
+          revision,
+          controller.signal,
+        );
         if (!active) return;
         setResult({ identity, data });
         if (['HELD', 'SETTLEMENT_LOCKED'].includes(data.latestHoldState))
           timer = setTimeout(load, 3000);
       } catch (error) {
-        if (active && !controller.signal.aborted) setResult({ identity, error });
+        if (active && !controller.signal.aborted)
+          setResult({ identity, error });
       }
     }
     if (prescriptionId) load();

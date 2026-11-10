@@ -3,7 +3,7 @@
   --catalog-teal: #00857c;
   --catalog-ink: #17394a;
   color: var(--catalog-ink);
-  font-family: Inter, "Segoe UI", sans-serif;
+  font-family: Inter, 'Segoe UI', sans-serif;
   max-width: 1160px;
   margin: auto;
   padding: 28px;
@@ -83,13 +83,13 @@
   outline: 3px solid #00a68c;
   outline-offset: 3px;
 }
-.umc-catalog [role="tablist"] {
+.umc-catalog [role='tablist'] {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
-.umc-catalog [aria-selected="true"],
-.catalog-price-form button[type="submit"] {
+.umc-catalog [aria-selected='true'],
+.catalog-price-form button[type='submit'] {
   background: var(--catalog-blue);
   color: white;
   border-color: var(--catalog-blue);
@@ -151,7 +151,7 @@
   padding: 24px;
   color: #597381;
 }
-.umc-catalog [role="alert"] {
+.umc-catalog [role='alert'] {
   background: #fff3ef;
   color: #913a25;
   border-left: 4px solid #d77959;

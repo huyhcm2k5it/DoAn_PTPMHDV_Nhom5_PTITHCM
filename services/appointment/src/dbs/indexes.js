@@ -10,10 +10,16 @@ const appointmentStorage = [
     name: 'retry_jobs',
     indexes: [
       { name: 'uq_retry_job', key: { id: 1 }, unique: true },
-      { name: 'ix_retry_due', key: { consumerName: 1, state: 1, nextAttemptAt: 1, leaseUntil: 1 } },
+      {
+        name: 'ix_retry_due',
+        key: { consumerName: 1, state: 1, nextAttemptAt: 1, leaseUntil: 1 },
+      },
     ],
   },
-  { name: 'dead_letters', indexes: [{ name: 'uq_dead_letter', key: { id: 1 }, unique: true }] },
+  {
+    name: 'dead_letters',
+    indexes: [{ name: 'uq_dead_letter', key: { id: 1 }, unique: true }],
+  },
   entity('schedules', [
     { name: 'ix_schedules_doctor_start', key: { doctorId: 1, startAt: 1 } },
     { name: 'ix_schedules_room_start', key: { room: 1, startAt: 1 } },
@@ -27,7 +33,14 @@ const appointmentStorage = [
       },
     ]),
     validator: requiredFields(
-      ['id', 'scheduleId', 'startAt', 'capacity', 'heldCount', 'confirmedCount'],
+      [
+        'id',
+        'scheduleId',
+        'startAt',
+        'capacity',
+        'heldCount',
+        'confirmedCount',
+      ],
       {
         capacity: { bsonType: ['int', 'long'], minimum: 1 },
         heldCount: { bsonType: ['int', 'long'], minimum: 0 },
@@ -54,7 +67,14 @@ const appointmentStorage = [
       ['principalId', 'idempotencyKey', 'slotId', 'patientId', 'expiresAt'],
     ),
     validator: requiredFields(
-      ['id', 'principalId', 'idempotencyKey', 'slotId', 'patientId', 'expiresAt'],
+      [
+        'id',
+        'principalId',
+        'idempotencyKey',
+        'slotId',
+        'patientId',
+        'expiresAt',
+      ],
       {
         principalId: { bsonType: 'string', minLength: 1 },
         idempotencyKey: { bsonType: 'string', minLength: 1 },
@@ -97,34 +117,58 @@ const appointmentStorage = [
   {
     name: 'patient_time_locks',
     validator: requiredFields(['patientId']),
-    indexes: [{ name: 'uq_patient_time_lock', key: { patientId: 1 }, unique: true }],
+    indexes: [
+      { name: 'uq_patient_time_lock', key: { patientId: 1 }, unique: true },
+    ],
   },
   {
     name: 'command_results',
     validator: requiredFields(['command_id']),
     indexes: [
       { name: 'uq_command_result', key: { command_id: 1 }, unique: true },
-      { name: 'uq_command_request', key: { request_id: 1 }, unique: true, sparse: true },
+      {
+        name: 'uq_command_request',
+        key: { request_id: 1 },
+        unique: true,
+        sparse: true,
+      },
     ],
   },
   {
     name: 'user_access_projection',
-    indexes: [{ name: 'uq_user_access_projection', key: { userId: 1 }, unique: true }],
+    indexes: [
+      { name: 'uq_user_access_projection', key: { userId: 1 }, unique: true },
+    ],
   },
   {
     name: 'patient_access_projection',
-    indexes: [{ name: 'uq_patient_access_projection', key: { patientId: 1 }, unique: true }],
+    indexes: [
+      {
+        name: 'uq_patient_access_projection',
+        key: { patientId: 1 },
+        unique: true,
+      },
+    ],
   },
   {
     name: 'catalog_projection',
     indexes: [
       { name: 'uq_catalog_entity', key: { entityKey: 1 }, unique: true },
-      { name: 'ix_catalog_type_id', key: { entityType: 1, entityId: 1, entityVersion: -1 } },
+      {
+        name: 'ix_catalog_type_id',
+        key: { entityType: 1, entityId: 1, entityVersion: -1 },
+      },
     ],
   },
   {
     name: 'projection_checkpoints',
-    indexes: [{ name: 'uq_projection_checkpoint', key: { projectionName: 1 }, unique: true }],
+    indexes: [
+      {
+        name: 'uq_projection_checkpoint',
+        key: { projectionName: 1 },
+        unique: true,
+      },
+    ],
   },
   ...technicalStorage,
 ];

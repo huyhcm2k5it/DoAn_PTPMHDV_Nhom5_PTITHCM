@@ -1,12 +1,15 @@
 export type WebSession = {
   userId: string;
-  actorType: "PATIENT" | "DOCTOR" | "STAFF";
+  actorType: 'PATIENT' | 'DOCTOR' | 'STAFF';
   capabilities: string[];
   tokenVersion?: number;
   lease?: (action: string) => Promise<string>;
 };
 
-export type GatewayTransport = (url: string, init?: RequestInit) => Promise<Response>;
+export type GatewayTransport = (
+  url: string,
+  init?: RequestInit,
+) => Promise<Response>;
 
 /** Public adapter boundary; Hưng supplies transport/session and the Identity redirect callback. */
 export type WebRuntime = {

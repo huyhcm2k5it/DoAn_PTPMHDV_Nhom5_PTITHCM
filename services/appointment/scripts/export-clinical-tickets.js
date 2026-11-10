@@ -14,7 +14,9 @@ async function exportClinicalTickets({ connection, date }) {
       .session(session)
       .lean();
     if (rows.length > 1000)
-      throw new Error('Snapshot limit exceeded; agree a partition with Clinical owner.');
+      throw new Error(
+        'Snapshot limit exceeded; agree a partition with Clinical owner.',
+      );
     return rows.map((row) => {
       const result = { ticketId: row.id };
       for (const key of [
@@ -47,7 +49,9 @@ async function exportClinicalTickets({ connection, date }) {
       }
       if (
         !['FIRST', 'RETURN'].includes(result.ticketType) ||
-        !['WAITING', 'CALLED', 'CLAIMED', 'NO_SHOW', 'DONE'].includes(result.state) ||
+        !['WAITING', 'CALLED', 'CLAIMED', 'NO_SHOW', 'DONE'].includes(
+          result.state,
+        ) ||
         !Number.isSafeInteger(result.version) ||
         result.version < 1
       )
@@ -60,7 +64,9 @@ if (require.main === module) {
   (async () => {
     const fs = require('node:fs'),
       path = require('node:path');
-    const date = process.argv.find((arg) => arg.startsWith('--date='))?.slice(7);
+    const date = process.argv
+      .find((arg) => arg.startsWith('--date='))
+      ?.slice(7);
     if (!date) throw new Error('Supply --date=YYYY-MM-DD.');
     const connection = await require('../src/configs/database').connectDatabase(
       process.env.MONGODB_URI,
@@ -70,9 +76,13 @@ if (require.main === module) {
       const directory = path.resolve(__dirname, '../../../.runtime/exports');
       fs.mkdirSync(directory, { recursive: true });
       const target = path.join(directory, 'clinical-tickets-' + date + '.json');
-      fs.writeFileSync(target, JSON.stringify(rows, null, 2) + '\n', { flag: 'wx' });
+      fs.writeFileSync(target, JSON.stringify(rows, null, 2) + '\n', {
+        flag: 'wx',
+      });
       console.log(
-        'Exported ' + rows.length + ' trusted ticket snapshots to local .runtime/exports.',
+        'Exported ' +
+          rows.length +
+          ' trusted ticket snapshots to local .runtime/exports.',
       );
     } finally {
       await connection.close();

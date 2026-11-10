@@ -27,11 +27,17 @@ export function createPharmacyApi(
     const headers = new Headers(init?.headers);
     if (action) {
       if (!options.authorizationLease)
-        throw Object.assign(new Error('Phiên chưa cung cấp quyền thao tác ngắn hạn từ Identity.'), {
-          status: 503,
-          code: 'AUTHORIZATION_LEASE_REQUIRED',
-        });
-      headers.set('X-Authorization-Lease', await options.authorizationLease(action));
+        throw Object.assign(
+          new Error('Phiên chưa cung cấp quyền thao tác ngắn hạn từ Identity.'),
+          {
+            status: 503,
+            code: 'AUTHORIZATION_LEASE_REQUIRED',
+          },
+        );
+      headers.set(
+        'X-Authorization-Lease',
+        await options.authorizationLease(action),
+      );
     }
     const response = await transport(root + path, {
       ...init,
@@ -40,7 +46,9 @@ export function createPharmacyApi(
     const body = await response.json().catch(() => null);
     if (!response.ok)
       throw Object.assign(
-        new Error(body?.error?.message || 'Không thực hiện được thao tác dược.'),
+        new Error(
+          body?.error?.message || 'Không thực hiện được thao tác dược.',
+        ),
         {
           status: response.status,
           code: body?.error?.code,
@@ -48,7 +56,9 @@ export function createPharmacyApi(
         },
       );
     if (!body || !Object.hasOwn(body, 'data'))
-      throw Object.assign(new Error('Phản hồi không đúng định dạng.'), { status: 502 });
+      throw Object.assign(new Error('Phản hồi không đúng định dạng.'), {
+        status: 502,
+      });
     return body.data;
   }
   const post = (input: unknown, key: string): RequestInit => ({
@@ -68,7 +78,9 @@ export function createPharmacyApi(
       request('/prescriptions/queue?page=' + page + '&limit=20', { signal }),
     detail: (id, revision, signal) =>
       request(
-        '/prescriptions/' + encodeURIComponent(id) + (revision ? '?revision=' + revision : ''),
+        '/prescriptions/' +
+          encodeURIComponent(id) +
+          (revision ? '?revision=' + revision : ''),
         { signal },
       ),
     hold: (id, prescriptionRevision, key) =>
@@ -77,13 +89,25 @@ export function createPharmacyApi(
         post({ prescriptionRevision }, key),
       ),
     release: (id, expectedVersion, key) =>
-      request('/holds/' + encodeURIComponent(id) + '?expectedVersion=' + expectedVersion, {
-        method: 'DELETE',
-        headers: { 'Idempotency-Key': key },
-      }),
+      request(
+        '/holds/' +
+          encodeURIComponent(id) +
+          '?expectedVersion=' +
+          expectedVersion,
+        {
+          method: 'DELETE',
+          headers: { 'Idempotency-Key': key },
+        },
+      ),
     reconcile: (id, expectedAttemptNo, key) =>
-      request('/holds/' + encodeURIComponent(id) + '/commit', post({ expectedAttemptNo }, key)),
+      request(
+        '/holds/' + encodeURIComponent(id) + '/commit',
+        post({ expectedAttemptNo }, key),
+      ),
     dispense: (id, expectedVersion, key) =>
-      request('/holds/' + encodeURIComponent(id) + '/dispense', post({ expectedVersion }, key)),
+      request(
+        '/holds/' + encodeURIComponent(id) + '/dispense',
+        post({ expectedVersion }, key),
+      ),
   };
 }

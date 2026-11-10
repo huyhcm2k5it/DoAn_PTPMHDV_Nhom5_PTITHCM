@@ -1,5 +1,8 @@
 const { connectDatabase } = require('../src/configs/database.js');
-const { getScheduleModel, getSlotModel } = require('../src/models/appointment.model.js');
+const {
+  getScheduleModel,
+  getSlotModel,
+} = require('../src/models/appointment.model.js');
 const { ensureAppointmentStorage } = require('../src/dbs/indexes.js');
 
 const ids = {
@@ -19,8 +22,9 @@ async function seed({
   demoDate = process.env.DEMO_APPOINTMENT_DATE,
   dryRun = process.argv.includes('--dry-run'),
 } = {}) {
-  const vietnamTomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
-    .toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
+  const vietnamTomorrow = new Date(
+    now.getTime() + 24 * 60 * 60 * 1000,
+  ).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
   const selectedDate = demoDate || vietnamTomorrow;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedDate))
     throw new Error('DEMO_APPOINTMENT_DATE must be YYYY-MM-DD.');
@@ -68,8 +72,18 @@ async function seed({
       },
     ],
     patientAccess: [
-      { patientId: ids.patientA, ownerUserId: ids.ownerA, active: true, policyVersion: 1 },
-      { patientId: ids.patientB, ownerUserId: ids.ownerB, active: true, policyVersion: 1 },
+      {
+        patientId: ids.patientA,
+        ownerUserId: ids.ownerA,
+        active: true,
+        policyVersion: 1,
+      },
+      {
+        patientId: ids.patientB,
+        ownerUserId: ids.ownerB,
+        active: true,
+        policyVersion: 1,
+      },
     ],
   };
   if (dryRun) return records;
@@ -84,7 +98,11 @@ async function seed({
       { $setOnInsert: records.schedule },
       { upsert: true },
     );
-    await Slot.updateOne({ id: records.slot.id }, { $setOnInsert: records.slot }, { upsert: true });
+    await Slot.updateOne(
+      { id: records.slot.id },
+      { $setOnInsert: records.slot },
+      { upsert: true },
+    );
     for (const projection of records.access)
       await connection
         .collection('user_access_projection')

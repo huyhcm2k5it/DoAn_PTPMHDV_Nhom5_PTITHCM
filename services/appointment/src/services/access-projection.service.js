@@ -3,7 +3,9 @@ const { withMongoTransaction } = require('../../../../mongo/transaction.js');
 const { ApiError } = require('../core/errors.js');
 
 function messageHash(message) {
-  return createHash('sha256').update(JSON.stringify(message.payload)).digest('hex');
+  return createHash('sha256')
+    .update(JSON.stringify(message.payload))
+    .digest('hex');
 }
 
 function projectionHash(projection) {
@@ -25,8 +27,17 @@ async function applyAccessProjection({
   now = new Date(),
   consumerName = 'appointment-access',
 }) {
-  if (!message || !message.messageId || !message.messageType || !message.payload)
-    throw new ApiError(400, 'INVALID_MESSAGE', 'Projection message is incomplete.');
+  if (
+    !message ||
+    !message.messageId ||
+    !message.messageType ||
+    !message.payload
+  )
+    throw new ApiError(
+      400,
+      'INVALID_MESSAGE',
+      'Projection message is incomplete.',
+    );
   const inbox = connection.collection('inbox');
   const hash = messageHash(message);
   const existing = await inbox.findOne(
@@ -35,7 +46,11 @@ async function applyAccessProjection({
   );
   if (existing) {
     if (existing.payload_hash && existing.payload_hash !== hash)
-      throw new ApiError(409, 'MESSAGE_CONFLICT', 'MessageId đã được dùng cho payload khác.');
+      throw new ApiError(
+        409,
+        'MESSAGE_CONFLICT',
+        'MessageId đã được dùng cho payload khác.',
+      );
     return { duplicate: true };
   }
   try {
@@ -51,9 +66,15 @@ async function applyAccessProjection({
       );
       const payload = message.payload;
       if (message.messageType === 'IdentityAccessChanged') {
-        const version = Number.isInteger(payload.version) ? payload.version : payload.policyVersion;
+        const version = Number.isInteger(payload.version)
+          ? payload.version
+          : payload.policyVersion;
         if (!payload.userId || !Number.isInteger(version))
-          throw new ApiError(400, 'INVALID_MESSAGE', 'Identity projection payload is incomplete.');
+          throw new ApiError(
+            400,
+            'INVALID_MESSAGE',
+            'Identity projection payload is incomplete.',
+          );
         const current = await connection
           .collection('user_access_projection')
           .findOne({ userId: payload.userId }, { session });
@@ -67,7 +88,11 @@ async function applyAccessProjection({
             policyVersion: version,
           };
           if (projectionHash(incoming) !== projectionHash(current))
-            throw new ApiError(409, 'PROJECTION_CONFLICT', 'Same-version Identity projection differs.');
+            throw new ApiError(
+              409,
+              'PROJECTION_CONFLICT',
+              'Same-version Identity projection differs.',
+            );
         } else if (!current || version > current.policyVersion)
           await connection.collection('user_access_projection').replaceOne(
             { userId: payload.userId },
@@ -83,8 +108,16 @@ async function applyAccessProjection({
             { upsert: true, session },
           );
       } else if (message.messageType === 'PatientAccessChanged') {
-        if (!payload.patientId || !payload.ownerUserId || !Number.isInteger(payload.policyVersion))
-          throw new ApiError(400, 'INVALID_MESSAGE', 'Patient projection payload is incomplete.');
+        if (
+          !payload.patientId ||
+          !payload.ownerUserId ||
+          !Number.isInteger(payload.policyVersion)
+        )
+          throw new ApiError(
+            400,
+            'INVALID_MESSAGE',
+            'Patient projection payload is incomplete.',
+          );
         const current = await connection
           .collection('patient_access_projection')
           .findOne({ patientId: payload.patientId }, { session });
@@ -99,7 +132,11 @@ async function applyAccessProjection({
             current.ownerUserId !== incoming.ownerUserId ||
             current.active !== incoming.active
           )
-            throw new ApiError(409, 'PROJECTION_CONFLICT', 'Same-version Patient projection differs.');
+            throw new ApiError(
+              409,
+              'PROJECTION_CONFLICT',
+              'Same-version Patient projection differs.',
+            );
         } else if (!current || payload.policyVersion > current.policyVersion)
           await connection.collection('patient_access_projection').replaceOne(
             { patientId: payload.patientId },
@@ -112,7 +149,12 @@ async function applyAccessProjection({
             },
             { upsert: true, session },
           );
-      } else throw new ApiError(400, 'INVALID_MESSAGE', 'Unsupported access projection message.');
+      } else
+        throw new ApiError(
+          400,
+          'INVALID_MESSAGE',
+          'Unsupported access projection message.',
+        );
       await connection.collection('projection_checkpoints').updateOne(
         { projectionName: message.messageType },
         {
@@ -134,7 +176,11 @@ async function applyAccessProjection({
       );
       if (raced) {
         if (raced.payload_hash && raced.payload_hash !== hash)
-          throw new ApiError(409, 'MESSAGE_CONFLICT', 'MessageId đã được dùng cho payload khác.');
+          throw new ApiError(
+            409,
+            'MESSAGE_CONFLICT',
+            'MessageId đã được dùng cho payload khác.',
+          );
         return { duplicate: true };
       }
     }
@@ -148,14 +194,22 @@ async function authorizePatientAccess({ connection, authContext, patientId }) {
     userId: authContext.userId,
     status: 'ACTIVE',
   });
-  if (!user || (Number.isInteger(authContext.tokenVersion) && user.tokenVersion !== authContext.tokenVersion))
+  if (
+    !user ||
+    (Number.isInteger(authContext.tokenVersion) &&
+      user.tokenVersion !== authContext.tokenVersion)
+  )
     return false;
   const patient = await connection
     .collection('patient_access_projection')
     .findOne({ patientId, active: true });
   if (!patient) return false;
-  if (authContext.actorType === 'PATIENT') return patient.ownerUserId === authContext.userId;
-  if (authContext.actorType === 'STAFF' && authContext.capabilities.includes('RECEPTION')) {
+  if (authContext.actorType === 'PATIENT')
+    return patient.ownerUserId === authContext.userId;
+  if (
+    authContext.actorType === 'STAFF' &&
+    authContext.capabilities.includes('RECEPTION')
+  ) {
     return Boolean(user?.capabilities?.includes('RECEPTION'));
   }
   return false;

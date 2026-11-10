@@ -19,7 +19,9 @@ export function StockPage({ api }: { api: PharmacyApi }) {
     [quantity, setQuantity] = useState('1'),
     [batchRef, setBatchRef] = useState('');
   const [busy, setBusy] = useState(false);
-  const intention = useRef<{ body: string; key: string } | undefined>(undefined);
+  const intention = useRef<{ body: string; key: string } | undefined>(
+    undefined,
+  );
   useEffect(() => {
     const controller = new AbortController();
     setItems(undefined);
@@ -46,7 +48,8 @@ export function StockPage({ api }: { api: PharmacyApi }) {
       batchRef: batchRef.trim(),
     };
     const body = JSON.stringify(input);
-    if (intention.current?.body !== body) intention.current = { body, key: crypto.randomUUID() };
+    if (intention.current?.body !== body)
+      intention.current = { body, key: crypto.randomUUID() };
     setBusy(true);
     setFormError(undefined);
     setNotice('');
@@ -88,7 +91,10 @@ export function StockPage({ api }: { api: PharmacyApi }) {
         <button className="button button-secondary">Tìm thuốc</button>
       </form>
       {error ? (
-        <ErrorPanel error={error} onRetry={() => setVersion((value) => value + 1)} />
+        <ErrorPanel
+          error={error}
+          onRetry={() => setVersion((value) => value + 1)}
+        />
       ) : !items ? (
         <Loading label="Đang tải tồn kho" />
       ) : items.length === 0 ? (

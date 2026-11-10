@@ -28,7 +28,9 @@ function requestHash(value) {
 }
 function assertUuid(value, field) {
   if (
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value || '')
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value || '',
+    )
   )
     throw new ApiError(400, 'VALIDATION_ERROR', field + ' must be a UUID.');
 }
@@ -42,8 +44,18 @@ function responseForHold(hold) {
   };
 }
 
-async function existingIdempotency({ Idempotency, principalId, route, key, hash }) {
-  const row = await Idempotency.findOne({ principal_id: principalId, route, key }).lean();
+async function existingIdempotency({
+  Idempotency,
+  principalId,
+  route,
+  key,
+  hash,
+}) {
+  const row = await Idempotency.findOne({
+    principal_id: principalId,
+    route,
+    key,
+  }).lean();
   if (!row) return null;
   if (row.request_hash !== hash)
     throw new ApiError(
@@ -68,7 +80,11 @@ async function createHold({
   if (!slotId || typeof slotId !== 'string')
     throw new ApiError(400, 'VALIDATION_ERROR', 'slotId is required.');
   if (!principalId || !idempotencyKey)
-    throw new ApiError(400, 'VALIDATION_ERROR', 'principalId and Idempotency-Key are required.');
+    throw new ApiError(
+      400,
+      'VALIDATION_ERROR',
+      'principalId and Idempotency-Key are required.',
+    );
   const route = 'POST /api/v1/appointment-holds';
   const hash = requestHash({ patientId, slotId });
   const Schedule = getScheduleModel(connection);
@@ -89,11 +105,20 @@ async function createHold({
   try {
     return await withMongoTransaction(connection, async (session) => {
       const slot = await Slot.findOne({ id: slotId }).session(session).lean();
-      if (!slot) throw new ApiError(404, 'SLOT_NOT_FOUND', 'Slot không tồn tại.');
-      const schedule = await Schedule.findOne({ id: slot.scheduleId, status: 'OPEN' })
+      if (!slot)
+        throw new ApiError(404, 'SLOT_NOT_FOUND', 'Slot không tồn tại.');
+      const schedule = await Schedule.findOne({
+        id: slot.scheduleId,
+        status: 'OPEN',
+      })
         .session(session)
         .lean();
-      if (!schedule) throw new ApiError(409, 'SCHEDULE_UNAVAILABLE', 'Lịch khám không còn mở.');
+      if (!schedule)
+        throw new ApiError(
+          409,
+          'SCHEDULE_UNAVAILABLE',
+          'Lịch khám không còn mở.',
+        );
       await Lock.updateOne(
         { patientId },
         { $set: { updatedAt: now }, $inc: { version: 1 } },
@@ -110,7 +135,15 @@ async function createHold({
         .lean();
       const activeAppointment = await Appointment.findOne({
         patientId,
-        state: { $in: ['PENDING_PAYMENT', 'SETTLEMENT_LOCKED', 'CONFIRMED', 'CHECKED_IN', 'IN_SERVICE'] },
+        state: {
+          $in: [
+            'PENDING_PAYMENT',
+            'SETTLEMENT_LOCKED',
+            'CONFIRMED',
+            'CHECKED_IN',
+            'IN_SERVICE',
+          ],
+        },
         startAt: { $lt: slot.endAt },
         endAt: { $gt: slot.startAt },
       })
@@ -123,12 +156,23 @@ async function createHold({
           'Bệnh nhân đã có lịch hoặc giữ chỗ trùng giờ.',
         );
       const reserved = await Slot.updateOne(
-        { id: slotId, $expr: { $lt: [{ $add: ['$heldCount', '$confirmedCount'] }, '$capacity'] } },
+        {
+          id: slotId,
+          $expr: {
+            $lt: [{ $add: ['$heldCount', '$confirmedCount'] }, '$capacity'],
+          },
+        },
         { $inc: { heldCount: 1 } },
         { session },
       );
-      if (!reserved.modifiedCount) throw new ApiError(409, 'SLOT_UNAVAILABLE', 'Slot đã hết chỗ.');
-      const priceSnapshot = await resolvePriceSnapshot({ slot, schedule, now, session });
+      if (!reserved.modifiedCount)
+        throw new ApiError(409, 'SLOT_UNAVAILABLE', 'Slot đã hết chỗ.');
+      const priceSnapshot = await resolvePriceSnapshot({
+        slot,
+        schedule,
+        now,
+        session,
+      });
       if (
         !priceSnapshot ||
         priceSnapshot.amountVnd == null ||
@@ -208,7 +252,10 @@ async function releaseHold({
       'holdId, principalId and Idempotency-Key are required.',
     );
   const route = 'DELETE /api/v1/appointment-holds/' + holdId;
-  const hash = requestHash({ holdId, expectedVersion: expectedVersion ?? null });
+  const hash = requestHash({
+    holdId,
+    expectedVersion: expectedVersion ?? null,
+  });
   const Hold = getHoldModel(connection);
   const Slot = getSlotModel(connection);
   const Idempotency = getIdempotencyModel(connection);
@@ -223,26 +270,36 @@ async function releaseHold({
   try {
     return await withMongoTransaction(connection, async (session) => {
       const hold = await Hold.findOne({ id: holdId }).session(session).lean();
-      if (!hold) throw new ApiError(404, 'HOLD_NOT_FOUND', 'Hold không tồn tại.');
+      if (!hold)
+        throw new ApiError(404, 'HOLD_NOT_FOUND', 'Hold không tồn tại.');
       if (hold.principalId !== principalId)
         throw new ApiError(403, 'FORBIDDEN', 'Không có quyền trên hold này.');
       if (expectedVersion != null && Number(expectedVersion) !== hold.version)
         throw new ApiError(409, 'VERSION_CONFLICT', 'Hold đã thay đổi.');
       if (hold.status !== 'HELD')
-        throw new ApiError(409, 'HOLD_ALREADY_CONSUMED', 'Hold không còn hiệu lực.');
+        throw new ApiError(
+          409,
+          'HOLD_ALREADY_CONSUMED',
+          'Hold không còn hiệu lực.',
+        );
       const changed = await Hold.updateOne(
         { id: holdId, status: 'HELD', version: hold.version },
         { $set: { status: 'RELEASED', releasedAt: now }, $inc: { version: 1 } },
         { session },
       );
-      if (!changed.modifiedCount) throw new ApiError(409, 'VERSION_CONFLICT', 'Hold đã thay đổi.');
+      if (!changed.modifiedCount)
+        throw new ApiError(409, 'VERSION_CONFLICT', 'Hold đã thay đổi.');
       const restored = await Slot.updateOne(
         { id: hold.slotId, heldCount: { $gt: 0 } },
         { $inc: { heldCount: -1 } },
         { session },
       );
       if (!restored.modifiedCount)
-        throw new ApiError(500, 'CAPACITY_INVARIANT_BROKEN', 'Không thể trả sức chứa slot.');
+        throw new ApiError(
+          500,
+          'CAPACITY_INVARIANT_BROKEN',
+          'Không thể trả sức chứa slot.',
+        );
       const response = { holdId, state: 'RELEASED' };
       await Idempotency.create(
         [
@@ -278,7 +335,10 @@ async function expireHolds({ connection, now = new Date(), batchSize = 100 }) {
   const Hold = getHoldModel(connection);
   const Slot = getSlotModel(connection);
   let count = 0;
-  const candidates = await Hold.find({ status: 'HELD', expiresAt: { $lte: now } })
+  const candidates = await Hold.find({
+    status: 'HELD',
+    expiresAt: { $lte: now },
+  })
     .sort({ expiresAt: 1 })
     .limit(batchSize)
     .lean();
@@ -287,7 +347,10 @@ async function expireHolds({ connection, now = new Date(), batchSize = 100 }) {
       await withMongoTransaction(connection, async (session) => {
         const changed = await Hold.updateOne(
           { id: candidate.id, status: 'HELD', version: candidate.version },
-          { $set: { status: 'EXPIRED', releasedAt: now }, $inc: { version: 1 } },
+          {
+            $set: { status: 'EXPIRED', releasedAt: now },
+            $inc: { version: 1 },
+          },
           { session },
         );
         if (!changed.modifiedCount) return;
@@ -297,7 +360,11 @@ async function expireHolds({ connection, now = new Date(), batchSize = 100 }) {
           { session },
         );
         if (!restored.modifiedCount)
-          throw new ApiError(500, 'CAPACITY_INVARIANT_BROKEN', 'Không thể trả sức chứa slot.');
+          throw new ApiError(
+            500,
+            'CAPACITY_INVARIANT_BROKEN',
+            'Không thể trả sức chứa slot.',
+          );
         count += 1;
       });
     } catch (error) {
@@ -307,9 +374,27 @@ async function expireHolds({ connection, now = new Date(), batchSize = 100 }) {
   return count;
 }
 
-module.exports = { createHold, releaseHold, expireHolds, requestHash, stableJson };
+module.exports = {
+  createHold,
+  releaseHold,
+  expireHolds,
+  requestHash,
+  stableJson,
+};
 
 // Cache invalidation runs after successful transaction commit.
-module.exports.createHold = async (...args) => { const result = await createHold(...args); await require('../services/slot-cache.service').getSlotCache().invalidate(); return result; };
-module.exports.releaseHold = async (...args) => { const result = await releaseHold(...args); await require('../services/slot-cache.service').getSlotCache().invalidate(); return result; };
-module.exports.expireHolds = async (...args) => { const result = await expireHolds(...args); await require('../services/slot-cache.service').getSlotCache().invalidate(); return result; };
+module.exports.createHold = async (...args) => {
+  const result = await createHold(...args);
+  await require('../services/slot-cache.service').getSlotCache().invalidate();
+  return result;
+};
+module.exports.releaseHold = async (...args) => {
+  const result = await releaseHold(...args);
+  await require('../services/slot-cache.service').getSlotCache().invalidate();
+  return result;
+};
+module.exports.expireHolds = async (...args) => {
+  const result = await expireHolds(...args);
+  await require('../services/slot-cache.service').getSlotCache().invalidate();
+  return result;
+};

@@ -16,7 +16,9 @@ export function PrescriptionDetail({
   const { data, error, reload } = useMedicationPolling(api, prescriptionId);
   const [busy, setBusy] = useState(false),
     [actionError, setActionError] = useState<unknown>();
-  const intention = useRef<{ signature: string; key: string } | undefined>(undefined);
+  const intention = useRef<{ signature: string; key: string } | undefined>(
+    undefined,
+  );
   if (error) return <ErrorPanel error={error} onRetry={reload} />;
   if (!data) return <Loading label="Đang tải chi tiết toa thuốc" />;
   const hold = data.holds?.[0];
@@ -37,9 +39,12 @@ export function PrescriptionDetail({
     try {
       const key = intention.current!.key;
       if (action === 'hold') await api.hold(prescriptionId, data.revision, key);
-      else if (hold && action === 'release') await api.release(hold.id, hold.version, key);
-      else if (hold && action === 'reconcile') await api.reconcile(hold.id, hold.attemptNo, key);
-      else if (hold && action === 'dispense') await api.dispense(hold.id, hold.version, key);
+      else if (hold && action === 'release')
+        await api.release(hold.id, hold.version, key);
+      else if (hold && action === 'reconcile')
+        await api.reconcile(hold.id, hold.attemptNo, key);
+      else if (hold && action === 'dispense')
+        await api.dispense(hold.id, hold.version, key);
       intention.current = undefined;
       reload();
     } catch (caught) {
@@ -71,7 +76,8 @@ export function PrescriptionDetail({
             <ul>
               {data.prescription.itemsSnapshot.map((item) => (
                 <li key={item.medicineCode}>
-                  <strong>{item.nameSnapshot || item.medicineCode}</strong> · {item.quantity} đơn vị
+                  <strong>{item.nameSnapshot || item.medicineCode}</strong> ·{' '}
+                  {item.quantity} đơn vị
                   {item.doseText && <p>{item.doseText}</p>}
                 </li>
               ))}
@@ -99,13 +105,19 @@ export function PrescriptionDetail({
           )}
           {['HELD', 'SETTLEMENT_LOCKED'].includes(data.latestHoldState) && (
             <p className="state-card" role="status">
-              Đang chờ xác nhận thanh toán từ quầy thu ngân. Thuốc chỉ được cấp khi máy chủ xác nhận
-              sẵn sàng.
+              Đang chờ xác nhận thanh toán từ quầy thu ngân. Thuốc chỉ được cấp
+              khi máy chủ xác nhận sẵn sàng.
             </p>
           )}
           <div className="pharmacy-actions" aria-busy={busy}>
-            {['NOT_HELD', 'RELEASED', 'EXPIRED'].includes(data.latestHoldState) && (
-              <button className="button button-primary" disabled={busy} onClick={() => act('hold')}>
+            {['NOT_HELD', 'RELEASED', 'EXPIRED'].includes(
+              data.latestHoldState,
+            ) && (
+              <button
+                className="button button-primary"
+                disabled={busy}
+                onClick={() => act('hold')}
+              >
                 Giữ toàn toa
               </button>
             )}
@@ -136,14 +148,20 @@ export function PrescriptionDetail({
                 Xác nhận cấp phát
               </button>
             )}
-            <button className="button button-secondary" disabled={busy} onClick={reload}>
+            <button
+              className="button button-secondary"
+              disabled={busy}
+              onClick={reload}
+            >
               Tải lại trạng thái
             </button>
           </div>
         </>
       )}
       {data.dispensedAt && (
-        <p role="status">Đã cấp thuốc lúc {new Date(data.dispensedAt).toLocaleString('vi-VN')}.</p>
+        <p role="status">
+          Đã cấp thuốc lúc {new Date(data.dispensedAt).toLocaleString('vi-VN')}.
+        </p>
       )}
       {actionError != null && <ErrorPanel error={actionError} />}
     </section>

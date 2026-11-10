@@ -7,8 +7,15 @@ const {
 const { ApiError } = require('../core/errors.js');
 
 function requireCapability(req, capability) {
-  if (req.authContext.actorType !== 'STAFF' || !req.authContext.capabilities.includes(capability))
-    throw new ApiError(403, 'FORBIDDEN', `${capability} capability is required.`);
+  if (
+    req.authContext.actorType !== 'STAFF' ||
+    !req.authContext.capabilities.includes(capability)
+  )
+    throw new ApiError(
+      403,
+      'FORBIDDEN',
+      `${capability} capability is required.`,
+    );
 }
 
 function createQueueController(dependencies) {
@@ -17,7 +24,11 @@ function createQueueController(dependencies) {
       try {
         requireCapability(req, 'RECEPTION');
         if (req.body?.expectedVersion == null)
-          throw new ApiError(400, 'VALIDATION_ERROR', 'expectedVersion is required.');
+          throw new ApiError(
+            400,
+            'VALIDATION_ERROR',
+            'expectedVersion is required.',
+          );
         const data = await checkInAppointment({
           connection: dependencies.connection,
           appointmentId: req.params.appointmentId,
@@ -27,7 +38,9 @@ function createQueueController(dependencies) {
           now: dependencies.now?.() || new Date(),
           createId: dependencies.createId,
         });
-        res.status(200).json({ data, meta: { correlationId: req.correlationId } });
+        res
+          .status(200)
+          .json({ data, meta: { correlationId: req.correlationId } });
       } catch (error) {
         next(error);
       }
@@ -46,7 +59,9 @@ function createQueueController(dependencies) {
           limit: req.query.limit,
           now: dependencies.now?.() || new Date(),
         });
-        res.status(200).json({ data, meta: { correlationId: req.correlationId } });
+        res
+          .status(200)
+          .json({ data, meta: { correlationId: req.correlationId } });
       } catch (error) {
         next(error);
       }
@@ -54,7 +69,11 @@ function createQueueController(dependencies) {
     async callNext(req, res, next) {
       try {
         if (!['FIRST', 'RETURN'].includes(req.body?.ticketType))
-          throw new ApiError(400, 'VALIDATION_ERROR', 'ticketType is required and must be FIRST or RETURN.');
+          throw new ApiError(
+            400,
+            'VALIDATION_ERROR',
+            'ticketType is required and must be FIRST or RETURN.',
+          );
         const data = await callNextQueueTicket({
           connection: dependencies.connection,
           actorType: req.authContext.actorType,
@@ -66,7 +85,9 @@ function createQueueController(dependencies) {
           idempotencyKey: req.get('idempotency-key'),
           now: dependencies.now?.() || new Date(),
         });
-        res.status(200).json({ data, meta: { correlationId: req.correlationId } });
+        res
+          .status(200)
+          .json({ data, meta: { correlationId: req.correlationId } });
       } catch (error) {
         next(error);
       }
@@ -83,7 +104,9 @@ function createQueueController(dependencies) {
           idempotencyKey: req.get('idempotency-key'),
           now: dependencies.now?.() || new Date(),
         });
-        res.status(200).json({ data, meta: { correlationId: req.correlationId } });
+        res
+          .status(200)
+          .json({ data, meta: { correlationId: req.correlationId } });
       } catch (error) {
         next(error);
       }

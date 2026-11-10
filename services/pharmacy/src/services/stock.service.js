@@ -1,28 +1,53 @@
 const { randomUUID } = require('node:crypto');
 const { uuid, integer, INT_MAX, mutate, failure } = require('./common');
 async function receiveStock(args) {
-  const { connection, medicineId, quantity, batchRef = '', principalId, now = new Date() } = args;
+  const {
+    connection,
+    medicineId,
+    quantity,
+    batchRef = '',
+    principalId,
+    now = new Date(),
+  } = args;
   uuid(medicineId, 'medicineId');
   integer(quantity, 'quantity');
   if (typeof batchRef !== 'string' || batchRef.length > 200)
     throw failure(400, 'VALIDATION_ERROR', 'Invalid batchRef.');
   return mutate(
-    { ...args, now, route: 'PH-002', input: { medicineId, quantity, batchRef } },
+    {
+      ...args,
+      now,
+      route: 'PH-002',
+      input: { medicineId, quantity, batchRef },
+    },
     async (session) => {
-      const medicine = await connection.collection('catalog_projection').findOne(
-        {
-          entityType: 'MEDICINE',
-          entityId: medicineId,
-          active: true,
-        },
-        { session },
-      );
+      const medicine = await connection
+        .collection('catalog_projection')
+        .findOne(
+          {
+            entityType: 'MEDICINE',
+            entityId: medicineId,
+            active: true,
+          },
+          { session },
+        );
       if (!medicine)
-        throw failure(503, 'SERVICE_UNAVAILABLE', 'Medicine projection is unavailable.');
+        throw failure(
+          503,
+          'SERVICE_UNAVAILABLE',
+          'Medicine projection is unavailable.',
+        );
       const stock = connection.collection('inventory');
       await stock.updateOne(
         { medicineId },
-        { $setOnInsert: { id: randomUUID(), onHand: 0, reserved: 0, version: 0 } },
+        {
+          $setOnInsert: {
+            id: randomUUID(),
+            onHand: 0,
+            reserved: 0,
+            version: 0,
+          },
+        },
         { upsert: true, session },
       );
       const result = await stock.findOneAndUpdate(
@@ -30,34 +55,31 @@ async function receiveStock(args) {
         { $inc: { onHand: quantity, version: 1 }, $set: { updatedAt: now } },
         { session, returnDocument: 'after' },
       );
-      if (!result) throw failure(409, 'STATE_CONFLICT', 'Stock would exceed int32.');
+      if (!result)
+        throw failure(409, 'STATE_CONFLICT', 'Stock would exceed int32.');
       const stockReceiptId = randomUUID();
-      await connection
-        .collection('stock_receipts')
-        .insertOne(
-          {
-            id: stockReceiptId,
-            receiptKey: principalId + ':' + args.idempotencyKey,
-            actorUserId: principalId,
-            items: [{ medicineId, quantity, batchRef }],
-            receivedAt: now,
-          },
-          { session },
-        );
-      await connection
-        .collection('stock_audit')
-        .insertOne(
-          {
-            id: randomUUID(),
-            medicineId,
-            kind: 'RECEIPT',
-            quantity,
-            receiptId: stockReceiptId,
-            actorUserId: principalId,
-            at: now,
-          },
-          { session },
-        );
+      await connection.collection('stock_receipts').insertOne(
+        {
+          id: stockReceiptId,
+          receiptKey: principalId + ':' + args.idempotencyKey,
+          actorUserId: principalId,
+          items: [{ medicineId, quantity, batchRef }],
+          receivedAt: now,
+        },
+        { session },
+      );
+      await connection.collection('stock_audit').insertOne(
+        {
+          id: randomUUID(),
+          medicineId,
+          kind: 'RECEIPT',
+          quantity,
+          receiptId: stockReceiptId,
+          actorUserId: principalId,
+          at: now,
+        },
+        { session },
+      );
       return {
         stockReceiptId,
         medicineId,
@@ -67,7 +89,14 @@ async function receiveStock(args) {
     },
   );
 }
-async function listStock({ connection, page = 1, limit = 20, code, name, session }) {
+async function listStock({
+  connection,
+  page = 1,
+  limit = 20,
+  code,
+  name,
+  session,
+}) {
   integer(page, 'page');
   integer(limit, 'limit', 100);
   const filter = {};
@@ -87,7 +116,10 @@ async function listStock({ connection, page = 1, limit = 20, code, name, session
         .filter(
           (m) =>
             (!code || m.fullSnapshot.code === code) &&
-            (!name || String(m.fullSnapshot.name).toLowerCase().includes(name.toLowerCase())),
+            (!name ||
+              String(m.fullSnapshot.name)
+                .toLowerCase()
+                .includes(name.toLowerCase())),
         )
         .map((m) => m.entityId),
     };
@@ -104,7 +136,10 @@ async function listStock({ connection, page = 1, limit = 20, code, name, session
   for (const row of rows) {
     const m = await connection
       .collection('catalog_projection')
-      .findOne({ entityType: 'MEDICINE', entityId: row.medicineId }, { session });
+      .findOne(
+        { entityType: 'MEDICINE', entityId: row.medicineId },
+        { session },
+      );
     items.push({
       medicineId: row.medicineId,
       medicineCode: m?.fullSnapshot.code || '',

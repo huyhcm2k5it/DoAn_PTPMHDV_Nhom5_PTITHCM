@@ -27,7 +27,12 @@ function createAppointmentsController(dependencies) {
     async create(req, res, next) {
       try {
         const { patientId, holdId } = req.body || {};
-        await checkPatientAccess(dependencies, req, patientId, 'APPOINTMENT_CREATE');
+        await checkPatientAccess(
+          dependencies,
+          req,
+          patientId,
+          'APPOINTMENT_CREATE',
+        );
         const data = await createAppointment({
           connection: dependencies.connection,
           principalId: req.authContext.userId,
@@ -51,28 +56,48 @@ function createAppointmentsController(dependencies) {
         const data = await getAppointment({
           connection: dependencies.connection,
           appointmentId: req.params.appointmentId,
-          principalId: req.authContext.actorType === 'PATIENT' ? req.authContext.userId : undefined,
+          principalId:
+            req.authContext.actorType === 'PATIENT'
+              ? req.authContext.userId
+              : undefined,
         });
-        await checkPatientAccess(dependencies, req, data.appointment.patientId, 'APPOINTMENT_READ');
-        res.status(200).json({ data, meta: { correlationId: req.correlationId } });
+        await checkPatientAccess(
+          dependencies,
+          req,
+          data.appointment.patientId,
+          'APPOINTMENT_READ',
+        );
+        res
+          .status(200)
+          .json({ data, meta: { correlationId: req.correlationId } });
       } catch (error) {
         next(error);
       }
     },
     async listByPatient(req, res, next) {
       try {
-        await checkPatientAccess(dependencies, req, req.params.patientId, 'APPOINTMENT_LIST');
+        await checkPatientAccess(
+          dependencies,
+          req,
+          req.params.patientId,
+          'APPOINTMENT_LIST',
+        );
         const data = await listPatientAppointments({
           connection: dependencies.connection,
           patientId: req.params.patientId,
-          principalId: req.authContext.actorType === 'PATIENT' ? req.authContext.userId : undefined,
+          principalId:
+            req.authContext.actorType === 'PATIENT'
+              ? req.authContext.userId
+              : undefined,
           state: req.query.state,
           from: req.query.from,
           to: req.query.to,
           page: req.query.page,
           limit: req.query.limit,
         });
-        res.status(200).json({ data, meta: { correlationId: req.correlationId } });
+        res
+          .status(200)
+          .json({ data, meta: { correlationId: req.correlationId } });
       } catch (error) {
         next(error);
       }
@@ -102,7 +127,9 @@ function createAppointmentsController(dependencies) {
           resolvePriceSnapshot: dependencies.resolvePriceSnapshot,
           createId: dependencies.createId,
         });
-        res.status(200).json({ data, meta: { correlationId: req.correlationId } });
+        res
+          .status(200)
+          .json({ data, meta: { correlationId: req.correlationId } });
       } catch (error) {
         next(error);
       }
@@ -131,7 +158,9 @@ function createAppointmentsController(dependencies) {
           now: dependencies.now?.() || new Date(),
           createId: dependencies.createId,
         });
-        res.status(200).json({ data, meta: { correlationId: req.correlationId } });
+        res
+          .status(200)
+          .json({ data, meta: { correlationId: req.correlationId } });
       } catch (error) {
         next(error);
       }

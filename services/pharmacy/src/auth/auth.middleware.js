@@ -12,13 +12,24 @@ function createAuthContext({ connection, verifyBearerToken }) {
       if (
         !claims?.sub ||
         !['STAFF', 'PATIENT', 'DOCTOR'].includes(claims.actorType) ||
-        !Number.isInteger(claims.tokenVersion) || claims.action || claims.tokenType === 'LEASE'
+        !Number.isInteger(claims.tokenVersion) ||
+        claims.action ||
+        claims.tokenType === 'LEASE'
       )
-        throw failure(401, 'UNAUTHENTICATED', 'A valid access token is required.');
+        throw failure(
+          401,
+          'UNAUTHENTICATED',
+          'A valid access token is required.',
+        );
       const user = await connection
         .collection('user_access_projection')
         .findOne({ userId: claims.sub });
-      if (!user) throw failure(503, 'SERVICE_UNAVAILABLE', 'Identity projection is unavailable.');
+      if (!user)
+        throw failure(
+          503,
+          'SERVICE_UNAVAILABLE',
+          'Identity projection is unavailable.',
+        );
       if (
         user.status !== 'ACTIVE' ||
         user.tokenVersion !== claims.tokenVersion ||
@@ -70,14 +81,24 @@ function requireLease({ verifyAuthorizationLease, now }, action) {
           tokenVersion: req.authContext.tokenVersion,
         });
       } catch (error) {
-        if (/expir/i.test(error?.message || '')) throw failure(401, 'AUTHZ_LEASE_EXPIRED', 'Authorization lease expired.');
+        if (/expir/i.test(error?.message || ''))
+          throw failure(
+            401,
+            'AUTHZ_LEASE_EXPIRED',
+            'Authorization lease expired.',
+          );
         throw failure(
           403,
           'AUTHORIZATION_LEASE_INVALID',
           'Authorization lease is expired or invalid.',
         );
       }
-      if (lease?.exp != null && lease.exp * 1000 <= +(now?.() || new Date())) throw failure(401, 'AUTHZ_LEASE_EXPIRED', 'Authorization lease expired.');
+      if (lease?.exp != null && lease.exp * 1000 <= +(now?.() || new Date()))
+        throw failure(
+          401,
+          'AUTHZ_LEASE_EXPIRED',
+          'Authorization lease expired.',
+        );
       if (
         !lease ||
         lease.sub !== req.authContext.userId ||

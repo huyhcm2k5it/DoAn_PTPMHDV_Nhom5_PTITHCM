@@ -1,5 +1,8 @@
 import type { DiagnosticApi } from './types';
-export type DiagnosticTransport = (url: string, init?: RequestInit) => Promise<Response>;
+export type DiagnosticTransport = (
+  url: string,
+  init?: RequestInit,
+) => Promise<Response>;
 export class DiagnosticError extends Error {
   constructor(
     public status: number,
@@ -15,8 +18,14 @@ export function diagnosticMessage(error: unknown): string {
     return `${error.message}${error.correlationId ? ` (Mã tra cứu: ${error.correlationId})` : ''}`;
   return 'Không kết nối được máy chủ. Giữ nguyên yêu cầu để thử lại.';
 }
-export function createDiagnosticApi(transport: DiagnosticTransport): DiagnosticApi {
-  async function request<T>(path: string, init?: RequestInit, status = 200): Promise<T> {
+export function createDiagnosticApi(
+  transport: DiagnosticTransport,
+): DiagnosticApi {
+  async function request<T>(
+    path: string,
+    init?: RequestInit,
+    status = 200,
+  ): Promise<T> {
     const res = await transport(`/api/v1/${path}`, init);
     const b = await res.json().catch(() => null);
     if (!res.ok)
@@ -27,7 +36,11 @@ export function createDiagnosticApi(transport: DiagnosticTransport): DiagnosticA
         b?.meta?.correlationId,
       );
     if (res.status !== status || !b || !Object.hasOwn(b, 'data'))
-      throw new DiagnosticError(502, 'INVALID_RESPONSE', 'Phản hồi máy chủ không đúng hợp đồng');
+      throw new DiagnosticError(
+        502,
+        'INVALID_RESPONSE',
+        'Phản hồi máy chủ không đúng hợp đồng',
+      );
     return b.data as T;
   }
   const post = (body: unknown, key: string): RequestInit => ({
@@ -37,16 +50,28 @@ export function createDiagnosticApi(transport: DiagnosticTransport): DiagnosticA
   });
   return {
     list: (q, signal) => {
-      const params = new URLSearchParams({ page: String(q.page), limit: String(q.limit) });
+      const params = new URLSearchParams({
+        page: String(q.page),
+        limit: String(q.limit),
+      });
       if (q.state) params.set('state', q.state);
       return request(`diagnostic-orders?${params}`, { signal });
     },
-    detail: (id, signal) => request(`diagnostic-orders/${encodeURIComponent(id)}`, { signal }),
+    detail: (id, signal) =>
+      request(`diagnostic-orders/${encodeURIComponent(id)}`, { signal }),
     collect: (id, input, key) =>
-      request(`diagnostic-orders/${encodeURIComponent(id)}/specimens`, post(input, key), 201),
+      request(
+        `diagnostic-orders/${encodeURIComponent(id)}/specimens`,
+        post(input, key),
+        201,
+      ),
     reject: (id, input, key) =>
       request(`specimens/${encodeURIComponent(id)}/reject`, post(input, key)),
     recollect: (id, input, key) =>
-      request(`diagnostic-orders/${encodeURIComponent(id)}/recollect`, post(input, key), 201),
+      request(
+        `diagnostic-orders/${encodeURIComponent(id)}/recollect`,
+        post(input, key),
+        201,
+      ),
   };
 }

@@ -1,5 +1,7 @@
 const { connectDatabase } = require('../src/configs/database.js');
-const { expirePendingAppointments } = require('../src/workers/appointment-expiry.worker.js');
+const {
+  expirePendingAppointments,
+} = require('../src/workers/appointment-expiry.worker.js');
 
 async function main() {
   if (!process.env.MONGODB_URI) throw new Error('MONGODB_URI is required');

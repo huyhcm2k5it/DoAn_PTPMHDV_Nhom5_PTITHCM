@@ -57,7 +57,8 @@ export function PrescriptionQueue({ api }: { api: PharmacyApi }) {
               <Link
                 className="text-link"
                 to={
-                  '/staff/pharmacy/prescriptions/' + encodeURIComponent(rx.prescriptionId || rx.id)
+                  '/staff/pharmacy/prescriptions/' +
+                  encodeURIComponent(rx.prescriptionId || rx.id)
                 }
               >
                 Tiếp nhận toa

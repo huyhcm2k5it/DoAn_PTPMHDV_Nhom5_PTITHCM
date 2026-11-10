@@ -1,7 +1,11 @@
 function errorHandler(err, req, res, next) {
   if (res.headersSent) return next(err);
   const status =
-    err.type === 'entity.parse.failed' ? 400 : Number.isInteger(err.status) ? err.status : 500;
+    err.type === 'entity.parse.failed'
+      ? 400
+      : Number.isInteger(err.status)
+        ? err.status
+        : 500;
   res.status(status).json({
     error: {
       code:
@@ -17,11 +21,9 @@ function errorHandler(err, req, res, next) {
   });
 }
 function notFound(req, res) {
-  res
-    .status(404)
-    .json({
-      error: { code: 'NOT_FOUND', message: 'Không tìm thấy tài nguyên.' },
-      meta: { correlationId: req.correlationId },
-    });
+  res.status(404).json({
+    error: { code: 'NOT_FOUND', message: 'Không tìm thấy tài nguyên.' },
+    meta: { correlationId: req.correlationId },
+  });
 }
 module.exports = { errorHandler, notFound };
