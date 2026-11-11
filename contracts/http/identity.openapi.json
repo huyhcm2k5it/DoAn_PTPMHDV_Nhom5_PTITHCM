@@ -131,6 +131,11 @@
                     "type": "string",
                     "description": "Số điện thoại dùng định danh hoặc tra cứu tài khoản; server chuẩn hóa trước khi so khớp."
                   },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "Địa chỉ email dùng để nhận mã xác thực OTP."
+                  },
                   "password": {
                     "type": "string",
                     "description": "Mật khẩu người dùng; chỉ truyền qua HTTPS, không ghi log hoặc trả lại trong response."
@@ -138,6 +143,7 @@
                 },
                 "required": [
                   "phone",
+                  "email",
                   "password"
                 ],
                 "additionalProperties": false
