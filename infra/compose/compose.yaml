@@ -397,6 +397,7 @@ services:
     - 127.0.0.1:${GATEWAY_HOST_PORT:-8080}:8080
     volumes:
     - ../../.runtime/jwks.json:/etc/envoy/jwks.json:ro
+    - ../../envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
     depends_on:
       identity:
         condition: service_healthy
@@ -599,8 +600,7 @@ services:
     - private
     restart: unless-stopped
 networks:
-  private:
-    internal: true
+  private: {}
 volumes:
   mongo_data: null
   rabbitmq_data: null

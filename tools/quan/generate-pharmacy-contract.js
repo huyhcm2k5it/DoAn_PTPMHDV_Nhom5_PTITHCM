@@ -28,7 +28,10 @@ const schemas = {
       {
         code: { type: 'string' },
         message: { type: 'string' },
-        details: { type: 'object', additionalProperties: { type: ['string', 'number', 'integer', 'boolean', 'null'] } },
+        details: {
+          type: 'object',
+          additionalProperties: { type: ['string', 'number', 'integer', 'boolean', 'null'] },
+        },
       },
       ['code', 'message'],
     ),
@@ -221,14 +224,22 @@ const errorCodes = {
   401: ['UNAUTHENTICATED', 'AUTHZ_LEASE_EXPIRED'],
   403: ['FORBIDDEN'],
   404: ['NOT_FOUND'],
-  409: ['STATE_CONFLICT', 'INSUFFICIENT_STOCK', 'PRESCRIPTION_REVISION_CONFLICT', 'HOLD_EXPIRED', 'SETTLEMENT_NOT_CONFIRMED', 'ALREADY_DISPENSED'],
+  409: [
+    'STATE_CONFLICT',
+    'INSUFFICIENT_STOCK',
+    'PRESCRIPTION_REVISION_CONFLICT',
+    'HOLD_EXPIRED',
+    'SETTLEMENT_NOT_CONFIRMED',
+    'ALREADY_DISPENSED',
+  ],
   503: ['SERVICE_UNAVAILABLE'],
 };
 const paths = {};
 for (const [operationId, method, suffix, status, response, body, params] of definitions) {
+  if (typeof suffix !== 'string') throw new TypeError('Pharmacy route suffix must be a string');
   const route = '/api/v1/pharmacy' + suffix;
   const parameters = [...params];
-  for (const match of suffix.matchAll(/\{(.*?)\}/g))
+  for (const match of suffix.matchAll(/\{([^{}]*)\}/g))
     parameters.push({ in: 'path', name: match[1], required: true, schema: id });
   if (method !== 'get') parameters.push(key);
   if (operationId !== 'PH-001')
@@ -266,7 +277,10 @@ for (const [operationId, method, suffix, status, response, body, params] of defi
       [status, 400, 401, 403, 404, 409, 503].map((code) => [
         code,
         {
-          description: code === status ? 'Operation result' : (errorCodes[code] || []).join(', ') + ': Operation rejected or unavailable',
+          description:
+            code === status
+              ? 'Operation result'
+              : (errorCodes[code] || []).join(', ') + ': Operation rejected or unavailable',
           ...(code !== status ? { 'x-error-codes': errorCodes[code] || [] } : {}),
           ...(code === 202 ? { headers: { Location: { schema: { type: 'string' } } } } : {}),
           content: {
