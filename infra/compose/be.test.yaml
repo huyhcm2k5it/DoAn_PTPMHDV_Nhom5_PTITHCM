@@ -110,16 +110,19 @@ services:
       dockerfile: services/patient/Dockerfile
     environment:
       NODE_ENV: production
-      PORT: '3000'
+      PORT: ${PATIENT_PORT:?set PATIENT_PORT}
       MONGODB_URI: $PATIENT_MONGO_URI
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
       JWT_ISSUER: umc-care-identity
       JWT_AUDIENCE: umc-care-services
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: '5672'
       RABBITMQ_USER: patient
       RABBITMQ_PASSWORD: ${PATIENT_RABBIT_PASSWORD}
       RABBITMQ_VHOST: /umc-be-test
       AMQP_URL: ${PATIENT_AMQP_URL}
       RABBITMQ_URL: ${PATIENT_AMQP_URL}
+      UMC_AMQP_URL: ${PATIENT_AMQP_URL}
     volumes:
     - ../../.runtime/be-test/jwt_public.pem:/run/config/jwt_public.pem:ro
     depends_on:
@@ -132,7 +135,7 @@ services:
       - CMD
       - node
       - -e
-      - fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      - fetch('http://127.0.0.1:' + process.env.PORT + '/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
       interval: 5s
       timeout: 3s
       retries: 20
@@ -142,17 +145,20 @@ services:
       dockerfile: services/appointment/Dockerfile
     environment:
       NODE_ENV: production
-      PORT: '3000'
+      PORT: ${APPOINTMENT_PORT:?set APPOINTMENT_PORT}
       MONGODB_URI: $APPOINTMENT_MONGO_URI
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
       JWT_ISSUER: umc-care-identity
       JWT_AUDIENCE: umc-care-services
       APPOINTMENT_REDIS_URL: redis://appointment:${APPOINTMENT_REDIS_PASSWORD}@redis-catalog:6379
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: '5672'
       RABBITMQ_USER: appointment
       RABBITMQ_PASSWORD: ${APPOINTMENT_RABBIT_PASSWORD}
       RABBITMQ_VHOST: /umc-be-test
       AMQP_URL: ${APPOINTMENT_AMQP_URL}
       RABBITMQ_URL: ${APPOINTMENT_AMQP_URL}
+      UMC_AMQP_URL: ${APPOINTMENT_AMQP_URL}
     volumes:
     - ../../.runtime/be-test/jwt_public.pem:/run/config/jwt_public.pem:ro
     depends_on:
@@ -165,7 +171,7 @@ services:
       - CMD
       - node
       - -e
-      - fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      - fetch('http://127.0.0.1:' + process.env.PORT + '/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
       interval: 5s
       timeout: 3s
       retries: 20
@@ -181,10 +187,13 @@ services:
       NODE_ENV: production
       MONGODB_URI: $APPOINTMENT_MONGO_URI
       AMQP_URL: ${APPOINTMENT_AMQP_URL}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: '5672'
       RABBITMQ_USER: appointment
       RABBITMQ_PASSWORD: ${APPOINTMENT_RABBIT_PASSWORD}
       RABBITMQ_VHOST: /umc-be-test
       RABBITMQ_URL: ${APPOINTMENT_AMQP_URL}
+      UMC_AMQP_URL: ${APPOINTMENT_AMQP_URL}
     depends_on:
       mongo-bootstrap:
         condition: service_completed_successfully
@@ -204,10 +213,13 @@ services:
       NODE_ENV: production
       MONGODB_URI: $PATIENT_MONGO_URI
       AMQP_URL: ${PATIENT_AMQP_URL}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: '5672'
       RABBITMQ_USER: patient
       RABBITMQ_PASSWORD: ${PATIENT_RABBIT_PASSWORD}
       RABBITMQ_VHOST: /umc-be-test
       RABBITMQ_URL: ${PATIENT_AMQP_URL}
+      UMC_AMQP_URL: ${PATIENT_AMQP_URL}
     depends_on:
       mongo-bootstrap:
         condition: service_completed_successfully
@@ -221,16 +233,19 @@ services:
       dockerfile: services/pharmacy/Dockerfile
     environment:
       NODE_ENV: production
-      PORT: '3000'
+      PORT: ${PHARMACY_PORT:?set PHARMACY_PORT}
       MONGODB_URI: $PHARMACY_MONGO_URI
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
       JWT_ISSUER: umc-care-identity
       JWT_AUDIENCE: umc-care-services
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: '5672'
       RABBITMQ_USER: pharmacy
       RABBITMQ_PASSWORD: ${PHARMACY_RABBIT_PASSWORD}
       RABBITMQ_VHOST: /umc-be-test
       AMQP_URL: ${PHARMACY_AMQP_URL}
       RABBITMQ_URL: ${PHARMACY_AMQP_URL}
+      UMC_AMQP_URL: ${PHARMACY_AMQP_URL}
     volumes:
     - ../../.runtime/be-test/jwt_public.pem:/run/config/jwt_public.pem:ro
     depends_on:
@@ -243,7 +258,7 @@ services:
       - CMD
       - node
       - -e
-      - fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
+      - fetch('http://127.0.0.1:' + process.env.PORT + '/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))
       interval: 5s
       timeout: 3s
       retries: 20
@@ -261,26 +276,31 @@ services:
       - CMD
       - curl
       - -f
-      - http://127.0.0.1:8000/health/ready
+      - http://127.0.0.1:8004/health/ready
       interval: 5s
       timeout: 3s
       retries: 20
     environment:
-      IDENTITY_DB_HOST: postgres
-      IDENTITY_DB_NAME: identity_db
-      IDENTITY_DB_USER: identity_owner
-      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:?set owner database password}
+      PORT: ${IDENTITY_PORT:?set IDENTITY_PORT}
       JWT_PUBLIC_KEY_PATH: /run/config/jwt_public.pem
       RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: '5672'
       RABBITMQ_USER: identity
       RABBITMQ_PASSWORD: ${IDENTITY_RABBIT_PASSWORD}
       RABBITMQ_VHOST: /umc-be-test
+      UMC_AMQP_URL: ${IDENTITY_AMQP_URL}
       JWT_PRIVATE_KEY_PATH: /run/secrets/identity_private.pem
+      AMQP_URL: ${IDENTITY_AMQP_URL}
+      RABBITMQ_URL: ${IDENTITY_AMQP_URL}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set test secret}
       DEBUG: 'false'
       ALLOW_DEV_OTP: 'false'
-      AMQP_URL: ${IDENTITY_AMQP_URL}
-      RABBITMQ_URL: ${IDENTITY_AMQP_URL}
+      IDENTITY_DB_HOST: postgres
+      IDENTITY_DB_PORT: '5432'
+      IDENTITY_DB_NAME: identity_db
+      IDENTITY_DB_USER: identity_owner
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD}
+      IDENTITY_DB_SSLMODE: disable
     volumes: &id001
     - ../../.runtime/be-test/jwt_public.pem:/run/config/jwt_public.pem:ro
     - ../../.runtime/be-test/jwt_private.pem:/run/secrets/identity_private.pem:ro
@@ -298,25 +318,30 @@ services:
       - CMD
       - curl
       - -f
-      - http://127.0.0.1:8000/health/ready
+      - http://127.0.0.1:8005/health/ready
       interval: 5s
       timeout: 3s
       retries: 20
     environment:
-      BILLING_DB_HOST: postgres
-      BILLING_DB_NAME: billing_db
-      BILLING_DB_USER: billing_owner
-      BILLING_DB_PASSWORD: ${BILLING_DB_PASSWORD:?set owner database password}
+      PORT: ${BILLING_PORT:?set BILLING_PORT}
       JWT_PUBLIC_KEY_PATH: /run/config/jwt_public.pem
       RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: '5672'
       RABBITMQ_USER: billing
       RABBITMQ_PASSWORD: ${BILLING_RABBIT_PASSWORD}
       RABBITMQ_VHOST: /umc-be-test
+      UMC_AMQP_URL: ${BILLING_AMQP_URL}
+      AMQP_URL: ${BILLING_AMQP_URL}
+      RABBITMQ_URL: ${BILLING_AMQP_URL}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set test secret}
       DEBUG: 'false'
       ALLOW_DEV_OTP: 'false'
-      AMQP_URL: ${BILLING_AMQP_URL}
-      RABBITMQ_URL: ${BILLING_AMQP_URL}
+      BILLING_DB_HOST: postgres
+      BILLING_DB_PORT: '5432'
+      BILLING_DB_NAME: billing_db
+      BILLING_DB_USER: billing_owner
+      BILLING_DB_PASSWORD: ${BILLING_DB_PASSWORD}
+      BILLING_DB_SSLMODE: disable
     volumes:
     - ../../.runtime/be-test/jwt_public.pem:/run/config/jwt_public.pem:ro
   billing-worker:
@@ -337,20 +362,25 @@ services:
     networks:
     - private
     environment:
-      BILLING_DB_HOST: postgres
-      BILLING_DB_NAME: billing_db
-      BILLING_DB_USER: billing_owner
-      BILLING_DB_PASSWORD: ${BILLING_DB_PASSWORD:?set owner database password}
+      PORT: ${BILLING_PORT:?set BILLING_PORT}
       JWT_PUBLIC_KEY_PATH: /run/config/jwt_public.pem
       RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: '5672'
       RABBITMQ_USER: billing
       RABBITMQ_PASSWORD: ${BILLING_RABBIT_PASSWORD}
       RABBITMQ_VHOST: /umc-be-test
+      UMC_AMQP_URL: ${BILLING_AMQP_URL}
+      AMQP_URL: ${BILLING_AMQP_URL}
+      RABBITMQ_URL: ${BILLING_AMQP_URL}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set test secret}
       DEBUG: 'false'
       ALLOW_DEV_OTP: 'false'
-      AMQP_URL: ${BILLING_AMQP_URL}
-      RABBITMQ_URL: ${BILLING_AMQP_URL}
+      BILLING_DB_HOST: postgres
+      BILLING_DB_PORT: '5432'
+      BILLING_DB_NAME: billing_db
+      BILLING_DB_USER: billing_owner
+      BILLING_DB_PASSWORD: ${BILLING_DB_PASSWORD}
+      BILLING_DB_SSLMODE: disable
     volumes:
     - ../../.runtime/be-test/jwt_public.pem:/run/config/jwt_public.pem:ro
   notification:
@@ -367,25 +397,30 @@ services:
       - CMD
       - curl
       - -f
-      - http://127.0.0.1:8000/health/ready
+      - http://127.0.0.1:8006/health/ready
       interval: 5s
       timeout: 3s
       retries: 20
     environment:
-      NOTIFICATION_DB_HOST: postgres
-      NOTIFICATION_DB_NAME: notification_db
-      NOTIFICATION_DB_USER: notification_owner
-      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?set owner database password}
+      PORT: ${NOTIFICATION_PORT:?set NOTIFICATION_PORT}
       JWT_PUBLIC_KEY_PATH: /run/config/jwt_public.pem
       RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: '5672'
       RABBITMQ_USER: notification
       RABBITMQ_PASSWORD: ${NOTIFICATION_RABBIT_PASSWORD}
       RABBITMQ_VHOST: /umc-be-test
+      UMC_AMQP_URL: ${NOTIFICATION_AMQP_URL}
+      AMQP_URL: ${NOTIFICATION_AMQP_URL}
+      RABBITMQ_URL: ${NOTIFICATION_AMQP_URL}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set test secret}
       DEBUG: 'false'
       ALLOW_DEV_OTP: 'false'
-      AMQP_URL: ${NOTIFICATION_AMQP_URL}
-      RABBITMQ_URL: ${NOTIFICATION_AMQP_URL}
+      NOTIFICATION_DB_HOST: postgres
+      NOTIFICATION_DB_PORT: '5432'
+      NOTIFICATION_DB_NAME: notification_db
+      NOTIFICATION_DB_USER: notification_owner
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD}
+      NOTIFICATION_DB_SSLMODE: disable
     volumes:
     - ../../.runtime/be-test/jwt_public.pem:/run/config/jwt_public.pem:ro
   notification-worker:
@@ -404,20 +439,25 @@ services:
     networks:
     - private
     environment:
-      NOTIFICATION_DB_HOST: postgres
-      NOTIFICATION_DB_NAME: notification_db
-      NOTIFICATION_DB_USER: notification_owner
-      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?set owner database password}
+      PORT: ${NOTIFICATION_PORT:?set NOTIFICATION_PORT}
       JWT_PUBLIC_KEY_PATH: /run/config/jwt_public.pem
       RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: '5672'
       RABBITMQ_USER: notification
       RABBITMQ_PASSWORD: ${NOTIFICATION_RABBIT_PASSWORD}
       RABBITMQ_VHOST: /umc-be-test
+      UMC_AMQP_URL: ${NOTIFICATION_AMQP_URL}
+      AMQP_URL: ${NOTIFICATION_AMQP_URL}
+      RABBITMQ_URL: ${NOTIFICATION_AMQP_URL}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set test secret}
       DEBUG: 'false'
       ALLOW_DEV_OTP: 'false'
-      AMQP_URL: ${NOTIFICATION_AMQP_URL}
-      RABBITMQ_URL: ${NOTIFICATION_AMQP_URL}
+      NOTIFICATION_DB_HOST: postgres
+      NOTIFICATION_DB_PORT: '5432'
+      NOTIFICATION_DB_NAME: notification_db
+      NOTIFICATION_DB_USER: notification_owner
+      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD}
+      NOTIFICATION_DB_SSLMODE: disable
     volumes:
     - ../../.runtime/be-test/jwt_public.pem:/run/config/jwt_public.pem:ro
   gateway:
@@ -449,10 +489,13 @@ services:
     environment:
       MONGODB_URI: $PHARMACY_MONGO_URI
       AMQP_URL: ${PHARMACY_AMQP_URL}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: '5672'
       RABBITMQ_USER: pharmacy
       RABBITMQ_PASSWORD: ${PHARMACY_RABBIT_PASSWORD}
       RABBITMQ_VHOST: /umc-be-test
       RABBITMQ_URL: ${PHARMACY_AMQP_URL}
+      UMC_AMQP_URL: ${PHARMACY_AMQP_URL}
     depends_on:
       mongo-bootstrap:
         condition: service_completed_successfully
@@ -482,12 +525,15 @@ services:
     entrypoint:
     - /migrate
     environment:
-      DATABASE_URL: postgres://catalog_owner:${CATALOG_DB_PASSWORD}@postgres:5432/catalog_db?sslmode=disable
+      DATABASE_URL: ${CATALOG_DATABASE_URL:?set Catalog PostgreSQL URL}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: '5672'
       RABBITMQ_USER: catalog
       RABBITMQ_PASSWORD: ${CATALOG_RABBIT_PASSWORD}
       RABBITMQ_VHOST: /umc-be-test
       AMQP_URL: ${CATALOG_AMQP_URL}
       RABBITMQ_URL: ${CATALOG_AMQP_URL}
+      UMC_AMQP_URL: ${CATALOG_AMQP_URL}
     depends_on:
       postgres:
         condition: service_healthy
@@ -497,19 +543,22 @@ services:
     image: umc-care-catalog:local
     build: ../../services/catalog
     environment:
-      DATABASE_URL: postgres://catalog_owner:${CATALOG_DB_PASSWORD}@postgres:5432/catalog_db?sslmode=disable
-      LISTEN_ADDR: :8081
+      DATABASE_URL: ${CATALOG_DATABASE_URL:?set Catalog PostgreSQL URL}
+      LISTEN_ADDR: :${CATALOG_PORT:?set CATALOG_PORT}
       REDIS_ADDR: redis-catalog:6379
       REDIS_USERNAME: catalog
       REDIS_PASSWORD: ${CATALOG_REDIS_PASSWORD}
       JWT_ISSUER: umc-care-identity
       JWT_AUDIENCE: umc-care-services
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: '5672'
       RABBITMQ_USER: catalog
       RABBITMQ_PASSWORD: ${CATALOG_RABBIT_PASSWORD}
       RABBITMQ_VHOST: /umc-be-test
       AMQP_URL: ${CATALOG_AMQP_URL}
       RABBITMQ_URL: ${CATALOG_AMQP_URL}
+      UMC_AMQP_URL: ${CATALOG_AMQP_URL}
     volumes:
     - ../../.runtime/be-test/jwt_public.pem:/run/config/jwt_public.pem:ro
     depends_on:
@@ -522,13 +571,16 @@ services:
     entrypoint:
     - /worker
     environment:
-      DATABASE_URL: postgres://catalog_owner:${CATALOG_DB_PASSWORD}@postgres:5432/catalog_db?sslmode=disable
+      DATABASE_URL: ${CATALOG_DATABASE_URL:?set Catalog PostgreSQL URL}
       AMQP_URL: ${CATALOG_AMQP_URL}
       CATALOG_DECLARE_TOPOLOGY: 'true'
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: '5672'
       RABBITMQ_USER: catalog
       RABBITMQ_PASSWORD: ${CATALOG_RABBIT_PASSWORD}
       RABBITMQ_VHOST: /umc-be-test
       RABBITMQ_URL: ${CATALOG_AMQP_URL}
+      UMC_AMQP_URL: ${CATALOG_AMQP_URL}
     depends_on:
       catalog-migrate:
         condition: service_completed_successfully
@@ -542,12 +594,15 @@ services:
     entrypoint:
     - /migrate
     environment:
-      DATABASE_URL: postgres://clinical_owner:${CLINICAL_DB_PASSWORD}@postgres:5432/clinical_db?sslmode=disable
+      DATABASE_URL: ${CLINICAL_DATABASE_URL:?set Clinical PostgreSQL URL}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: '5672'
       RABBITMQ_USER: clinical
       RABBITMQ_PASSWORD: ${CLINICAL_RABBIT_PASSWORD}
       RABBITMQ_VHOST: /umc-be-test
       AMQP_URL: ${CLINICAL_AMQP_URL}
       RABBITMQ_URL: ${CLINICAL_AMQP_URL}
+      UMC_AMQP_URL: ${CLINICAL_AMQP_URL}
     depends_on:
       postgres:
         condition: service_healthy
@@ -557,16 +612,19 @@ services:
     image: umc-care-clinical:local
     build: ../../services/clinical
     environment:
-      DATABASE_URL: postgres://clinical_owner:${CLINICAL_DB_PASSWORD}@postgres:5432/clinical_db?sslmode=disable
-      LISTEN_ADDR: :8082
+      DATABASE_URL: ${CLINICAL_DATABASE_URL:?set Clinical PostgreSQL URL}
+      LISTEN_ADDR: :${CLINICAL_PORT:?set CLINICAL_PORT}
       JWT_ISSUER: umc-care-identity
       JWT_AUDIENCE: umc-care-services
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: '5672'
       RABBITMQ_USER: clinical
       RABBITMQ_PASSWORD: ${CLINICAL_RABBIT_PASSWORD}
       RABBITMQ_VHOST: /umc-be-test
       AMQP_URL: ${CLINICAL_AMQP_URL}
       RABBITMQ_URL: ${CLINICAL_AMQP_URL}
+      UMC_AMQP_URL: ${CLINICAL_AMQP_URL}
     volumes:
     - ../../.runtime/be-test/jwt_public.pem:/run/config/jwt_public.pem:ro
     depends_on:
@@ -579,13 +637,16 @@ services:
     entrypoint:
     - /worker
     environment:
-      DATABASE_URL: postgres://clinical_owner:${CLINICAL_DB_PASSWORD}@postgres:5432/clinical_db?sslmode=disable
+      DATABASE_URL: ${CLINICAL_DATABASE_URL:?set Clinical PostgreSQL URL}
       RABBITMQ_URL: ${CLINICAL_AMQP_URL}
       CLINICAL_DECLARE_TOPOLOGY: '1'
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: '5672'
       RABBITMQ_USER: clinical
       RABBITMQ_PASSWORD: ${CLINICAL_RABBIT_PASSWORD}
       RABBITMQ_VHOST: /umc-be-test
       AMQP_URL: ${CLINICAL_AMQP_URL}
+      UMC_AMQP_URL: ${CLINICAL_AMQP_URL}
     depends_on:
       clinical-migrate:
         condition: service_completed_successfully
@@ -599,12 +660,15 @@ services:
     entrypoint:
     - /migrate
     environment:
-      DATABASE_URL: postgres://diagnostic_owner:${DIAGNOSTIC_DB_PASSWORD}@postgres:5432/diagnostic_db?sslmode=disable
+      DATABASE_URL: ${DIAGNOSTIC_DATABASE_URL:?set Diagnostic PostgreSQL URL}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: '5672'
       RABBITMQ_USER: diagnostic
       RABBITMQ_PASSWORD: ${DIAGNOSTIC_RABBIT_PASSWORD}
       RABBITMQ_VHOST: /umc-be-test
       AMQP_URL: ${DIAGNOSTIC_AMQP_URL}
       RABBITMQ_URL: ${DIAGNOSTIC_AMQP_URL}
+      UMC_AMQP_URL: ${DIAGNOSTIC_AMQP_URL}
     depends_on:
       postgres:
         condition: service_healthy
@@ -614,16 +678,19 @@ services:
     image: umc-care-diagnostic:local
     build: ../../services/diagnostic
     environment:
-      DATABASE_URL: postgres://diagnostic_owner:${DIAGNOSTIC_DB_PASSWORD}@postgres:5432/diagnostic_db?sslmode=disable
-      LISTEN_ADDR: :8083
+      DATABASE_URL: ${DIAGNOSTIC_DATABASE_URL:?set Diagnostic PostgreSQL URL}
+      LISTEN_ADDR: :${DIAGNOSTIC_PORT:?set DIAGNOSTIC_PORT}
       JWT_ISSUER: umc-care-identity
       JWT_AUDIENCE: umc-care-services
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: '5672'
       RABBITMQ_USER: diagnostic
       RABBITMQ_PASSWORD: ${DIAGNOSTIC_RABBIT_PASSWORD}
       RABBITMQ_VHOST: /umc-be-test
       AMQP_URL: ${DIAGNOSTIC_AMQP_URL}
       RABBITMQ_URL: ${DIAGNOSTIC_AMQP_URL}
+      UMC_AMQP_URL: ${DIAGNOSTIC_AMQP_URL}
     volumes:
     - ../../.runtime/be-test/jwt_public.pem:/run/config/jwt_public.pem:ro
     depends_on:
@@ -636,13 +703,16 @@ services:
     entrypoint:
     - /worker
     environment:
-      DATABASE_URL: postgres://diagnostic_owner:${DIAGNOSTIC_DB_PASSWORD}@postgres:5432/diagnostic_db?sslmode=disable
+      DATABASE_URL: ${DIAGNOSTIC_DATABASE_URL:?set Diagnostic PostgreSQL URL}
       RABBITMQ_URL: ${DIAGNOSTIC_AMQP_URL}
       DIAGNOSTIC_DECLARE_TOPOLOGY: '1'
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: '5672'
       RABBITMQ_USER: diagnostic
       RABBITMQ_PASSWORD: ${DIAGNOSTIC_RABBIT_PASSWORD}
       RABBITMQ_VHOST: /umc-be-test
       AMQP_URL: ${DIAGNOSTIC_AMQP_URL}
+      UMC_AMQP_URL: ${DIAGNOSTIC_AMQP_URL}
     depends_on:
       diagnostic-migrate:
         condition: service_completed_successfully
@@ -659,21 +729,26 @@ services:
     - manage.py
     - run_identity_worker
     environment:
-      IDENTITY_DB_HOST: postgres
-      IDENTITY_DB_NAME: identity_db
-      IDENTITY_DB_USER: identity_owner
-      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:?set owner database password}
+      PORT: ${IDENTITY_PORT:?set IDENTITY_PORT}
       JWT_PUBLIC_KEY_PATH: /run/config/jwt_public.pem
       RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: '5672'
       RABBITMQ_USER: identity
       RABBITMQ_PASSWORD: ${IDENTITY_RABBIT_PASSWORD}
       RABBITMQ_VHOST: /umc-be-test
+      UMC_AMQP_URL: ${IDENTITY_AMQP_URL}
       JWT_PRIVATE_KEY_PATH: /run/secrets/identity_private.pem
+      AMQP_URL: ${IDENTITY_AMQP_URL}
+      RABBITMQ_URL: ${IDENTITY_AMQP_URL}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set test secret}
       DEBUG: 'false'
       ALLOW_DEV_OTP: 'false'
-      AMQP_URL: ${IDENTITY_AMQP_URL}
-      RABBITMQ_URL: ${IDENTITY_AMQP_URL}
+      IDENTITY_DB_HOST: postgres
+      IDENTITY_DB_PORT: '5432'
+      IDENTITY_DB_NAME: identity_db
+      IDENTITY_DB_USER: identity_owner
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD}
+      IDENTITY_DB_SSLMODE: disable
     volumes: *id001
     depends_on:
       identity:
@@ -684,7 +759,7 @@ services:
     - private
 networks:
   private:
-    internal: true
+    internal: false
 volumes:
   mongo_data: null
   rabbitmq_data: null

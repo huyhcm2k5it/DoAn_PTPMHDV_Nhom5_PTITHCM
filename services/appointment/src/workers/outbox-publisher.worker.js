@@ -104,7 +104,11 @@ async function publishOutboxBatch({
       channel.publish(
         destinationExchange,
         routingKey,
-        record.delivery_content ? Buffer.from(record.delivery_content) : body,
+        typeof record.delivery_content_base64 === 'string'
+          ? Buffer.from(record.delivery_content_base64, 'base64')
+          : typeof record.delivery_content === 'string'
+            ? Buffer.from(record.delivery_content)
+            : body,
         {
           persistent: true,
           mandatory: true,

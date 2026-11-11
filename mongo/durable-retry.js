@@ -2,14 +2,16 @@ const { createHash, randomUUID } = require('node:crypto');
 const { withMongoTransaction } = require('./transaction');
 const delays = [5000, 15000, 60000];
 function deliveryId(delivery) {
+  const usableId = value => typeof value === 'string' && value.trim().length > 0 &&
+    Buffer.byteLength(value, 'utf8') <= 255;
   try {
     const m = JSON.parse(delivery.content.toString());
-    if (m.messageId) return m.messageId;
+    if (usableId(m?.messageId)) return m.messageId;
   } catch {
     /* malformed */
   }
   return (
-    delivery.properties?.messageId || createHash('sha256').update(delivery.content).digest('hex')
+    usableId(delivery.properties?.messageId) ? delivery.properties.messageId : createHash('sha256').update(delivery.content).digest('hex')
   );
 }
 async function quarantine(connection, session, value, error, now) {
@@ -41,6 +43,9 @@ async function quarantine(connection, session, value, error, now) {
         correlation_id: value.messageId,
         occurred_at: now,
         delivery_content: value.content,
+        ...(typeof value.contentBase64 === 'string'
+          ? { delivery_content_base64: value.contentBase64 }
+          : {}),
         published_at: null,
         destination_exchange: 'umc.deadletters.' + value.consumerName + '.v1',
         destination_key: value.consumerName + '.quarantine.v1',
@@ -64,6 +69,7 @@ async function persistDeliveryFailure({
     consumerName,
     messageId,
     content: delivery.content.toString('utf8'),
+    contentBase64: delivery.content.toString('base64'),
     exchange: delivery.fields.exchange,
     routingKey: delivery.fields.routingKey,
   };
@@ -71,8 +77,11 @@ async function persistDeliveryFailure({
     const jobs = connection.collection('retry_jobs');
     const previous = await jobs.findOne({ id }, { session });
     if (previous) {
+      const previousContent = typeof previous.contentBase64 === 'string'
+        ? previous.contentBase64
+        : Buffer.from(previous.content, 'utf8').toString('base64');
       if (
-        previous.content !== value.content ||
+        previousContent !== value.contentBase64 ||
         previous.exchange !== value.exchange ||
         previous.routingKey !== value.routingKey
       ) {
