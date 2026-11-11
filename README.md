@@ -18,24 +18,20 @@ UMC Care là đồ án 9 microservice. Mỗi service sở hữu database, migrat
 - apps/android: Kotlin + Jetpack Compose; Hưng owns Android PATIENT.
 - services: nine services; Quân owns Patient, Appointment and Pharmacy.
 - contracts: HTTP and message contracts.
-- infra/compose: local Docker Compose configuration.
+- infra/compose: cấu hình triển khai chung và hướng dẫn chuyển sang dịch vụ dữ liệu online.
 - envoy, rabbitmq, mongo, postgres: gateway and data infrastructure.
 - tests: contract and integration tests.
 - docs: project source documentation.
 
 Mỗi service dùng credential riêng và không đọc database của service khác. Xem [env theo ba owner](env/README.md) và [Compose README](infra/compose/README.md) để chuẩn bị JWT key, database, RabbitMQ và Gateway. Chạy migration trước API; chạy worker riêng để phát outbox/nhận event. Chỉ bật HTTP API không hoàn thành luồng bất đồng bộ.
 
-**Chia sẻ giữa các máy:** source + `docker compose up --build` đủ để dựng image local; Docker Hub không đồng bộ PostgreSQL/MongoDB volumes hay RabbitMQ queue. Nhóm phải thống nhất DB/broker chung hoặc chuyển dữ liệu bằng backup/restore/seed. Compose mặc định dùng DB local và chỉ Gateway mở cổng host; xem mục đầu của [Compose README](infra/compose/README.md).
+**Demo giữa ba máy:** dùng cùng các database, Redis và broker online theo [env theo owner](env/README.md). Docker Hub chỉ lưu image, không lưu dữ liệu hoặc RabbitMQ queue. [Compose README](infra/compose/README.md) ghi rõ phần cấu hình hiện còn phải đổi trước khi coi stack là online hoàn chỉnh.
 
 Hợp đồng giao tiếp gồm [9 OpenAPI/86 operation](contracts/http/), [message schema](contracts/messages/) và [baseline manifest](contracts/be-baseline-manifest.json). HTTP `202` nghĩa là yêu cầu đã được nhận; client cần đọc `statusUrl` để biết trạng thái cuối.
 
-## Mongo storage and HTTP tests
+## Kiểm tra contract và luồng
 
-The isolated Mongo test package is in tests/mongo. It starts temporary replica sets for storage, HTTP/schema, booking, Pharmacy, concurrency, rollback and recovery checks. Each Node service has its own package and lockfile. Install dependencies with npm ci in services/patient, services/appointment, services/pharmacy, tests/mongo and apps/web, then run:
-
-```powershell
-powershell -File tools/quan/verify-local.ps1
-```
+Các bài kiểm tra mã và contract nằm trong `tests/` và README của từng service. Để nghiệm thu demo, kiểm trực tiếp trên cùng MongoDB Atlas, PostgreSQL online, Redis online và CloudAMQP đã cấu hình theo ba owner; bài test tách biệt không thay bằng chứng này.
 
 Kiểm tra contract tĩnh bằng `python tools/be/check_api_matrix.py` và `python tools/be/check_baseline.py`; kiểm tra một phần topology bằng `python tools/be/test_topology.py`. Lệnh chạy riêng của từng service nằm trong README của service đó. [Bộ test chung](tests/README.md) và [hồ sơ bàn giao](docs/ban-giao-umc-care/README.md) ghi rõ bằng chứng đã có và phần còn chờ.
 

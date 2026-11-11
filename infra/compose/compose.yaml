@@ -145,7 +145,7 @@ services:
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
       JWT_ISSUER: umc-care-identity
       JWT_AUDIENCE: umc-care-services
-      APPOINTMENT_REDIS_URL: redis://appointment:${APPOINTMENT_REDIS_PASSWORD}@redis-catalog:6379
+      APPOINTMENT_REDIS_URL: ${UMC_REDIS_URL:?set shared online Redis URL from Quân}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
     depends_on:
@@ -427,23 +427,6 @@ services:
     networks:
     - private
     restart: unless-stopped
-  redis-catalog:
-    image: redis:7.4-alpine
-    environment:
-      CATALOG_REDIS_PASSWORD: ${CATALOG_REDIS_PASSWORD:?set CATALOG_REDIS_PASSWORD}
-      APPOINTMENT_REDIS_PASSWORD: ${APPOINTMENT_REDIS_PASSWORD:?set APPOINTMENT_REDIS_PASSWORD}
-    entrypoint:
-    - /bin/sh
-    - -c
-    command:
-    - printf 'user default off\nuser catalog on >%s ~umc:catalog:v1:* +hello +auth
-      +ping +get +set +setnx\nuser appointment on >%s ~umc:appointment:available:v1:*
-      +hello +auth +ping +get +set +del +scan\n' "$${CATALOG_REDIS_PASSWORD}" "$${APPOINTMENT_REDIS_PASSWORD}"
-      > /tmp/cache-users.acl && exec redis-server --aclfile /tmp/cache-users.acl --maxmemory
-      128mb --maxmemory-policy allkeys-lru
-    networks:
-    - private
-    restart: unless-stopped
   catalog-migrate:
     build: ../../services/catalog
     image: umc-care-catalog:local
@@ -462,9 +445,7 @@ services:
     environment:
       DATABASE_URL: ${CATALOG_DATABASE_URL:?set Catalog PostgreSQL URL}
       LISTEN_ADDR: :${CATALOG_PORT:?set CATALOG_PORT}
-      REDIS_ADDR: redis-catalog:6379
-      REDIS_USERNAME: catalog
-      REDIS_PASSWORD: ${CATALOG_REDIS_PASSWORD}
+      REDIS_URL: ${UMC_REDIS_URL:?set shared online Redis URL from Quân}
       JWT_ISSUER: umc-care-identity
       JWT_AUDIENCE: umc-care-services
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem

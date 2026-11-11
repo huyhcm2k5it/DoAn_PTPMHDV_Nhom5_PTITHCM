@@ -12,12 +12,12 @@ Owner: Huy. Go/Echo/pgx, with domain and application ports independent from driv
 
 An ACCEPTED QueueTicketClaimed event creates one FIRST visit per appointment; RETURN resumes the same eligible visit once. REJECTED creates no visit. Both message ID and business result are deduplicated; conflicting terminal results are quarantined. A stale draft returns 409 and SIGNED visits cannot be edited.
 
-## Run on Windows
+## Run with online services
 
-From the repository root, configure your own Clinical database and the RSA public key supplied by Hưng. This service never reads another service's database. Password placeholders below are not usable credentials.
+From the repository root, load `CLINICAL_DATABASE_URL` from Huy's private env as the process `DATABASE_URL`. It must select `clinical_db` on Neon with `sslmode=require`. Configure the RSA public key supplied by Hưng. This service never reads another service's database. The placeholders below are examples, not usable credentials.
 
 ```powershell
-$env:DATABASE_URL='postgres://clinical_owner:YOUR_LOCAL_PASSWORD@127.0.0.1:55432/clinical_db?sslmode=disable'
+$env:DATABASE_URL='postgresql://REPLACE_USER:REPLACE_PASSWORD@REPLACE_NEON_HOST/clinical_db?sslmode=require'
 $env:JWT_ISSUER='YOUR_IDENTITY_ISSUER'
 $env:JWT_AUDIENCE='YOUR_API_AUDIENCE'
 $env:JWT_PUBLIC_KEY_FILE='C:/absolute/path/to/identity-public.pem'
@@ -39,7 +39,7 @@ The baseline command requires patientId although CL-002 accepts only ticketId/do
 
 Only import a trusted Appointment export. `doctorId` identifies the Catalog doctor while `doctorUserId` is the JWT subject. The API verifies their mapping from this snapshot, never from patientId supplied by a browser. Missing projection returns 503; the actual Appointment consumer must still validate ticket version/assignment when claiming.
 
-For a loopback-only fake fixture, opt in explicitly:
+The following fake fixture is for isolated development only; do not use it as evidence of the online group demo:
 
 ```powershell
 $env:CLINICAL_ALLOW_DEMO_SEED='1'
@@ -50,10 +50,10 @@ This seeds a fake doctor/patient/ticket only; it never manufactures an ACCEPTED 
 
 ## Worker and RabbitMQ
 
-After migration, open another terminal with the same DATABASE_URL and a Clinical broker account scoped to vhost `/umc-care`:
+After migration, start the worker with the same online database URL and Quân's shared `UMC_AMQP_URL`. Use the actual CloudAMQP vhost:
 
 ```powershell
-$env:RABBITMQ_URL='amqp://clinical_user:YOUR_LOCAL_PASSWORD@127.0.0.1:5672/%2Fumc-care'
+$env:RABBITMQ_URL='amqps://REPLACE_USER:REPLACE_PASSWORD@REPLACE_BROKER_HOST:5671/REPLACE_VHOST'
 ./tools/huy/go.ps1 clinical run ./cmd/worker
 ```
 

@@ -15,7 +15,7 @@ Owner: Quân. Node.js 24, Express 5, Mongoose 9, JavaScript CommonJS.
 - Owner-only pharmacy_db URI, additive index bootstrap/migration, insert-only inventory seed,
   readiness and graceful shutdown.
 
-## Run locally
+## Run with online dependencies
 
 ```powershell
 npm ci
@@ -26,8 +26,8 @@ npm start
 npm run worker
 ```
 
-Set MONGODB_URI to pharmacy_db (replica set required), JWT_PUBLIC_KEY_FILE, JWT_ISSUER,
-JWT_AUDIENCE; worker also needs AMQP_URL. Do not put secrets in source.
+Set MONGODB_URI to Quân's Atlas `pharmacy_db`, JWT_PUBLIC_KEY_FILE, JWT_ISSUER,
+JWT_AUDIENCE; worker also needs AMQP_URL set to Quân's shared CloudAMQP URL. Do not put secrets in source.
 Starting only HTTP does not publish outbox or run expiry/reconciliation.
 
 PH002..PH008 require X-Authorization-Lease, action PH002..PH008 respectively, <=30s,

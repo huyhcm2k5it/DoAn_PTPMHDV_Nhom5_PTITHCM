@@ -2,15 +2,11 @@
 
 Owner: Hưng. Django/PostgreSQL; sở hữu charge, settlement, payment, receipt và refund. Xem [OpenAPI](../../contracts/http/billing.openapi.json), [message schema](../../contracts/messages/billing.v1.schema.json) và [RabbitMQ topology](../../rabbitmq/definitions.json).
 
-## Chạy local
+## Chạy với database và broker online
 
-Hưng điền `env/hung.env` theo [mẫu chung](../../env/README.md); Quân cung cấp RabbitMQ credential qua `env/quan.env`. Compose nạp hai nhóm biến cho Billing; chạy native cần export biến và đổi DB/broker host cho phù hợp. Khi PostgreSQL sẵn sàng:
+Hưng điền `env/hung.env` theo [mẫu chung](../../env/README.md), với `BILLING_DB_*` trỏ Aiven và `BILLING_DB_SSLMODE=require`; Quân cung cấp CloudAMQP qua `env/quan.env`. API và worker phải dùng cùng database online và broker/vhost của nhóm. Khi schema online đã sẵn sàng:
 
-```powershell
-python -m pip install -r requirements.txt
-python manage.py migrate
-python manage.py runserver 127.0.0.1:8005
-```
+Dockerfile của service cài dependencies, chạy migration rồi mở API bằng Gunicorn trên cổng 8004–8006 tương ứng. Khi triển khai, nạp env thật vào container và chỉ cho Gateway truy cập API.
 
 Chạy `python manage.py run_billing_worker` riêng để nhận command/event và phát outbox. Compose đã tách API và worker. `/health/ready` không chứng minh saga thanh toán xuyên service đã xong.
 

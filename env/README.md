@@ -1,56 +1,39 @@
-# Env theo owner
+# Cấu hình online theo owner
 
-Ba file thật duy nhất cho stack chung là `env/quan.env`, `env/huy.env`, `env/hung.env`. Mỗi owner tạo file của mình từ file `.example` cùng tên. Git bỏ qua ba file thật; chỉ commit mẫu không có mật khẩu. Trao đổi giá trị thật qua kênh riêng của nhóm, không đưa lên GitHub.
+Nhóm dùng chung MongoDB Atlas, Neon PostgreSQL, Aiven PostgreSQL, CloudAMQP và một Redis online. Mỗi người giữ đúng một file thật: `env/quan.env`, `env/huy.env`, `env/hung.env`. Tạo từ file `.env.example` tương ứng, thay toàn bộ `REPLACE`, rồi chia sẻ credential qua kênh riêng. Git chỉ lưu file mẫu.
 
-| Owner | File | Biến chính |
+| Owner | File | Phạm vi |
 | --- | --- | --- |
-| Quân | `quan.env` | MongoDB, RabbitMQ, Appointment Redis |
-| Huy | `huy.env` | Catalog/Clinical/Diagnostic PostgreSQL, Catalog Redis |
-| Hưng | `hung.env` | PostgreSQL chung, Identity/Billing/Notification |
+| Quân | `quan.env` | Patient, Appointment, Pharmacy; ba MongoDB URI, Redis và RabbitMQ chung |
+| Huy | `huy.env` | Ba Neon PostgreSQL URL cho Catalog, Clinical, Diagnostic |
+| Hưng | `hung.env` | Ba database Identity, Billing, Notification trên Aiven; khóa ký JWT và SMS |
 
-## Cổng của stack
+## Cổng và địa chỉ
 
-| Thành phần | Cổng trong Compose | Khai báo tại | Cổng mở trên máy host |
-| --- | ---: | --- | --- |
-| Gateway/Envoy | 8080 | `GATEWAY_HOST_PORT` của Quân | `127.0.0.1:8080` mặc định |
-| Patient, Appointment, Pharmacy | 8001, 8002, 8003 | `PATIENT_PORT`, `APPOINTMENT_PORT`, `PHARMACY_PORT` của Quân | Không mở |
-| Identity, Billing, Notification | 8004, 8005, 8006 | `IDENTITY_PORT`, `BILLING_PORT`, `NOTIFICATION_PORT` của Hưng | Không mở |
-| Catalog, Clinical, Diagnostic | 8007, 8008, 8009 | `CATALOG_PORT`, `CLINICAL_PORT`, `DIAGNOSTIC_PORT` của Huy | Không mở trong Compose chung |
-| MongoDB, RabbitMQ, PostgreSQL, Redis | 27017, 5672, 5432, 6379 | Cổng có trong URI/DSN tương ứng; `RABBITMQ_PORT` dùng cho kết nối RabbitMQ | Không mở |
+| Thành phần | Cổng ứng dụng | Owner |
+| --- | ---: | --- |
+| Gateway | 8080 | Quân |
+| Patient, Appointment, Pharmacy | 8001–8003 | Quân |
+| Identity, Billing, Notification | 8004–8006 | Hưng |
+| Catalog, Clinical, Diagnostic | 8007–8009 | Huy |
 
-Các biến cổng service là **hợp đồng hiện tại** của Envoy, healthcheck và Dockerfile; không tự ý đổi riêng một giá trị. `GATEWAY_HOST_PORT` là cổng host duy nhất được Compose nội suy, còn cổng trong container Gateway vẫn là 8080. Compose riêng của Huy (`infra/compose/huy.catalog.yml`) mở loopback 55432, 56379, 8007, 8008, 8009 và không phải stack chung.
+Các cổng ứng dụng là hợp đồng với Gateway và healthcheck; đổi cổng phải đổi cả cấu hình định tuyến. Cổng database/broker do nhà cung cấp online cấp, không dùng cổng container làm địa chỉ kết nối. CloudAMQP TLS thường dùng `5671`; lấy host, vhost và cổng thực tế từ dashboard của broker.
 
-## Chọn kết nối local hoặc online
+## Giá trị cần điền
 
-- **Quân:** `PATIENT_MONGO_URI`, `APPOINTMENT_MONGO_URI`, `PHARMACY_MONGO_URI` trỏ đúng ba owner DB. Online dùng URI `mongodb+srv://...` do chủ DB cấp. `UMC_AMQP_URL` trỏ RabbitMQ chung; online TLS dùng `amqps://USER:PASSWORD@HOST:5671/VHOST`. Phần `VHOST` trong URL phải khớp `RABBITMQ_VHOST` của broker online, có thể khác `/umc-care` của Compose local. Đặt `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD` tương ứng. `RABBITMQ_DEFAULT_*` chỉ khởi tạo container RabbitMQ local.
-- **Huy:** `CATALOG_DATABASE_URL`, `CLINICAL_DATABASE_URL`, `DIAGNOSTIC_DATABASE_URL` là ba DSN được API, migrate và worker sử dụng trực tiếp. Online PostgreSQL dùng host/DB/user của từng owner và `sslmode=require`; không chỉ thay `*_DB_PASSWORD` vì biến đó dành cho bootstrap PostgreSQL local. Ba worker của Huy dùng `UMC_AMQP_URL` do Quân quản lý.
-- **Hưng:** mỗi nhóm `IDENTITY_DB_*`, `BILLING_DB_*`, `NOTIFICATION_DB_*` phải có `NAME`, `USER`, `PASSWORD`, `HOST`, `PORT`, `SSLMODE`. Với PostgreSQL online, đặt `SSLMODE=require`. `POSTGRES_PASSWORD` vẫn dành cho container bootstrap local. Worker Hưng dùng `UMC_AMQP_URL` của Quân trong Compose.
+1. **Quân:** mỗi `*_MONGO_URI` phải trỏ đúng database của service sở hữu. `UMC_AMQP_URL=amqps://USER:PASSWORD@HOST:PORT/VHOST` là URL broker duy nhất của nhóm. Các biến `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_VHOST`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD` phải khớp URL đó vì service Hưng còn đọc dạng tách trường. `UMC_REDIS_URL=rediss://USER:PASSWORD@HOST:PORT/0` là URL Redis chung; Compose truyền nó cho Appointment và Catalog.
+2. **Huy:** `CATALOG_DATABASE_URL`, `CLINICAL_DATABASE_URL`, `DIAGNOSTIC_DATABASE_URL` trỏ ba database Neon riêng, có `sslmode=require`. Worker Huy nhận RabbitMQ từ `UMC_AMQP_URL`; Catalog API nhận Redis từ `UMC_REDIS_URL`, cả hai do Quân quản lý.
+3. **Hưng:** mỗi bộ `IDENTITY_DB_*`, `BILLING_DB_*`, `NOTIFICATION_DB_*` có tên database, host, port, user, password và `SSLMODE=require` của Aiven. Hưng sở hữu duy nhất private key JWT và `DJANGO_SECRET_KEY`. `JWT_PRIVATE_KEY_B64` trong mẫu chưa được Compose/code tự nạp; cần giải mã thành private PEM trên máy chạy Identity. Public PEM cùng cặp cấp cho Gateway và các service xác minh, rồi tạo JWKS bằng `node tools/quan/prepare-gateway-key.js`. `JWT_ISSUER` và `JWT_AUDIENCE` phải khớp ở bên phát và bên xác minh token.
 
-Compose vẫn khởi động các container DB/RabbitMQ local để thỏa dependency và bootstrap, ngay cả khi URL ứng dụng trỏ online. Vì vậy phải giữ các biến bootstrap local hợp lệ. Chỉ đổi URL/host trong file env không chuyển dữ liệu: database online cần schema/migration, dữ liệu demo và RabbitMQ online cần vhost, exchange, queue, binding, ACL tương ứng. Không chạy seed/migration lên DB online dùng chung khi chưa thống nhất với owner.
+Mật khẩu nằm trong URI phải được percent-encode (`@` → `%40`, `/` → `%2F`). Base64 không mã hóa private key. Không commit file thật, DSN có mật khẩu, token, khóa riêng hoặc output của `docker compose config`.
 
-Ba file `.env.example` mô tả cấu hình đích **online** và chỉ chứa placeholder. Các mật khẩu bootstrap của MongoDB/PostgreSQL/RabbitMQ/Redis local không nằm trong mẫu online; Compose hiện tại vẫn yêu cầu một số biến local đó, nên chưa thể chạy trực tiếp chỉ bằng ba mẫu này. `CATALOG_REDIS_URL` và `JWT_PRIVATE_KEY_B64` cũng cần bước nạp tương ứng trong code/Compose trước khi demo. Không chép credential thật vào file mẫu hoặc README.
+## Điều kiện để demo bằng dữ liệu online
 
-### JWT và worker chung
+- Mỗi database online đã có schema/migration và dữ liệu demo tương ứng. Mỗi service chỉ truy cập database của mình; không tự chạy seed hoặc migration lên database chung khi chưa thống nhất với owner.
+- CloudAMQP đã có vhost, exchange, queue, binding và ACL cho producer/consumer. Kết nối TLS thành công chưa chứng minh message được phát và nhận.
+- JWT có một cặp khóa chung: Identity ký bằng private key; Gateway và API xác minh bằng public key/JWKS cùng cặp.
+- Redis online cấp quyền đọc/ghi cho hai namespace khóa `umc:appointment:*` và `umc:catalog:v1:*`. Catalog parse `rediss://` và dùng TLS; kiểm quyền của cùng tài khoản trên cả hai namespace trước demo.
 
-Identity ký token bằng private key tại `services/identity/jwt_private.pem` trên máy chạy service. Đặt public key cùng cặp tại `infra/certs/jwt_public.pem` cho Gateway và các API, rồi tạo JWKS theo [hướng dẫn Compose](../infra/compose/README.md). `JWT_ISSUER` và `JWT_AUDIENCE` phải khớp giữa Identity, Gateway và service xác minh. Có public key nhưng thiếu private key thì Identity không phát token thật được.
+**Trạng thái Compose:** Redis đã được nối tới URL online của Quân, nhưng `infra/compose/compose.yaml` vẫn khai báo container MongoDB, PostgreSQL và RabbitMQ cùng một số biến khởi tạo của chúng. Ba file mẫu online chưa đủ để chạy Compose đó. Không dùng lệnh `up` từ Compose hiện tại như bằng chứng toàn bộ hạ tầng đã chuyển online. Xem [hướng dẫn triển khai](../infra/compose/README.md) để biết phần còn phải đổi trước khi demo.
 
-Catalog/Clinical/Diagnostic lấy URL broker từ `UMC_AMQP_URL` của Quân trong Compose. Các service Hưng cũng đọc `UMC_AMQP_URL` chung; broker/vhost phải cấp quyền cho từng worker. Kết nối AMQP thành công chỉ xác nhận đăng nhập; cần kiểm exchange, queue, binding và quyền gửi/nhận bằng một message thật.
-
-## Quy định bổ sung env
-
-1. Mỗi biến có **một owner** và khai báo trong đúng một trong ba file. Quân quản lý Mongo/Rabbit/Appointment, Huy quản lý Catalog/Clinical/Diagnostic, Hưng quản lý Identity/Billing/Notification/PostgreSQL chung. Tránh định nghĩa trùng tên giữa ba file vì `--env-file` phía sau ghi đè file trước.
-2. Khi thêm biến, owner sửa file `env/<owner>.env.example` bằng giá trị mẫu, cập nhật Compose/code đọc biến và bổ sung mục này nếu biến ảnh hưởng kết nối hoặc cổng. File thật `env/<owner>.env` được cập nhật riêng trên máy chạy demo.
-3. Không commit ba file thật, DSN chứa mật khẩu, token hay private key. Gửi credential cho máy demo qua kênh riêng; không dán vào README, issue hoặc PR.
-4. URI phải percent-encode user/password (`@` thành `%40`, `/` thành `%2F`). Ba service dùng chung đúng broker/vhost; mỗi service chỉ truy cập DB owner của mình.
-5. Trước demo, chạy `docker compose ... config --quiet`, kiểm tra URL đã chọn bằng cách xem **tên host và cổng**, rồi thử kết nối/worker. Không in toàn bộ `docker compose config` hoặc env ra log vì sẽ lộ mật khẩu.
-
-Chạy từ gốc repo sau khi đủ ba file, khóa JWT và Mongo keyfile:
-
-```powershell
-docker compose --env-file env/quan.env --env-file env/huy.env --env-file env/hung.env -f infra/compose/compose.yaml config --quiet
-docker compose --env-file env/quan.env --env-file env/huy.env --env-file env/hung.env -f infra/compose/compose.yaml up -d --build
-```
-
-Compose dùng `env/quan.env` trực tiếp cho container RabbitMQ và `env/hung.env` cho ba service Python. Ba `--env-file` cung cấp biến để Compose nội suy cho toàn stack. `rabbitmq` và `postgres` là hostname **bên trong** Compose network; chúng không tự truy cập được từ máy khác. Khi dùng broker local với một tài khoản demo, `RABBITMQ_DEFAULT_PASS`, `RABBITMQ_PASSWORD` và mật khẩu trong `UMC_AMQP_URL` phải giống nhau. Biến cũ `RABBITMQ_ADMIN_USER/PASSWORD` không được Compose sử dụng để tạo broker account. RabbitMQ vẫn cần import `rabbitmq/definitions.json` và kiểm ACL trước khi nghiệm thu message.
-
-Không thay mật khẩu của volume DB/RabbitMQ đã khởi tạo rồi mà không cập nhật user trong DB/broker: biến `*_DEFAULT_*` và init scripts chỉ có tác dụng khi volume còn mới.
+Khi sửa biến kết nối, owner cập nhật đúng file `.env.example`, code/Compose đọc biến và tài liệu này. Ba file `.env` thật chỉ cập nhật trên máy chạy service.

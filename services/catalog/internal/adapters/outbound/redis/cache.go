@@ -49,6 +49,21 @@ func New(addr, username, password string) (*Cache, error) {
 	return &Cache{client: client}, nil
 }
 
+func NewFromURL(rawURL string) (*Cache, error) {
+	options, err := redisclient.ParseURL(rawURL)
+	if err != nil {
+		return nil, err
+	}
+	options.DialTimeout = commandTimeout
+	options.ReadTimeout = commandTimeout
+	options.WriteTimeout = commandTimeout
+	options.PoolTimeout = commandTimeout
+	options.MaxRetries = 0
+	options.ContextTimeoutEnabled = true
+	options.DisableIndentity = true
+	return &Cache{client: redisclient.NewClient(options)}, nil
+}
+
 func (c *Cache) Close() error { return c.client.Close() }
 
 func (c *Cache) Generation(ctx context.Context) (string, error) {

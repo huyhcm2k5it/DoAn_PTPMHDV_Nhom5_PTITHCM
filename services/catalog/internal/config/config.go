@@ -7,11 +7,11 @@ import (
 
 type Config struct {
 	Name, Address, DatabaseURL, JWTIssuer, JWTAudience, JWTKeyFile, LeaseKeyFile string
-	RedisAddr, RedisUsername, RedisPassword                                      string
+	RedisURL, RedisAddr, RedisUsername, RedisPassword                            string
 }
 
 func Load(name, address string) (Config, error) {
-	c := Config{Name: name, Address: address, DatabaseURL: os.Getenv("DATABASE_URL"), JWTIssuer: os.Getenv("JWT_ISSUER"), JWTAudience: os.Getenv("JWT_AUDIENCE"), JWTKeyFile: os.Getenv("JWT_PUBLIC_KEY_FILE"), LeaseKeyFile: os.Getenv("LEASE_PUBLIC_KEY_FILE"), RedisAddr: os.Getenv("REDIS_ADDR"), RedisUsername: os.Getenv("REDIS_USERNAME"), RedisPassword: os.Getenv("REDIS_PASSWORD")}
+	c := Config{Name: name, Address: address, DatabaseURL: os.Getenv("DATABASE_URL"), JWTIssuer: os.Getenv("JWT_ISSUER"), JWTAudience: os.Getenv("JWT_AUDIENCE"), JWTKeyFile: os.Getenv("JWT_PUBLIC_KEY_FILE"), LeaseKeyFile: os.Getenv("LEASE_PUBLIC_KEY_FILE"), RedisURL: os.Getenv("REDIS_URL"), RedisAddr: os.Getenv("REDIS_ADDR"), RedisUsername: os.Getenv("REDIS_USERNAME"), RedisPassword: os.Getenv("REDIS_PASSWORD")}
 	if a := os.Getenv("LISTEN_ADDR"); a != "" {
 		c.Address = a
 	}
@@ -26,7 +26,7 @@ func Load(name, address string) (Config, error) {
 	if c.LeaseKeyFile == "" {
 		c.LeaseKeyFile = c.JWTKeyFile
 	}
-	if c.RedisAddr != "" && c.RedisPassword == "" {
+	if c.RedisURL == "" && c.RedisAddr != "" && c.RedisPassword == "" {
 		return c, fmt.Errorf("REDIS_PASSWORD is required when REDIS_ADDR is configured")
 	}
 	return c, nil
