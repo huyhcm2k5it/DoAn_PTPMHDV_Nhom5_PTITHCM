@@ -83,7 +83,7 @@ class Session(models.Model):
     refresh_hash = models.CharField(max_length=255, unique=True)
     expires_at = models.DateTimeField()
     revoked_at = models.DateTimeField(null=True, blank=True)
-    device_id = models.CharField(max_length=100, blank=True)
+    device_id = models.CharField(max_length=100, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
