@@ -13,6 +13,7 @@ class User(models.Model):
         
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     phone = models.CharField(max_length=20, unique=True, help_text="Số điện thoại định danh")
+    email = models.EmailField(max_length=255, null=True, blank=True, help_text="Email nhận thông báo/OTP")
     password_hash = models.CharField(max_length=255)
     actor_type = models.CharField(
         max_length=20,
@@ -51,6 +52,7 @@ class OtpRequest(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name="otp_requests")
     phone = models.CharField(max_length=20)
+    email = models.EmailField(max_length=255, null=True, blank=True, help_text="Email nhận OTP (nếu có)")
     purpose = models.CharField(max_length=20, choices=[("REGISTER", "REGISTER"), ("RESET", "RESET")])
     code_hash = models.CharField(max_length=255)
     expires_at = models.DateTimeField()

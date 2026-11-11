@@ -12,10 +12,10 @@ class AuthPolicyTests(TestCase):
             otp = OtpRequest(user=user, phone=user.phone, purpose="REGISTER", expires_at=timezone.now()+timedelta(minutes=5))
             otp.set_code("123456"); otp.save()
             with patch("app.api.view_auth.send_otp", return_value=None):
-                response = APIClient().post("/api/v1/auth/register", {"phone":user.phone,"password":"password123"}, format="json")
-            self.assertEqual(response.status_code,409)
+                response = APIClient().post("/api/v1/auth/register", {"phone":user.phone,"email":"test@example.com","password":"password123"}, format="json")
+            self.assertEqual(getattr(response, "status_code", None),409)
             response = APIClient().post("/api/v1/auth/otp/verify", {"phone":user.phone,"purpose":"REGISTER","otpCode":"123456"},format="json")
-            self.assertEqual(response.status_code,409)
+            self.assertEqual(getattr(response, "status_code", None),409)
             user.refresh_from_db();self.assertEqual(user.status,status)
 
     def test_lease_is_not_access(self):
@@ -32,4 +32,4 @@ class ForgotPasswordTransactionTests(TransactionTestCase):
         user = User.objects.create(phone="0900077777", actor_type="PATIENT", status="ACTIVE")
         with patch("app.api.view_auth.send_otp",return_value=None):
             response = APIClient().post("/api/v1/auth/password/forgot",{"phone":user.phone},format="json")
-        self.assertEqual(response.status_code,200)
+        self.assertEqual(getattr(response, "status_code", None), 200)

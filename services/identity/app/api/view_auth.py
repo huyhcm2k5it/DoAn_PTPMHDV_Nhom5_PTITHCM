@@ -11,7 +11,9 @@ from rest_framework.response import Response
 from app.application.token_service import generate_access_token, verify_access_token, generate_authorization_lease
 from app.api.audit import record_audit
 from app.domain.models import User, OtpRequest, Session, StaffCapability
-from app.infrastructure.sms import get_sms_sender
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
+from app.infrastructure.email_sender import get_email_sender
 
 logger = logging.getLogger(__name__)
 
@@ -44,17 +46,19 @@ def validate_password(password):
         return f"Mật khẩu tối đa {MAX_PASSWORD_LENGTH} ký tự."
     return None
 
-def send_otp(phone, code, purpose, correlation_id):
+def send_otp(email, code, purpose, correlation_id):
     """Gửi OTP qua kênh đã cấu hình; trả response 503 nếu kênh lỗi."""
     try:
-        get_sms_sender().send_otp(phone, code, purpose)
+        if not email:
+            raise ValueError("Thiếu địa chỉ email nhận OTP")
+        get_email_sender().send_otp(email, code, purpose)
         return None
     except Exception:
-        logger.error("SMS adapter unavailable; correlation=%s", correlation_id)
+        logger.exception("Email adapter unavailable; correlation=%s", correlation_id)
         return Response({
             "error": {
-                "code": "SMS_UNAVAILABLE",
-                "message": "Chưa gửi được mã xác thực, vui lòng thử lại sau."
+                "code": "EMAIL_UNAVAILABLE",
+                "message": "Chưa gửi được mã xác thực qua email, vui lòng thử lại sau."
             },
             "meta": {"correlationId": correlation_id}
         }, status=503)
@@ -90,17 +94,29 @@ def register_view(request):
             "meta": {"correlationId": correlation_id}
         }, status=409)
 
+    email = str(request.data.get("email", "")).strip().lower()
+    try:
+        if not email:
+            raise ValidationError("Empty email")
+        validate_email(email)
+    except ValidationError:
+        return Response({
+            "error": {"code": "VALIDATION_ERROR", "message": "Email không hợp lệ hoặc bị bỏ trống."},
+            "meta": {"correlationId": correlation_id}
+        }, status=400)
+
     # Nếu chưa có thì tạo mới, nếu có ở dạng PENDING thì chỉ cập nhật lại mật khẩu
     if not existing_user:
-        user = User(phone=phone, actor_type="PATIENT", status="PENDING_VERIFICATION")
+        user = User(phone=phone, email=email, actor_type="PATIENT", status="PENDING_VERIFICATION")
         user.set_password(password)
         user.save()
         from app.application.access_events import publish_access
         publish_access(user)
     else:
         user = existing_user
+        user.email = email
         user.set_password(password)
-        user.save(update_fields=["password_hash"])
+        user.save(update_fields=["password_hash", "email"])
 
     # Sinh mã OTP 6 số ngẫu nhiên an toàn
     otp_code = f"{secrets.randbelow(900000) + 100000:06d}"
@@ -108,6 +124,7 @@ def register_view(request):
     otp_request = OtpRequest(
         user=user,
         phone=phone,
+        email=email,
         purpose="REGISTER",
         expires_at=expires_at,
         attempts=0
@@ -115,7 +132,7 @@ def register_view(request):
     otp_request.set_code(otp_code)
     otp_request.save()
 
-    send_error = send_otp(phone, otp_code, "REGISTER", correlation_id)
+    send_error = send_otp(email, otp_code, "REGISTER", correlation_id)
     if send_error:
         return send_error
 
@@ -243,11 +260,15 @@ def otp_resend_view(request):
     user = User.objects.select_for_update().filter(phone=phone).first()
     if purpose == "REGISTER" and (not user or user.actor_type != "PATIENT" or user.status != "PENDING_VERIFICATION"):
         return Response({"error": {"code": "ACCOUNT_NOT_ACTIVATABLE", "message": "Account cannot be activated."}}, status=409)
+
+    target_email = (user.email if user else None) or (latest_otp.email if latest_otp else None)
+
     otp_code = f"{secrets.randbelow(900000) + 100000:06d}"
     expires_at = timezone.now() + timedelta(minutes=5)
     otp_request = OtpRequest(
         user=user,
         phone=phone,
+        email=target_email,
         purpose=purpose,
         expires_at=expires_at,
         attempts=0
@@ -255,7 +276,7 @@ def otp_resend_view(request):
     otp_request.set_code(otp_code)
     otp_request.save()
 
-    send_error = send_otp(phone, otp_code, purpose, correlation_id)
+    send_error = send_otp(target_email, otp_code, purpose, correlation_id)
     if send_error:
         return send_error
 
@@ -284,11 +305,13 @@ def forgot_password_view(request):
 
     user = User.objects.select_for_update().filter(phone=phone).first()
     if user and user.status == "ACTIVE":
+        target_email = user.email
         otp_code = f"{secrets.randbelow(900000) + 100000:06d}"
         expires_at = timezone.now() + timedelta(minutes=5)
         otp_request = OtpRequest(
             user=user,
             phone=phone,
+            email=target_email,
             purpose="RESET",
             expires_at=expires_at,
             attempts=0
@@ -296,7 +319,7 @@ def forgot_password_view(request):
         otp_request.set_code(otp_code)
         otp_request.save()
         # Kênh giao lỗi không được làm lộ việc số này có tài khoản hay không
-        if send_otp(phone, otp_code, "RESET", correlation_id) is not None:
+        if send_otp(target_email, otp_code, "RESET", correlation_id) is not None:
             logger.warning("Không gửi được OTP RESET nhưng vẫn trả accepted để chống enumeration")
 
     # Luôn trả về 200 accepted theo chuẩn bảo mật chống enumeration
