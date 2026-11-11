@@ -44,20 +44,19 @@ if (-not (Test-Path -LiteralPath $huyFile)) {
     "CATALOG_DATABASE_URL=postgres://catalog_owner:$catalogPassword@postgres:5432/catalog_db?sslmode=disable"
     "CLINICAL_DATABASE_URL=postgres://clinical_owner:$clinicalPassword@postgres:5432/clinical_db?sslmode=disable"
     "DIAGNOSTIC_DATABASE_URL=postgres://diagnostic_owner:$diagnosticPassword@postgres:5432/diagnostic_db?sslmode=disable"
-    "HUY_AMQP_URL=$($quan['UMC_AMQP_URL'])"
   )
   [System.IO.File]::WriteAllLines($huyFile, $lines, [System.Text.UTF8Encoding]::new($false))
   Write-Output "Created env/huy.env with local-only generated secrets."
 }
 $huy = Read-Environment $huyFile
-foreach ($key in @("CATALOG_DATABASE_URL", "CLINICAL_DATABASE_URL", "DIAGNOSTIC_DATABASE_URL", "HUY_AMQP_URL")) {
+foreach ($key in @("CATALOG_DATABASE_URL", "CLINICAL_DATABASE_URL", "DIAGNOSTIC_DATABASE_URL")) {
   if (-not $huy[$key]) { throw "env/huy.env is missing $key" }
 }
 if (-not (Test-Path -LiteralPath $hungFile)) {
   throw "Create env/hung.env from env/hung.env.example with Hưng's values before starting Compose."
 }
 $hung = Read-Environment $hungFile
-foreach ($key in @("IDENTITY_DB_NAME", "IDENTITY_DB_USER", "IDENTITY_DB_HOST", "IDENTITY_DB_PORT", "IDENTITY_DB_SSLMODE", "BILLING_DB_NAME", "BILLING_DB_USER", "BILLING_DB_HOST", "BILLING_DB_PORT", "BILLING_DB_SSLMODE", "NOTIFICATION_DB_NAME", "NOTIFICATION_DB_USER", "NOTIFICATION_DB_HOST", "NOTIFICATION_DB_PORT", "NOTIFICATION_DB_SSLMODE", "HUNG_AMQP_URL")) {
+foreach ($key in @("IDENTITY_DB_NAME", "IDENTITY_DB_USER", "IDENTITY_DB_HOST", "IDENTITY_DB_PORT", "IDENTITY_DB_SSLMODE", "BILLING_DB_NAME", "BILLING_DB_USER", "BILLING_DB_HOST", "BILLING_DB_PORT", "BILLING_DB_SSLMODE", "NOTIFICATION_DB_NAME", "NOTIFICATION_DB_USER", "NOTIFICATION_DB_HOST", "NOTIFICATION_DB_PORT", "NOTIFICATION_DB_SSLMODE")) {
   if (-not $hung[$key]) { throw "env/hung.env is missing $key" }
 }
 Push-Location $repoRoot

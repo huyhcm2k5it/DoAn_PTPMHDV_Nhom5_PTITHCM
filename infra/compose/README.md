@@ -6,9 +6,11 @@
 
 Docker Hub lưu image, **không chứa dữ liệu trong named volumes** `mongo_data`, `postgres_be_data`, `rabbitmq_data`. Mỗi máy chạy Compose riêng sẽ có database và broker riêng, nên dữ liệu/event không tự xuất hiện trên máy người khác. Muốn cùng thấy dữ liệu, nhóm phải dùng chung DB/broker có địa chỉ truy cập được và credential thống nhất, hoặc thực hiện backup/restore/seed vào từng môi trường. Dữ liệu Huy đã nhập trên Neon chỉ có ở database Neon tương ứng; Compose mặc định vẫn trỏ Catalog/Clinical/Diagnostic về PostgreSQL container local.
 
-Compose hiện không publish cổng RabbitMQ `5672`/`15672` ra host. Tên `rabbitmq` trong `UMC_AMQP_URL` chỉ phân giải bên trong Compose network. Để service ở máy khác kết nối cùng broker, owner hạ tầng phải cung cấp host/port truy cập được, vhost `/umc-care`, user/password và ACL tương ứng, import `rabbitmq/definitions.json`, rồi cấu hình URL của từng worker. Ba file thật trong `env/` không có trong Git; xem [mẫu theo owner](../../env/README.md).
+Compose hiện không publish cổng RabbitMQ `5672`/`15672` ra host. Tên `rabbitmq` trong URL local chỉ phân giải bên trong Compose network. Để service ở máy khác kết nối cùng broker, owner hạ tầng phải cung cấp host/port truy cập được, vhost thực tế, user/password và ACL tương ứng; nạp topology tương ứng từ `rabbitmq/definitions.json`, rồi cấu hình URL của từng worker. Vhost online có thể khác `/umc-care` của Compose local. Ba file thật trong `env/` không có trong Git; xem [mẫu theo owner](../../env/README.md).
 
 Bản cấu hình đã qua Compose structural validation. Build image, health của 9 service và E2E live phải được xác nhận trên máy có Docker engine chạy. Go API/worker/migrate đã có trong cùng private network; health thành công vẫn chưa chứng minh hành trình nghiệp vụ.
+
+`docker compose ... config --quiet` chỉ kiểm cú pháp và biến bắt buộc; nó không kết nối DB, broker hay kiểm cặp khóa JWT. Trước khi `up`, xác nhận `services/identity/jwt_private.pem` tồn tại trên máy Identity và khớp `infra/certs/jwt_public.pem`. Với DB online, kiểm schema/migration riêng cho từng owner; không suy ra database đã sẵn sàng chỉ từ việc TCP hoặc TLS kết nối được.
 
 ## Chuẩn bị trên máy local
 
@@ -21,7 +23,7 @@ Bản cấu hình đã qua Compose structural validation. Build image, health c�
 4. Đặt public key Identity thật vào infra/certs/jwt_public.pem và chạy
    `node tools/quan/prepare-gateway-key.js`. Envoy cần JWKS JSON, không đọc PEM như JWKS.
    Private key chỉ ở owner Identity, không commit.
-5. `env/quan.env` có Mongo owner URI, AMQP URL/host/cổng và Appointment Redis; `env/huy.env` có ba PostgreSQL DSN và `HUY_AMQP_URL`; `env/hung.env` có DB host/cổng/SSL mode cùng `HUNG_AMQP_URL`. Bảng cổng service 8001–8009 và quy định bổ sung env nằm trong [env README](../../env/README.md).
+5. `env/quan.env` có Mongo owner URI, `UMC_AMQP_URL` dùng chung cho worker Quân và Huy, AMQP host/cổng và Appointment Redis; `env/huy.env` có ba PostgreSQL DSN; `env/hung.env` có DB host/cổng/SSL mode và cùng `UMC_AMQP_URL` của Quân. Bảng cổng service 8001–8009 và quy định bổ sung env nằm trong [env README](../../env/README.md).
    Dùng mật khẩu URL-safe. Giá trị phải khớp user đã khởi tạo trong volume cũ;
    init scripts không tự thay mật khẩu DB cũ.
 6. Với broker cũ, xem migration quorum trong tests/e2e/recovery.md trước khi bật worker mới.

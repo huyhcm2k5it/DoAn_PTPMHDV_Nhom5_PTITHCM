@@ -260,7 +260,7 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/umc-care}
-      UMC_AMQP_URL: ${HUNG_AMQP_URL:?set Hung AMQP URL}
+      UMC_AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
       JWT_PRIVATE_KEY_PATH: /run/secrets/identity_private.pem
     volumes: &id003
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
@@ -294,7 +294,7 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/umc-care}
-      UMC_AMQP_URL: ${HUNG_AMQP_URL:?set Hung AMQP URL}
+      UMC_AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
   billing-worker:
@@ -325,7 +325,7 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/umc-care}
-      UMC_AMQP_URL: ${HUNG_AMQP_URL:?set Hung AMQP URL}
+      UMC_AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
   notification:
@@ -357,7 +357,7 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/umc-care}
-      UMC_AMQP_URL: ${HUNG_AMQP_URL:?set Hung AMQP URL}
+      UMC_AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
   notification-worker:
@@ -386,7 +386,7 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/umc-care}
-      UMC_AMQP_URL: ${HUNG_AMQP_URL:?set Hung AMQP URL}
+      UMC_AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
   gateway:
@@ -482,7 +482,7 @@ services:
     - /worker
     environment:
       DATABASE_URL: ${CATALOG_DATABASE_URL:?set Catalog PostgreSQL URL}
-      AMQP_URL: ${HUY_AMQP_URL:?set Huy AMQP URL}
+      AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
       CATALOG_DECLARE_TOPOLOGY: 'true'
     depends_on:
       catalog-migrate:
@@ -527,7 +527,7 @@ services:
     - /worker
     environment:
       DATABASE_URL: ${CLINICAL_DATABASE_URL:?set Clinical PostgreSQL URL}
-      RABBITMQ_URL: ${HUY_AMQP_URL:?set Huy AMQP URL}
+      RABBITMQ_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
       CLINICAL_DECLARE_TOPOLOGY: '1'
     depends_on:
       clinical-migrate:
@@ -572,7 +572,7 @@ services:
     - /worker
     environment:
       DATABASE_URL: ${DIAGNOSTIC_DATABASE_URL:?set Diagnostic PostgreSQL URL}
-      RABBITMQ_URL: ${HUY_AMQP_URL:?set Huy AMQP URL}
+      RABBITMQ_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
       DIAGNOSTIC_DECLARE_TOPOLOGY: '1'
     depends_on:
       diagnostic-migrate:

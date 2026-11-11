@@ -22,11 +22,19 @@ Các biến cổng service là **hợp đồng hiện tại** của Envoy, healt
 
 ## Chọn kết nối local hoặc online
 
-- **Quân:** `PATIENT_MONGO_URI`, `APPOINTMENT_MONGO_URI`, `PHARMACY_MONGO_URI` trỏ đúng ba owner DB. Online dùng URI `mongodb+srv://...` do chủ DB cấp. `UMC_AMQP_URL` trỏ một RabbitMQ chung; online TLS dùng `amqps://...:5671/%2Fumc-care`, đồng thời đặt `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_VHOST`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD` tương ứng. `RABBITMQ_DEFAULT_*` chỉ khởi tạo container RabbitMQ local.
-- **Huy:** `CATALOG_DATABASE_URL`, `CLINICAL_DATABASE_URL`, `DIAGNOSTIC_DATABASE_URL` là ba DSN được API, migrate và worker sử dụng trực tiếp. Online PostgreSQL dùng host/DB/user của từng owner và `sslmode=require`; không chỉ thay `*_DB_PASSWORD` vì biến đó dành cho bootstrap PostgreSQL local. `HUY_AMQP_URL` là URL RabbitMQ cho ba worker của Huy.
-- **Hưng:** mỗi nhóm `IDENTITY_DB_*`, `BILLING_DB_*`, `NOTIFICATION_DB_*` phải có `NAME`, `USER`, `PASSWORD`, `HOST`, `PORT`, `SSLMODE`. Với PostgreSQL online, đặt `SSLMODE=require`. `POSTGRES_PASSWORD` vẫn dành cho container bootstrap local. `HUNG_AMQP_URL` là URL RabbitMQ cho ba service của Hưng, hỗ trợ `amqps://`.
+- **Quân:** `PATIENT_MONGO_URI`, `APPOINTMENT_MONGO_URI`, `PHARMACY_MONGO_URI` trỏ đúng ba owner DB. Online dùng URI `mongodb+srv://...` do chủ DB cấp. `UMC_AMQP_URL` trỏ RabbitMQ chung; online TLS dùng `amqps://USER:PASSWORD@HOST:5671/VHOST`. Phần `VHOST` trong URL phải khớp `RABBITMQ_VHOST` của broker online, có thể khác `/umc-care` của Compose local. Đặt `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD` tương ứng. `RABBITMQ_DEFAULT_*` chỉ khởi tạo container RabbitMQ local.
+- **Huy:** `CATALOG_DATABASE_URL`, `CLINICAL_DATABASE_URL`, `DIAGNOSTIC_DATABASE_URL` là ba DSN được API, migrate và worker sử dụng trực tiếp. Online PostgreSQL dùng host/DB/user của từng owner và `sslmode=require`; không chỉ thay `*_DB_PASSWORD` vì biến đó dành cho bootstrap PostgreSQL local. Ba worker của Huy dùng `UMC_AMQP_URL` do Quân quản lý.
+- **Hưng:** mỗi nhóm `IDENTITY_DB_*`, `BILLING_DB_*`, `NOTIFICATION_DB_*` phải có `NAME`, `USER`, `PASSWORD`, `HOST`, `PORT`, `SSLMODE`. Với PostgreSQL online, đặt `SSLMODE=require`. `POSTGRES_PASSWORD` vẫn dành cho container bootstrap local. Worker Hưng dùng `UMC_AMQP_URL` của Quân trong Compose.
 
 Compose vẫn khởi động các container DB/RabbitMQ local để thỏa dependency và bootstrap, ngay cả khi URL ứng dụng trỏ online. Vì vậy phải giữ các biến bootstrap local hợp lệ. Chỉ đổi URL/host trong file env không chuyển dữ liệu: database online cần schema/migration, dữ liệu demo và RabbitMQ online cần vhost, exchange, queue, binding, ACL tương ứng. Không chạy seed/migration lên DB online dùng chung khi chưa thống nhất với owner.
+
+Ba file `.env.example` mô tả cấu hình đích **online** và chỉ chứa placeholder. Các mật khẩu bootstrap của MongoDB/PostgreSQL/RabbitMQ/Redis local không nằm trong mẫu online; Compose hiện tại vẫn yêu cầu một số biến local đó, nên chưa thể chạy trực tiếp chỉ bằng ba mẫu này. `CATALOG_REDIS_URL` và `JWT_PRIVATE_KEY_B64` cũng cần bước nạp tương ứng trong code/Compose trước khi demo. Không chép credential thật vào file mẫu hoặc README.
+
+### JWT và worker chung
+
+Identity ký token bằng private key tại `services/identity/jwt_private.pem` trên máy chạy service. Đặt public key cùng cặp tại `infra/certs/jwt_public.pem` cho Gateway và các API, rồi tạo JWKS theo [hướng dẫn Compose](../infra/compose/README.md). `JWT_ISSUER` và `JWT_AUDIENCE` phải khớp giữa Identity, Gateway và service xác minh. Có public key nhưng thiếu private key thì Identity không phát token thật được.
+
+Catalog/Clinical/Diagnostic lấy URL broker từ `UMC_AMQP_URL` của Quân trong Compose. Các service Hưng cũng đọc `UMC_AMQP_URL` chung; broker/vhost phải cấp quyền cho từng worker. Kết nối AMQP thành công chỉ xác nhận đăng nhập; cần kiểm exchange, queue, binding và quyền gửi/nhận bằng một message thật.
 
 ## Quy định bổ sung env
 
