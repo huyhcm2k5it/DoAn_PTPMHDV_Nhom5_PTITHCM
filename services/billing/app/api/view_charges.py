@@ -119,14 +119,17 @@ def charges_list_view(request):
     """BI-013: CASHIER xem danh sách khoản thu theo trạng thái và thời gian."""
     correlation_id = get_correlation_id(request)
     page, limit, error = parse_pagination(request)
-    if error:
+    if error is not None:
         return error
     state, error = parse_state(request, CHARGE_STATES)
-    if error:
+    if error is not None:
         return error
     parsed_from, parsed_to, error = parse_window(request)
-    if error:
+    if error is not None:
         return error
+
+    assert page is not None
+    assert limit is not None
 
     queryset = Charge.objects.all().order_by("-created_at")
     if state:
@@ -173,6 +176,10 @@ def charge_detail_view(request, charge_id):
     latest_saga = SettlementSaga.objects.filter(charge=charge).order_by("-created_at").first()
     latest_refund = Refund.objects.filter(charge=charge).order_by("-updated_at").first()
     latest_receipt = Receipt.objects.filter(charge=charge).order_by("-issued_at").first()
+    latest_receipt_id = str(latest_receipt.id) if latest_receipt else None
+    latest_payment_paid_at = None
+    if latest_payment is not None:
+        latest_payment_paid_at = latest_payment.paid_at.isoformat() if latest_payment.paid_at else None
 
     return Response({
         "data": {
@@ -191,14 +198,14 @@ def charge_detail_view(request, charge_id):
             },
             "latestPayment": {
                 "id": str(latest_payment.id),
-                "receiptId": str(latest_receipt.id) if latest_receipt else None,
+                "receiptId": latest_receipt_id,
                 "transactionId": latest_payment.transaction_id,
                 "amountVnd": latest_payment.amount_vnd,
                 "state": latest_payment.state,
                 "method": latest_payment.method,
-                "paidAt": latest_payment.paid_at.isoformat() if latest_payment.paid_at else None,
+                "paidAt": latest_payment_paid_at,
             } if latest_payment else None,
-            "receiptId": str(latest_receipt.id) if latest_receipt else None,
+            "receiptId": latest_receipt_id,
             "saga": {
                 "id": str(latest_saga.id),
                 "state": latest_saga.state,
@@ -218,11 +225,14 @@ def patient_charges_list_view(request, patient_id):
     """BI-003: Lấy các khoản thu của hồ sơ bệnh nhân theo quyền."""
     correlation_id = get_correlation_id(request)
     page, limit, error = parse_pagination(request)
-    if error:
+    if error is not None:
         return error
     state, error = parse_state(request, CHARGE_STATES)
-    if error:
+    if error is not None:
         return error
+
+    assert page is not None
+    assert limit is not None
 
     if not can_read_patient_resource(request.principal, patient_id):
         return patient_scope_error(request)

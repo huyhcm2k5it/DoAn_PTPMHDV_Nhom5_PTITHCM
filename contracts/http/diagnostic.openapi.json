@@ -1918,8 +1918,7 @@
         "operationId": "DI_013",
         "security": [
           {
-            "bearerAuth": [],
-            "authorizationLease": []
+            "bearerAuth": []
           }
         ],
         "parameters": [
@@ -2050,13 +2049,6 @@
               }
             }
           }
-        },
-        "x-authorization-lease": {
-          "action": "DI-013",
-          "maxAgeSeconds": 30,
-          "expiryLeewaySeconds": 0,
-          "expiredStatus": 401,
-          "expiredCode": "AUTHZ_LEASE_EXPIRED"
         }
       }
     }

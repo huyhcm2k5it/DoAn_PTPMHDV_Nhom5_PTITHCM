@@ -15,7 +15,7 @@ from app.infrastructure.sms import get_sms_sender
 
 logger = logging.getLogger(__name__)
 
-PHONE_PATTERN = re.compile(r"^[0-9]{9,11}$")
+PHONE_PATTERN = re.compile(r"^\d{9,11}$")
 MIN_PASSWORD_LENGTH = 8
 MAX_PASSWORD_LENGTH = 128
 MAX_FAILED_LOGINS = 5
