@@ -5,6 +5,7 @@ import random
 import time
 import pika
 from django.core.management.base import BaseCommand
+from django.db import connections
 from django.utils import timezone
 from app.domain.models import IdentityOutbox
 
@@ -48,5 +49,9 @@ class Command(BaseCommand):
                 time.sleep(delay+random.uniform(0,0.5))
                 delay=min(delay*2,15)
             finally:
-                if conn and conn.is_open:
-                    conn.close()
+                try:
+                    if conn and conn.is_open:
+                        conn.close()
+                finally:
+                    # Workers have no request lifecycle to discard broken DB sessions.
+                    connections.close_all()

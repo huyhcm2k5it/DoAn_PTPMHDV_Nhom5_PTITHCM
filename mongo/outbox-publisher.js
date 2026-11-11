@@ -45,9 +45,11 @@ async function publishOutbox({ connection, channel, destination, now = new Date(
       channel.publish(
         target.exchange,
         target.key,
-        row.delivery_content
-          ? Buffer.from(row.delivery_content)
-          : Buffer.from(JSON.stringify(body)),
+        typeof row.delivery_content_base64 === 'string'
+          ? Buffer.from(row.delivery_content_base64, 'base64')
+          : typeof row.delivery_content === 'string'
+            ? Buffer.from(row.delivery_content)
+            : Buffer.from(JSON.stringify(body)),
         {
           persistent: true,
           mandatory: true,

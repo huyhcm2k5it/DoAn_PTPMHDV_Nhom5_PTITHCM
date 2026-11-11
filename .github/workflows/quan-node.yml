@@ -131,11 +131,18 @@ jobs:
         run: |
           npm ci --ignore-scripts --prefix tests/mongo
           npm ci --ignore-scripts --prefix services/pharmacy
+          npm ci --ignore-scripts --prefix services/patient
+      - name: Prepare an isolated Patient broker vhost
+        run: |
+          docker exec '${{ job.services.rabbitmq.id }}' rabbitmqctl add_vhost quan-ci-patient
+          docker exec '${{ job.services.rabbitmq.id }}' rabbitmqctl set_permissions -p quan-ci-patient quan-ci '.*' '.*' '.*'
       - name: Real RabbitMQ producer receiver and restart tests
         working-directory: tests/mongo
         env:
           TEST_AMQP_URL: amqp://quan-ci:isolated-test-only@127.0.0.1:5672/quan-ci-pharmacy
-        run: node --test pharmacy-broker.integration.js
+        run: |
+          node --test --test-concurrency=1 pharmacy-broker.integration.js
+          TEST_AMQP_URL=amqp://quan-ci:isolated-test-only@127.0.0.1:5672/quan-ci-patient node --test --test-concurrency=1 patient-broker.integration.js
 
   contracts:
     runs-on: ubuntu-latest

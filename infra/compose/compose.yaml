@@ -145,7 +145,7 @@ services:
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
       JWT_ISSUER: umc-care-identity
       JWT_AUDIENCE: umc-care-services
-      APPOINTMENT_REDIS_URL: redis://appointment:${APPOINTMENT_REDIS_PASSWORD}@redis-catalog:6379
+      APPOINTMENT_REDIS_URL: ${UMC_REDIS_URL:?set shared online Redis URL from Quân}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
     depends_on:
@@ -260,7 +260,7 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/umc-care}
-      UMC_AMQP_URL: ${HUNG_AMQP_URL:?set Hung AMQP URL}
+      UMC_AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
       JWT_PRIVATE_KEY_PATH: /run/secrets/identity_private.pem
     volumes: &id003
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
@@ -294,7 +294,7 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/umc-care}
-      UMC_AMQP_URL: ${HUNG_AMQP_URL:?set Hung AMQP URL}
+      UMC_AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
   billing-worker:
@@ -325,7 +325,7 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/umc-care}
-      UMC_AMQP_URL: ${HUNG_AMQP_URL:?set Hung AMQP URL}
+      UMC_AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
   notification:
@@ -357,7 +357,7 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/umc-care}
-      UMC_AMQP_URL: ${HUNG_AMQP_URL:?set Hung AMQP URL}
+      UMC_AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
   notification-worker:
@@ -386,7 +386,7 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/umc-care}
-      UMC_AMQP_URL: ${HUNG_AMQP_URL:?set Hung AMQP URL}
+      UMC_AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
   gateway:
@@ -397,7 +397,6 @@ services:
     - 127.0.0.1:${GATEWAY_HOST_PORT:-8080}:8080
     volumes:
     - ../../.runtime/jwks.json:/etc/envoy/jwks.json:ro
-    - ../../envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
     depends_on:
       identity:
         condition: service_healthy
@@ -428,23 +427,6 @@ services:
     networks:
     - private
     restart: unless-stopped
-  redis-catalog:
-    image: redis:7.4-alpine
-    environment:
-      CATALOG_REDIS_PASSWORD: ${CATALOG_REDIS_PASSWORD:?set CATALOG_REDIS_PASSWORD}
-      APPOINTMENT_REDIS_PASSWORD: ${APPOINTMENT_REDIS_PASSWORD:?set APPOINTMENT_REDIS_PASSWORD}
-    entrypoint:
-    - /bin/sh
-    - -c
-    command:
-    - printf 'user default off\nuser catalog on >%s ~umc:catalog:v1:* +hello +auth
-      +ping +get +set +setnx\nuser appointment on >%s ~umc:appointment:available:v1:*
-      +hello +auth +ping +get +set +del +scan\n' "$${CATALOG_REDIS_PASSWORD}" "$${APPOINTMENT_REDIS_PASSWORD}"
-      > /tmp/cache-users.acl && exec redis-server --aclfile /tmp/cache-users.acl --maxmemory
-      128mb --maxmemory-policy allkeys-lru
-    networks:
-    - private
-    restart: unless-stopped
   catalog-migrate:
     build: ../../services/catalog
     image: umc-care-catalog:local
@@ -463,9 +445,7 @@ services:
     environment:
       DATABASE_URL: ${CATALOG_DATABASE_URL:?set Catalog PostgreSQL URL}
       LISTEN_ADDR: :${CATALOG_PORT:?set CATALOG_PORT}
-      REDIS_ADDR: redis-catalog:6379
-      REDIS_USERNAME: catalog
-      REDIS_PASSWORD: ${CATALOG_REDIS_PASSWORD}
+      REDIS_URL: ${UMC_REDIS_URL:?set shared online Redis URL from Quân}
       JWT_ISSUER: umc-care-identity
       JWT_AUDIENCE: umc-care-services
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
@@ -483,7 +463,7 @@ services:
     - /worker
     environment:
       DATABASE_URL: ${CATALOG_DATABASE_URL:?set Catalog PostgreSQL URL}
-      AMQP_URL: ${HUY_AMQP_URL:?set Huy AMQP URL}
+      AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
       CATALOG_DECLARE_TOPOLOGY: 'true'
     depends_on:
       catalog-migrate:
@@ -528,7 +508,7 @@ services:
     - /worker
     environment:
       DATABASE_URL: ${CLINICAL_DATABASE_URL:?set Clinical PostgreSQL URL}
-      RABBITMQ_URL: ${HUY_AMQP_URL:?set Huy AMQP URL}
+      RABBITMQ_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
       CLINICAL_DECLARE_TOPOLOGY: '1'
     depends_on:
       clinical-migrate:
@@ -573,7 +553,7 @@ services:
     - /worker
     environment:
       DATABASE_URL: ${DIAGNOSTIC_DATABASE_URL:?set Diagnostic PostgreSQL URL}
-      RABBITMQ_URL: ${HUY_AMQP_URL:?set Huy AMQP URL}
+      RABBITMQ_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
       DIAGNOSTIC_DECLARE_TOPOLOGY: '1'
     depends_on:
       diagnostic-migrate:
@@ -600,7 +580,8 @@ services:
     - private
     restart: unless-stopped
 networks:
-  private: {}
+  private:
+    internal: false
 volumes:
   mongo_data: null
   rabbitmq_data: null

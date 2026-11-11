@@ -14,7 +14,7 @@ async function publishPatientOutboxBatch({
   const records = await connection
     .collection('outbox')
     .find({
-      message_type: 'PatientAccessChanged',
+      message_type: { $in: ['PatientAccessChanged', 'DeliveryQuarantined'] },
       published_at: null,
       $and: [
         {
@@ -29,6 +29,15 @@ async function publishPatientOutboxBatch({
   await channel.assertExchange(exchange, 'topic', { durable: true });
   let published = 0;
   for (const record of records) {
+    const quarantine = record.message_type === 'DeliveryQuarantined';
+    const destinationExchange = quarantine
+      ? 'umc.deadletters.patient.v1'
+      : exchange;
+    const destinationKey = quarantine ? 'patient.quarantine.v1' : routingKey;
+    const messageId = record.original_message_id || record.message_id;
+    await channel.assertExchange(destinationExchange, 'topic', {
+      durable: true,
+    });
     const leaseUntil = new Date(now.getTime() + 30 * 1000);
     const claimed = await connection.collection('outbox').updateOne(
       {
@@ -62,17 +71,26 @@ async function publishPatientOutboxBatch({
     );
     let returned = false;
     const onReturn = (message) => {
-      if (message?.properties?.messageId === record.message_id) returned = true;
+      if (message?.properties?.messageId === messageId) returned = true;
     };
     channel.on?.('return', onReturn);
     try {
-      channel.publish(exchange, routingKey, body, {
-        persistent: true,
-        mandatory: true,
-        messageId: record.message_id,
-        type: record.message_type,
-        headers: { workerId },
-      });
+      channel.publish(
+        destinationExchange,
+        destinationKey,
+        quarantine
+          ? typeof record.delivery_content_base64 === 'string'
+            ? Buffer.from(record.delivery_content_base64, 'base64')
+            : Buffer.from(record.delivery_content)
+          : body,
+        {
+          persistent: true,
+          mandatory: true,
+          messageId,
+          type: record.message_type,
+          headers: { workerId },
+        },
+      );
       if (channel.waitForConfirms) await channel.waitForConfirms();
       if (returned) throw new Error('OUTBOX_UNROUTABLE');
     } catch (error) {

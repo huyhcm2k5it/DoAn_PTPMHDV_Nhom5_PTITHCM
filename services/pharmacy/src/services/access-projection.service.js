@@ -32,9 +32,17 @@ async function applyAccessProjection({
       !['PATIENT', 'DOCTOR', 'STAFF'].includes(p.actorType) ||
       !Array.isArray(p.capabilities) ||
       p.capabilities.some((c) => typeof c !== 'string') ||
-      !['ACTIVE', 'INACTIVE', 'REVOKED', 'LOCKED', 'DISABLED'].includes(
-        p.status,
-      )
+      ![
+        'ACTIVE',
+        'UNVERIFIED',
+        'BLOCKED',
+        // Accept already queued snapshots from before Identity canonicalized status.
+        'PENDING_VERIFICATION',
+        'INACTIVE',
+        'REVOKED',
+        'LOCKED',
+        'DISABLED',
+      ].includes(p.status)
     )
       throw failure(
         400,
