@@ -1,12 +1,12 @@
 # RabbitMQ
 
-RabbitMQ chạy trong private Compose network, dùng vhost `/umc-care`. [definitions.json](definitions.json) chứa exchange, quorum queue và binding cho cả 9 service. Compose không tự import file này hoặc tự cấp ACL publisher/consumer: owner broker phải import và cấp quyền trước khi chạy worker.
+Quân quản lý một broker CloudAMQP online, một vhost và `UMC_AMQP_URL` dùng chung cho 9 service. URL dùng `amqps://` với TLS; host, cổng và vhost lấy từ CloudAMQP. [definitions.json](definitions.json) chứa exchange, quorum queue và binding. Owner broker đối chiếu định nghĩa với vhost online, import topology và cấp ACL publisher/consumer trước khi chạy worker.
 
-Compose không publish `5672`/`15672` ra host. Worker trong cùng Compose dùng hostname `rabbitmq`; service chạy trên máy khác cần một broker reachable và URL/credential/vhost do owner hạ tầng cấp. Chạy mỗi người một RabbitMQ local tạo ra các broker tách biệt, message không tự chuyển giữa chúng. Docker Hub chỉ phân phối image, không đồng bộ queue hay dữ liệu broker.
+Hưng còn đọc `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_VHOST`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD`; các biến này phải chỉ cùng broker/vhost với `UMC_AMQP_URL`. Giá trị thật nằm trong `env/quan.env` và không được commit. Compose hiện vẫn dựng RabbitMQ container; xem [giới hạn triển khai online](../infra/compose/README.md).
 
 - `umc.commands.appointment.v1` / `billing.request-charge.v1` -> `cmd.billing.v1`.
 - `umc.commands.billing.v1` and `umc.commands.clinical.v1` -> `cmd.appointment.v1`.
 - Billing/Clinical events -> `evt.appointment.v1`; Identity/Patient/Catalog projections -> dedicated Appointment queues.
 - Appointment failures -> durable `dlq.appointment.v1` through `umc.deadletters.appointment.v1`.
 
-Các route có trong JSON chưa chứng minh message đã chạy thật. Khi nghiệm thu, kiểm publisher confirm/mandatory return, consumer ACK sau commit, retry/quarantine và replay trên broker cô lập. Credential local của broker và worker nằm trong [env/quan.env](../env/README.md); file thật không commit.
+Các route có trong JSON chưa chứng minh message đã chạy thật. Khi nghiệm thu, kiểm publisher confirm/mandatory return, consumer ACK sau commit, retry/quarantine và replay bằng một message thật trên broker dùng cho demo.

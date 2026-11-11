@@ -1,80 +1,25 @@
-# Stack chung UMC Care — bàn giao tuần 4–5
+# Triển khai UMC Care với dịch vụ dữ liệu online
 
-## Docker image, dữ liệu và máy của từng thành viên
+Mục tiêu demo của nhóm là dùng cùng MongoDB Atlas, Neon, Aiven, CloudAMQP và một Redis online để ba máy thấy cùng dữ liệu và sự kiện. Docker Hub chỉ phân phối image ứng dụng; image không đồng bộ database hoặc queue. Mỗi service phải dùng credential và database đúng owner. Danh sách biến nằm ở [env theo owner](../../env/README.md).
 
-`docker compose --env-file env/quan.env --env-file env/huy.env --env-file env/hung.env -f infra/compose/compose.yaml up -d --build` tải base image (MongoDB, PostgreSQL, RabbitMQ, Redis) nếu máy chưa có và **build image ứng dụng từ source tại máy**. Không cần push image ứng dụng lên Docker Hub để chạy Compose local. Chỉ cần registry/push/pull nếu nhóm chọn phân phối image đã build thay cho việc build từ source.
+## Chuẩn bị theo thứ tự
 
-Docker Hub lưu image, **không chứa dữ liệu trong named volumes** `mongo_data`, `postgres_be_data`, `rabbitmq_data`. Mỗi máy chạy Compose riêng sẽ có database và broker riêng, nên dữ liệu/event không tự xuất hiện trên máy người khác. Muốn cùng thấy dữ liệu, nhóm phải dùng chung DB/broker có địa chỉ truy cập được và credential thống nhất, hoặc thực hiện backup/restore/seed vào từng môi trường. Dữ liệu Huy đã nhập trên Neon chỉ có ở database Neon tương ứng; Compose mặc định vẫn trỏ Catalog/Clinical/Diagnostic về PostgreSQL container local.
+1. Quân cấp ba MongoDB URI riêng, **một** `UMC_REDIS_URL` cho Appointment và Catalog, cùng **một** `UMC_AMQP_URL` CloudAMQP; xác nhận host, TLS port, vhost, ACL và topology RabbitMQ.
+2. Huy cấp ba Neon URL riêng cho Catalog, Clinical, Diagnostic. Chạy migration đúng từng database trước khi bật API/worker.
+3. Hưng cấp ba bộ thông tin Aiven cho Identity, Billing, Notification, private key JWT và cấu hình SMS. Public key cùng cặp phải được đặt tại `infra/certs/jwt_public.pem`; chạy `node tools/quan/prepare-gateway-key.js` để tạo JWKS cho Gateway. Không đưa private key lên Git.
+4. Mỗi owner tạo file `.env` thật từ mẫu của mình, thay placeholder và giữ file đó ngoài Git. Kiểm tra DNS, TLS, quyền đăng nhập, schema và dữ liệu demo trên từng nhà cung cấp. Dùng cùng broker/vhost cho tất cả worker.
+5. Khởi chạy migrate, API và worker theo thứ tự phụ thuộc. Publisher, expiry và reconcile chạy ở worker riêng; HTTP health không xác nhận outbox đã được xử lý. Kiểm một hành trình có JWT thật, dữ liệu đọc được từ database online và message đi qua CloudAMQP đến consumer.
 
-Compose hiện không publish cổng RabbitMQ `5672`/`15672` ra host. Tên `rabbitmq` trong `UMC_AMQP_URL` chỉ phân giải bên trong Compose network. Để service ở máy khác kết nối cùng broker, owner hạ tầng phải cung cấp host/port truy cập được, vhost `/umc-care`, user/password và ACL tương ứng, import `rabbitmq/definitions.json`, rồi cấu hình URL của từng worker. Ba file thật trong `env/` không có trong Git; xem [mẫu theo owner](../../env/README.md).
+## Giới hạn của Compose hiện tại
 
-Bản cấu hình đã qua Compose structural validation. Build image, health của 9 service và E2E live phải được xác nhận trên máy có Docker engine chạy. Go API/worker/migrate đã có trong cùng private network; health thành công vẫn chưa chứng minh hành trình nghiệp vụ.
+`compose.yaml` đã truyền `UMC_REDIS_URL` của Quân cho Appointment và Catalog qua TLS. Nó vẫn dựng MongoDB, PostgreSQL và RabbitMQ container, chạy bootstrap tương ứng và yêu cầu một số mật khẩu khởi tạo. Vì vậy chỉ điền ba `.env.example` online rồi chạy Compose **chưa tạo ra stack online hoàn chỉnh**. Trước demo online bằng Compose, cần chuyển các dependency/healthcheck của hạ tầng sang dịch vụ được quản lý, bỏ bootstrap dữ liệu container không dùng. `JWT_PRIVATE_KEY_B64` cũng chưa được tự giải mã bởi Compose. Chủ từng phần cần hoàn thiện các bước này trong code/Compose; README không thay thế được cấu hình chạy thật.
 
-## Chuẩn bị trên máy local
+Lệnh `docker compose ... config --quiet` chỉ kiểm cú pháp và biến bắt buộc, không kiểm kết nối DB, broker, quyền, schema hay cặp khóa JWT. Không in toàn bộ cấu hình sau nội suy vì có thể lộ credential. Không lấy kết quả health hoặc kết nối TCP/TLS làm bằng chứng hành trình nghiệp vụ đã thông suốt.
 
-1. Cài dependencies theo lockfile: npm ci ở services/patient, services/appointment, services/pharmacy,
-   tests/mongo và apps/web. Node theo CI là 24.14.0.
-2. Mỗi owner tạo file của mình từ `env/quan.env.example`, `env/huy.env.example`, `env/hung.env.example`.
-   Quân có thể dùng `scripts/dev/bootstrap-local.ps1` để tạo `env/quan.env` và Mongo keyfile local; `tools/quan/prepare-stack.ps1` tạo `env/huy.env` nếu thiếu, giữ file đã có và yêu cầu `env/hung.env` do Hưng chuẩn bị.
-3. Hưng điền `env/hung.env`: DB host trong Compose là `postgres`, broker host là `rabbitmq` và đúng vhost/credentials từ `env/quan.env`.
-   Đối chiếu infra/compose/postgres/hung/init.sql; không dùng mật khẩu placeholder để nghiệm thu.
-4. Đặt public key Identity thật vào infra/certs/jwt_public.pem và chạy
-   `node tools/quan/prepare-gateway-key.js`. Envoy cần JWKS JSON, không đọc PEM như JWKS.
-   Private key chỉ ở owner Identity, không commit.
-5. `env/quan.env` có Mongo owner URI, AMQP URL/host/cổng và Appointment Redis; `env/huy.env` có ba PostgreSQL DSN và `HUY_AMQP_URL`; `env/hung.env` có DB host/cổng/SSL mode cùng `HUNG_AMQP_URL`. Bảng cổng service 8001–8009 và quy định bổ sung env nằm trong [env README](../../env/README.md).
-   Dùng mật khẩu URL-safe. Giá trị phải khớp user đã khởi tạo trong volume cũ;
-   init scripts không tự thay mật khẩu DB cũ.
-6. Với broker cũ, xem migration quorum trong tests/e2e/recovery.md trước khi bật worker mới.
-   RabbitMQ definitions là artifact import; Compose không tự import hoặc tự cấp ACL producer.
-   Owner broker import definitions vào vhost /umc-care và kiểm ACL publish/consume/declare theo ownership.
+## Dữ liệu demo và kiểm tra luồng
 
-## Dựng và kiểm tra
-
-```powershell
-docker compose --env-file env/quan.env --env-file env/huy.env --env-file env/hung.env -f infra/compose/compose.yaml config --quiet
-docker compose --env-file env/quan.env --env-file env/huy.env --env-file env/hung.env -f infra/compose/compose.yaml up -d --build
-powershell -File tools/quan/check-stack.ps1
-powershell -File tools/quan/verify-local.ps1
-```
-
-Mongo bootstrap tạo replica/user trước Node API. Go migrations chạy trước Go API/worker.
-Publisher/expiry/reconcile chạy trong worker riêng; chỉ bật API không làm outbox tự drain.
-Gateway chỉ public port 8080; Postgres của Huy và Redis ở private network.
-Trong Compose chung này, PostgreSQL không publish cổng ra host; cấu hình chạy riêng của từng owner cần được kiểm tra độc lập.
-Health thành công chỉ chứng minh dependency sẵn sàng, không chứng minh hành trình nghiệp vụ.
-
-## Pharmacy migration và seed
-
-Trong container pharmacy, MONGODB_URI đã chọn pharmacy_db:
-
-```powershell
-docker compose --env-file env/quan.env --env-file env/huy.env --env-file env/hung.env -f infra/compose/compose.yaml exec -T pharmacy node scripts/migrate-storage.js
-docker compose --env-file env/quan.env --env-file env/huy.env --env-file env/hung.env -f infra/compose/compose.yaml exec -T pharmacy node scripts/migrate-storage.js --apply
-docker compose --env-file env/quan.env --env-file env/huy.env --env-file env/hung.env -f infra/compose/compose.yaml exec -T pharmacy node scripts/seed-demo.js --dry-run
-docker compose --env-file env/quan.env --env-file env/huy.env --env-file env/hung.env -f infra/compose/compose.yaml exec -T pharmacy node scripts/seed-demo.js
-```
-
-Migration mặc định chỉ report; active legacy hold thiếu attemptNo phải được owner đối soát.
-Seed insert-only tồn 30 cho medicine 00000000-0000-4000-8000-000000000301; chạy lại không reset lượng đã dùng.
-Đây là seed kho, chưa đủ hành trình E2E: Catalog medicine/price, Identity access, Patient access và
-Clinical FINAL phải do owner thật phát. Không seed PAID/COMMITTED để làm evidence.
-Không có lệnh reset dữ liệu shared. Thử clean clone trên project/volume mới, giữ project cũ.
-
-## Snapshot FIRST/RETURN giao Clinical
-
-Dùng owner Appointment, cấu hình MONGODB_URI chỉ appointment_db:
-`node services/appointment/scripts/export-clinical-tickets.js --date=2026-11-07`.
-Output local .runtime/exports, tối đa 1000 ticket/ngày; thiếu mapping bác sĩ/visit thì fail closed.
-Không ghi đè output đã có. Huy review/import theo contracts/messages/clinical-ticket-snapshot.v1.schema.json.
-Đây là operator snapshot tạm, không phải public event, chưa tự cấp Clinical visit grants.
-
-## Gate và artifact
-
-- tests/e2e/gate4-pharmacy.md: hai hành trình và phiếu người nhận.
-- tests/e2e/access-matrix.md, recovery.md: ma trận quyền và crash points.
-- UMC_READ_URL + UMC_TEST_TOKEN local rồi chạy node tools/quan/measure-read.js:
-  100 GET/30 concurrency, ghi p95 và lỗi; ngưỡng read <2s theo SRS.
-  Chưa đo cache hit >=80%, projection p95<5s/recovery<=60s hoặc responsive bằng browser thật.
-- powershell -File tools/quan/package-release.ps1 -OutputDirectory <existing-local-directory-outside-repo>:
-  yêu cầu working tree sạch, archive đúng HEAD + SHA256 manifest; không tạo tag/push/backup DB.
-  Backup DB/restore do từng owner thực hiện, APK do Hưng cấp rồi ghép manifest cùng commit.
+- Mỗi owner chạy migration và seed chỉ trên database online mình quản lý, sau khi thống nhất dữ liệu chung. Không reset hoặc ghi đè dữ liệu shared để kiểm thử.
+- Pharmacy có `node scripts/migrate-storage.js` để kiểm migration trước khi dùng `--apply`, và `node scripts/seed-demo.js --dry-run` để xem seed trước khi ghi. Chỉ thực hiện trên `pharmacy_db` online đã được Quân xác nhận.
+- Appointment có `node services/appointment/scripts/export-clinical-tickets.js --date=YYYY-MM-DD` để xuất snapshot FIRST/RETURN cho Clinical khi feed ticket chưa sẵn sàng. Snapshot này chưa tự cấp quyền lượt khám; cần kiểm mapping bác sĩ và visit.
+- Kiểm JWT do Identity phát qua Gateway, quyền của Clinical/Diagnostic, event RabbitMQ và trạng thái cuối của các request HTTP `202`. Theo dõi `statusUrl` và projection tương ứng.
+- [Gate Pharmacy](../../tests/e2e/gate4-pharmacy.md), [ma trận quyền](../../tests/e2e/access-matrix.md) và [recovery](../../tests/e2e/recovery.md) là tiêu chí kiểm demo; chỉ đánh dấu đạt khi có bằng chứng chạy với các dịch vụ online cùng môi trường.

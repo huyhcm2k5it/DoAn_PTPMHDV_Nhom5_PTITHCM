@@ -33,6 +33,18 @@ func TestCircuitBreakerOpensAndAllowsOneProbe(t *testing.T) {
 	}
 }
 
+func TestNewFromURLUsesTLSAndCredentials(t *testing.T) {
+	cache, err := NewFromURL("rediss://shared:secret@redis.example:6380/0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cache.Close()
+	opts := cache.client.Options()
+	if opts.Addr != "redis.example:6380" || opts.Username != "shared" || opts.Password != "secret" || opts.TLSConfig == nil {
+		t.Fatalf("online Redis URL was not applied: addr=%q user=%q tls=%v", opts.Addr, opts.Username, opts.TLSConfig != nil)
+	}
+}
+
 func TestReadCacheWithRealRedis(t *testing.T) {
 	addr := os.Getenv("TEST_REDIS_ADDR")
 	if addr == "" {

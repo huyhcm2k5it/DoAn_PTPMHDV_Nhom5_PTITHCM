@@ -55,8 +55,14 @@ func run() error {
 		auth = httpadapter.NewJWT(access, lease, cfg.JWTIssuer, cfg.JWTAudience)
 	}
 	var cache ports.ReadCache
-	if cfg.RedisAddr != "" {
-		redisCache, cacheErr := redisadapter.New(cfg.RedisAddr, cfg.RedisUsername, cfg.RedisPassword)
+	if cfg.RedisURL != "" || cfg.RedisAddr != "" {
+		var redisCache *redisadapter.Cache
+		var cacheErr error
+		if cfg.RedisURL != "" {
+			redisCache, cacheErr = redisadapter.NewFromURL(cfg.RedisURL)
+		} else {
+			redisCache, cacheErr = redisadapter.New(cfg.RedisAddr, cfg.RedisUsername, cfg.RedisPassword)
+		}
 		if cacheErr != nil {
 			return cacheErr
 		}

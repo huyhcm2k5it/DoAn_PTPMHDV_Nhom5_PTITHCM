@@ -3,35 +3,24 @@
 Go 1.27.0 · Echo 5.4.0 · pgx 5.11.0 · PostgreSQL 18 · Hexagonal Architecture.
 Sáu HTTP operation CA-001–006, CatalogChanged v1 snapshot/checkpoint stream, RabbitMQ outbox publisher và bounded Redis cache-aside cho GET đều có implementation. Clinical và Diagnostic cũng có luồng nghiệp vụ riêng; xem từng service README và contract integration để biết giới hạn nối Appointment/Billing/Gateway còn lại.
 
-## Chạy với Compose riêng của Catalog
+## Dữ liệu online
 
-Từ gốc repo, copy `env/huy.env.example` sang `env/huy.env`, điền năm password khác nhau (ký tự URL-safe). Cần Docker engine chạy:
-
-```powershell
-docker compose --env-file env/huy.env -f infra/compose/huy.catalog.yml up --build -d
-# Seed chỉ dành cho demo, chạy chủ động sau migration:
-docker compose --env-file env/huy.env -f infra/compose/huy.catalog.yml run --rm catalog-migrate -seed
-Invoke-RestMethod http://127.0.0.1:8007/health/ready
-Invoke-RestMethod http://127.0.0.1:8007/api/v1/medical-services
-```
-
-Compose bind API/DB/Redis vào loopback. Redis giới hạn 128 MiB với `allkeys-lru`; ACL giới hạn user Catalog vào prefix `umc:catalog:v1:*`. Không mở rộng init script sang DB có sẵn. Không xóa volume để sửa migration.
-
-## Chạy Go native
-
-Tạo một DB riêng thuộc Catalog, set `DATABASE_URL` từ credential trong `env/huy.env`; không dùng DB service khác. Từ repo:
+Tạo `env/huy.env` từ mẫu. `CATALOG_DATABASE_URL` phải trỏ đúng `catalog_db` trên Neon với `sslmode=require`. Chạy migration trước API; chỉ seed sau khi Huy đã thống nhất dữ liệu demo trên database chung. Nạp `DATABASE_URL` từ file thật vào tiến trình Catalog, rồi khởi chạy migrate, API và worker. Kiểm HTTP qua Gateway của Quân.
 
 ```powershell
-$env:DATABASE_URL='postgres://catalog_owner:YOUR_URL_SAFE_PASSWORD@127.0.0.1:55432/catalog_db?sslmode=disable'
-# Redis là tùy chọn khi chạy native; thiếu REDIS_ADDR thì cache bị tắt.
-$env:REDIS_ADDR='127.0.0.1:56379'
-$env:REDIS_USERNAME='default'
-$env:REDIS_PASSWORD='YOUR_CATALOG_REDIS_PASSWORD'
-.\tools\huy\go.ps1 -Service catalog run ./cmd/migrate -seed
-.\tools\huy\go.ps1 -Service catalog run ./cmd/api
+./tools/huy/go.ps1 -Service catalog run ./cmd/migrate
+./tools/huy/go.ps1 -Service catalog run ./cmd/api
 ```
 
-Helper đặt cache/temp vào `.runtime/` để tránh lỗi quyền Windows. Trên Linux/macOS chạy Go trực tiếp trong `services/catalog`. API mặc định chỉ nghe `127.0.0.1:8007`; container dùng `LISTEN_ADDR=:8007`.
+Đặt public key JWT cùng cặp với Identity cho protected API. Không in DSN chứa mật khẩu vào log.
+
+## Redis của Catalog
+
+Catalog có Redis cache-aside cho GET. Quân quản lý một `UMC_REDIS_URL` online; Compose truyền URL này vào runtime Catalog dưới tên `REDIS_URL` và Appointment dưới tên `APPOINTMENT_REDIS_URL`. Catalog dùng `rediss://` với TLS và namespace khóa `umc:catalog:v1:*`; Appointment dùng namespace riêng.
+
+Trước demo, xác nhận cùng tài khoản Redis có quyền trên cả hai namespace và kiểm cache hit/fallback. Khi Redis lỗi, GET fallback sang PostgreSQL theo giới hạn đã định nghĩa trong phần API bên dưới.
+
+Trên Linux/macOS chạy Go trực tiếp trong `services/catalog`. Khi triển khai container, đặt `LISTEN_ADDR=:8007`; Gateway là điểm truy cập HTTP chung.
 
 Public không cần Identity. Protected không có JWT config thì fail closed: thiếu bearer → 401, có bearer nhưng verifier chưa cấu hình → 503. Không có auth bypass. Xem `contracts/http/catalog-integration.md` để cấu hình key/lease và đối chiếu với Hưng trước tích hợp.
 
