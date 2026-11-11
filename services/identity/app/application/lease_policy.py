@@ -23,6 +23,7 @@ POLICY = {
     "DI-008": {"STAFF": {"LAB_TECH"}},
     "DI-009": {"STAFF": {"LAB_TECH"}},
     "DI-011": {"STAFF": {"LAB_REVIEW"}},
+    "DI-013": {"PATIENT": set(), "DOCTOR": set()},
     "BI-004": {"PATIENT": set()},
     "BI-005": {"STAFF": {"CASHIER"}},
     "BI-007": {"STAFF": {"CASHIER"}},

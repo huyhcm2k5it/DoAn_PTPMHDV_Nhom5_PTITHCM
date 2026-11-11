@@ -6,7 +6,7 @@ import random
 import time
 import uuid
 from datetime import timedelta
-from django.db import transaction, OperationalError
+from django.db import connections, transaction, OperationalError
 from django.utils import timezone
 from app.domain.models import Notification, MessageInbox, RetryJob, DeadLetter
 from app.worker.event_bus import get_rabbitmq_connection, NOTIFICATION_QUEUE, BINDINGS
@@ -134,5 +134,9 @@ def start_consumer():
             time.sleep(delay+random.uniform(0,0.5))
             delay=min(delay*2,15)
         finally:
-            if conn and conn.is_open:
-                conn.close()
+            try:
+                if conn and conn.is_open:
+                    conn.close()
+            finally:
+                # Workers have no request lifecycle to discard broken DB sessions.
+                connections.close_all()
