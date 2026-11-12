@@ -46,7 +46,6 @@
           "WAITING",
           "CALLED",
           "CLAIMED",
-          "IN_SERVICE",
           "NO_SHOW",
           "DONE"
         ]
