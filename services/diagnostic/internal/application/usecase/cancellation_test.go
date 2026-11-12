@@ -16,7 +16,9 @@ type grantTx struct{ *memory }
 func (m grantStore) Within(ctx context.Context, _ string, f func(ports.Tx) error) error {
 	return f(grantTx{m.memory})
 }
-func (t grantTx) VerifyVisitGrant(_ context.Context, _, _ string) error { return nil }
+func (t grantTx) VerifyVisitGrant(_ context.Context, _, _, _ string, _ bool, _ time.Time) error {
+	return nil
+}
 
 func TestCancellationNeedsGrantAndPreservesSpecimenHistory(t *testing.T) {
 	ctx := context.Background()

@@ -5,6 +5,7 @@ UMC Care · hợp đồng API v5.2 đã rà soát · 17/10/2026 · chưa biểu 
 API ID,Vị trí,Trường,Kiểu,Bắt buộc,Ràng buộc / mặc định,Mô tả
 IA-001,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
 IA-001,body,phone,string,Có,,Số điện thoại dùng định danh hoặc tra cứu tài khoản; server chuẩn hóa trước khi so khớp.
+IA-001,body,email,string,Có,format=email,Địa chỉ nhận OTP. Identity bỏ khoảng trắng đầu cuối và chuyển về chữ thường trước khi lưu.
 IA-001,body,password,string,Có,,"Mật khẩu người dùng; chỉ truyền qua HTTPS, không ghi log hoặc trả lại trong response."
 IA-002,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
 IA-002,body,phone,string,Có,,Số điện thoại dùng định danh hoặc tra cứu tài khoản; server chuẩn hóa trước khi so khớp.

@@ -17,10 +17,10 @@ Tài liệu này hiện thực hóa BRD 5.0 ngày 17/10/2026. Đây là baseline
 | **Thuộc tính** | **Quyết định** |
 | --- | --- |
 | **Phạm vi** | Web đủ ba actor (bệnh nhân, bác sĩ, nhân viên bệnh viện); Android bệnh nhân gọn nhưng hoàn chỉnh các thao tác chính. |
-| **Kiến trúc** | Gateway → 9 service có DB riêng; client dùng HTTP; liên service dùng 18 event/5 command RabbitMQ, outbox/inbox và projection. Redis cache tùy chọn cho đọc; Compose cho demo. |
+| **Kiến trúc** | Gateway → 9 service có DB riêng; client dùng HTTP; liên service dùng 20 event/5 command RabbitMQ, outbox/inbox và projection. Redis cache tùy chọn cho đọc; Compose cho demo. |
 | **Công nghệ** | Node.js/TypeScript: Patient, Appointment, Pharmacy. Django: Identity, Billing, Notification. Go: Catalog, Clinical, Diagnostic. |
 | **Dữ liệu** | Ba MongoDB logic và sáu PostgreSQL logic. Mỗi service chỉ ghi DB của mình; ID liên dịch vụ là opaque string. |
-| **Đích API** | 86 operation HTTP: 83 endpoint client/tác vụ và 3 adapter phục hồi IA-014 DI-001 BI-001. Loại 10 IN-01..IN-10 của bản 3.0; health/metrics/job không tính. 18 event và 5 command tính riêng. |
+| **Đích API** | 86 operation HTTP: 83 endpoint client/tác vụ và 3 adapter phục hồi IA-014 DI-001 BI-001. Loại 10 IN-01..IN-10 của bản 3.0; health/metrics/job không tính. 20 event và 5 command tính riêng. |
 | **Chủ phần** | Huy: Catalog Clinical Diagnostic; Quân: Patient Appointment Pharmacy; Hưng: Identity Billing Notification. Mỗi người 3 service; review và E2E chung. |
 
 # 2 Kiến trúc và actor
@@ -57,12 +57,12 @@ flowchart TD
     Gateway --> Identity & Patient & Catalog & Appointment & Clinical & Diagnostic & Pharmacy & Billing & Notification
 
     subgraph Infra["Hạ tầng liên lạc & Bộ đệm"]
-        RabbitMQ["RABBITMQ: 18 integration event + 5 command (outbox / inbox / retry / DLQ)"]
+        RabbitMQ["RABBITMQ: 20 integration event + 5 command (outbox / inbox / retry / DLQ)"]
         Redis["REDIS: Cache Catalog 60s & slot tham khảo 3s (không giữ tiền, lịch, tồn, quyền)"]
     end
 ```
 
-Sơ đồ 9 service theo owner 3–3–3: Patient, Appointment và Pharmacy dùng MongoDB; sáu service còn lại dùng PostgreSQL. Web phục vụ ba actor, Android phục vụ PATIENT. RabbitMQ mang 18 event và 5 command; Redis chỉ cache Catalog và slot tham khảo của Appointment.
+Sơ đồ 9 service theo owner 3–3–3: Patient, Appointment và Pharmacy dùng MongoDB; sáu service còn lại dùng PostgreSQL. Web phục vụ ba actor, Android phục vụ PATIENT. RabbitMQ mang 20 event và 5 command; Redis chỉ cache Catalog và slot tham khảo của Appointment.
 
 Gateway kiểm token, route và correlationId; owner quyết định quyền tài nguyên từ dữ liệu cục bộ. Request không gọi chuỗi service. Dữ liệu cần từ owner khác được nhân bản tối thiểu qua event; hành động xuyên service ghi outbox rồi trả 202 và client poll. Redis chỉ cache đọc, không thay quyền hay transaction. [S1] PDF 50–51, 65–66; [S2] slide 30–31, 40.
 
@@ -85,9 +85,9 @@ Mỗi FR là điều kiện bắt buộc kiểm thử được. Mã BR trỏ t�
 
 | **FR** | **Hành vi cần triển khai** | **BR** |
 | --- | --- | --- |
-| **FR-01** | Đăng ký số điện thoại, tạo OTP REGISTER và gửi qua adapter SMS giả lập vào hộp thư demo chỉ mở localhost; xác minh rồi kích hoạt tài khoản. | BR-01 |
-| **FR-02** | Gửi lại OTP có giới hạn; OTP sai/hết hạn/đã dùng trả mã lỗi ổn định và không tiết lộ tài khoản. | BR-01 |
-| **FR-03** | Đăng nhập, refresh, logout; reset bằng OTP và đổi mật khẩu thu hồi phiên cũ. | BR-02 |
+| **FR-01** | Đăng ký yêu cầu số điện thoại duy nhất, email hợp lệ và mật khẩu. Identity gửi OTP REGISTER đến email đã nhập và kích hoạt tài khoản sau khi xác minh mã. | BR-01 |
+| **FR-02** | Gửi lại OTP theo số điện thoại và mục đích, có giới hạn và dùng email đã lưu. OTP sai, hết hạn hoặc đã dùng trả mã lỗi ổn định. | BR-01 |
+| **FR-03** | Đăng nhập bằng số điện thoại, hỗ trợ refresh và logout. Khi quên mật khẩu, Identity tra cứu theo số điện thoại và gửi OTP RESET đến email đã lưu. Phản hồi yêu cầu gửi mã không tiết lộ tài khoản có tồn tại hay không. Đổi hoặc đặt lại mật khẩu thu hồi phiên cũ. | BR-02 |
 | **FR-05** | Cấp capability cho tài khoản STAFF theo tác vụ/khoa; chỉ STAFF[ADMIN] có quyền thay đổi. | BR-04,BR-30 |
 
 ## Patient · Quân
@@ -280,7 +280,7 @@ Mọi chuyển trạng thái được server kiểm tra bằng expectedVersion/�
 
 # 6 Hợp đồng RabbitMQ và phối hợp bất đồng bộ
 
-18 integration event là sự kiện đã xảy ra, 5 command là yêu cầu một owner thực hiện. Domain event bên trong service không tính vào bảng này. Response của command là event có requestId; không chờ response trong HTTP gốc.
+20 integration event là sự kiện đã xảy ra, 5 command là yêu cầu một owner thực hiện. Domain event bên trong service không tính vào bảng này. Response của command là event có requestId; không chờ response trong HTTP gốc.
 
 | **Integration event** | **Producer** | **Consumer** | **Nội dung và tác dụng** |
 | --- | --- | --- | --- |
@@ -296,10 +296,12 @@ Mọi chuyển trạng thái được server kiểm tra bằng expectedVersion/�
 | VisitReturnReady | Clinical | Appointment | visitId, appointmentId, returnRound, version. Tạo RETURN duy nhất |
 | CatalogChanged | Catalog | Appointment Clinical Diagnostic Pharmacy Billing | entityType, entityId, entityVersion, fullSnapshot, effectiveAt, streamSequence, mode. UPSERT/TOMBSTONE/CHECKPOINT; cập nhật projection tối thiểu |
 | PatientAccessChanged | Patient | Appointment Clinical Diagnostic Pharmacy Billing | patientId, ownerUserId, active, policyVersion. Projection quyền hồ sơ; không mang bệnh án, địa chỉ hoặc BHYT |
-| IdentityAccessChanged | Identity | Patient Appointment Clinical Diagnostic Pharmacy Billing Notification Catalog | userId, status, actorType, capabilities, tokenVersion, phoneVerified, version. Projection quyền và trạng thái tài khoản; không mang mật khẩu/OTP/phone đầy đủ |
+| IdentityAccessChanged | Identity | Patient Appointment Clinical Diagnostic Pharmacy Billing Notification Catalog | userId, status, actorType, capabilities, tokenVersion, phoneVerified, version. Projection quyền và trạng thái tài khoản. Identity đặt cờ phoneVerified khi kích hoạt qua OTP email. Cờ này biểu thị xác minh tài khoản, không chứng minh quyền sở hữu số điện thoại. Payload không mang mật khẩu, OTP, email hoặc số điện thoại đầy đủ. |
 | ChargePrepared | Billing | Appointment Diagnostic Pharmacy | requestId, sourceType, sourceId, sourceRevision, chargeId, state, reasonCode. Phản hồi nghiệp vụ cho RequestCharge; state=CREATED/REJECTED |
 | LabOrderResolved | Diagnostic | Clinical | requestId, visitId, state, orderId?, reasonCode, version. CREATED/REJECTED; kết thúc pending registry an toàn |
 | QueueTicketClaimed | Appointment | Clinical | requestId, ticketId, appointmentId, patientId, visitId?, claimId?, state, reasonCode. ACCEPTED/REJECTED; FIRST và RETURN cùng contract |
+| QueueTicketChanged | Appointment | Clinical | ticketId, appointmentId, patientId, doctorId, doctorUserId, departmentId, ticketType, state, version, visitId tùy loại vé. Đồng bộ vé FIRST và RETURN trước claim. |
+| VisitDoctorGrantChanged | Clinical | Diagnostic | mode, sequence và thông tin cấp hoặc thu hồi quyền theo lượt khám. Checkpoint xác nhận độ mới của luồng quyền. |
 | SettlementReserved | Appointment Diagnostic Pharmacy | Billing | settlementId, sourceId, sourceRevision, state, fence?, lockedAt?, reasonCode. ACCEPTED/REJECTED; owner khóa nguồn trong transaction |
 | SettlementDecision | Billing | Appointment Diagnostic Pharmacy | settlementId, sourceId, sourceRevision, decisionVersion, state, fence?, paymentId?. SUCCEEDED/FAILED/UNKNOWN; UNKNOWN không mở khóa |
 
@@ -341,7 +343,7 @@ Android có 5 cụm màn hình: (1) đăng ký/OTP/login/quên/đổi mật kh�
 
 # 9 Danh mục API nghiệp vụ
 
-Kiểm kê 86 operation HTTP giữ ID từ bản 3.0: 83 endpoint client/tác vụ và 3 adapter phục hồi nội bộ IA-014 DI-001 BI-001. HTTP liên service phục hồi không thuộc đường request người dùng; profile chuẩn dùng 18 event và 5 command. Không đếm handler, worker, cache hoặc job là API.
+Kiểm kê 86 operation HTTP giữ ID từ bản 3.0: 83 endpoint client/tác vụ và 3 adapter phục hồi nội bộ IA-014 DI-001 BI-001. HTTP liên service phục hồi không thuộc đường request người dùng; profile chuẩn dùng 20 event và 5 command. Không đếm handler, worker, cache hoặc job là API.
 
 ## Identity gồm 14 API
 
@@ -518,7 +520,7 @@ ID UUID; UTC ISO-8601; tiền int64 VND. Ghi có Idempotency-Key/requestHash và
 | **Mã** | **Nhóm** | **Tiêu chí đo được** |
 | --- | --- | --- |
 | **NFR-01** | Bảo mật | JWT access 15 phút, refresh rotation; hash mật khẩu Argon2id hoặc bcrypt cost phù hợp; TLS ở gateway khi demo công khai; CORS allowlist. |
-| **NFR-02** | Riêng tư | Chỉ dùng dữ liệu giả; OTP đi qua hộp thư SMS giả lập chỉ mở localhost trong demo, không trả trong API nghiệp vụ hoặc log; log chỉ ID rút gọn/correlationId, không dữ liệu y tế/định danh đầy đủ. |
+| **NFR-02** | Riêng tư | Demo chỉ dùng dữ liệu giả. Với SMTP, gửi OTP đến hộp thư kiểm thử. Hộp thư dev chỉ dùng trong môi trường phát triển cô lập. API nghiệp vụ không trả OTP và log không ghi OTP, dữ liệu y tế hoặc thông tin định danh đầy đủ. |
 | **NFR-03** | Hiệu năng | Với seed ≥100 lịch và 30 request đọc đồng thời trên máy demo, p95 tra cứu/lịch <2 giây; ghi thường <3 giây khi dependency khỏe. |
 | **NFR-04** | Đúng đắn | Test tranh slot cuối, idempotency cho callback/thu/hoàn/phát, unique index và transaction Mongo replica set; không oversell. |
 | **NFR-05** | Khả dụng | RabbitMQ dừng: commit local/outbox vẫn bền vững, luồng xuyên service pending. Redis dừng: cache đọc fallback có bulkhead; không mất lịch/tiền/tồn. Không tuyên bố mọi write vẫn sẵn sàng khi điều kiện an toàn chưa biết. |
@@ -534,7 +536,7 @@ ID UUID; UTC ISO-8601; tiền int64 VND. Ghi có Idempotency-Key/requestHash và
 
 | **BAC** | **Kịch bản bắt buộc** | **Bằng chứng tối thiểu** |
 | --- | --- | --- |
-| **BAC-01** | Đăng ký → OTP → login, quên/đổi mật khẩu chạy trên web và Android; OTP sai/hết hạn/replay không tạo quyền. | Test tự động hoặc kịch bản chạy; ảnh UI; request/response; DB/event/log có correlationId. |
+| **BAC-01** | Trên web và Android, đăng ký yêu cầu email hợp lệ, xác minh OTP nhận qua email và đăng nhập bằng số điện thoại. Quên mật khẩu gửi OTP đến email đã lưu. Kiểm tra đổi mật khẩu và từ chối OTP sai, hết hạn hoặc đã dùng. | Test tự động hoặc kịch bản chạy; ảnh UI; request/response; DB/event/log có correlationId. |
 | **BAC-02** | Cùng tài khoản tạo hồ sơ bản thân/người thân; truy cập hồ sơ khác bị 403; nhân viên chỉ thấy phạm vi được gán. | Test tự động hoặc kịch bản chạy; ảnh UI; request/response; DB/event/log có correlationId. |
 | **BAC-03** | Hai người tranh chỗ cuối: chỉ một hold/booking thành công; hold hết hạn trả chỗ; tiền đến muộn không xác nhận lịch đã EXPIRED và có đường hoàn; retry không thu lặp. | Test tự động hoặc kịch bản chạy; ảnh UI; request/response; DB/event/log có correlationId. |
 | **BAC-04** | Đổi lịch hợp lệ giữ slot mới rồi trả slot cũ; lỗi hoặc timeout vẫn giữ lịch cũ. Hủy có căn cứ và trạng thái hoàn riêng. | Test tự động hoặc kịch bản chạy; ảnh UI; request/response; DB/event/log có correlationId. |
@@ -545,7 +547,7 @@ ID UUID; UTC ISO-8601; tiền int64 VND. Ghi có Idempotency-Key/requestHash và
 | **BAC-09** | Thiếu thuốc không giữ một phần; nhập bổ sung, giữ lại toàn toa, thu và phát một lần; nhả hold chưa thu đúng trạng thái. | Test tự động hoặc kịch bản chạy; ảnh UI; request/response; DB/event/log có correlationId. |
 | **BAC-10** | Web đủ ba actor và các module nhân viên theo quyền; Android đủ luồng bệnh nhân; trạng thái server giống nhau trên hai nền tảng. | Test tự động hoặc kịch bản chạy; ảnh UI; request/response; DB/event/log có correlationId. |
 | **BAC-11** | Một Mongo replica set chứa ba DB logic và một PostgreSQL chứa sáu DB logic; service không ghi DB của nhau; event lặp/restart không lặp lịch, tiền, mẫu hoặc phát thuốc. | Test tự động hoặc kịch bản chạy; ảnh UI; request/response; DB/event/log có correlationId. |
-| **BAC-12** | Một lệnh Compose dựng 9 service và hạ tầng gồm RabbitMQ/Redis; có bằng chứng 18 event, 5 command, retry/DLQ, dedupe và cache fallback. | Test tự động hoặc kịch bản chạy; ảnh UI; request/response; DB/event/log có correlationId. |
+| **BAC-12** | Một lệnh Compose dựng 9 service và hạ tầng gồm RabbitMQ/Redis; có bằng chứng 20 event, 5 command, retry/DLQ, dedupe và cache fallback. | Test tự động hoặc kịch bản chạy; ảnh UI; request/response; DB/event/log có correlationId. |
 
 Bộ seed demo: ít nhất 2 bệnh nhân, 1 lễ tân, 2 bác sĩ, 1 KTV, 1 reviewer, 1 dược sĩ, 1 thu ngân, 1 admin; một slot còn 1 chỗ; một mẫu lỗi; một thuốc thiếu; một refund FAILED rồi retry. Test E2E chạy lại được từ dữ liệu reset, không sửa DB thủ công giữa các bước.
 
@@ -593,7 +595,7 @@ Bộ seed demo: ít nhất 2 bệnh nhân, 1 lễ tân, 2 bác sĩ, 1 KTV, 1 rev
 * Thanh toán/hoàn là mô phỏng nhưng có transactionId, trạng thái và biên nhận; không kết nối tiền thật.
 * BHYT chỉ là trường hồ sơ tự khai, không xác minh hay tính đồng chi trả.
 * Mỗi service có migration/seed, Dockerfile, OpenAPI và test tối thiểu cho bất biến của owner. PR cần một reviewer khác owner.
-* OpenAPI cho 86 operation HTTP, JSON Schema cho 18 integration event và 5 command được chốt cùng PR. 3 adapter HTTP phục hồi tắt trong profile chuẩn; 10 API IN cũ đã loại bỏ. Mọi thay đổi contract phải cập nhật bốn tài liệu và test tương thích.
+* OpenAPI cho 86 operation HTTP, JSON Schema cho 20 integration event và 5 command được chốt cùng PR. 3 adapter HTTP phục hồi tắt trong profile chuẩn; 10 API IN cũ đã loại bỏ. Mọi thay đổi contract phải cập nhật bốn tài liệu và test tương thích.
 * Docker Compose là bằng chứng chạy hệ thống: một lệnh dựng stack, healthcheck, restart service, seed/reset và log. Không tuyên bố HA hay vận hành bệnh viện thật.
 
 # 14 Thuật ngữ
@@ -653,7 +655,7 @@ Catalog là context tham chiếu được chấp nhận trong phạm vi đồ á
 | Backend | Node.js/TypeScript cho Patient, Appointment, Pharmacy; Django cho Identity, Billing, Notification; Go cho Catalog, Clinical, Diagnostic | Sách cho phép polyglot; giữ công nghệ mỗi owner theo năng lực nhóm. |
 | API Gateway | Envoy Gateway, JWT filter với public key cục bộ, TLS, allowlist route và request ID | Một cổng dùng chung web/Android; chưa tạo BFF riêng để hạn chế khối lượng. |
 | HTTP | Client → Gateway → một service; 83 endpoint client/tác vụ và 3 adapter phục hồi nội bộ | Ghi liên service trả 202 sau commit cục bộ; client poll resource hiện có. |
-| RabbitMQ | AMQP 0-9-1, 18 integration event và 5 command, JSON schema có version | Producer outbox, consumer inbox, publisher confirm, manual ack và DLQ. |
+| RabbitMQ | AMQP 0-9-1, 20 integration event và 5 command, JSON schema có version | Producer outbox, consumer inbox, publisher confirm, manual ack và DLQ. |
 | Redis | Một instance cache có thể dựng lại; cache-aside và namespace theo owner | Không coi Redis cache là nguồn bằng chứng giữ chỗ, tiền, tồn hoặc quyền. |
 | MongoDB | Một replica set demo, 3 DB và credential tách biệt | Transaction cục bộ giữ slot/tồn và outbox; mỗi owner chỉ ghi DB của mình. |
 | PostgreSQL | Một instance demo, identity\_db, catalog\_db, clinical\_db, diagnostic\_db, billing\_db và notification\_db, role/migration riêng | FK, row lock và migration riêng trong 6 DB; Billing dùng transaction SQL cho tiền/receipt/outbox. |
@@ -841,7 +843,7 @@ Mỗi artifact triển khai có version riêng, OpenAPI/JSON Schema và migratio
 | Tự trị và tránh chuỗi HTTP | [S1] PDF 50–51 và 65–66; [S2] slide 30–31, 40 | REST từ client qua Gateway; AMQP cho liên service, read model cục bộ. |
 | eShopOnContainers | [S1] PDF 111–115; [S2] slide 4 | Gateway, event bus, database per service; không sao chép miền giỏ hàng sang bệnh án. |
 | Redis và dữ liệu tạm | [S1] PDF 147–148; [S2] slide 22 | Cache danh mục và slot tham khảo; giữ chỗ/tiền/tồn vẫn là dữ liệu bền vững. |
-| Event bus và outbox | [S1] PDF 148–160; [S2] slide 50–53 | 18 event và 5 command; state + outbox cùng transaction. |
+| Event bus và outbox | [S1] PDF 148–160; [S2] slide 50–53 | 20 event và 5 command; state + outbox cùng transaction. |
 | Idempotency và bản tin cũ | [S1] PDF 164–166; [S2] slide 54 | Inbox mọi message, domain unique, version và fence; không chỉ dựa redelivered. |
 | DDD và CQRS đơn giản | [S1] PDF 198–211; [S2] slide 56–62 | Command/domain/query tách logic, cùng DB owner; domain không import broker/ORM. |
 | Khả năng phục hồi và health | [S1] PDF 311–330; [S2] slide 64–66 | Timeout, backoff có giới hạn, bulkhead, liveness/readiness và kiểm thử lỗi. |

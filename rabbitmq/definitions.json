@@ -534,6 +534,14 @@
       "vhost": "/umc-care",
       "destination": "evt.clinical.v1",
       "destination_type": "queue",
+      "routing_key": "appointment.queue-ticket-changed.v1",
+      "arguments": {}
+    },
+    {
+      "source": "umc.events.appointment.v1",
+      "vhost": "/umc-care",
+      "destination": "evt.clinical.v1",
+      "destination_type": "queue",
       "routing_key": "appointment.queue-ticket-claimed.v1",
       "arguments": {}
     },
@@ -700,6 +708,14 @@
     {
       "source": "umc.events.clinical.v1",
       "vhost": "/umc-care",
+      "destination": "evt.diagnostic.v1",
+      "destination_type": "queue",
+      "routing_key": "clinical.visit-doctor-grant-changed.v1",
+      "arguments": {}
+    },
+    {
+      "source": "umc.events.clinical.v1",
+      "vhost": "/umc-care",
       "destination": "evt.appointment.v1",
       "destination_type": "queue",
       "routing_key": "clinical.visit-return-ready.v1",
@@ -759,6 +775,14 @@
       "destination": "evt.billing.v1",
       "destination_type": "queue",
       "routing_key": "diagnostic.settlement-reserved.v1",
+      "arguments": {}
+    },
+    {
+      "source": "umc.events.diagnostic.v1",
+      "vhost": "/umc-care",
+      "destination": "evt.clinical.v1",
+      "destination_type": "queue",
+      "routing_key": "lab.order-resolved.v1",
       "arguments": {}
     },
     {

@@ -48,6 +48,23 @@ test('export fails closed when doctor mapping is missing instead of inventing a 
   );
 });
 
+test('owner enqueue publishes FIRST and RETURN snapshots via the canonical outbox', async () => {
+  const rows = [ticket(), ticket('RETURN')];
+  rows[1].state = 'IN_SERVICE';
+  await h.connection.collection('queue_tickets').insertMany(rows);
+  const result = await exportClinicalTickets({
+    connection: h.connection, date: '2026-11-07', enqueue: true,
+  });
+  assert.equal(validate(result), true, JSON.stringify(validate.errors));
+  const events = await h.connection.collection('outbox').find({ message_type: 'QueueTicketChanged' }).toArray();
+  assert.equal(events.length, 2);
+  for (const event of events) {
+    assert.equal(event.aggregate_id, event.payload.ticketId);
+    assert.equal(event.aggregate_version, event.payload.version);
+    assert.deepEqual(event.payload, result.find((snapshot) => snapshot.ticketId === event.aggregate_id));
+  }
+});
+
 test('owner slot and queue lookups use their business indexes', async () => {
   const row = ticket();
   row.state = 'WAITING';

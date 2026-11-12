@@ -49,7 +49,7 @@ ERROR_CODES = {
 
 def operation(id,response,status=200,parameters=None,body=None,errors=None):
     oid = id.replace('_', '-')
-    sensitive = oid in {'CL-009', 'CL-010', 'CL-011', 'DI-008', 'DI-009', 'DI-011'}
+    sensitive = oid in {'CL-009', 'CL-010', 'CL-011', 'DI-008', 'DI-009', 'DI-011', 'DI-012', 'DI-013'}
     sec = {'bearerAuth': [], **({'authorizationLease': []} if sensitive else {})}
     result={'operationId':id,'security':[sec],'parameters':[correlation]+(parameters or []),'responses':{str(status):{'description':'Committed locally; poll statusUrl for the claim result' if status==202 else 'Success','content':{'application/json':{'schema':ref(response)}}}}}
     if sensitive:

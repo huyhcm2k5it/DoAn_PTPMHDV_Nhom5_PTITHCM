@@ -7,6 +7,7 @@ const {
 } = require('../models/appointment.model.js');
 const { ApiError } = require('../core/errors.js');
 const { requestHash } = require('./holds.service.js');
+const { enqueueClinicalTicket } = require('./clinical-ticket-feed.js');
 
 function vietnamDate(value) {
   const date = value instanceof Date ? value : new Date(value);
@@ -236,6 +237,7 @@ async function checkInAppointment({
         appointmentDate: vietnamDate(appointment.startAt),
       };
       await QueueTicket.create([ticket], { session });
+      await enqueueClinicalTicket(connection, session, ticket, now);
       const response = responseForTicket(ticket);
       response.appointmentId = appointmentId;
       response.ticket = { ...response };
@@ -390,6 +392,7 @@ async function callNextQueueTicket({
         'QUEUE_EMPTY',
         'No waiting ticket matches the requested queue.',
       );
+    await enqueueClinicalTicket(connection, session, ticket, now);
     const response = responseForTicket(ticket);
     response.ticket = { ...response };
     await saveReplay(
@@ -516,12 +519,14 @@ async function markNoShow({
           { session },
         );
       }
-      const response = responseForTicket({
+      const updated = {
         ...ticket,
         state: 'NO_SHOW',
         noShowReason: reasonCode,
         version: version + 1,
-      });
+      };
+      await enqueueClinicalTicket(connection, session, updated, now);
+      const response = responseForTicket(updated);
       await saveReplay(
         Idempotency,
         {

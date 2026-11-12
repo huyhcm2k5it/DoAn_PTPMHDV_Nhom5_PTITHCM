@@ -56,7 +56,7 @@ func (r *Receiver) Receive(ctx context.Context, d ports.Incoming) error {
 	}
 	var err error
 	switch {
-	case (event.MessageType == "CatalogChanged" && d.Exchange == "umc.events.catalog.v1" && d.RoutingKey == "catalog.catalog-changed.v1") || (event.MessageType == "LabOrderResolved" && d.Exchange == "umc.events.diagnostic.v1" && d.RoutingKey == "lab.order-resolved.v1") || (event.MessageType == "LabResultPublished" && d.Exchange == "umc.events.diagnostic.v1" && d.RoutingKey == "diagnostic.lab-result-published.v1") || (event.MessageType == "LabCancelled" && d.Exchange == "umc.events.diagnostic.v1" && d.RoutingKey == "diagnostic.lab-cancelled.v1"):
+	case (event.MessageType == "CatalogChanged" && d.Exchange == "umc.events.catalog.v1" && d.RoutingKey == "catalog.catalog-changed.v1") || (event.MessageType == "LabOrderResolved" && d.Exchange == "umc.events.diagnostic.v1" && (d.RoutingKey == "diagnostic.lab-order-resolved.v1" || d.RoutingKey == "lab.order-resolved.v1")) || (event.MessageType == "LabResultPublished" && d.Exchange == "umc.events.diagnostic.v1" && d.RoutingKey == "diagnostic.lab-result-published.v1") || (event.MessageType == "LabCancelled" && d.Exchange == "umc.events.diagnostic.v1" && d.RoutingKey == "diagnostic.lab-cancelled.v1"):
 		handler, ok := r.handler.(interface {
 			HandleTreatmentMessage(context.Context, string, domain.Envelope) error
 		})
@@ -66,6 +66,8 @@ func (r *Receiver) Receive(ctx context.Context, d ports.Incoming) error {
 		err = handler.HandleTreatmentMessage(ctx, d.Exchange, event)
 	case event.MessageType == "QueueTicketClaimed" && d.Exchange == "umc.events.appointment.v1" && d.RoutingKey == "appointment.queue-ticket-claimed.v1":
 		err = r.handler.HandleClaim(ctx, d.Exchange, event)
+	case event.MessageType == "QueueTicketChanged" && d.Exchange == "umc.events.appointment.v1" && d.RoutingKey == "appointment.queue-ticket-changed.v1":
+		err = r.handler.HandleProjection(ctx, d.Exchange, event)
 	case event.MessageType == "IdentityAccessChanged" && d.Exchange == "umc.events.identity.v1" && d.RoutingKey == "identity.identity-access-changed.v1":
 		err = r.handler.HandleProjection(ctx, d.Exchange, event)
 	case event.MessageType == "PatientAccessChanged" && d.Exchange == "umc.events.patient.v1" && d.RoutingKey == "patient.patient-access-changed.v1":
@@ -119,6 +121,18 @@ func (s *Service) HandleProjection(ctx context.Context, exchange string, event d
 				return domain.Fail("INVALID_MESSAGE", "Invalid Patient projection")
 			}
 			e = tx.UpdatePatientAccess(ctx, domain.PatientAccess{PatientID: domain.ID(p.PatientID), OwnerUserID: domain.ID(p.OwnerUserID), Active: *p.Active, PolicyVersion: p.PolicyVersion})
+		case exchange == "umc.events.appointment.v1" && event.Producer == "appointment" && event.MessageType == "QueueTicketChanged":
+			var ticket domain.Ticket
+			if strictJSON(event.Payload, &ticket) != nil || domain.ID(ticket.ID) != domain.ID(event.AggregateID) || ticket.Version != event.AggregateVersion {
+				return domain.Fail("INVALID_MESSAGE", "Invalid ticket snapshot")
+			}
+			writer, ok := tx.(interface {
+				UpdateTicket(context.Context, domain.Ticket) error
+			})
+			if !ok {
+				return domain.Fail("SERVICE_UNAVAILABLE", "Ticket projection writer unavailable")
+			}
+			e = writer.UpdateTicket(ctx, ticket)
 		default:
 			return domain.Fail("INVALID_MESSAGE", "Untrusted projection producer")
 		}

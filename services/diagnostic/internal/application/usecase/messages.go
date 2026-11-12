@@ -69,7 +69,7 @@ func (s *Service) Handle(ctx context.Context, exchange, route string, m domain.E
 	if m.SchemaVersion != 1 || !domain.ValidID(m.MessageID) || !domain.ValidID(m.AggregateID) || m.AggregateVersion < 1 || m.CorrelationID == "" || len(m.CorrelationID) > 128 || m.OccurredAt.IsZero() {
 		return domain.Fail("INVALID_MESSAGE", "Invalid message envelope")
 	}
-	expected := map[string][3]string{"CreateLabOrder": {"clinical", "umc.commands.clinical.v1", "diagnostic.create-lab-order.v1"}, "ReserveSettlement": {"billing", "umc.commands.billing.v1", "diagnostic.reserve-settlement.v1"}, "ChargePrepared": {"billing", "umc.events.billing.v1", "billing.charge-prepared.v1"}, "BillingStatusChanged": {"billing", "umc.events.billing.v1", "billing.billing-status-changed.v1"}, "ChargePaid": {"billing", "umc.events.billing.v1", "billing.charge-paid.v1"}, "SettlementDecision": {"billing", "umc.events.billing.v1", "billing.settlement-decision.v1"}, "IdentityAccessChanged": {"identity", "umc.events.identity.v1", "identity.identity-access-changed.v1"}, "PatientAccessChanged": {"patient", "umc.events.patient.v1", "patient.patient-access-changed.v1"}, "CatalogChanged": {"catalog", "umc.events.catalog.v1", "catalog.changed.v1"}}
+	expected := map[string][3]string{"CreateLabOrder": {"clinical", "umc.commands.clinical.v1", "diagnostic.create-lab-order.v1"}, "ReserveSettlement": {"billing", "umc.commands.billing.v1", "diagnostic.reserve-settlement.v1"}, "ChargePrepared": {"billing", "umc.events.billing.v1", "billing.charge-prepared.v1"}, "BillingStatusChanged": {"billing", "umc.events.billing.v1", "billing.billing-status-changed.v1"}, "ChargePaid": {"billing", "umc.events.billing.v1", "billing.charge-paid.v1"}, "SettlementDecision": {"billing", "umc.events.billing.v1", "billing.settlement-decision.v1"}, "IdentityAccessChanged": {"identity", "umc.events.identity.v1", "identity.identity-access-changed.v1"}, "PatientAccessChanged": {"patient", "umc.events.patient.v1", "patient.patient-access-changed.v1"}, "VisitDoctorGrantChanged": {"clinical", "umc.events.clinical.v1", "clinical.visit-doctor-grant-changed.v1"}, "CatalogChanged": {"catalog", "umc.events.catalog.v1", "catalog.changed.v1"}}
 	v, ok := expected[m.MessageType]
 	producer := m.Producer
 	if producer == "Catalog" {
@@ -85,7 +85,7 @@ func (s *Service) Handle(ctx context.Context, exchange, route string, m domain.E
 	if m.MessageKind != kind {
 		return domain.Fail("INVALID_MESSAGE", "Invalid message kind")
 	}
-	gap := false
+	gap := ""
 	err := s.store.Within(ctx, "diagnostic:business", func(t ports.Tx) error {
 		h := domain.Hash(m)
 		seen, e := t.SeenMessage(ctx, domain.ID(m.MessageID), h, retryLease(ctx))
@@ -97,17 +97,28 @@ func (s *Service) Handle(ctx context.Context, exchange, route string, m domain.E
 			e = s.create(ctx, t, m)
 		case "IdentityAccessChanged", "PatientAccessChanged", "CatalogChanged":
 			e = s.project(ctx, t, m)
+		case "VisitDoctorGrantChanged":
+			var p projection.VisitGrantEvent
+			if strictJSON(m.Payload, &p) != nil {
+				return domain.Fail("INVALID_MESSAGE", "Malformed visit grant event")
+			}
+			var missing bool
+			missing, e = projection.ApplyVisitGrant(ctx, t, m, p, s.now())
+			if e == nil && missing {
+				gap = "Visit grant stream gap"
+				return nil
+			}
 		default:
 			e = s.billing(ctx, t, m)
 		}
 		if domain.Code(e) == "CATALOG_STREAM_GAP" {
-			gap = true
+			gap = "Catalog stream gap"
 			return nil
 		}
 		if e != nil {
 			return e
 		}
-		if gap {
+		if gap != "" {
 			return nil
 		}
 		return t.MarkMessage(ctx, domain.ID(m.MessageID), h)
@@ -115,8 +126,8 @@ func (s *Service) Handle(ctx context.Context, exchange, route string, m domain.E
 	if err != nil {
 		return err
 	}
-	if gap {
-		return domain.Fail("SERVICE_UNAVAILABLE", "Catalog stream gap")
+	if gap != "" {
+		return domain.Fail("SERVICE_UNAVAILABLE", gap)
 	}
 	return nil
 }
@@ -380,11 +391,11 @@ func (s *Service) create(ctx context.Context, t ports.Tx, m domain.Envelope) err
 	if e = s.emit(ctx, t, m, "COMMAND", "RequestCharge", o.ID, "billing.request-charge.v1", 1, map[string]any{"requestId": o.ChargeRequestID, "sourceType": "LAB_ORDER", "sourceId": o.ID, "sourceRevision": 1, "patientId": o.PatientID, "recipientUserId": patient.OwnerUserID, "linesSnapshot": o.Lines, "amountVnd": o.AmountVND, "snapshotHash": o.AmountHash}); e != nil {
 		return e
 	}
-	return s.emit(ctx, t, m, "EVENT", "LabOrderResolved", in.RequestID, "lab.order-resolved.v1", 1, map[string]any{"requestId": in.RequestID, "visitId": in.VisitID, "state": "CREATED", "orderId": o.ID, "reasonCode": "", "version": 1})
+	return s.emit(ctx, t, m, "EVENT", "LabOrderResolved", in.RequestID, "diagnostic.lab-order-resolved.v1", 1, map[string]any{"requestId": in.RequestID, "visitId": in.VisitID, "state": "CREATED", "orderId": o.ID, "reasonCode": "", "version": 1})
 }
 func (s *Service) rejectCreate(ctx context.Context, t ports.Tx, m domain.Envelope, in domain.CreateInput, reason string) error {
 	if e := t.Put(ctx, "requests", domain.ID(in.RequestID), map[string]any{"hash": in.RequestHash, "state": "REJECTED", "reasonCode": reason}); e != nil {
 		return e
 	}
-	return s.emit(ctx, t, m, "EVENT", "LabOrderResolved", in.RequestID, "lab.order-resolved.v1", 1, map[string]any{"requestId": in.RequestID, "visitId": in.VisitID, "state": "REJECTED", "reasonCode": reason, "version": 1})
+	return s.emit(ctx, t, m, "EVENT", "LabOrderResolved", in.RequestID, "diagnostic.lab-order-resolved.v1", 1, map[string]any{"requestId": in.RequestID, "visitId": in.VisitID, "state": "REJECTED", "reasonCode": reason, "version": 1})
 }

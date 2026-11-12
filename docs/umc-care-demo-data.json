@@ -1,0 +1,872 @@
+{
+  "metadata": {
+    "title": "Dữ liệu minh họa hành trình bệnh nhân UMC Care",
+    "version": "1.0",
+    "purpose": "Dữ liệu giả dành cho đọc và chuẩn bị demo, không phải seed hoặc chứng cứ chạy hệ thống.",
+    "time_zone": "UTC",
+    "business_date": "2026-11-10",
+    "limitations": [
+      "Các bản ghi biểu diễn một trạng thái giả định đã hoàn thành và không xác nhận API, worker hay email đã chạy.",
+      "Các nhóm Clinical và Diagnostic kết hợp trường nghiệp vụ từ ERD và mô hình hiện tại; Diagnostic thực tế lưu aggregate trong body JSON. Đây không phải bản dump database.",
+      "Mật khẩu, mã OTP, token, khóa ký, hash, ID sự kiện, projection, inbox, outbox, idempotency, audit kỹ thuật và bằng chứng settlement đầy đủ phải do service tạo hoặc xử lý trong môi trường thử nghiệm.",
+      "Không nạp trực tiếp file vào database. Thời gian và giá là giả lập cố định, có thể đã hết hiệu lực khi chạy demo."
+    ],
+    "identity_note": "Tài khoản, email miền example.invalid và số bắt đầu 000 là giả. Tài khoản chỉ thể hiện trạng thái minh họa, không thể dùng đăng nhập hoặc nhận OTP.",
+    "review_note": "Người nhập và người duyệt xét nghiệm là hai tài khoản STAFF khác nhau.",
+    "references_note": "Các ID UUID được sinh cố định cho bộ dữ liệu này, không khớp với seed hiện có."
+  },
+  "services": {
+    "identity": {
+      "users": [
+        {
+          "id": "9367c90c-9e4f-5d6b-b2a8-c55c2c85a610",
+          "phone": "0000000001",
+          "email": "an@example.invalid",
+          "actor_type": "PATIENT",
+          "status": "ACTIVE",
+          "phone_verified_at": "2026-11-10T01:00:00Z",
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "db78960c-720f-5965-9b04-9f091980ceba",
+          "phone": "0000000002",
+          "email": "binh@example.invalid",
+          "actor_type": "PATIENT",
+          "status": "ACTIVE",
+          "phone_verified_at": "2026-11-10T01:00:00Z",
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "ffd26cd4-cbc2-5473-a5c0-7a9c4e64f480",
+          "phone": "0000000003",
+          "email": "bacsi@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "99d31f2a-0cc9-53b8-bb37-310ea694ef41",
+          "phone": "0000000004",
+          "email": "admin@example.invalid",
+          "actor_type": "STAFF",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "bbfcfdc6-595d-5ff9-aee2-c53f62dbbff7",
+          "phone": "0000000005",
+          "email": "kythuat@example.invalid",
+          "actor_type": "STAFF",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "efb2cfb8-7b50-58ef-9dbe-d9da81688061",
+          "phone": "0000000006",
+          "email": "duyet@example.invalid",
+          "actor_type": "STAFF",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "6759b405-ef24-5942-954d-b3846d4cca92",
+          "phone": "0000000007",
+          "email": "nhathuoc@example.invalid",
+          "actor_type": "STAFF",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "bfc87b3a-8de9-5836-9495-8b79af505254",
+          "phone": "0000000008",
+          "email": "bacsi2@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        }
+      ],
+      "staff_capabilities": [
+        {
+          "id": "fb50dba4-9d6e-56fd-80bc-962437e17e68",
+          "user_id": "99d31f2a-0cc9-53b8-bb37-310ea694ef41",
+          "capability": "ADMIN",
+          "scope_key": "GLOBAL",
+          "enabled": true,
+          "assigned_by": "99d31f2a-0cc9-53b8-bb37-310ea694ef41",
+          "assigned_at": "2026-11-10T00:00:00Z"
+        },
+        {
+          "id": "41b7d21b-a26e-575c-8d48-f5566b980e54",
+          "user_id": "99d31f2a-0cc9-53b8-bb37-310ea694ef41",
+          "capability": "RECEPTION",
+          "scope_key": "GLOBAL",
+          "enabled": true,
+          "assigned_by": "99d31f2a-0cc9-53b8-bb37-310ea694ef41",
+          "assigned_at": "2026-11-10T00:00:00Z"
+        },
+        {
+          "id": "a473c5f1-c06f-597b-b1ab-53ea26043371",
+          "user_id": "bbfcfdc6-595d-5ff9-aee2-c53f62dbbff7",
+          "capability": "LAB_TECH",
+          "scope_key": "GLOBAL",
+          "enabled": true,
+          "assigned_by": "99d31f2a-0cc9-53b8-bb37-310ea694ef41",
+          "assigned_at": "2026-11-10T00:00:00Z"
+        },
+        {
+          "id": "117eb2ab-9fff-513e-b7c7-15b798fe9090",
+          "user_id": "efb2cfb8-7b50-58ef-9dbe-d9da81688061",
+          "capability": "LAB_REVIEW",
+          "scope_key": "GLOBAL",
+          "enabled": true,
+          "assigned_by": "99d31f2a-0cc9-53b8-bb37-310ea694ef41",
+          "assigned_at": "2026-11-10T00:00:00Z"
+        },
+        {
+          "id": "2202cea6-8578-59e3-8ab1-b25b3e966b73",
+          "user_id": "6759b405-ef24-5942-954d-b3846d4cca92",
+          "capability": "PHARMACY",
+          "scope_key": "GLOBAL",
+          "enabled": true,
+          "assigned_by": "99d31f2a-0cc9-53b8-bb37-310ea694ef41",
+          "assigned_at": "2026-11-10T00:00:00Z"
+        }
+      ]
+    },
+    "patient": {
+      "patients": [
+        {
+          "id": "1cb1d7ec-2620-5e26-9f12-02bf4150f774",
+          "ownerUserId": "9367c90c-9e4f-5d6b-b2a8-c55c2c85a610",
+          "relation": "SELF",
+          "fullName": "Nguyễn Demo An",
+          "birthDate": "1995-03-12",
+          "sex": "FEMALE",
+          "contactPhone": "0000000001",
+          "active": true,
+          "version": 1,
+          "policyVersion": 1,
+          "createdAt": "2026-11-10T01:05:00Z",
+          "updatedAt": "2026-11-10T01:05:00Z"
+        },
+        {
+          "id": "c3d50eac-48d1-5df4-941b-e3eaf28fde92",
+          "ownerUserId": "db78960c-720f-5965-9b04-9f091980ceba",
+          "relation": "SELF",
+          "fullName": "Trần Demo Bình",
+          "birthDate": "1990-05-18",
+          "sex": "MALE",
+          "contactPhone": "0000000002",
+          "active": true,
+          "version": 1,
+          "policyVersion": 1,
+          "createdAt": "2026-11-10T01:05:00Z",
+          "updatedAt": "2026-11-10T01:05:00Z"
+        }
+      ]
+    },
+    "catalog": {
+      "departments": [
+        {
+          "id": "c4f4129b-face-57e4-a659-a311f0d8cd0b",
+          "code": "DEMO-NOI",
+          "name": "Nội tổng quát mẫu",
+          "status": "ACTIVE"
+        }
+      ],
+      "doctors": [
+        {
+          "id": "543e4e87-7dcb-5612-b685-ce84b3d721f5",
+          "identity_user_id": "ffd26cd4-cbc2-5473-a5c0-7a9c4e64f480",
+          "department_id": "c4f4129b-face-57e4-a659-a311f0d8cd0b",
+          "display_name": "BS. Demo Minh",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "ea19a2f7-b99b-5bd0-ac4c-184d58477e47",
+          "identity_user_id": "bfc87b3a-8de9-5836-9495-8b79af505254",
+          "department_id": "c4f4129b-face-57e4-a659-a311f0d8cd0b",
+          "display_name": "BS. Demo Lan",
+          "status": "ACTIVE"
+        }
+      ],
+      "medical_services": [
+        {
+          "id": "65316ab7-2d21-5178-b3dd-a51702bbbcb6",
+          "department_id": "c4f4129b-face-57e4-a659-a311f0d8cd0b",
+          "code": "DEMO-KHAM",
+          "name": "Khám tổng quát mẫu",
+          "status": "ACTIVE"
+        }
+      ],
+      "medicines": [
+        {
+          "id": "b3c064cd-acd4-5cc2-9ba9-bc9d0c6a486f",
+          "code": "DEMO-MED-01",
+          "name": "Thuốc mẫu A",
+          "unit": "viên",
+          "strength": "500 mg",
+          "form": "viên nén",
+          "status": "ACTIVE"
+        }
+      ],
+      "lab_tests": [
+        {
+          "id": "d6c115e9-3634-5be8-867a-ae4d6218ac79",
+          "code": "DEMO-LAB-01",
+          "name": "Xét nghiệm mẫu",
+          "specimen_type": "BLOOD",
+          "unit": "đơn vị",
+          "reference_range": "khoảng tham chiếu mẫu",
+          "revision": 1,
+          "status": "ACTIVE"
+        }
+      ],
+      "price_versions": [
+        {
+          "id": "11de5be2-a27e-5198-8b07-8c45d749a756",
+          "item_type": "EXAM",
+          "item_id": "65316ab7-2d21-5178-b3dd-a51702bbbcb6",
+          "revision": 1,
+          "amount_vnd": 150000,
+          "effective_from": "2026-11-01T00:00:00Z",
+          "effective_to": "2026-12-01T00:00:00Z",
+          "created_by": "99d31f2a-0cc9-53b8-bb37-310ea694ef41"
+        },
+        {
+          "id": "dbb8cdad-ebc0-5fe4-97c0-60ac603abe6f",
+          "item_type": "LAB",
+          "item_id": "d6c115e9-3634-5be8-867a-ae4d6218ac79",
+          "revision": 1,
+          "amount_vnd": 100000,
+          "effective_from": "2026-11-01T00:00:00Z",
+          "effective_to": "2026-12-01T00:00:00Z",
+          "created_by": "99d31f2a-0cc9-53b8-bb37-310ea694ef41"
+        },
+        {
+          "id": "d0ed1ec0-aec9-5abf-a2ca-1629528c62a6",
+          "item_type": "MEDICINE",
+          "item_id": "b3c064cd-acd4-5cc2-9ba9-bc9d0c6a486f",
+          "revision": 1,
+          "amount_vnd": 2000,
+          "effective_from": "2026-11-01T00:00:00Z",
+          "effective_to": "2026-12-01T00:00:00Z",
+          "created_by": "99d31f2a-0cc9-53b8-bb37-310ea694ef41"
+        }
+      ]
+    },
+    "appointment": {
+      "schedules": [
+        {
+          "id": "dcac42cb-35ce-54cc-9776-821404af775c",
+          "doctorId": "543e4e87-7dcb-5612-b685-ce84b3d721f5",
+          "doctorUserId": "ffd26cd4-cbc2-5473-a5c0-7a9c4e64f480",
+          "departmentId": "c4f4129b-face-57e4-a659-a311f0d8cd0b",
+          "serviceId": "65316ab7-2d21-5178-b3dd-a51702bbbcb6",
+          "room": "P-DEMO-01",
+          "startAt": "2026-11-10T02:00:00Z",
+          "endAt": "2026-11-10T05:00:00Z",
+          "capacityPerSlot": 1,
+          "status": "OPEN",
+          "slotMinutes": 30,
+          "version": 1
+        }
+      ],
+      "slots": [
+        {
+          "id": "e5961a51-5af3-536e-bf03-d13abd6ca622",
+          "scheduleId": "dcac42cb-35ce-54cc-9776-821404af775c",
+          "startAt": "2026-11-10T02:00:00Z",
+          "endAt": "2026-11-10T02:30:00Z",
+          "capacity": 1,
+          "heldCount": 0,
+          "confirmedCount": 1
+        }
+      ],
+      "holds": [
+        {
+          "id": "d0ebd6e4-d222-50bb-8b1e-8238f4b2b9c9",
+          "principalId": "9367c90c-9e4f-5d6b-b2a8-c55c2c85a610",
+          "idempotencyKey": "1c2fda42-fba5-5d68-b660-f5ac558c8f41",
+          "patientId": "1cb1d7ec-2620-5e26-9f12-02bf4150f774",
+          "slotId": "e5961a51-5af3-536e-bf03-d13abd6ca622",
+          "doctorId": "543e4e87-7dcb-5612-b685-ce84b3d721f5",
+          "doctorUserId": "ffd26cd4-cbc2-5473-a5c0-7a9c4e64f480",
+          "departmentId": "c4f4129b-face-57e4-a659-a311f0d8cd0b",
+          "serviceId": "65316ab7-2d21-5178-b3dd-a51702bbbcb6",
+          "scheduleId": "dcac42cb-35ce-54cc-9776-821404af775c",
+          "slotStartAt": "2026-11-10T02:00:00Z",
+          "slotEndAt": "2026-11-10T02:30:00Z",
+          "status": "CONSUMED",
+          "createdAt": "2026-11-10T01:10:00Z",
+          "expiresAt": "2026-11-10T01:20:00Z",
+          "version": 2
+        }
+      ],
+      "appointments": [
+        {
+          "id": "93440dea-6eac-54c1-a067-333e6d91b0d6",
+          "requestId": "2a67255d-f857-5726-91e3-ff71af3e2f0c",
+          "sourceRevision": 1,
+          "holdId": "d0ebd6e4-d222-50bb-8b1e-8238f4b2b9c9",
+          "patientId": "1cb1d7ec-2620-5e26-9f12-02bf4150f774",
+          "principalId": "9367c90c-9e4f-5d6b-b2a8-c55c2c85a610",
+          "slotId": "e5961a51-5af3-536e-bf03-d13abd6ca622",
+          "scheduleId": "dcac42cb-35ce-54cc-9776-821404af775c",
+          "doctorId": "543e4e87-7dcb-5612-b685-ce84b3d721f5",
+          "doctorUserId": "ffd26cd4-cbc2-5473-a5c0-7a9c4e64f480",
+          "departmentId": "c4f4129b-face-57e4-a659-a311f0d8cd0b",
+          "serviceId": "65316ab7-2d21-5178-b3dd-a51702bbbcb6",
+          "startAt": "2026-11-10T02:00:00Z",
+          "endAt": "2026-11-10T02:30:00Z",
+          "state": "COMPLETED",
+          "chargeSync": "CREATED",
+          "chargeId": "f49461f3-ec23-5d35-847b-13130bad8fe1",
+          "chargeStatus": "PAID",
+          "settlementId": "659d1f0c-b064-5765-9e3b-1c0292136f61",
+          "settlementState": "SUCCEEDED",
+          "fence": 1,
+          "visitId": "9fa26179-4de2-5c99-bbeb-d51a510023bf",
+          "version": 5,
+          "createdAt": "2026-11-10T01:12:00Z",
+          "updatedAt": "2026-11-10T03:00:00Z",
+          "priceSnapshot": {
+            "priceVersionId": "11de5be2-a27e-5198-8b07-8c45d749a756",
+            "amountVnd": 150000
+          }
+        }
+      ],
+      "queue_tickets": [
+        {
+          "id": "0721e727-3516-5fd9-a224-160579525d70",
+          "appointmentId": "93440dea-6eac-54c1-a067-333e6d91b0d6",
+          "patientId": "1cb1d7ec-2620-5e26-9f12-02bf4150f774",
+          "doctorId": "543e4e87-7dcb-5612-b685-ce84b3d721f5",
+          "doctorUserId": "ffd26cd4-cbc2-5473-a5c0-7a9c4e64f480",
+          "departmentId": "c4f4129b-face-57e4-a659-a311f0d8cd0b",
+          "ticketType": "FIRST",
+          "returnRound": 0,
+          "appointmentDate": "2026-11-10",
+          "state": "DONE",
+          "claimId": "25dc3d41-e6b9-5476-9dc0-b50b53c4ddb1",
+          "visitId": "9fa26179-4de2-5c99-bbeb-d51a510023bf",
+          "version": 4,
+          "calledAt": "2026-11-10T02:00:00Z",
+          "claimedAt": "2026-11-10T02:01:00Z",
+          "completedAt": "2026-11-10T02:15:00Z",
+          "createdAt": "2026-11-10T01:55:00Z",
+          "updatedAt": "2026-11-10T02:15:00Z"
+        },
+        {
+          "id": "bb7ddce1-57be-5520-a951-12b662b184ea",
+          "appointmentId": "93440dea-6eac-54c1-a067-333e6d91b0d6",
+          "patientId": "1cb1d7ec-2620-5e26-9f12-02bf4150f774",
+          "doctorId": "543e4e87-7dcb-5612-b685-ce84b3d721f5",
+          "doctorUserId": "ffd26cd4-cbc2-5473-a5c0-7a9c4e64f480",
+          "departmentId": "c4f4129b-face-57e4-a659-a311f0d8cd0b",
+          "ticketType": "RETURN",
+          "returnRound": 1,
+          "appointmentDate": "2026-11-10",
+          "state": "DONE",
+          "claimId": "e85d5fce-0018-541d-baae-935cac5b8812",
+          "visitId": "9fa26179-4de2-5c99-bbeb-d51a510023bf",
+          "version": 4,
+          "calledAt": "2026-11-10T02:50:00Z",
+          "claimedAt": "2026-11-10T02:51:00Z",
+          "completedAt": "2026-11-10T03:00:00Z",
+          "createdAt": "2026-11-10T02:46:00Z",
+          "updatedAt": "2026-11-10T03:00:00Z"
+        }
+      ]
+    },
+    "clinical": {
+      "visits": [
+        {
+          "id": "9fa26179-4de2-5c99-bbeb-d51a510023bf",
+          "appointment_id": "93440dea-6eac-54c1-a067-333e6d91b0d6",
+          "patient_id": "1cb1d7ec-2620-5e26-9f12-02bf4150f774",
+          "doctor_user_id": "ffd26cd4-cbc2-5473-a5c0-7a9c4e64f480",
+          "department_id": "c4f4129b-face-57e4-a659-a311f0d8cd0b",
+          "claim_id": "25dc3d41-e6b9-5476-9dc0-b50b53c4ddb1",
+          "state": "SIGNED",
+          "version": 5,
+          "return_round": 1,
+          "started_at": "2026-11-10T02:01:00Z",
+          "signed_at": "2026-11-10T03:00:00Z",
+          "signed_by": "ffd26cd4-cbc2-5473-a5c0-7a9c4e64f480"
+        }
+      ],
+      "visit_notes": [
+        {
+          "id": "c43ad46e-93eb-596f-a37c-b48483434f4b",
+          "visit_id": "9fa26179-4de2-5c99-bbeb-d51a510023bf",
+          "revision": 1,
+          "symptoms": "Triệu chứng minh họa",
+          "findings": "Thông tin khám minh họa",
+          "assessment": "Đánh giá minh họa",
+          "diagnosis": "Chẩn đoán minh họa",
+          "author_user_id": "ffd26cd4-cbc2-5473-a5c0-7a9c4e64f480",
+          "saved_at": "2026-11-10T02:59:00Z"
+        }
+      ],
+      "lab_requests": [
+        {
+          "request_id": "5d6178aa-7acf-548a-96c5-f22304704d6b",
+          "visit_id": "9fa26179-4de2-5c99-bbeb-d51a510023bf",
+          "state": "PUBLISHED",
+          "order_id": "7ff6d0c1-5655-55b4-9b9f-a611b0c6c9e0",
+          "source_version": 1,
+          "tests": [
+            {
+              "testId": "d6c115e9-3634-5be8-867a-ae4d6218ac79",
+              "revision": 1,
+              "code": "DEMO-LAB-01",
+              "name": "Xét nghiệm mẫu",
+              "unit": "đơn vị",
+              "referenceRange": "khoảng tham chiếu mẫu"
+            }
+          ]
+        }
+      ],
+      "prescriptions": [
+        {
+          "id": "2a3e6767-445f-5b0c-837e-a3e530995f19",
+          "visit_id": "9fa26179-4de2-5c99-bbeb-d51a510023bf",
+          "patient_id": "1cb1d7ec-2620-5e26-9f12-02bf4150f774",
+          "revision": 1,
+          "state": "FINAL",
+          "version": 2,
+          "lines": [
+            {
+              "medicineCode": "DEMO-MED-01",
+              "nameSnapshot": "Thuốc mẫu A",
+              "doseText": "1 viên mỗi lần",
+              "quantity": 10,
+              "instruction": "Theo hướng dẫn bác sĩ"
+            }
+          ],
+          "finalized_at": "2026-11-10T03:01:00Z"
+        }
+      ]
+    },
+    "diagnostic": {
+      "lab_orders": [
+        {
+          "id": "7ff6d0c1-5655-55b4-9b9f-a611b0c6c9e0",
+          "requestId": "5d6178aa-7acf-548a-96c5-f22304704d6b",
+          "visitId": "9fa26179-4de2-5c99-bbeb-d51a510023bf",
+          "patientId": "1cb1d7ec-2620-5e26-9f12-02bf4150f774",
+          "doctorId": "543e4e87-7dcb-5612-b685-ce84b3d721f5",
+          "state": "PUBLISHED",
+          "version": 4,
+          "sourceRevision": 1,
+          "chargeId": "48536d14-1ff6-52f6-8c8b-3d7dbda4ad11",
+          "chargeState": "PAID",
+          "amountVnd": 100000,
+          "tests": [
+            {
+              "testId": "d6c115e9-3634-5be8-867a-ae4d6218ac79",
+              "revision": 1,
+              "code": "DEMO-LAB-01",
+              "name": "Xét nghiệm mẫu",
+              "unit": "đơn vị",
+              "referenceRange": "khoảng tham chiếu mẫu"
+            }
+          ],
+          "linesSnapshot": [
+            {
+              "itemId": "d6c115e9-3634-5be8-867a-ae4d6218ac79",
+              "code": "DEMO-LAB-01",
+              "name": "Xét nghiệm mẫu",
+              "quantity": 1,
+              "unitPriceVnd": 100000,
+              "priceVersionId": "dbb8cdad-ebc0-5fe4-97c0-60ac603abe6f",
+              "revision": 1
+            }
+          ],
+          "createdAt": "2026-11-10T02:05:00Z"
+        }
+      ],
+      "specimens": [
+        {
+          "id": "db1e5d39-91d1-5e34-befd-a60600175c19",
+          "order_id": "7ff6d0c1-5655-55b4-9b9f-a611b0c6c9e0",
+          "sequence": 1,
+          "state": "COLLECTED",
+          "barcode": "DEMO-BARCODE-001",
+          "collected_at": "2026-11-10T02:20:00Z",
+          "collected_by": "bbfcfdc6-595d-5ff9-aee2-c53f62dbbff7",
+          "version": 1
+        }
+      ],
+      "results": [
+        {
+          "id": "9f28496b-fff0-5c58-9002-c90d60e78fca",
+          "order_id": "7ff6d0c1-5655-55b4-9b9f-a611b0c6c9e0",
+          "specimen_id": "db1e5d39-91d1-5e34-befd-a60600175c19",
+          "revision": 1,
+          "state": "PUBLISHED",
+          "entered_by": "bbfcfdc6-595d-5ff9-aee2-c53f62dbbff7",
+          "submitted_at": "2026-11-10T02:35:00Z",
+          "published_at": "2026-11-10T02:45:00Z",
+          "version": 3,
+          "contributor_user_ids": [
+            "bbfcfdc6-595d-5ff9-aee2-c53f62dbbff7"
+          ]
+        }
+      ],
+      "result_items": [
+        {
+          "id": "9f496d39-b907-56ea-8f64-0f286cf2a113",
+          "result_id": "9f28496b-fff0-5c58-9002-c90d60e78fca",
+          "test_code": "DEMO-LAB-01",
+          "value_text": "Giá trị mẫu",
+          "unit": "đơn vị",
+          "reference_range": "khoảng tham chiếu mẫu",
+          "flag": "NORMAL"
+        }
+      ],
+      "reviews": [
+        {
+          "id": "17682ec1-a371-5d9c-baac-2566998e02a1",
+          "result_id": "9f28496b-fff0-5c58-9002-c90d60e78fca",
+          "reviewer_user_id": "efb2cfb8-7b50-58ef-9dbe-d9da81688061",
+          "decision": "PUBLISH",
+          "reviewed_at": "2026-11-10T02:45:00Z"
+        }
+      ]
+    },
+    "pharmacy": {
+      "inventory": [
+        {
+          "id": "fdc20ccb-c7e5-53b7-9da7-219df705db8b",
+          "medicineId": "b3c064cd-acd4-5cc2-9ba9-bc9d0c6a486f",
+          "medicineCode": "DEMO-MED-01",
+          "onHand": 90,
+          "reserved": 0,
+          "version": 3,
+          "updatedAt": "2026-11-10T03:10:00Z"
+        }
+      ],
+      "prescription_projection": [
+        {
+          "id": "2a3e6767-445f-5b0c-837e-a3e530995f19:1",
+          "prescriptionId": "2a3e6767-445f-5b0c-837e-a3e530995f19",
+          "revision": 1,
+          "visitId": "9fa26179-4de2-5c99-bbeb-d51a510023bf",
+          "patientId": "1cb1d7ec-2620-5e26-9f12-02bf4150f774",
+          "linesSnapshot": [
+            {
+              "medicineCode": "DEMO-MED-01",
+              "nameSnapshot": "Thuốc mẫu A",
+              "doseText": "1 viên mỗi lần",
+              "quantity": 10,
+              "instruction": "Theo hướng dẫn bác sĩ"
+            }
+          ],
+          "finalizedAt": "2026-11-10T03:01:00Z",
+          "state": "FINAL",
+          "itemsSnapshot": [
+            {
+              "medicineCode": "DEMO-MED-01",
+              "nameSnapshot": "Thuốc mẫu A",
+              "doseText": "1 viên mỗi lần",
+              "quantity": 10,
+              "instruction": "Theo hướng dẫn bác sĩ"
+            }
+          ]
+        }
+      ],
+      "medication_holds": [
+        {
+          "id": "fba000c8-114e-5266-b5a5-cdfc13ded52c",
+          "prescriptionId": "2a3e6767-445f-5b0c-837e-a3e530995f19",
+          "revision": 1,
+          "attemptNo": 1,
+          "status": "DISPENSED",
+          "itemsSnapshot": [
+            {
+              "medicineId": "b3c064cd-acd4-5cc2-9ba9-bc9d0c6a486f",
+              "medicineCode": "DEMO-MED-01",
+              "nameSnapshot": "Thuốc mẫu A",
+              "quantity": 10,
+              "priceVersionId": "d0ed1ec0-aec9-5abf-a2ca-1629528c62a6",
+              "doseText": "1 viên mỗi lần",
+              "instruction": "Theo hướng dẫn bác sĩ",
+              "unitAmountVnd": 2000,
+              "priceVersion": 1
+            }
+          ],
+          "patientId": "1cb1d7ec-2620-5e26-9f12-02bf4150f774",
+          "chargeId": "eed9245f-27e8-563a-b4c4-d55f831f1692",
+          "settlementId": "c04145ba-8f8d-5015-a769-f6deeb8b8f3c",
+          "settlementState": "SUCCEEDED",
+          "fence": 1,
+          "expiresAt": "2026-11-10T03:18:00Z",
+          "dispensedAt": "2026-11-10T03:10:00Z",
+          "version": 4,
+          "recipientUserId": "9367c90c-9e4f-5d6b-b2a8-c55c2c85a610",
+          "amountVnd": 20000,
+          "currency": "VND",
+          "chargeSync": "CREATED",
+          "createdAt": "2026-11-10T03:03:00Z",
+          "updatedAt": "2026-11-10T03:10:00Z"
+        }
+      ],
+      "dispenses": [
+        {
+          "id": "62182d7a-b78c-5781-b08a-550ed42fd9d5",
+          "holdId": "fba000c8-114e-5266-b5a5-cdfc13ded52c",
+          "prescriptionId": "2a3e6767-445f-5b0c-837e-a3e530995f19",
+          "revision": 1,
+          "actorUserId": "6759b405-ef24-5942-954d-b3846d4cca92",
+          "itemsSnapshot": [
+            {
+              "medicineId": "b3c064cd-acd4-5cc2-9ba9-bc9d0c6a486f",
+              "medicineCode": "DEMO-MED-01",
+              "nameSnapshot": "Thuốc mẫu A",
+              "quantity": 10,
+              "priceVersionId": "d0ed1ec0-aec9-5abf-a2ca-1629528c62a6",
+              "doseText": "1 viên mỗi lần",
+              "instruction": "Theo hướng dẫn bác sĩ",
+              "unitAmountVnd": 2000,
+              "priceVersion": 1
+            }
+          ],
+          "dispensedAt": "2026-11-10T03:10:00Z",
+          "attemptNo": 1
+        }
+      ],
+      "stock_receipts": [
+        {
+          "id": "b5aa7692-e5ac-5b60-9555-5c412526cd90",
+          "receiptKey": "6759b405-ef24-5942-954d-b3846d4cca92:5c00ed65-4467-5359-b5f8-db59c77bcff9",
+          "actorUserId": "6759b405-ef24-5942-954d-b3846d4cca92",
+          "items": [
+            {
+              "medicineId": "b3c064cd-acd4-5cc2-9ba9-bc9d0c6a486f",
+              "quantity": 100,
+              "batchRef": "DEMO-BATCH-01"
+            }
+          ],
+          "receivedAt": "2026-11-10T01:00:00Z"
+        }
+      ]
+    },
+    "billing": {
+      "charges": [
+        {
+          "id": "f49461f3-ec23-5d35-847b-13130bad8fe1",
+          "patient_id": "1cb1d7ec-2620-5e26-9f12-02bf4150f774",
+          "recipient_user_id": "9367c90c-9e4f-5d6b-b2a8-c55c2c85a610",
+          "source_type": "APPOINTMENT",
+          "source_id": "93440dea-6eac-54c1-a067-333e6d91b0d6",
+          "source_revision": 1,
+          "amount_vnd": 150000,
+          "state": "PAID",
+          "price_snapshot": {
+            "amountVnd": 150000
+          },
+          "version": 2,
+          "settlement_id": "659d1f0c-b064-5765-9e3b-1c0292136f61",
+          "settlement_state": "SUCCEEDED",
+          "settlement_saga_id": "659d1f0c-b064-5765-9e3b-1c0292136f61"
+        },
+        {
+          "id": "48536d14-1ff6-52f6-8c8b-3d7dbda4ad11",
+          "patient_id": "1cb1d7ec-2620-5e26-9f12-02bf4150f774",
+          "recipient_user_id": "9367c90c-9e4f-5d6b-b2a8-c55c2c85a610",
+          "source_type": "LAB_ORDER",
+          "source_id": "7ff6d0c1-5655-55b4-9b9f-a611b0c6c9e0",
+          "source_revision": 1,
+          "amount_vnd": 100000,
+          "state": "PAID",
+          "price_snapshot": {
+            "amountVnd": 100000
+          },
+          "version": 2,
+          "settlement_id": "210f8913-a2f9-5065-8e91-6b3c36bc3957",
+          "settlement_state": "SUCCEEDED",
+          "settlement_saga_id": "210f8913-a2f9-5065-8e91-6b3c36bc3957"
+        },
+        {
+          "id": "eed9245f-27e8-563a-b4c4-d55f831f1692",
+          "patient_id": "1cb1d7ec-2620-5e26-9f12-02bf4150f774",
+          "recipient_user_id": "9367c90c-9e4f-5d6b-b2a8-c55c2c85a610",
+          "source_type": "MED_HOLD",
+          "source_id": "fba000c8-114e-5266-b5a5-cdfc13ded52c",
+          "source_revision": 1,
+          "amount_vnd": 20000,
+          "state": "PAID",
+          "price_snapshot": {
+            "amountVnd": 20000
+          },
+          "version": 2,
+          "settlement_id": "c04145ba-8f8d-5015-a769-f6deeb8b8f3c",
+          "settlement_state": "SUCCEEDED",
+          "settlement_saga_id": "c04145ba-8f8d-5015-a769-f6deeb8b8f3c"
+        }
+      ],
+      "settlement_sagas": [
+        {
+          "id": "659d1f0c-b064-5765-9e3b-1c0292136f61",
+          "charge_id": "f49461f3-ec23-5d35-847b-13130bad8fe1",
+          "source_type": "APPOINTMENT",
+          "source_id": "93440dea-6eac-54c1-a067-333e6d91b0d6",
+          "source_revision": 1,
+          "state": "SUCCEEDED",
+          "fence": 1,
+          "decision_version": 1,
+          "version": 3
+        },
+        {
+          "id": "210f8913-a2f9-5065-8e91-6b3c36bc3957",
+          "charge_id": "48536d14-1ff6-52f6-8c8b-3d7dbda4ad11",
+          "source_type": "LAB_ORDER",
+          "source_id": "7ff6d0c1-5655-55b4-9b9f-a611b0c6c9e0",
+          "source_revision": 1,
+          "state": "SUCCEEDED",
+          "fence": 1,
+          "decision_version": 1,
+          "version": 3
+        },
+        {
+          "id": "c04145ba-8f8d-5015-a769-f6deeb8b8f3c",
+          "charge_id": "eed9245f-27e8-563a-b4c4-d55f831f1692",
+          "source_type": "MED_HOLD",
+          "source_id": "fba000c8-114e-5266-b5a5-cdfc13ded52c",
+          "source_revision": 1,
+          "state": "SUCCEEDED",
+          "fence": 1,
+          "decision_version": 1,
+          "version": 3
+        }
+      ],
+      "payments": [
+        {
+          "id": "b4a31193-b09b-5fcf-9ad2-68e6d8a482cd",
+          "charge_id": "f49461f3-ec23-5d35-847b-13130bad8fe1",
+          "saga_id": "659d1f0c-b064-5765-9e3b-1c0292136f61",
+          "transaction_id": "DEMO-TXN-1",
+          "amount_vnd": 150000,
+          "state": "SUCCEEDED",
+          "method": "SIMULATION",
+          "attempted_at": "2026-11-10T01:13:00Z",
+          "paid_at": "2026-11-10T01:13:00Z",
+          "source_revision": 1,
+          "settlement_id": "659d1f0c-b064-5765-9e3b-1c0292136f61",
+          "fence": 1
+        },
+        {
+          "id": "2f151272-75d1-5620-b327-929fc7a7549d",
+          "charge_id": "48536d14-1ff6-52f6-8c8b-3d7dbda4ad11",
+          "saga_id": "210f8913-a2f9-5065-8e91-6b3c36bc3957",
+          "transaction_id": "DEMO-TXN-2",
+          "amount_vnd": 100000,
+          "state": "SUCCEEDED",
+          "method": "SIMULATION",
+          "attempted_at": "2026-11-10T02:10:00Z",
+          "paid_at": "2026-11-10T02:10:00Z",
+          "source_revision": 1,
+          "settlement_id": "210f8913-a2f9-5065-8e91-6b3c36bc3957",
+          "fence": 1
+        },
+        {
+          "id": "4a959117-2c76-53b1-8f5d-d04a1b14c00b",
+          "charge_id": "eed9245f-27e8-563a-b4c4-d55f831f1692",
+          "saga_id": "c04145ba-8f8d-5015-a769-f6deeb8b8f3c",
+          "transaction_id": "DEMO-TXN-3",
+          "amount_vnd": 20000,
+          "state": "SUCCEEDED",
+          "method": "SIMULATION",
+          "attempted_at": "2026-11-10T03:05:00Z",
+          "paid_at": "2026-11-10T03:05:00Z",
+          "source_revision": 1,
+          "settlement_id": "c04145ba-8f8d-5015-a769-f6deeb8b8f3c",
+          "fence": 1
+        }
+      ],
+      "receipts": [
+        {
+          "id": "e23d7075-d819-5f62-bec1-807863f2731f",
+          "payment_id": "b4a31193-b09b-5fcf-9ad2-68e6d8a482cd",
+          "charge_id": "f49461f3-ec23-5d35-847b-13130bad8fe1",
+          "receipt_no": "DEMO-RCPT-1",
+          "amount_vnd": 150000,
+          "issued_at": "2026-11-10T01:13:00Z"
+        },
+        {
+          "id": "976e9b1a-0fcf-5b43-bec8-faf0e3729ac2",
+          "payment_id": "2f151272-75d1-5620-b327-929fc7a7549d",
+          "charge_id": "48536d14-1ff6-52f6-8c8b-3d7dbda4ad11",
+          "receipt_no": "DEMO-RCPT-2",
+          "amount_vnd": 100000,
+          "issued_at": "2026-11-10T02:10:00Z"
+        },
+        {
+          "id": "92a7db1d-5407-535d-915e-05872b6f1ec3",
+          "payment_id": "4a959117-2c76-53b1-8f5d-d04a1b14c00b",
+          "charge_id": "eed9245f-27e8-563a-b4c4-d55f831f1692",
+          "receipt_no": "DEMO-RCPT-3",
+          "amount_vnd": 20000,
+          "issued_at": "2026-11-10T03:05:00Z"
+        }
+      ]
+    },
+    "notification": {
+      "notifications": [
+        {
+          "id": "9f4907bf-e454-51e9-8306-c3d685899d92",
+          "user_id": "9367c90c-9e4f-5d6b-b2a8-c55c2c85a610",
+          "kind": "DIAGNOSTIC",
+          "title": "Có kết quả xét nghiệm mới",
+          "body": "Mở ứng dụng để xem trạng thái đã được hệ thống xác nhận.",
+          "payload": {
+            "orderId": "7ff6d0c1-5655-55b4-9b9f-a611b0c6c9e0",
+            "publishedAt": "2026-11-10T02:45:00Z"
+          },
+          "created_at": "2026-11-10T02:45:00Z",
+          "read_at": null
+        },
+        {
+          "id": "90c9de7a-1c80-5e52-a2af-1ce84c26713f",
+          "user_id": "9367c90c-9e4f-5d6b-b2a8-c55c2c85a610",
+          "kind": "PHARMACY",
+          "title": "Đã cấp phát đơn thuốc",
+          "body": "Mở ứng dụng để xem trạng thái đã được hệ thống xác nhận.",
+          "payload": {
+            "prescriptionId": "2a3e6767-445f-5b0c-837e-a3e530995f19",
+            "holdId": "fba000c8-114e-5266-b5a5-cdfc13ded52c",
+            "revision": 1,
+            "attemptNo": 1,
+            "dispensedAt": "2026-11-10T03:10:00Z"
+          },
+          "created_at": "2026-11-10T03:10:00Z",
+          "read_at": null
+        }
+      ]
+    }
+  }
+}

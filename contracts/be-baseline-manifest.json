@@ -5,19 +5,19 @@
   "sources": [
     {
       "path": "docs/UMC_Care_API_86_9_Service_v5_2 - 01_HTTP_86.csv",
-      "sha256": "5bc6194d58edba21584bea87938484529016c49cd3f58fe7bd4327a75f0bba52"
+      "sha256": "cec0aea1ab77207b6b5508a6e90c1e8103f01af8f47f466dde6a9ef1f72a12ed"
     },
     {
       "path": "docs/UMC_Care_API_86_9_Service_v5_2 - 02_ThamSo.csv",
-      "sha256": "2d0157f975be27e606734a02092f799317f1dc3cd8b17b0528aea7f2620d5181"
+      "sha256": "594cbdcd95b7f1052f3a30ee8cd3f753b3e5c7e6305e14cd52d5c8b197874886"
     },
     {
       "path": "docs/UMC_Care_API_86_9_Service_v5_2 - 03_PhanHoi.csv",
-      "sha256": "f17c15a7abfb0dc2cf2c8d37346d2f4e6805574ccfb02567d1c08e2f5da73d2c"
+      "sha256": "66714083b2d8920bfaf311b20b5df51094ff09c8c487c26a43f9aadb50028888"
     },
     {
       "path": "docs/UMC_Care_API_86_9_Service_v5_2 - 04_Events_18.csv",
-      "sha256": "6934e1581155a98e73ecf2b9a25a69df72dd912a1a91f882bdc94006e0770b2d"
+      "sha256": "20cf4f3b32e8c7455695cc9ac1b1e7cf1033971d0de24162fa3192260b141454"
     },
     {
       "path": "docs/UMC_Care_API_86_9_Service_v5_2 - 05_Commands_5.csv",
@@ -35,7 +35,7 @@
     "C04": "Lease action API-ID with hyphen, max30s no expiry leeway; access/lease/service token types separate; expired401 AUTHZ_LEASE_EXPIRED.",
     "C05": "FAILED/REJECTED LAB unresolved until audited revisioned resubmit or valid cancellation; no new HTTP operation.",
     "C06": "Stable medication hold per prescription revision; retain reserved at COMMITTED, decrement onHand/reserved only at DISPENSED.",
-    "C07": "Notification durable technical retry/quarantine; no additional domain event beyond18.",
+    "C07": "Notification durable technical retry/quarantine; ticket and visit-grant events are owned by Appointment and Clinical.",
     "C08": "Three recovery operations disabled by default; private SERVICE identity plus owner evidence required.",
     "C09": "Integer VND <=9007199254740991 in interoperable JSON; immutable64hex snapshot hash; Billing must not reprice.",
     "C10": "Source DOCX/workbook v5.2 plus Git24Oct; user overrides Node TypeScript to CommonJS; onePGsixDB and Mongo3DB."
@@ -1117,7 +1117,7 @@
       "Exchange": "umc.events.{producer}.v1",
       "Routing key": "identity.identity-access-changed.v1",
       "Queue nhận": "evt.appointment.v1, evt.billing.v1, evt.catalog.v1, evt.clinical.v1, evt.diagnostic.v1, evt.notification.v1, evt.patient.v1, evt.pharmacy.v1",
-      "Quy tắc nghiệp vụ": "userId, status, actorType, capabilities, tokenVersion, phoneVerified, version. Projection quyền và trạng thái tài khoản; không mang mật khẩu/OTP/phone đầy đủ"
+      "Quy tắc nghiệp vụ": "Projection quyền và trạng thái tài khoản. phoneVerified giữ nguyên tên và được bật khi xác minh OTP đăng ký qua email, không chứng minh quyền sở hữu số điện thoại. Payload không mang mật khẩu, OTP, email hoặc số điện thoại đầy đủ."
     },
     {
       "Event": "ChargePrepared",
@@ -1168,6 +1168,26 @@
       "Routing key": "billing.settlement-decision.v1",
       "Queue nhận": "evt.appointment.v1, evt.diagnostic.v1, evt.pharmacy.v1",
       "Quy tắc nghiệp vụ": "settlementId, sourceId, sourceRevision, decisionVersion, state, fence?, paymentId?. SUCCEEDED/FAILED/UNKNOWN; UNKNOWN không mở khóa"
+    },
+    {
+      "Event": "QueueTicketChanged",
+      "Producer": "Appointment",
+      "Consumer": "Clinical",
+      "Payload fields (? = tùy chọn)": "ticketId, appointmentId, patientId, doctorId, doctorUserId, departmentId, ticketType, state, version, visitId?",
+      "Exchange": "umc.events.appointment.v1",
+      "Routing key": "appointment.queue-ticket-changed.v1",
+      "Queue nhận": "evt.clinical.v1",
+      "Quy tắc nghiệp vụ": "Snapshot từ outbox Appointment. Clinical áp dụng version tăng dần. Vé RETURN gắn visitId."
+    },
+    {
+      "Event": "VisitDoctorGrantChanged",
+      "Producer": "Clinical",
+      "Consumer": "Diagnostic",
+      "Payload fields (? = tùy chọn)": "mode, sequence, visitId?, patientId?, doctorUserId?, active?, canCancel?",
+      "Exchange": "umc.events.clinical.v1",
+      "Routing key": "clinical.visit-doctor-grant-changed.v1",
+      "Queue nhận": "evt.diagnostic.v1",
+      "Quy tắc nghiệp vụ": "UPSERT quyền theo lượt khám. CHECKPOINT kiểm tra tiến độ và độ mới của luồng quyền."
     }
   ],
   "commands": [

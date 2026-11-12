@@ -103,6 +103,7 @@ func DeclareOwned(ch *amqp.Channel) error {
 		{"umc.events.catalog.v1", "catalog.catalog-changed.v1", "evt.diagnostic.v1"},
 		{"umc.events.identity.v1", "identity.identity-access-changed.v1", "evt.diagnostic.v1"},
 		{"umc.events.patient.v1", "patient.patient-access-changed.v1", "evt.diagnostic.v1"},
+		{"umc.events.clinical.v1", "clinical.visit-doctor-grant-changed.v1", "evt.diagnostic.v1"},
 	} {
 		if e := ch.QueueBind(binding[2], binding[1], binding[0], false, nil); e != nil {
 			return e

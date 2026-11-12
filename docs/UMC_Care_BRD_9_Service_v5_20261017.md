@@ -79,8 +79,8 @@ Có ba actor: PATIENT, DOCTOR và STAFF. STAFF là nhóm người dùng, quyền
 
 | **Mã** | **Yêu cầu** |
 | --- | --- |
-| **BR-01** | Người bệnh tự đăng ký bằng số điện thoại, nhận và xác minh OTP rồi đăng nhập; có gửi lại OTP và lỗi rõ ràng. Môi trường demo có kênh nhận mã giả lập cho dữ liệu giả. |
-| **BR-02** | Người bệnh quên/đặt lại mật khẩu bằng OTP, đổi mật khẩu từ phiên hợp lệ và đăng xuất; đổi hoặc đặt lại thu hồi phiên cũ. |
+| **BR-01** | Người bệnh tự đăng ký bằng số điện thoại, email và mật khẩu, xác minh tài khoản bằng OTP nhận qua email rồi đăng nhập bằng số điện thoại và mật khẩu. Có gửi lại OTP và thông báo lỗi rõ ràng. Demo dùng hộp thư kiểm thử hoặc chế độ nhận mã offline. |
+| **BR-02** | Khi quên mật khẩu, người bệnh nhập số điện thoại và dùng OTP gửi đến email đã lưu để đặt lại mật khẩu. Người bệnh có thể đổi mật khẩu từ phiên hợp lệ và đăng xuất. Đổi hoặc đặt lại mật khẩu thu hồi phiên cũ. |
 
 ## Hồ sơ
 
@@ -290,7 +290,7 @@ Baseline có 86 operation HTTP: 83 endpoint client/tác vụ đi Gateway và 3 a
 
 | **Mã** | **Kịch bản đạt** |
 | --- | --- |
-| **BAC-01** | Đăng ký → OTP → login, quên/đổi mật khẩu chạy trên web và Android; OTP sai/hết hạn/replay không tạo quyền. |
+| **BAC-01** | Trên web và Android, đăng ký với số điện thoại và email, xác minh OTP nhận qua email rồi đăng nhập bằng số điện thoại. Khi quên mật khẩu, nhận OTP qua email đã lưu. Kiểm tra đổi mật khẩu và từ chối OTP sai, hết hạn hoặc đã dùng. |
 | **BAC-02** | Cùng tài khoản tạo hồ sơ bản thân/người thân; truy cập hồ sơ khác bị 403; nhân viên chỉ thấy phạm vi được gán. |
 | **BAC-03** | Hai người tranh chỗ cuối: chỉ một hold/booking thành công; hold hết hạn trả chỗ; tiền đến muộn không xác nhận lịch đã EXPIRED và có đường hoàn; retry không thu lặp. |
 | **BAC-04** | Đổi lịch hợp lệ giữ slot mới rồi trả slot cũ; lỗi hoặc timeout vẫn giữ lịch cũ. Hủy có căn cứ và trạng thái hoàn riêng. |

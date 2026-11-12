@@ -69,6 +69,18 @@ class DiagnosticPublishedResultsLeaseTests(TestCase):
     def test_doctor_obtains_current_signed_published_results_lease(self):
         self.assert_bound_lease("DOCTOR")
 
+    def test_lab_cancellation_lease_is_doctor_only(self):
+        doctor = self.user("DOCTOR")
+        response = self.session(doctor, "DI-012")
+        self.assertEqual(response.status_code, 200, response.json())
+        claims = jwt.decode(
+            response.json()["data"]["authorizationLease"], self.public, algorithms=["RS256"],
+            issuer="umc-care-identity", audience="umc-care-services",
+        )
+        self.assertEqual(claims["action"], "DI-012")
+        self.assertEqual(claims["exp"] - claims["iat"], 30)
+        self.assertEqual(self.session(self.user("PATIENT"), "DI-012").status_code, 403)
+
     def test_staff_capabilities_and_stale_doctor_claim_cannot_grant_results_lease(self):
         user = self.user("STAFF")
         for capability in ["ADMIN", "RECEPTION", "LAB_TECH", "LAB_REVIEW"]:

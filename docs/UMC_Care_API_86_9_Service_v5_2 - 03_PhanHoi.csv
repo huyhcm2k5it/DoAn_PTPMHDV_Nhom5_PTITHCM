@@ -3,21 +3,21 @@
 UMC Care · hợp đồng API v5.2 đã rà soát · 17/10/2026 · chưa biểu thị trạng thái đã code,,,,,
 ,,,,,
 API ID,HTTP status,Loại,Error code,Ý nghĩa,Dữ liệu / schema
-IA-001,201,Thành công,,Hoàn tất thao tác tạo tài khoản và otp đăng ký. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"userId: string:uuid, status: string, otpExpiresAt: string:date-time"
-IA-001,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
+IA-001,201,Thành công,,Tài khoản chờ xác minh và Identity đã chuyển OTP REGISTER cho kênh gửi email đã cấu hình. meta.correlationId dùng để truy vết yêu cầu.,"userId: string:uuid, status: string, otpExpiresAt: string:date-time"
+IA-001,400,Lỗi,VALIDATION_ERROR,"Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào. Email bỏ trống hoặc sai định dạng cũng trả VALIDATION_ERROR.",ErrorResponse
 IA-001,409,Lỗi,PHONE_ALREADY_REGISTERED,PHONE_ALREADY_REGISTERED: Số điện thoại đã có tài khoản.,ErrorResponse
 IA-001,429,Lỗi,RATE_LIMITED,RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.,ErrorResponse
-IA-001,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+IA-001,503,Lỗi,SERVICE_UNAVAILABLE,OpenAPI khai báo SERVICE_UNAVAILABLE. Identity hiện trả EMAIL_UNAVAILABLE khi kênh gửi OTP lỗi.,ErrorResponse
 IA-002,200,Thành công,,Hoàn tất thao tác xác minh otp theo purpose. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"verified: boolean, status: string"
 IA-002,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
 IA-002,409,Lỗi,"OTP_EXPIRED, OTP_ALREADY_USED",OTP_EXPIRED: OTP đã quá hạn.; OTP_ALREADY_USED: OTP đã được dùng.,ErrorResponse
 IA-002,429,Lỗi,RATE_LIMITED,RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.,ErrorResponse
 IA-002,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
-IA-003,200,Thành công,,Hoàn tất thao tác gửi lại otp có rate limit. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"accepted: boolean, retryAfterSeconds: integer:int32"
+IA-003,200,Thành công,,Identity đã chuyển OTP mới cho kênh gửi đến email đã lưu. Kết quả kèm thời gian chờ gửi lại và meta.correlationId.,"accepted: boolean, retryAfterSeconds: integer:int32"
 IA-003,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
 IA-003,409,Lỗi,OTP_NOT_RESENDABLE_YET,OTP_NOT_RESENDABLE_YET: Chưa hết thời gian chờ để gửi lại OTP.,ErrorResponse
 IA-003,429,Lỗi,RATE_LIMITED,RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.,ErrorResponse
-IA-003,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+IA-003,503,Lỗi,SERVICE_UNAVAILABLE,OpenAPI khai báo SERVICE_UNAVAILABLE. Identity hiện trả EMAIL_UNAVAILABLE nếu không có email đích hoặc kênh gửi OTP lỗi.,ErrorResponse
 IA-004,200,Thành công,,Hoàn tất thao tác đăng nhập cho cả ba actor. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"accessToken: string, refreshToken: string, actorType: string, expiresInSeconds: integer:int32"
 IA-004,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
 IA-004,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
@@ -33,10 +33,10 @@ IA-006,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu
 IA-006,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
 IA-006,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 IA-006,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
-IA-007,200,Thành công,,Hoàn tất thao tác xin otp đặt lại mật khẩu. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"accepted: boolean, retryAfterSeconds: integer:int32"
+IA-007,200,Thành công,,Yêu cầu được tiếp nhận. Identity trả cùng phản hồi nếu không có tài khoản ACTIVE hoặc không gửi được email. accepted không xác nhận OTP đã được gửi.,"accepted: boolean, retryAfterSeconds: integer:int32"
 IA-007,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
 IA-007,429,Lỗi,RATE_LIMITED,RATE_LIMITED: Vượt giới hạn tần suất; client chờ trước khi gửi lại.,ErrorResponse
-IA-007,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
+IA-007,503,Lỗi,SERVICE_UNAVAILABLE,OpenAPI khai báo SERVICE_UNAVAILABLE. Riêng lỗi gửi email OTP được xử lý với phản hồi 200 accepted.,ErrorResponse
 IA-008,200,Thành công,,Hoàn tất thao tác đặt lại bằng otp. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,changed: boolean
 IA-008,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
 IA-008,409,Lỗi,"OTP_EXPIRED, OTP_ALREADY_USED",OTP_EXPIRED: OTP đã quá hạn.; OTP_ALREADY_USED: OTP đã được dùng.,ErrorResponse

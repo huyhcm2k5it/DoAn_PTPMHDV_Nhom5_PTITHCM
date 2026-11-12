@@ -13,7 +13,7 @@ class BaselineTests(unittest.TestCase):
         self.assertEqual(len(manifest["http"]), 86)
         self.assertEqual(len({row["id"] for row in manifest["http"]}), 86)
         self.assertEqual(sum(row["profile"] == "normal" for row in manifest["http"]), 83)
-        self.assertEqual(len(manifest["events"]), 18)
+        self.assertEqual(len(manifest["events"]), 20)
         self.assertEqual(len(manifest["commands"]), 5)
         self.assertEqual(set(manifest["decisions"]), {f"C{i:02}" for i in range(1, 11)})
         self.assertEqual(manifest["ownerApproval"], "PENDING_REVIEW")

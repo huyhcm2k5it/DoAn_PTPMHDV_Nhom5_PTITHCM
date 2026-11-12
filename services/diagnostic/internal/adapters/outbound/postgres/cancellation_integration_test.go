@@ -19,7 +19,9 @@ func (s visitGrantStore) Within(ctx context.Context, lock string, fn func(ports.
 	return s.Probe.Within(ctx, lock, func(tx ports.Tx) error { return fn(visitGrantTx{tx}) })
 }
 
-func (visitGrantTx) VerifyVisitGrant(context.Context, string, string) error { return nil }
+func (visitGrantTx) VerifyVisitGrant(context.Context, string, string, string, bool, time.Time) error {
+	return nil
+}
 
 func TestCancellationRejectsInFlightChargeBeforeDelayedChargePrepared(t *testing.T) {
 	db := testDB(t)

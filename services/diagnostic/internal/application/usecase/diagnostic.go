@@ -110,17 +110,8 @@ func (s *Service) Detail(ctx context.Context, p domain.Principal, id string) (ou
 			if !ok {
 				return domain.Fail("SERVICE_UNAVAILABLE", "Current doctor-visit grant projection unavailable")
 			}
-			if err := verifier.VerifyVisitGrant(ctx, o.VisitID, domain.ID(p.UserID)); err != nil {
+			if err := verifier.VerifyVisitGrant(ctx, o.VisitID, o.PatientID, domain.ID(p.UserID), false, s.now()); err != nil {
 				return err
-			}
-			var mapping struct {
-				IdentityUserID string `json:"identityUserId"`
-			}
-			if err := load(ctx, t, "DOCTOR", o.DoctorID, &mapping); err != nil {
-				return domain.Fail("SERVICE_UNAVAILABLE", "Doctor projection unavailable")
-			}
-			if domain.ID(mapping.IdentityUserID) != domain.ID(p.UserID) {
-				return domain.Fail("NOT_FOUND", "Order not found")
 			}
 		}
 		out = domain.Detail{Order: o, Specimens: o.Specimens, Results: []domain.Result{}}

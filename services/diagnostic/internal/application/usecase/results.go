@@ -30,10 +30,11 @@ func (s *Service) PublishedResults(ctx context.Context, p domain.Principal, pati
 		if access.Status != "ACTIVE" || access.ActorType != p.ActorType || access.TokenVersion != p.TokenVersion {
 			return domain.Fail("FORBIDDEN", "Access revoked")
 		}
-		if p.ActorType == "DOCTOR" {
-			return domain.Fail("SERVICE_UNAVAILABLE", "Current doctor-patient grant projection unavailable")
+		doctorReader, supportsDoctor := t.(ports.DoctorPublishedResultsRecords)
+		if p.ActorType == "DOCTOR" && !supportsDoctor {
+			return domain.Fail("SERVICE_UNAVAILABLE", "Current doctor-visit grant projection unavailable")
 		}
-		if p.ActorType != "PATIENT" || access.ActorType != "PATIENT" {
+		if p.ActorType != "PATIENT" && p.ActorType != "DOCTOR" {
 			return domain.Fail("FORBIDDEN", "Patient owner required")
 		}
 		var patient struct {
@@ -45,10 +46,15 @@ func (s *Service) PublishedResults(ctx context.Context, p domain.Principal, pati
 		} else if e != nil {
 			return domain.Fail("SERVICE_UNAVAILABLE", "Patient access projection unavailable")
 		}
-		if !patient.Active || domain.ID(patient.OwnerUserID) != domain.ID(p.UserID) {
+		if !patient.Active || (p.ActorType == "PATIENT" && domain.ID(patient.OwnerUserID) != domain.ID(p.UserID)) {
 			return domain.Fail("NOT_FOUND", "Patient not found")
 		}
-		if reader, ok := t.(ports.PublishedResultsRecords); ok {
+		if p.ActorType == "DOCTOR" {
+			out, e = doctorReader.PublishedResultsForDoctor(ctx, domain.ID(patientID), domain.ID(p.UserID), page, limit, s.now())
+			if e != nil {
+				return e
+			}
+		} else if reader, ok := t.(ports.PublishedResultsRecords); ok {
 			out, e = reader.PublishedResultsForPatient(ctx, domain.ID(patientID), page, limit)
 			if e != nil {
 				return e

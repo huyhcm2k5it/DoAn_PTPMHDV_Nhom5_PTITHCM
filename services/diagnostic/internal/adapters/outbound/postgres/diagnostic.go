@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/jackc/pgx/v5"
+	"time"
 	"umccare/diagnostic/internal/application/ports"
+	"umccare/diagnostic/internal/application/projection"
 	"umccare/diagnostic/internal/domain"
 	"umccare/diagnostic/migrations"
 )
@@ -101,6 +103,41 @@ func (t diagnosticTx) Orders(ctx context.Context) ([]domain.Order, error) {
 }
 
 func (t diagnosticTx) PublishedResultsForPatient(ctx context.Context, patientID string, page, limit int) (domain.PublishedResults, error) {
+	return t.publishedResults(ctx, patientID, "", page, limit)
+}
+
+func (t diagnosticTx) VerifyVisitGrant(ctx context.Context, visitID, patientID, doctorUserID string, cancel bool, now time.Time) error {
+	if err := projection.RequireCurrentVisitStream(ctx, t, now); err != nil {
+		return err
+	}
+	raw, err := t.Get(ctx, "visit_grant", domain.ID(visitID))
+	if domain.Code(err) == "NOT_FOUND" {
+		return domain.Fail("SERVICE_UNAVAILABLE", "Visit grant has not synchronized")
+	}
+	if err != nil {
+		return err
+	}
+	var grant projection.VisitGrantEvent
+	if json.Unmarshal(raw, &grant) != nil || grant.Active == nil || grant.CanCancel == nil {
+		return domain.Fail("SERVICE_UNAVAILABLE", "Invalid visit grant projection")
+	}
+	if grant.PatientID != domain.ID(patientID) || grant.DoctorUserID != domain.ID(doctorUserID) || !*grant.Active {
+		return domain.Fail("NOT_FOUND", "Order not found")
+	}
+	if cancel && !*grant.CanCancel {
+		return domain.Fail("STATE_CONFLICT", "Signed visit cannot cancel LAB")
+	}
+	return nil
+}
+
+func (t diagnosticTx) PublishedResultsForDoctor(ctx context.Context, patientID, doctorUserID string, page, limit int, now time.Time) (domain.PublishedResults, error) {
+	if err := projection.RequireCurrentVisitStream(ctx, t, now); err != nil {
+		return domain.PublishedResults{}, err
+	}
+	return t.publishedResults(ctx, patientID, doctorUserID, page, limit)
+}
+
+func (t diagnosticTx) publishedResults(ctx context.Context, patientID, doctorUserID string, page, limit int) (domain.PublishedResults, error) {
 	out := domain.PublishedResults{Items: []domain.Result{}}
 	var raw []byte
 	err := t.tx.QueryRow(ctx, `WITH eligible AS (
@@ -111,6 +148,14 @@ func (t diagnosticTx) PublishedResultsForPatient(ctx context.Context, patientID 
 		JOIN objects AS relation ON relation.kind='result-order' AND relation.key=orders.id::text
 		JOIN objects AS result ON result.kind='result' AND result.key=relation.value#>>'{}'
 		WHERE orders.body->'order'->>'patientId'=$1
+		  AND ($4='' OR EXISTS (
+		      SELECT 1 FROM objects AS assignment
+		      WHERE assignment.kind='visit_grant'
+		        AND assignment.key=orders.body->'order'->>'visitId'
+		        AND assignment.value->>'patientId'=$1
+		        AND assignment.value->>'doctorUserId'=$4
+		        AND assignment.value->'active'='true'::jsonb
+		  ))
 		  AND result.value->'result'->>'state'='PUBLISHED'
 		  AND result.value->'result'->>'orderId'=orders.id::text
 		  AND result.value->'result'->>'publishedAt' IS NOT NULL
@@ -119,7 +164,7 @@ func (t diagnosticTx) PublishedResultsForPatient(ctx context.Context, patientID 
 		ORDER BY published_at DESC,result_id DESC LIMIT $2 OFFSET $3
 	)
 	SELECT COALESCE((SELECT jsonb_agg(body ORDER BY published_at DESC,result_id DESC) FROM page),'[]'::jsonb),
-	       (SELECT count(*) FROM eligible)`, patientID, limit, (page-1)*limit).Scan(&raw, &out.Total)
+	       (SELECT count(*) FROM eligible)`, patientID, limit, (page-1)*limit, doctorUserID).Scan(&raw, &out.Total)
 	if err != nil {
 		return out, err
 	}

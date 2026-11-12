@@ -12,11 +12,12 @@ func TestBillingStatusProjectionDoesNotRollBack(t *testing.T) {
 	o := domain.Order{ID: domain.NewID(), ChargeID: domain.NewID(), State: "CANCELLED", Version: 1}
 	m := &memory{objects: map[string]json.RawMessage{}, orders: []domain.Order{o}}
 	s := New(m, time.Now)
+	userID, refundID := domain.NewID(), domain.NewID()
 	for _, v := range []struct {
 		Version int
 		State   string
-	}{{2, "SUCCEEDED"}, {1, "REQUESTED"}} {
-		body, _ := json.Marshal(map[string]any{"chargeId": o.ChargeID, "sourceId": o.ID, "sourceType": "LAB_ORDER", "version": v.Version, "state": "REFUNDED", "refundStatus": v.State})
+	}{{1, "REQUESTED"}, {2, "FAILED"}, {3, "SUCCEEDED"}, {2, "FAILED"}, {4, ""}} {
+		body, _ := json.Marshal(map[string]any{"recipientUserId": userID, "refundId": refundID, "chargeId": o.ChargeID, "sourceId": o.ID, "sourceType": "LAB_ORDER", "version": v.Version, "state": "REFUNDED", "refundStatus": v.State})
 		if err := s.billing(context.Background(), m, domain.Envelope{MessageType: "BillingStatusChanged", Payload: body}); err != nil {
 			t.Fatal(err)
 		}

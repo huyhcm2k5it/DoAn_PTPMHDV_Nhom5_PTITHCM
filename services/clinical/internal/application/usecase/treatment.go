@@ -383,6 +383,9 @@ func (s *Service) Complete(ctx context.Context, p domain.Principal, id, key stri
 		if e = tx.UpdateVisit(ctx, v); e != nil {
 			return e
 		}
+		if e = publishVisitGrant(ctx, tx, v, now, meta); e != nil {
+			return e
+		}
 		message := s.event(v, "VisitSigned", "EVENT", map[string]any{"visitId": v.ID, "appointmentId": v.AppointmentID, "signedAt": now, "version": v.Version}, meta)
 		if e = tx.AppendMessage(ctx, message, "umc.events.clinical.v1", "clinical.visit-signed.v1"); e != nil {
 			return e
