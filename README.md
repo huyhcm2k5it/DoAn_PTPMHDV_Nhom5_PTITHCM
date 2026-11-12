@@ -35,4 +35,4 @@ Các bài kiểm tra mã và contract nằm trong `tests/` và README của từ
 
 Kiểm tra contract tĩnh bằng `python tools/be/check_api_matrix.py` và `python tools/be/check_baseline.py`; kiểm tra một phần topology bằng `python tools/be/test_topology.py`. Lệnh chạy riêng của từng service nằm trong README của service đó. [Bộ test chung](tests/README.md) và [hồ sơ bàn giao](docs/ban-giao-umc-care/README.md) ghi rõ bằng chứng đã có và phần còn chờ.
 
-**Giới hạn hiện tại:** Clinical cần feed ticket trước khi claim từ Appointment; một số API bác sĩ của Clinical/Diagnostic cần projection quyền hiện hành. Contract test, dữ liệu seed hoặc health check không chứng minh hành trình 9 service đã chạy end-to-end.
+**Nghiệm thu tích hợp:** Clinical nhận feed ticket từ Appointment trước khi claim. Diagnostic dùng quyền theo lượt khám và checkpoint từ Clinical. [Hướng dẫn hai luồng khám](tests/e2e/care-integration.md) ghi cách kiểm các event này trên môi trường online.

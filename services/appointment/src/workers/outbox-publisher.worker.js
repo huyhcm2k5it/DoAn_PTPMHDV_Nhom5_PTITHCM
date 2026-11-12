@@ -15,6 +15,8 @@ function routingKeyFor(message) {
     return 'appointment.settlement-reserved.v1';
   if (message.message_type === 'QueueTicketClaimed')
     return 'appointment.queue-ticket-claimed.v1';
+  if (message.message_type === 'QueueTicketChanged')
+    return 'appointment.queue-ticket-changed.v1';
   return null;
 }
 function exchangeFor(message, commandExchange, eventExchange) {

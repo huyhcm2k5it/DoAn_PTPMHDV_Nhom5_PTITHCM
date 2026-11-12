@@ -16,6 +16,16 @@ type Service struct {
 func New(store ports.ClinicalStore, now func() time.Time) *Service {
 	return &Service{store: store, now: now}
 }
+
+func publishVisitGrant(ctx context.Context, tx ports.ClinicalTx, v domain.Visit, now time.Time, meta domain.Meta) error {
+	writer, ok := tx.(interface {
+		PublishVisitGrant(context.Context, domain.Visit, time.Time, domain.Meta) error
+	})
+	if !ok {
+		return domain.Fail("SERVICE_UNAVAILABLE", "Visit grant outbox unavailable")
+	}
+	return writer.PublishVisitGrant(ctx, v, now, meta)
+}
 func authorize(ctx context.Context, tx ports.ClinicalTx, p domain.Principal, actors ...string) error {
 	if !domain.ValidID(p.UserID) {
 		return domain.Fail("UNAUTHENTICATED", "Authentication required")
@@ -278,6 +288,9 @@ func (s *Service) HandleClaim(ctx context.Context, exchange string, event domain
 				if !found {
 					visit = domain.Visit{ID: domain.NewID(), AppointmentID: claim.AppointmentID, PatientID: claim.PatientID, DoctorUserID: ticket.DoctorUserID, DepartmentID: ticket.DepartmentID, ClaimID: claim.ClaimID, State: "IN_PROGRESS", Version: 1, StartedAt: s.now().UTC()}
 					if e = tx.InsertVisit(ctx, visit); e != nil {
+						return e
+					}
+					if e = publishVisitGrant(ctx, tx, visit, s.now(), domain.Meta{CorrelationID: event.CorrelationID, RequestID: event.RequestID}); e != nil {
 						return e
 					}
 				} else if visit.ClaimID != claim.ClaimID {

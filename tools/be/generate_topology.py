@@ -1,4 +1,4 @@
-"""Deterministic RabbitMQ topology from the 18 events and 5 commands."""
+"""Deterministic RabbitMQ topology from the 20 events and 5 commands."""
 import argparse
 import json
 import re
@@ -37,6 +37,8 @@ def generate():
         bind("billing","commands",owner+".reserve-settlement.v1","cmd."+owner+".v1")
     bind("clinical","commands","diagnostic.create-lab-order.v1","cmd.diagnostic.v1")
     bind("clinical","commands","appointment.claim-queue-ticket.v1","cmd.appointment.v1")
+    # Drain Diagnostic outbox rows created before the routing key was aligned.
+    bind("diagnostic","events","lab.order-resolved.v1","evt.clinical.v1")
     for owner in OWNERS:
         exchange="umc.deadletters."+owner+".v1"
         exchanges.add(exchange)

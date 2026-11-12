@@ -16,8 +16,37 @@ from app.auth.jwt_auth import (
     require_staff,
 )
 from app.domain.models import BillingAuditEvent, BillingEventOutbox, Charge, Refund
+from app.infrastructure.message_delivery import make_envelope
 
 REFUND_STATES = ("REQUESTED", "SUCCEEDED", "FAILED")
+
+
+def enqueue_refund_status(charge, refund, correlation_id):
+    # Call inside the transaction holding the charge lock.
+    charge.version += 1
+    charge.save(update_fields=["version", "updated_at"])
+    if not charge.recipient_user_id:
+        return
+    payload = {
+        "chargeId": str(charge.id),
+        "recipientUserId": str(charge.recipient_user_id),
+        "refundId": str(refund.id),
+        "sourceId": str(charge.source_id),
+        "sourceType": charge.source_type,
+        "refundStatus": refund.state,
+        "state": "REFUNDED" if refund.state == "SUCCEEDED" else charge.state,
+        "version": charge.version,
+    }
+    BillingEventOutbox.objects.create(
+        event_type="BillingStatusChanged",
+        exchange="umc.events.billing.v1",
+        routing_key="billing.billing-status-changed.v1",
+        payload=make_envelope(
+            "BillingStatusChanged", payload, charge.id, charge.version,
+            cause={"correlationId": correlation_id},
+        ),
+    )
+
 
 
 def get_correlation_id(request):
@@ -274,6 +303,7 @@ def create_refund(request):
             attempts=[],
             version=1
         )
+        enqueue_refund_status(charge, refund, correlation_id)
 
         data = {"refund": serialize_refund(refund)}
         idempotency.remember(scope, idempotency_key, payload, data)
@@ -490,28 +520,6 @@ def execute_refund_view(request, refund_id):
             })
             refund.version += 1
             refund.save()
-
-            from app.infrastructure.message_delivery import make_envelope
-            charge.version += 1
-            charge.save(update_fields=["version", "updated_at"])
-            if charge.recipient_user_id:
-                status_payload = {
-                    "chargeId": str(charge.id),
-                    "recipientUserId": str(charge.recipient_user_id),
-                    "refundId": str(refund.id),
-                    "sourceId": str(charge.source_id),
-                    "sourceType": charge.source_type,
-                    "refundStatus": refund.state,
-                    "state": "REFUNDED",
-                    "version": charge.version,
-                }
-                BillingEventOutbox.objects.create(
-                    event_type="BillingStatusChanged",
-                    exchange="umc.events.billing.v1",
-                    routing_key="billing.billing-status-changed.v1",
-                    payload=make_envelope("BillingStatusChanged", status_payload, charge.id, refund.version),
-                )
-
         else:
             refund.state = "FAILED"
             refund.attempts.append({
@@ -523,6 +531,7 @@ def execute_refund_view(request, refund_id):
             refund.version += 1
             refund.save()
 
+        enqueue_refund_status(charge, refund, correlation_id)
         data = {"refund": serialize_refund(refund)}
         idempotency.remember(scope, idempotency_key, payload, data)
         record_audit(

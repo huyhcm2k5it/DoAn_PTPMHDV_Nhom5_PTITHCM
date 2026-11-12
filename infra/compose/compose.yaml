@@ -565,6 +565,8 @@ services:
     restart: unless-stopped
   identity-worker:
     build: *id001
+    env_file:
+    - ../../env/hung.env
     command:
     - python
     - manage.py

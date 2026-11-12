@@ -1,6 +1,6 @@
 THIẾT KẾ CƠ SỞ DỮ LIỆU & SƠ ĐỒ ERD CHI TIẾT — HỆ THỐNG UMC CARE (v5.0)
 
-**Phiên bản:** 5.0 (Đồng bộ BRD, SRS, UC, OpenAPI 86 & AsyncAPI 18 Events / 5 Commands ngày 17/10/2026)
+**Phiên bản:** 5.0 (Đồng bộ BRD, SRS, UC, OpenAPI 86 & AsyncAPI 18 Events / 5 Commands ngày 17/10/2026. Bản tích hợp bổ sung QueueTicketChanged và VisitDoctorGrantChanged)
 
 **Mô hình phân công (3–3–3):**
 
@@ -16,81 +16,51 @@ THIẾT KẾ CƠ SỞ DỮ LIỆU & SƠ ĐỒ ERD CHI TIẾT — HỆ THỐNG UM
 
 **Database-per-Service:** 6 database logic PostgreSQL và 3 database logic MongoDB (trên 1 Mongo Replica Set và 1 PostgreSQL instance phục vụ demo). Mỗi service dùng credential riêng và **chỉ có quyền ghi vào DB của mình**.
 
-**Không FK / Không JOIN xuyên Service:** Mọi tham chiếu sang thực thể của service khác đều là **LREF (Logical Reference)** lưu dưới dạng UUID opaque. Việc kiểm tra quyền hoặc đồng bộ dữ liệu đọc được thực hiện qua **Local Projections** cập nhật từ 18 Integration Events và 5 Commands trên RabbitMQ.
+**Không FK / Không JOIN xuyên Service:** Mọi tham chiếu sang thực thể của service khác đều là **LREF (Logical Reference)** lưu dưới dạng UUID opaque. Việc kiểm tra quyền hoặc đồng bộ dữ liệu đọc được thực hiện qua **Local Projections** cập nhật từ 20 Integration Events và 5 Commands trên RabbitMQ.
+
+**Cách đọc DBML:** Mỗi khối ERD ở Phần 1 mô tả một service và có thể dán riêng vào trình hỗ trợ DBML. Với MongoDB, `Table` biểu diễn collection và `pk` là khóa logic trong tài liệu. Các tham chiếu nội bộ MongoDB và LREF xuyên service nằm trong ghi chú. `ref` biểu diễn khóa ngoại nội bộ PostgreSQL. Bảng kỹ thuật và quy tắc có điều kiện được mô tả trong từ điển dữ liệu.
 
 **Định dạng chuẩn:** Khóa chính id kiểu uuid; thời gian lưu theo UTC (ngày nghiệp vụ tính theo Asia/Ho\_Chi\_Minh); tiền tệ kiểu số nguyên bigint / int64 (VND); kiểm soát đồng thời bằng version (Optimistic Concurrency) và SELECT FOR UPDATE / Mongo Transaction cho các thao tác giữ chỗ, trừ tồn, thu/hoàn tiền.
 
 ## 0.2. Sơ đồ Liên kết Logic xuyên Service (Cross-Service LREF & Event/Command Topology)
 
-```mermaid
-flowchart TD
-    subgraph S1["1. IDENTITY (PostgreSQL · Hưng)"]
-        S1_Data["• users (PK id, UQ phone)
-• staff_capabilities"]
-    end
+Dán riêng khối này vào trình hỗ trợ DBML System Architecture. Đường nét đứt biểu diễn LREF theo bảng mục 0.3. Các đường AMQP biểu diễn luồng trao đổi qua RabbitMQ.
 
-    subgraph S2["2. PATIENT (MongoDB · Quân)"]
-        S2_Data["• patients (PK id)
-• profile_audit"]
-    end
+```dbml
+---
+diagram_type: arch
+---
 
-    subgraph S3["3. CATALOG (PostgreSQL · Huy)"]
-        S3_Data["• departments / doctors
-• medical_services / labs
-• medicines / price_versions"]
-    end
+Server "Identity" as identity [database: 'identity_db / PostgreSQL']
+Server "Patient" as patient [database: 'patient_db / MongoDB']
+Server "Catalog" as catalog [database: 'catalog_db / PostgreSQL']
+Server "Appointment" as appointment [database: 'appointment_db / MongoDB']
+Server "Clinical" as clinical [database: 'clinical_db / PostgreSQL']
+Server "Diagnostic" as diagnostic [database: 'diagnostic_db / PostgreSQL']
+Server "Pharmacy" as pharmacy [database: 'pharmacy_db / MongoDB']
+Server "Billing" as billing [database: 'billing_db / PostgreSQL']
+Server "Notification" as notification [database: 'notification_db / PostgreSQL']
 
-    subgraph S4["4. APPOINTMENT (MongoDB · Quân)"]
-        S4_Data["• schedules / slots / holds
-• appointments / tickets"]
-    end
+// Liên kết logic. Bội số và khóa tham chiếu xem mục 0.3.
+Link: identity - patient [style: dashed, lref: 'patients.ownerUserId']
+Link: identity - catalog [style: dashed, lref: 'doctors.identity_user_id']
+Link: identity - notification [style: dashed, lref: 'notifications.recipient_user_id']
+Link: patient - appointment [style: dashed, lref: 'appointments.patientId']
+Link: catalog - appointment [style: dashed, lref: 'schedules.doctorId, schedules.serviceId']
+Link: catalog - pharmacy [style: dashed, lref: 'inventory.medicineId']
+Link: catalog - diagnostic [style: dashed, lref: 'lab_orders.test_codes, lab_orders.test_snapshot']
+Link: appointment - clinical [style: dashed, lref: 'visits.appointment_id']
+Link: clinical - diagnostic [style: dashed, lref: 'lab_orders.clinical_request_id, lab_orders.visit_id']
+Link: clinical - pharmacy [style: dashed, lref: 'prescription_projection.(prescriptionId, revision)']
 
-    subgraph S5["5. CLINICAL (PostgreSQL · Huy)"]
-        S5_Data["• visits (UQ appointment_id)
-• visit_notes / lab_reqs
-• prescriptions / items"]
-    end
-
-    subgraph S6["6. DIAGNOSTIC (PostgreSQL · Huy)"]
-        S6_Data["• lab_orders (UQ req_id)
-• specimens / results
-• result_items / reviews"]
-    end
-
-    subgraph S7["7. PHARMACY (MongoDB · Quân)"]
-        S7_Data["• inventory (UQ medicineId)
-• prescription_projection
-• medication_holds / disp."]
-    end
-
-    subgraph S8["8. BILLING (PostgreSQL · Hưng)"]
-        S8_Data["• charges (UQ source+rev)
-• settlement_sagas
-• payments / receipts / refunds"]
-    end
-
-    subgraph S9["9. NOTIFICATION (PostgreSQL · Hưng)"]
-        S9_Data["• inbox (UQ msg+consumer)
-• notifications"]
-    end
-
-    %% Reference / Key flows
-    S1 -->|"ownerUserId · 1:0..N"| S2
-    S1 -->|"identity_user_id · UQ · 1:0..1"| S3
-    S2 -.->|"patientId · LREF · 1:0..N"| S4
-    S3 -->|"doctorId · Ref"| S4
-    S3 -->|"serviceId · Ref"| S4
-    S3 -->|"medicineId UQ / test_codes"| S6
-    S4 -->|"appointment_id · UQ · 1:0..1"| S5
-    S5 -->|"clinical_req_id · UQ · 1:0..1"| S6
-    S5 -->|"(prescriptionId, rev) · UQ"| S7
-    S1 -.->|"recipient_user_id · LREF · 1:0..N"| S9
-
-    %% Event / status flows
-    S4 ==>|"sourceType = APPOINTMENT"| S8
-    S6 ==>|"sourceType = LAB_ORDER"| S8
-    S7 ==>|"sourceType = MED_HOLD"| S8
-    S8 ==>|"events: BillingStatusChanged"| S9
+// Luồng command/event đi qua RabbitMQ.
+Link: appointment - billing [proto: AMQP, source_type: 'APPOINTMENT']
+Link: diagnostic - billing [proto: AMQP, source_type: 'LAB_ORDER']
+Link: pharmacy - billing [proto: AMQP, source_type: 'MED_HOLD']
+Link: appointment - notification [proto: AMQP, event: 'AppointmentChanged']
+Link: diagnostic - notification [proto: AMQP, event: 'LabResultPublished']
+Link: pharmacy - notification [proto: AMQP, event: 'MedicationDispensed']
+Link: billing - notification [proto: AMQP, event: 'BillingStatusChanged']
 ```
 
 ## 0.3. Bảng tổng hợp Liên kết Logic xuyên Service (Cross-Service LREF)
@@ -114,54 +84,98 @@ flowchart TD
 
 ## 1. Identity Service (identity\_db — PostgreSQL · Owner: Hưng · Django)
 
-**Trách nhiệm:** Quản lý tài khoản (PATIENT, DOCTOR, STAFF), xác thực OTP 6 số, phiên đăng nhập (sessions), phân quyền nhân viên theo capability/scope (staff\_capabilities), cấp authorization lease ngắn hạn (tối đa 30s) và ghi nhật ký bảo mật (audit\_events).
+**Trách nhiệm:** Quản lý tài khoản (PATIENT, DOCTOR, STAFF), xác minh tài khoản và đặt lại mật khẩu bằng OTP 6 số gửi qua email, quản lý phiên đăng nhập (sessions), phân quyền nhân viên theo capability/scope (staff\_capabilities), cấp authorization lease ngắn hạn (tối đa 30s) và ghi nhật ký bảo mật (audit\_events).
 
 ### Sơ đồ ERD — Identity Service
 
-```mermaid
-erDiagram
-    users ||--o{ otp_requests : "user_id"
-    users ||--o{ sessions : "user_id"
-    users ||--o{ staff_capabilities : "user_id"
-    users ||--o{ audit_events : "actor_user_id"
+```dbml
+Project identity_db {
+  database_type: 'PostgreSQL'
+}
 
-    users {
-        uuid id PK
-        text phone UK
-        text password_hash
-        text actor_type
-        text status
-        int version
-    }
-    otp_requests {
-        uuid id PK
-        uuid user_id FK
-        text phone
-        text purpose
-        text code_hash
-        int attempts
-    }
-    sessions {
-        uuid id PK
-        uuid user_id FK
-        text refresh_hash UK
-        timestamptz expires_at
-    }
-    staff_capabilities {
-        uuid id PK
-        uuid user_id FK
-        text capability
-        text scope_key
-        boolean enabled
-    }
+Table users {
+  id uuid [pk]
+  phone text [not null, unique]
+  email varchar(255) [null, note: 'Địa chỉ nhận OTP. IA-001 bắt buộc email hợp lệ.']
+  password_hash text [not null]
+  actor_type text [not null]
+  status text [not null]
+  phone_verified_at timestamptz [null, note: 'Tên trường hiện hành. Identity ghi khi xác minh OTP đăng ký qua email.']
+  version int [not null]
+  token_version int [not null]
+  access_version int [not null]
+
+  checks {
+    `actor_type IN ('PATIENT', 'DOCTOR', 'STAFF')`
+  }
+}
+
+Table otp_requests {
+  id uuid [pk]
+  user_id uuid [null, ref: > users.id]
+  phone text [not null]
+  email varchar(255) [null, note: 'Địa chỉ đích của lần gửi OTP. Tra cứu mã theo phone và purpose.']
+  purpose text [not null]
+  code_hash text [not null]
+  expires_at timestamptz [not null]
+  used_at timestamptz [null]
+  attempts int [not null]
+
+  indexes {
+    (phone, purpose, expires_at)
+  }
+}
+
+Table sessions {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  refresh_hash text [not null, unique]
+  expires_at timestamptz [not null]
+  revoked_at timestamptz [null]
+  device_id text [null]
+
+  indexes {
+    (user_id, expires_at)
+  }
+}
+
+Table staff_capabilities {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  capability text [not null]
+  scope_key text [not null]
+  enabled boolean [not null]
+  assigned_by uuid [not null, ref: > users.id]
+  assigned_at timestamptz [not null]
+
+  indexes {
+    (user_id, capability, scope_key) [unique]
+  }
+}
+
+Table audit_events {
+  id uuid [pk]
+  actor_user_id uuid [null, ref: > users.id]
+  action text [not null]
+  target_id uuid [null, note: 'LREF']
+  before_after jsonb [null]
+  correlation_id uuid [not null]
+  at timestamptz [not null]
+
+  indexes {
+    (actor_user_id, at)
+  }
+
+  Note: 'Append-only. Không lưu OTP hoặc password hash.'
+}
 ```
 
 ### Từ điển dữ liệu — Identity Service
 
 | **Bảng (Table)** | **Thuộc tính & Kiểu dữ liệu** | **Khóa, Chỉ mục & Quy tắc bất biến (Invariants)** |
 | --- | --- | --- |
-| users | id: uuid PK; phone: text UQ; password\_hash: text; actor\_type: text; status: text; phone\_verified\_at: timestamptz?; version: int; token\_version: int; access\_version: int | UQ(phone); CHECK actor\_type IN ('PATIENT','DOCTOR','STAFF'); chỉ tài khoản ACTIVE mới được tạo phiên. |
-| otp\_requests | id: uuid PK; user\_id: uuid FK?; phone: text; purpose: text; code\_hash: text; expires\_at: timestamptz; used\_at: timestamptz?; attempts: int | FK user\_id -> users.id (khi có); INDEX(phone, purpose, expires\_at); giới hạn thử ≤ 5 lần trong transaction; job dọn dữ liệu quá hạn. |
+| users | id: uuid PK; phone: text UQ; email: varchar(255)?; password\_hash: text; actor\_type: text; status: text; phone\_verified\_at: timestamptz?; version: int; token\_version: int; access\_version: int | UQ(phone); CHECK actor\_type IN ('PATIENT','DOCTOR','STAFF'); chỉ tài khoản ACTIVE mới được tạo phiên. API đăng ký yêu cầu email hợp lệ để nhận OTP. DB cho phép email NULL và không đặt UNIQUE cho email. Identity ghi phone\_verified\_at khi xác minh OTP đăng ký qua email. |
+| otp\_requests | id: uuid PK; user\_id: uuid FK?; phone: text; email: varchar(255)?; purpose: text; code\_hash: text; expires\_at: timestamptz; used\_at: timestamptz?; attempts: int | FK user\_id -> users.id (khi có); INDEX(phone, purpose, expires\_at); giới hạn thử ≤ 5 lần trong transaction; job dọn dữ liệu quá hạn. Email là địa chỉ đích của lần gửi. Identity vẫn tra cứu mã theo phone và purpose. |
 | sessions | id: uuid PK; user\_id: uuid FK; refresh\_hash: text UQ; expires\_at: timestamptz; revoked\_at: timestamptz?; device\_id: text? | FK user\_id -> users.id; UQ(refresh\_hash); INDEX(user\_id, expires\_at). Đổi/reset mật khẩu thu hồi toàn bộ phiên cũ. |
 | staff\_capabilities | id: uuid PK; user\_id: uuid FK; capability: text; scope\_key: text; enabled: boolean; assigned\_by: uuid FK; assigned\_at: timestamptz | FK user\_id, assigned\_by -> users.id; UQ(user\_id, capability, scope\_key); quyền ADMIN chỉ cấp cho tài khoản quản trị chỉ định. |
 | audit\_events | id: uuid PK; actor\_user\_id: uuid FK?; action: text; target\_id: uuid? LREF; before\_after: jsonb?; correlation\_id: uuid; at: timestamptz | INDEX(actor\_user\_id, at); bảng bất biến (append-only), tuyệt đối không ghi mã OTP hoặc password hash vào log/audit. |
@@ -173,26 +187,46 @@ erDiagram
 
 ### Sơ đồ ERD — Patient Service
 
-```mermaid
-erDiagram
-    patients ||--o{ profile_audit : "patientId"
+```dbml
+Project patient_db {
+  Note: 'Mô hình document MongoDB. Table biểu diễn collection. PK là khóa logic và các tham chiếu được ghi chú.'
+}
 
-    patients {
-        uuid id PK
-        uuid ownerUserId FK "LREF"
-        enum relation
-        string fullName
-        date birthDate
-        string bhytSelfDeclared
-        bool active
-    }
-    profile_audit {
-        uuid id PK
-        uuid patientId FK
-        uuid actorUserId FK "LREF"
-        string action
-        timestamp at
-    }
+Table patients {
+  id uuid [pk]
+  ownerUserId uuid [not null, note: 'LREF']
+  relation string [not null, note: 'Giá trị: SELF, OTHER.']
+  fullName string [not null]
+  birthDate date [not null]
+  sex string [null]
+  bhytSelfDeclared string [null]
+  version int [not null]
+  contactPhone string [null]
+  address string [null]
+  createdAt date [not null]
+  updatedAt date [not null]
+  active bool [not null]
+  policyVersion int [not null]
+
+  indexes {
+    ownerUserId
+  }
+}
+
+Table profile_audit {
+  id uuid [pk]
+  patientId uuid [not null, note: 'Tham chiếu nội bộ: patients.id.']
+  actorUserId uuid [not null, note: 'LREF']
+  action string [not null]
+  changedFields string[] [not null]
+  at date [not null]
+
+  indexes {
+    (patientId, at)
+  }
+
+  Note: 'Chỉ lưu tên trường thay đổi trong changedFields.'
+}
 ```
 
 ### Từ điển dữ liệu — Patient Service
@@ -209,50 +243,75 @@ erDiagram
 
 ### Sơ đồ ERD — Catalog Service
 
-```mermaid
-erDiagram
-    departments ||--o{ doctors : "department_id"
-    departments ||--o{ medical_services : "department_id"
-    medical_services ||--o{ price_versions : "item_id"
-    medicines ||--o{ price_versions : "item_id"
-    lab_tests ||--o{ price_versions : "item_id"
+```dbml
+Project catalog_db {
+  database_type: 'PostgreSQL'
+}
 
-    departments {
-        uuid id PK
-        text code UK
-        text name
-    }
-    doctors {
-        uuid id PK
-        uuid identity_user_id UK "LREF"
-        uuid department_id FK
-        text display_name
-    }
-    medical_services {
-        uuid id PK
-        uuid department_id FK
-        text code UK
-        text name
-    }
-    medicines {
-        uuid id PK
-        text code UK
-        text name
-        text unit
-    }
-    lab_tests {
-        uuid id PK
-        text code UK
-        text name
-        text specimen_type
-    }
-    price_versions {
-        uuid id PK
-        text item_type
-        uuid item_id
-        int revision
-        bigint amount_vnd
-    }
+Table departments {
+  id uuid [pk]
+  code text [not null, unique]
+  name text [not null]
+  status text [not null]
+}
+
+Table doctors {
+  id uuid [pk]
+  identity_user_id uuid [not null, unique, note: 'LREF']
+  department_id uuid [not null, ref: > departments.id]
+  display_name text [not null]
+  status text [not null]
+}
+
+Table medical_services {
+  id uuid [pk]
+  department_id uuid [not null, ref: > departments.id]
+  code text [not null, unique]
+  name text [not null]
+  status text [not null]
+}
+
+Table medicines {
+  id uuid [pk]
+  code text [not null, unique]
+  name text [not null]
+  unit text [not null]
+  strength text [null]
+  form text [null]
+  status text [not null]
+}
+
+Table lab_tests {
+  id uuid [pk]
+  code text [not null, unique]
+  name text [not null]
+  specimen_type text [not null]
+  unit text [null]
+  reference_range text [null]
+  revision int [not null]
+  status text [not null]
+}
+
+Table price_versions {
+  id uuid [pk]
+  item_type text [not null, note: 'Giá trị: EXAM, LAB, MEDICINE.']
+  item_id uuid [not null, note: 'Tham chiếu theo item_type: EXAM → medical_services.id, LAB → lab_tests.id, MEDICINE → medicines.id.']
+  revision int [not null]
+  amount_vnd bigint [not null]
+  effective_from timestamptz [not null]
+  effective_to timestamptz [null]
+  created_by uuid [not null, note: 'LREF']
+
+  indexes {
+    (item_type, item_id, revision) [unique]
+  }
+
+  checks {
+    `amount_vnd >= 0`
+  }
+
+  Note: 'Các khoảng hiệu lực của cùng (item_type, item_id) không được chồng lấn.'
+}
 ```
 
 ### Từ điển dữ liệu — Catalog Service
@@ -273,52 +332,104 @@ erDiagram
 
 ### Sơ đồ ERD — Appointment Service
 
-```mermaid
-erDiagram
-    schedules ||--o{ slots : "scheduleId"
-    slots ||--o{ holds : "slotId"
-    holds ||--o| appointments : "holdId"
-    appointments ||--o{ queue_tickets : "appointmentId"
-    patient_time_locks ||--o{ holds : "locks"
+```dbml
+Project appointment_db {
+  Note: 'Mô hình document MongoDB. Table biểu diễn collection. PK là khóa logic và các tham chiếu được ghi chú.'
+}
 
-    schedules {
-        uuid id PK
-        uuid doctorId FK "LREF"
-        uuid serviceId FK "LREF"
-        string room
-        UTC startAt
-        int capacityPerSlot
-    }
-    slots {
-        uuid id PK
-        uuid scheduleId FK
-        UTC startAt
-        int capacity
-        int heldCount
-        int confirmedCount
-    }
-    holds {
-        uuid id PK
-        uuid slotId FK
-        uuid patientId FK "LREF"
-        enum status
-        UTC expiresAt
-    }
-    appointments {
-        uuid id PK
-        uuid holdId UK "ref"
-        uuid patientId FK "LREF"
-        uuid slotId FK
-        enum state
-        bigint priceSnapshotVnd
-    }
-    queue_tickets {
-        uuid id PK
-        uuid appointmentId FK
-        enum ticketType
-        int returnRound
-        enum state
-    }
+Table schedules {
+  id uuid [pk]
+  doctorId uuid [not null, note: 'LREF']
+  serviceId uuid [not null, note: 'LREF']
+  room string [not null]
+  startAt date [not null]
+  endAt date [not null]
+  capacityPerSlot int [not null]
+  status string [not null]
+  version int [not null]
+  slotMinutes int [not null]
+
+  indexes {
+    (doctorId, startAt)
+  }
+}
+
+Table slots {
+  id uuid [pk]
+  scheduleId uuid [not null, note: 'Tham chiếu nội bộ: schedules.id.']
+  startAt date [not null]
+  endAt date [not null]
+  capacity int [not null]
+  heldCount int [not null]
+  confirmedCount int [not null]
+  version int [not null]
+
+  indexes {
+    (scheduleId, startAt) [unique]
+  }
+
+  Note: 'heldCount + confirmedCount không vượt capacity.'
+}
+
+Table holds {
+  id uuid [pk]
+  slotId uuid [not null, note: 'Tham chiếu nội bộ: slots.id.']
+  patientId uuid [not null, note: 'LREF']
+  status string [not null, note: 'Giá trị: HELD, CONSUMED, RELEASED, EXPIRED.']
+  expiresAt date [not null]
+  principalId string [not null]
+  idempotencyKey string [not null]
+  createdAt date [not null]
+  priceSnapshot object [not null]
+  consumedAt date [null]
+
+  indexes {
+    (principalId, idempotencyKey) [unique]
+  }
+}
+
+Table appointments {
+  id uuid [pk]
+  holdId uuid [not null, unique, note: 'Tham chiếu nội bộ: holds.id (tối đa một lịch hẹn mỗi hold).']
+  patientId uuid [not null, note: 'LREF']
+  slotId uuid [not null, note: 'Tham chiếu nội bộ: slots.id.']
+  serviceId uuid [not null, note: 'LREF']
+  doctorId uuid [not null, note: 'LREF']
+  priceSnapshotVnd int64 [not null]
+  state string [not null]
+  version int [not null]
+  slotHistory object[] [not null]
+  chargeId uuid [null, note: 'LREF']
+  expiresAt date [not null]
+  priceVersion uuid [not null, note: 'LREF']
+  settlementId uuid [null]
+  settlementState string [not null]
+  settlementVersion int [not null]
+}
+
+Table queue_tickets {
+  id uuid [pk]
+  appointmentId uuid [not null, note: 'Tham chiếu nội bộ: appointments.id.']
+  ticketType string [not null, note: 'Giá trị: FIRST, RETURN.']
+  visitId uuid [null, note: 'LREF']
+  returnRound int [not null]
+  state string [not null, note: 'Giá trị: WAITING, CALLED, CLAIMED, NO_SHOW, DONE.']
+  calledAt date [null]
+  claimId uuid [null, note: 'Chỉ mục duy nhất có điều kiện cho claimId hợp lệ.']
+  claimedBy uuid [null, note: 'LREF']
+  noShowReason string [null]
+  version int [not null]
+
+  indexes {
+    (appointmentId, ticketType, returnRound) [unique]
+  }
+}
+
+Table patient_time_locks {
+  patientId uuid [pk, note: 'LREF']
+  intervals object[] [not null, note: 'Mảng tài liệu nhúng [{holdId, appointmentId?, startAt, endAt, state}]. holdId và appointmentId tham chiếu nội bộ. Mỗi patientId có một document.']
+  version int [not null]
+}
 ```
 
 ### Từ điển dữ liệu — Appointment Service
@@ -327,7 +438,7 @@ erDiagram
 | --- | --- | --- |
 | schedules | id: uuid PK; doctorId: uuid LREF; serviceId: uuid LREF; room: string; startAt: UTC; endAt: UTC; capacityPerSlot: int; status: enum; version: int; slotMinutes: int | INDEX(doctorId, startAt) chặn trùng ca bác sĩ; kiểm tra overlap (room, startAt); cấm giảm capacityPerSlot xuống dưới held + confirmed. slotMinutes được lưu từ AP-005/AP-006 để tái tạo slots nhất quán. |
 | slots | id: uuid PK; scheduleId: uuid ref; startAt: UTC; endAt: UTC; capacity: int; heldCount: int; confirmedCount: int; version: int | UQ(scheduleId, startAt); bất biến heldCount + confirmedCount <= capacity. |
-| holds | id: uuid PK; slotId: uuid ref; patientId: uuid LREF; status: enum (HELD|CONSUMED|RELEASED|EXPIRED); expiresAt: UTC; idempotencyKey: string; createdAt: UTC; priceSnapshot: object; consumedAt: UTC? | UQ(principalId, idempotencyKey); giữ chỗ 10 phút trong Mongo transaction; job trả chỗ khi hết hạn (Redis không phải nguồn giữ chỗ). |
+| holds | id: uuid PK; slotId: uuid ref; patientId: uuid LREF; status: enum (HELD|CONSUMED|RELEASED|EXPIRED); expiresAt: UTC; principalId: string; idempotencyKey: string; createdAt: UTC; priceSnapshot: object; consumedAt: UTC? | UQ(principalId, idempotencyKey); giữ chỗ 10 phút trong Mongo transaction; job trả chỗ khi hết hạn (Redis không phải nguồn giữ chỗ). |
 | appointments | id: uuid PK; holdId: uuid ref UQ; patientId: uuid LREF; slotId: uuid ref; serviceId: uuid LREF; doctorId: uuid LREF; priceSnapshotVnd: int64; state: enum; version: int; slotHistory: object[]; chargeId: uuid LREF?; expiresAt: UTC; priceVersion: uuid LREF; settlementId: uuid?; settlementState: enum; settlementVersion: int | UQ(holdId). Đổi lịch giữ slot mới trước rồi mới nhả slot cũ trong cùng transaction. Chỉ chuyển CONFIRMED khi nhận ChargePaid/SettlementDecision đúng fence. |
 | queue\_tickets | id: uuid PK; appointmentId: uuid ref; ticketType: FIRST|RETURN; visitId: uuid LREF?; returnRound: int; state: WAITING|CALLED|CLAIMED|NO\_SHOW|DONE; calledAt: UTC?; claimId: uuid?; claimedBy: uuid LREF?; noShowReason: string?; version: int | UQ(appointmentId, ticketType, returnRound); sparse UQ(claimId). FIRST có returnRound=0, RETURN có returnRound=1. Vắng mặt RETURN không đổi appointment thành NO\_SHOW. |
 | patient\_time\_locks | patientId: uuid PK LREF; intervals: [{holdId, appointmentId?, startAt, endAt, state}]; version: int | 1 document / patient; cập nhật trong cùng Mongo transaction với slots khi giữ/đổi/nhả để chặn 1 hồ sơ đặt 2 lịch trùng khoảng [startAt, endAt). |
@@ -339,47 +450,87 @@ erDiagram
 
 ### Sơ đồ ERD — Clinical Service
 
-```mermaid
-erDiagram
-    visits ||--o{ visit_notes : "visit_id"
-    visits ||--o{ lab_requests : "visit_id"
-    visits ||--o{ prescriptions : "visit_id"
-    prescriptions ||--|{ prescription_items : "prescription_id"
+```dbml
+Project clinical_db {
+  database_type: 'PostgreSQL'
+}
 
-    visits {
-        uuid id PK
-        uuid appointment_id UK "LREF"
-        uuid doctor_user_id FK "LREF"
-        enum state
-        UTC started_at
-        UTC signed_at
-    }
-    visit_notes {
-        uuid id PK
-        uuid visit_id FK
-        int revision
-        text symptoms
-        text diagnosis
-    }
-    lab_requests {
-        uuid id PK
-        uuid visit_id FK
-        string request_key
-        enum state
-        uuid order_id FK "LREF"
-    }
-    prescriptions {
-        uuid id PK
-        uuid visit_id FK
-        int revision
-        enum state
-    }
-    prescription_items {
-        uuid id PK
-        uuid prescription_id FK
-        uuid medicine_id FK "LREF"
-        int quantity
-    }
+Table visits {
+  id uuid [pk]
+  appointment_id uuid [not null, unique, note: 'LREF']
+  doctor_user_id uuid [not null, note: 'LREF']
+  state text [not null]
+  version int [not null]
+  started_at timestamptz [not null]
+  signed_at timestamptz [null]
+  patient_id uuid [not null, note: 'LREF']
+  department_id uuid [not null, note: 'LREF']
+  return_round int [not null]
+  claim_id uuid [not null, note: 'LREF']
+}
+
+Table visit_notes {
+  id uuid [pk]
+  visit_id uuid [not null, ref: > visits.id]
+  revision int [not null]
+  symptoms text [not null]
+  findings text [not null]
+  assessment text [not null]
+  diagnosis text [not null]
+  author_user_id uuid [not null, note: 'LREF']
+  saved_at timestamptz [not null]
+
+  indexes {
+    (visit_id, revision) [unique]
+  }
+}
+
+Table prescriptions {
+  id uuid [pk]
+  visit_id uuid [not null, ref: > visits.id]
+  revision int [not null]
+  state text [not null, note: 'Giá trị: DRAFT, FINAL, DELETED.']
+  version int [not null]
+  finalized_at timestamptz [null]
+  finalized_by uuid [null, note: 'LREF']
+
+  indexes {
+    (visit_id, revision) [unique]
+  }
+
+  Note: 'Toa DRAFT có thể chưa có dòng thuốc. Khi FINAL phải có ít nhất một dòng thuốc và visit đã SIGNED. Tối đa một bản FINAL hiệu lực trên mỗi visit.'
+}
+
+Table prescription_items {
+  id uuid [pk]
+  prescription_id uuid [not null, ref: > prescriptions.id]
+  medicine_id uuid [not null, note: 'LREF']
+  medicine_code_snapshot string [not null]
+  name_snapshot string [not null]
+  dose_text string [not null]
+  quantity int [not null]
+  instruction text [not null]
+
+  checks {
+    `quantity > 0`
+  }
+}
+
+Table lab_requests {
+  id uuid [pk]
+  visit_id uuid [not null, ref: > visits.id]
+  request_key string [not null]
+  request_hash string [not null]
+  state text [not null, note: 'Giá trị: PENDING, CREATED, FAILED.']
+  order_id uuid [null, note: 'LREF']
+  test_snapshot jsonb [not null]
+  version int [not null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (visit_id, request_key) [unique]
+  }
+}
 ```
 
 ### Từ điển dữ liệu — Clinical Service
@@ -399,47 +550,89 @@ erDiagram
 
 ### Sơ đồ ERD — Diagnostic Service
 
-```mermaid
-erDiagram
-    lab_orders ||--|{ specimens : "order_id"
-    lab_orders ||--o{ results : "order_id"
-    specimens ||--o{ results : "specimen_id"
-    results ||--|{ result_items : "result_id"
-    results ||--o{ reviews : "result_id"
+```dbml
+Project diagnostic_db {
+  database_type: 'PostgreSQL'
+}
 
-    lab_orders {
-        uuid id PK
-        uuid clinical_request_id UK "LREF"
-        uuid visit_id FK "LREF"
-        jsonb test_codes
-        enum state
-    }
-    specimens {
-        uuid id PK
-        uuid order_id FK
-        int sequence
-        string barcode UK
-        enum state
-    }
-    results {
-        uuid id PK
-        uuid order_id FK
-        uuid specimen_id FK
-        int revision
-        enum state
-    }
-    result_items {
-        uuid id PK
-        uuid result_id FK
-        string test_code
-        string value_text
-    }
-    reviews {
-        uuid id PK
-        uuid result_id FK
-        uuid reviewer_user_id FK "LREF"
-        enum decision
-    }
+Table lab_orders {
+  id uuid [pk]
+  visit_id uuid [not null, note: 'LREF']
+  test_codes jsonb [not null]
+  state text [not null]
+  charge_id uuid [null, note: 'LREF']
+  created_at timestamptz [not null]
+  version int [not null]
+  clinical_request_id uuid [not null, unique, note: 'LREF']
+  patient_id uuid [not null, note: 'LREF']
+  test_snapshot jsonb [not null]
+  price_snapshot jsonb [not null]
+  settlement_id uuid [null]
+  settlement_state text [not null]
+  settlement_version int [not null]
+
+  Note: 'Một order có thể chưa có mẫu. Chỉ hủy trước khi có specimen.'
+}
+
+Table specimens {
+  id uuid [pk]
+  order_id uuid [not null, ref: > lab_orders.id]
+  sequence int [not null]
+  state text [not null, note: 'Giá trị: COLLECTED, REJECTED.']
+  barcode string [not null, unique]
+  collected_at timestamptz [not null]
+  collected_by uuid [not null, note: 'LREF']
+  reject_reason string [null]
+  version int [not null]
+
+  indexes {
+    (order_id, sequence) [unique]
+  }
+}
+
+Table results {
+  id uuid [pk]
+  order_id uuid [not null, ref: > lab_orders.id]
+  specimen_id uuid [not null, ref: > specimens.id]
+  revision int [not null]
+  state text [not null, note: 'Giá trị: DRAFT, REVIEW, REWORK, PUBLISHED.']
+  entered_by uuid [not null, note: 'LREF']
+  submitted_at timestamptz [null]
+  published_at timestamptz [null]
+  version int [not null]
+  contributor_user_ids uuid[] [not null]
+
+  indexes {
+    (order_id, revision) [unique]
+  }
+
+  Note: 'Specimen phải thuộc cùng order. Kết quả PUBLISHED là bất biến.'
+}
+
+Table result_items {
+  id uuid [pk]
+  result_id uuid [not null, ref: > results.id]
+  test_code string [not null]
+  value_text string [not null]
+  unit string [null]
+  reference_range string [null]
+  flag string [null]
+
+  indexes {
+    (result_id, test_code) [unique]
+  }
+}
+
+Table reviews {
+  id uuid [pk]
+  result_id uuid [not null, ref: > results.id]
+  reviewer_user_id uuid [not null, note: 'LREF']
+  decision text [not null]
+  reason text [null]
+  reviewed_at timestamptz [not null]
+
+  Note: 'Reviewer không được có trong results.contributor_user_ids.'
+}
 ```
 
 ### Từ điển dữ liệu — Diagnostic Service
@@ -459,38 +652,79 @@ erDiagram
 
 ### Sơ đồ ERD — Pharmacy Service
 
-```mermaid
-erDiagram
-    prescription_projection ||--o{ medication_holds : "prescriptionId"
-    medication_holds ||--o| dispenses : "holdId"
-    inventory ||--o{ dispenses : "medicineId"
+```dbml
+Project pharmacy_db {
+  Note: 'Mô hình document MongoDB. Table biểu diễn collection. PK là khóa logic và các tham chiếu được ghi chú.'
+}
 
-    inventory {
-        uuid id PK
-        uuid medicineId UK "LREF"
-        int onHand
-        int reserved
-    }
-    prescription_projection {
-        uuid id PK
-        uuid prescriptionId FK "LREF"
-        int revision
-        uuid visitId FK "LREF"
-    }
-    medication_holds {
-        uuid id PK
-        uuid prescriptionId FK "LREF"
-        int revision
-        int attemptNo
-        enum status
-    }
-    dispenses {
-        uuid id PK
-        uuid holdId UK "ref"
-        uuid prescriptionId FK "LREF"
-        int revision
-        UTC dispensedAt
-    }
+Table inventory {
+  id uuid [pk]
+  medicineId uuid [not null, unique, note: 'LREF']
+  onHand int [not null]
+  reserved int [not null]
+  version int [not null]
+  updatedAt date [not null]
+
+  Note: '0 <= reserved <= onHand. Giữ, nhả và cấp phát toàn toa trong Mongo transaction.'
+}
+
+Table stock_receipts {
+  id uuid [pk]
+  receiptKey string [not null, unique]
+  actorUserId uuid [not null, note: 'LREF']
+  items object[] [not null, note: 'Mảng tài liệu nhúng [{medicineId, quantity, batchRef}]. medicineId đối chiếu inventory.medicineId.']
+  receivedAt date [not null]
+}
+
+Table prescription_projection {
+  id uuid [pk]
+  prescriptionId uuid [not null, note: 'LREF']
+  revision int [not null]
+  visitId uuid [not null, note: 'LREF']
+  linesSnapshot object[] [not null]
+  sourceEventId uuid [not null]
+  patientId uuid [not null, note: 'LREF']
+
+  indexes {
+    (prescriptionId, revision) [unique]
+  }
+}
+
+Table medication_holds {
+  id uuid [pk]
+  prescriptionId uuid [not null, note: 'LREF. Đối chiếu prescription_projection theo (prescriptionId, revision). Mỗi bản chiếu có tối đa một hold, dùng attemptNo khi giữ lại.']
+  revision int [not null]
+  attemptNo int [not null]
+  status string [not null, note: 'Giá trị: HELD, SETTLEMENT_LOCKED, COMMITTED, RELEASED, EXPIRED.']
+  itemsSnapshot object[] [not null]
+  expiresAt date [not null]
+  chargeId uuid [null, note: 'LREF']
+  version int [not null]
+  attemptHistory object[] [not null]
+  patientId uuid [not null, note: 'LREF']
+  settlementId uuid [null]
+  settlementState string [not null]
+  settlementVersion int [not null]
+
+  indexes {
+    (prescriptionId, revision) [unique]
+  }
+}
+
+Table dispenses {
+  id uuid [pk]
+  holdId uuid [not null, unique, note: 'Tham chiếu nội bộ: medication_holds.id (tối đa một lượt cấp phát mỗi hold).']
+  prescriptionId uuid [not null, note: 'LREF']
+  revision int [not null]
+  actorUserId uuid [not null, note: 'LREF']
+  itemsSnapshot object[] [not null, note: 'Mỗi dòng thuốc trong mảng đối chiếu inventory.medicineId. Một lần cấp phát có thể chứa nhiều thuốc.']
+  dispensedAt date [not null]
+  attemptNo int [not null]
+
+  indexes {
+    (prescriptionId, revision) [unique]
+  }
+}
 ```
 
 ### Từ điển dữ liệu — Pharmacy Service
@@ -510,50 +744,93 @@ erDiagram
 
 ### Sơ đồ ERD — Billing Service
 
-```mermaid
-erDiagram
-    charges ||--o{ settlement_sagas : "charge_id"
-    charges ||--o{ payments : "charge_id"
-    settlement_sagas ||--o| payments : "saga_id"
-    payments ||--|| receipts : "payment_id"
-    charges ||--o{ refunds : "charge_id"
+```dbml
+Project billing_db {
+  database_type: 'PostgreSQL'
+}
 
-    charges {
-        uuid id PK
-        uuid patient_id FK "LREF"
-        text source_type
-        uuid source_id FK "LREF"
-        int source_revision
-        bigint amount_vnd
-        text state
-    }
-    settlement_sagas {
-        uuid id PK
-        uuid charge_id FK
-        text state
-        int fence
-    }
-    payments {
-        uuid id PK
-        uuid charge_id FK
-        uuid saga_id FK
-        text transaction_id UK
-        bigint amount_vnd
-        text state
-    }
-    receipts {
-        uuid id PK
-        uuid payment_id UK "FK"
-        uuid charge_id FK
-        text receipt_no UK
-        bigint amount_vnd
-    }
-    refunds {
-        uuid id PK
-        uuid charge_id FK
-        bigint amount_vnd
-        text state
-    }
+Table charges {
+  id uuid [pk]
+  patient_id uuid [not null, note: 'LREF']
+  source_type text [not null]
+  source_id uuid [not null, note: 'LREF. Nguồn được chọn bởi source_type: APPOINTMENT, LAB_ORDER hoặc MED_HOLD.']
+  source_revision int [not null]
+  amount_vnd bigint [not null]
+  state text [not null, note: 'Giá trị: OPEN, PAID, VOID.']
+  price_snapshot jsonb [not null]
+  version int [not null]
+  snapshot_hash text [not null]
+  settlement_id uuid [null]
+  settlement_state text [not null]
+  settlement_saga_id uuid [null, ref: > settlement_sagas.id]
+
+  indexes {
+    (source_type, source_id, source_revision) [unique]
+  }
+
+  checks {
+    `amount_vnd >= 0`
+  }
+}
+
+Table settlement_sagas {
+  id uuid [pk]
+  charge_id uuid [not null, ref: > charges.id]
+  source_type text [not null]
+  source_id uuid [not null, note: 'LREF đến nguồn được chọn bởi source_type.']
+  source_revision int [not null]
+  state text [not null, note: 'Giá trị: REQUESTED, RESERVED, IN_DOUBT, SUCCEEDED, FAILED.']
+  fence int [null]
+  amount_hash text [not null]
+  decision_version int [not null]
+  deadline_at timestamptz [not null]
+  version int [not null]
+
+  Note: 'Unique có điều kiện trên charge_id đối với REQUESTED, RESERVED và IN_DOUBT.'
+}
+
+Table payments {
+  id uuid [pk]
+  charge_id uuid [not null, ref: > charges.id]
+  saga_id uuid [not null, unique, ref: - settlement_sagas.id]
+  transaction_id text [not null, unique]
+  amount_vnd bigint [not null]
+  state text [not null, note: 'Giá trị: PENDING, SUCCEEDED, FAILED.']
+  method text [not null]
+  attempted_at timestamptz [not null]
+  paid_at timestamptz [null]
+  source_revision int [not null]
+  settlement_id uuid [not null]
+  idempotency_key text [not null]
+  fence int [not null]
+
+  Note: 'Unique có điều kiện trên charge_id khi state = SUCCEEDED.'
+}
+
+Table receipts {
+  id uuid [pk]
+  payment_id uuid [not null, unique, ref: - payments.id, note: 'Mỗi payment có tối đa một receipt. Chỉ tạo receipt khi payment SUCCEEDED.']
+  charge_id uuid [not null, ref: > charges.id]
+  receipt_no text [not null, unique]
+  amount_vnd bigint [not null]
+  issued_at timestamptz [not null]
+}
+
+Table refunds {
+  id uuid [pk]
+  charge_id uuid [not null, ref: > charges.id]
+  cancellation_id uuid [not null, note: 'LREF']
+  reason_code text [not null]
+  amount_vnd bigint [not null]
+  state text [not null, note: 'Giá trị: REQUESTED, SUCCEEDED, FAILED.']
+  attempts jsonb [not null]
+  version int [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (charge_id, cancellation_id, reason_code) [unique]
+  }
+}
 ```
 
 ### Từ điển dữ liệu — Billing Service
@@ -573,23 +850,44 @@ erDiagram
 
 ### Sơ đồ ERD — Notification Service
 
-```mermaid
-erDiagram
-    notifications {
-        uuid id PK
-        uuid recipient_user_id FK "LREF"
-        uuid event_id
-        text kind
-        text message_code
-        text status
-        timestamptz created_at
-    }
-    inbox {
-        uuid message_id PK
-        text consumer_name PK
-        text state
-        timestamptz processed_at
-    }
+```dbml
+Project notification_db {
+  database_type: 'PostgreSQL'
+}
+
+Table notifications {
+  id uuid [pk]
+  recipient_user_id uuid [not null, note: 'LREF']
+  event_id uuid [not null]
+  kind text [not null]
+  subject_ref text [not null]
+  message_code text [not null]
+  created_at timestamptz [not null]
+  read_at timestamptz [null]
+  source_aggregate_id uuid [not null]
+  source_version int [not null]
+
+  indexes {
+    (recipient_user_id, event_id, kind) [unique]
+    (recipient_user_id, created_at [desc])
+  }
+
+  Note: 'Chỉ lưu mã thông báo và tham chiếu, ghi cùng transaction với inbox.'
+}
+
+Table inbox {
+  message_id uuid [not null]
+  consumer_name text [not null]
+  command_id uuid [null]
+  payload_hash text [not null]
+  state text [not null, note: 'Giá trị: PROCESSED, RETRY_SCHEDULED.']
+  outcome_ref text [null]
+  processed_at timestamptz [not null]
+
+  indexes {
+    (message_id, consumer_name) [unique]
+  }
+}
 ```
 
 ### Từ điển dữ liệu — Notification Service

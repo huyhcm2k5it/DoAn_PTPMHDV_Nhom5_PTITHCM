@@ -26,15 +26,34 @@ func (s *Service) billing(ctx context.Context, t ports.Tx, m domain.Envelope) er
 			ChargeID, RecipientUserID, PaymentID, State, RefundID, SourceType, SourceID, RefundStatus, AsOf string
 			Version                                                                                         int
 		}
-		if strictJSON(m.Payload, &p) != nil || !domain.ValidID(p.ChargeID) || !domain.ValidID(p.SourceID) || p.SourceType != "LAB_ORDER" || p.Version < 1 {
+		if strictJSON(m.Payload, &p) != nil || !domain.ValidID(p.ChargeID) || p.Version < 1 ||
+			(m.AggregateID != "" && domain.ID(p.ChargeID) != domain.ID(m.AggregateID)) ||
+			!domain.ValidID(p.RecipientUserID) || p.State == "" ||
+			(p.SourceType != "" && !domain.Has([]string{"APPOINTMENT", "LAB_ORDER", "MED_HOLD"}, p.SourceType)) ||
+			(p.SourceID != "" && !domain.ValidID(p.SourceID)) {
 			return domain.Fail("INVALID_MESSAGE", "Invalid Billing status")
+		}
+		// The shared status topic includes all source owners and legacy payment
+		// notices. They carry no Diagnostic refund to project.
+		if p.RefundStatus != "" && (!domain.ValidID(p.RefundID) ||
+			!domain.Has([]string{"REQUESTED", "FAILED", "SUCCEEDED"}, p.RefundStatus)) {
+			return domain.Fail("INVALID_MESSAGE", "Invalid refund status")
+		}
+		if p.SourceType != "LAB_ORDER" || p.RefundStatus == "" {
+			return nil
+		}
+		if !domain.ValidID(p.SourceID) {
+			return domain.Fail("INVALID_MESSAGE", "LAB refund source is required")
 		}
 		o, err := orders(ctx, t, p.SourceID)
 		if err != nil {
 			return domain.Fail("SERVICE_UNAVAILABLE", "Order not synchronized")
 		}
-		if o.ChargeID != p.ChargeID {
-			return domain.Fail("INVALID_MESSAGE", "Billing charge mismatch")
+		if o.ChargeID == "" {
+			return domain.Fail("SERVICE_UNAVAILABLE", "Billing charge not synchronized")
+		}
+		if domain.ID(o.ChargeID) != domain.ID(p.ChargeID) || o.State != "CANCELLED" {
+			return domain.Fail("INVALID_MESSAGE", "Billing refund does not match a cancelled LAB charge")
 		}
 		var prior struct {
 			Version int

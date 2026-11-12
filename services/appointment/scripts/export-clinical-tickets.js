@@ -1,6 +1,11 @@
 const { withMongoTransaction } = require('../../../mongo/transaction');
 const { getQueueTicketModel } = require('../src/models/appointment.model');
-async function exportClinicalTickets({ connection, date }) {
+const {
+  clinicalTicketSnapshot,
+  enqueueClinicalTicket,
+} = require('../src/services/clinical-ticket-feed');
+
+async function exportClinicalTickets({ connection, date, enqueue = false }) {
   if (
     !/^\d{4}-\d{2}-\d{2}$/.test(date || '') ||
     new Date(date + 'T00:00:00Z').toISOString().slice(0, 10) !== date
@@ -17,47 +22,18 @@ async function exportClinicalTickets({ connection, date }) {
       throw new Error(
         'Snapshot limit exceeded; agree a partition with Clinical owner.',
       );
-    return rows.map((row) => {
-      const result = { ticketId: row.id };
-      for (const key of [
-        'appointmentId',
-        'patientId',
-        'doctorId',
-        'doctorUserId',
-        'departmentId',
-        'ticketType',
-        'state',
-        'version',
-      ])
-        result[key] = row[key];
-      if (row.ticketType === 'RETURN') result.visitId = row.visitId;
-      for (const key of [
-        'ticketId',
-        'appointmentId',
-        'patientId',
-        'doctorId',
-        'doctorUserId',
-        'departmentId',
-        ...(row.ticketType === 'RETURN' ? ['visitId'] : []),
-      ]) {
-        if (
-          !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-            result[key] || '',
-          )
-        )
-          throw new Error('Trusted ticket mapping missing: ' + key);
-      }
-      if (
-        !['FIRST', 'RETURN'].includes(result.ticketType) ||
-        !['WAITING', 'CALLED', 'CLAIMED', 'NO_SHOW', 'DONE'].includes(
-          result.state,
-        ) ||
-        !Number.isSafeInteger(result.version) ||
-        result.version < 1
-      )
-        throw new Error('Invalid ticket snapshot.');
-      return result;
-    });
+    const snapshots = [];
+    for (const row of rows) {
+      const snapshot = clinicalTicketSnapshot(row);
+      if (!snapshot)
+        throw new Error(
+          'Trusted ticket mapping missing or invalid ticket state.',
+        );
+      snapshots.push(snapshot);
+      if (enqueue)
+        await enqueueClinicalTicket(connection, session, row, new Date());
+    }
+    return snapshots;
   });
 }
 if (require.main === module) {
@@ -68,11 +44,24 @@ if (require.main === module) {
       .find((arg) => arg.startsWith('--date='))
       ?.slice(7);
     if (!date) throw new Error('Supply --date=YYYY-MM-DD.');
+    const enqueue = process.argv.includes('--enqueue');
+    if (enqueue && !process.argv.includes('--apply'))
+      throw new Error(
+        'Add --apply only after reviewing the owner-verified ticket export.',
+      );
     const connection = await require('../src/configs/database').connectDatabase(
       process.env.MONGODB_URI,
     );
     try {
-      const rows = await exportClinicalTickets({ connection, date });
+      const rows = await exportClinicalTickets({ connection, date, enqueue });
+      if (enqueue) {
+        console.log(
+          'Queued ' +
+            rows.length +
+            ' trusted ticket snapshots in Appointment outbox.',
+        );
+        return;
+      }
       const directory = path.resolve(__dirname, '../../../.runtime/exports');
       fs.mkdirSync(directory, { recursive: true });
       const target = path.join(directory, 'clinical-tickets-' + date + '.json');

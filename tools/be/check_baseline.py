@@ -15,7 +15,7 @@ DECISIONS = {
     "C04": "Lease action API-ID with hyphen, max30s no expiry leeway; access/lease/service token types separate; expired401 AUTHZ_LEASE_EXPIRED.",
     "C05": "FAILED/REJECTED LAB unresolved until audited revisioned resubmit or valid cancellation; no new HTTP operation.",
     "C06": "Stable medication hold per prescription revision; retain reserved at COMMITTED, decrement onHand/reserved only at DISPENSED.",
-    "C07": "Notification durable technical retry/quarantine; no additional domain event beyond18.",
+    "C07": "Notification durable technical retry/quarantine; ticket and visit-grant events are owned by Appointment and Clinical.",
     "C08": "Three recovery operations disabled by default; private SERVICE identity plus owner evidence required.",
     "C09": "Integer VND <=9007199254740991 in interoperable JSON; immutable64hex snapshot hash; Billing must not reprice.",
     "C10": "Source DOCX/workbook v5.2 plus Git24Oct; user overrides Node TypeScript to CommonJS; onePGsixDB and Mongo3DB."
@@ -63,7 +63,7 @@ def validate(manifest):
     assert len(manifest["http"]) == 86
     assert len({r["id"] for r in manifest["http"]}) == 86
     assert sum(r["profile"] == "normal" for r in manifest["http"]) == 83
-    assert len(manifest["events"]) == 18 and len(manifest["commands"]) == 5
+    assert len(manifest["events"]) == 20 and len(manifest["commands"]) == 5
     assert len(manifest["decisions"]) == 10
 
 
@@ -74,4 +74,4 @@ if __name__ == "__main__":
     if args.write:
         MANIFEST.write_text(json.dumps(build(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     validate(json.loads(MANIFEST.read_text(encoding="utf-8")))
-    print("PASS baseline: 86 HTTP, 18 events, 5 commands; human review PENDING.")
+    print("PASS baseline: 86 HTTP, 20 events, 5 commands; human review PENDING.")

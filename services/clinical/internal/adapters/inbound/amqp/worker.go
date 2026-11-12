@@ -91,7 +91,17 @@ func DeclareOwned(ch *amqp.Channel) error {
 	if _, e := ch.QueueDeclare("evt.clinical.v1", true, false, false, false, amqp.Table{"x-queue-type": "quorum"}); e != nil {
 		return e
 	}
-	for _, binding := range [][2]string{{"umc.events.catalog.v1", "catalog.catalog-changed.v1"}, {"umc.events.diagnostic.v1", "lab.order-resolved.v1"}, {"umc.events.diagnostic.v1", "diagnostic.lab-result-published.v1"}, {"umc.events.diagnostic.v1", "diagnostic.lab-cancelled.v1"}, {"umc.events.appointment.v1", "appointment.queue-ticket-claimed.v1"}, {"umc.events.identity.v1", "identity.identity-access-changed.v1"}, {"umc.events.patient.v1", "patient.patient-access-changed.v1"}} {
+	for _, binding := range [][2]string{
+		{"umc.events.catalog.v1", "catalog.catalog-changed.v1"},
+		{"umc.events.diagnostic.v1", "lab.order-resolved.v1"},
+		{"umc.events.diagnostic.v1", "diagnostic.lab-order-resolved.v1"},
+		{"umc.events.diagnostic.v1", "diagnostic.lab-result-published.v1"},
+		{"umc.events.diagnostic.v1", "diagnostic.lab-cancelled.v1"},
+		{"umc.events.appointment.v1", "appointment.queue-ticket-claimed.v1"},
+		{"umc.events.appointment.v1", "appointment.queue-ticket-changed.v1"},
+		{"umc.events.identity.v1", "identity.identity-access-changed.v1"},
+		{"umc.events.patient.v1", "patient.patient-access-changed.v1"},
+	} {
 		if e := ch.QueueBind("evt.clinical.v1", binding[1], binding[0], false, nil); e != nil {
 			return e
 		}
@@ -136,6 +146,7 @@ func Run(ctx context.Context, url string, store Store, receiver Receiver, declar
 	ticker := time.NewTicker(250 * time.Millisecond)
 	defer ticker.Stop()
 	nextPublish := time.Time{}
+	nextCheckpoint := time.Time{}
 	for {
 		select {
 		case <-ctx.Done():
@@ -158,6 +169,17 @@ func Run(ctx context.Context, url string, store Store, receiver Receiver, declar
 				slog.Info("Clinical delivery recorded", "messageId", envelope.MessageID, "messageType", envelope.MessageType, "correlationId", envelope.CorrelationID)
 			}
 		case <-ticker.C:
+			if checkpoints, ok := store.(interface {
+				PublishGrantCheckpoint(context.Context, time.Time) error
+			}); ok && !time.Now().Before(nextCheckpoint) {
+				call, cancel := context.WithTimeout(ctx, 5*time.Second)
+				err := checkpoints.PublishGrantCheckpoint(call, time.Now())
+				cancel()
+				if err != nil {
+					return err
+				}
+				nextCheckpoint = time.Now().Add(10 * time.Second)
+			}
 			if !time.Now().Before(nextPublish) {
 				for i := 0; i < 20; i++ {
 					call, cancel := context.WithTimeout(ctx, 5*time.Second)

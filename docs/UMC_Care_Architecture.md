@@ -104,7 +104,7 @@ flowchart TB
     GW --> HUY
     GW --> HUNG
 
-    MQ["RabbitMQ dùng chung cho 9 service<br/>5 command / 18 event; queue riêng từng consumer"]
+    MQ["RabbitMQ dùng chung cho 9 service<br/>5 command / 20 event; queue riêng từng consumer"]
     MQ -. "command / event" .- QUAN
     MQ -. "command / event" .- HUY
     MQ -. "command / event" .- HUNG
@@ -128,7 +128,7 @@ Bảng dưới là quyết định triển khai của nhóm, không phải tuyê
 | Backend Huy     | Go net/http, pgx, SQL migration, go test, worker AMQP.                                                      | Catalog, Clinical, Diagnostic; ít abstraction, SQL/constraint nhìn thấy được khi bảo vệ.                                                                |
 | Backend Hưng    | Django + Django REST Framework, PostgreSQL migration, worker AMQP.                                          | Identity, Billing, Notification; Billing sở hữu settlement Saga và ledger trạng thái.                                                                   |
 | Edge và message | Envoy; RabbitMQ durable queue/topic exchange; Redis cache chỉ đọc.                                          | Một public API entry point; async liên service; Redis mất không làm sai nguồn dữ liệu.                                                                  |
-| Dữ liệu và demo | PostgreSQL 6 DB logic; Mongo replica set 3 DB logic; Docker Compose; SMTP test sink cho OTP.                | Mỗi service một credential/database logic; payment giả trong Billing; OTP vào hộp thư test ở profile demo, không log OTP.                               |
+| Dữ liệu và demo | PostgreSQL 6 DB logic, Mongo replica set 3 DB logic, Docker Compose và bộ gửi OTP qua email của Identity. | Mỗi service có credential và database logic riêng. Billing mô phỏng thanh toán. Identity dùng SMTP để gửi OTP đến hộp thư kiểm thử hoặc lưu mã vào hộp thư dev khi chạy offline. |
 | Contract và CI  | OpenAPI 3.1.1 cho HTTP; JSON Schema/version cho message; GitHub Actions kiểm build/test/contract.           | Workbook API là danh mục ID và hành vi; schema máy đọc là nguồn kiểm CI; không tự tạo endpoint ngoài baseline.                                          |
 
 Không khóa phiên bản thư viện trong tài liệu kiến trúc: package/lockfile của từng app/service sẽ khóa phiên bản khi scaffold. Mọi nâng cấp sau đó qua PR và test. Không thêm Kubernetes, Kafka, GraphQL, BFF hoặc Event Sourcing để lấy điểm khi các luồng cốt lõi chưa chạy.
@@ -216,9 +216,11 @@ Bản đồ dưới là THIẾT KẾ thư mục để bạn duyệt. Chưa tạo
 | **Môi trường** | **Thành phần và cách kiểm**                                                                                                                                                                                            |
 |----------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | local dev      | Vite web dev server, Android emulator, Envoy localhost:8080, 9 service, Postgres/Mongo/RabbitMQ/Redis trong Compose. Chỉ mở cổng cần thiết; cấu hình .env.example, không commit secret.                                |
-| demo           | Build web static phục vụ trong container, Compose dựng hạ tầng, init/seed có thể chạy lại; 2 bệnh nhân và staff theo capability. OTP đi vào SMTP test sink; payment/refund giả lập. Android APK trỏ đúng Gateway demo. |
+| demo           | Build web static phục vụ trong container, Compose dựng hạ tầng, init/seed có thể chạy lại với 2 bệnh nhân và staff theo capability. Dùng email kiểm thử khi đăng ký và tài khoản có email khi demo quên mật khẩu. Mô phỏng thanh toán/hoàn tiền. Android APK trỏ đúng Gateway demo. |
 | CI             | Trên thay đổi: lint/build/test từng runtime và web; Android assemble/test khi app đổi; OpenAPI/event schema validation; kiểm secret; E2E Compose ở mốc tích hợp. Fail thì không coi PR/commit là Done.                 |
 | release        | main là bản được chốt, develop là bản tích hợp. Trước khi nhập main phải chạy seed→E2E→build APK→backup/restore thử. Chưa áp dụng GitHub branch protection/CI lên repo trong bước thiết kế này.                        |
+
+Với demo gửi email, đặt `EMAIL_BACKEND=smtp` cho Identity và cấp `SMTP_USER`, `SMTP_PASSWORD`. Cấu hình `SMTP_HOST`, `SMTP_PORT` và `SMTP_FROM_EMAIL` theo máy chủ gửi. Nếu không đặt `EMAIL_BACKEND`, Identity dùng `dev_inbox` và lưu mã trong DB. Chỉ dùng chế độ này để kiểm thử offline. Giữ `ALLOW_DEV_OTP=false` ngoài môi trường phát triển cô lập.
 
 Vì nhóm đang yêu cầu chỉ main/develop là hai nhánh tồn tại thường trực, đề xuất không giữ nhánh cá nhân lâu dài. Khi triển khai cần chốt một trong hai cơ chế: feature branch ngắn hạn rồi xóa ngay sau PR, hoặc cùng push develop theo phân vùng thư mục kèm review diff và pull/rebase trước push. Cơ chế thứ nhất dễ review/CI hơn nhưng tạo nhánh tạm; cơ chế thứ hai giữ đúng hai nhánh mọi lúc nhưng bảo vệ develop yếu hơn. Chưa đổi thiết lập GitHub khi chưa được duyệt.
 
@@ -236,7 +238,7 @@ Vì nhóm đang yêu cầu chỉ main/develop là hai nhánh tồn tại thườ
 | Billing · 12      | Hưng · Django · PostgreSQL  | Charge, settlement, payment/refund mô phỏng, receipt.                |
 | Notification · 2  | Hưng · Django · PostgreSQL  | Inbox thông báo, trạng thái đọc/dedupe.                              |
 
-Tổng 86 HTTP operations: 83 client/tác vụ và 3 recovery adapter nội bộ (IA-014, DI-001, BI-001) tắt theo profile chuẩn; health, metrics, background jobs, command/event không cộng vào số 86. 18 integration events và 5 commands là hợp đồng riêng; tên và payload chi tiết lấy từ workbook API.
+Tổng 86 HTTP operations: 83 client/tác vụ và 3 recovery adapter nội bộ (IA-014, DI-001, BI-001) tắt theo profile chuẩn; health, metrics, background jobs, command/event không cộng vào số 86. 20 integration events và 5 commands là hợp đồng riêng; tên và payload chi tiết lấy từ workbook API.
 
 # 5. Sở hữu dữ liệu và nhất quán
 
@@ -382,7 +384,7 @@ Tổng sức làm lý thuyết khoảng 300–360 giờ đến 23/11 (3 người
 | Docker Compose, không Kubernetes | Compose đủ tái lập local demo và health/restart; Kubernetes là nội dung tốt để giải thích mở rộng khi cần scale/HA, nhưng tăng vận hành cho nhóm 3 người.               |
 | Không BFF/GraphQL                | Một gateway và contract chung đủ cho 2 client; client composition nhẹ + owner projection giải quyết đọc. Xét BFF nếu số round-trip/độ khác biệt client đo được quá cao. |
 | Không Event Sourcing/CQRS đầy đủ | Dùng projection/CQRS đọc cục bộ nơi cần; state hiện hành + audit/outbox đủ cho scope. Event Sourcing thêm migration/replay semantics ngoài sức nhóm.                    |
-| Không Kafka hay payment thật     | 18 event/5 command và Compose phù hợp RabbitMQ; thanh toán giả để demo đúng Saga mà không vướng tích hợp ngân hàng và dữ liệu thật.                                     |
+| Không Kafka hay payment thật     | 20 event/5 command và Compose phù hợp RabbitMQ; thanh toán giả để demo đúng Saga mà không vướng tích hợp ngân hàng và dữ liệu thật.                                     |
 
 # 14. Các điểm phải sửa đồng bộ trước khi code phần liên quan
 

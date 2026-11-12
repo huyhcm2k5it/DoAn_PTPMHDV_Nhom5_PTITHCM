@@ -7,6 +7,9 @@ const {
   getOutboxModel,
 } = require('../models/appointment.model.js');
 const { ApiError } = require('../core/errors.js');
+const {
+  enqueueClinicalTicket,
+} = require('../services/clinical-ticket-feed.js');
 
 function hashPayload(payload) {
   return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
@@ -209,6 +212,13 @@ async function handleClaimQueueTicketCommand({
         );
         if (!changed.modifiedCount)
           throw new ApiError(409, 'VERSION_CONFLICT', 'Queue ticket changed.');
+        await enqueueClinicalTicket(
+          connection,
+          session,
+          { ...ticket, state: 'CLAIMED', version: ticket.version + 1 },
+          now,
+          message,
+        );
         if (ticket.ticketType === 'FIRST') {
           await Appointment.updateOne(
             { id: ticket.appointmentId, state: 'CHECKED_IN' },
@@ -392,6 +402,13 @@ async function handleClinicalMessage({
       );
       if (!changed.modifiedCount)
         throw new ApiError(409, 'VERSION_CONFLICT', 'Queue ticket changed.');
+      await enqueueClinicalTicket(
+        connection,
+        session,
+        { ...ticket, state: 'CLAIMED', version: ticket.version + 1 },
+        now,
+        message,
+      );
       await Appointment.updateOne(
         { id: ticket.appointmentId, state: 'CHECKED_IN' },
         {
@@ -440,11 +457,15 @@ async function handleClinicalMessage({
         },
         { session },
       );
+      const completing = {
+        appointmentId: appointment.id,
+        state: { $in: ['CLAIMED', 'IN_SERVICE'] },
+      };
+      const tickets = await QueueTicket.find(completing)
+        .session(session)
+        .lean();
       await QueueTicket.updateMany(
-        {
-          appointmentId: appointment.id,
-          state: { $in: ['CLAIMED', 'IN_SERVICE'] },
-        },
+        completing,
         {
           $set: { state: 'DONE', completedAt: now, updatedAt: now },
           $push: { stateHistory: { state: 'DONE', at: now } },
@@ -452,6 +473,15 @@ async function handleClinicalMessage({
         },
         { session },
       );
+      for (const ticket of tickets) {
+        await enqueueClinicalTicket(
+          connection,
+          session,
+          { ...ticket, state: 'DONE', version: ticket.version + 1 },
+          now,
+          message,
+        );
+      }
       return { duplicate: false, state: 'COMPLETED' };
     }
     if (message.messageType === 'VisitReturnReady') {
@@ -513,6 +543,7 @@ async function handleClinicalMessage({
         updatedAt: now,
       };
       await QueueTicket.create([ticket], { session });
+      await enqueueClinicalTicket(connection, session, ticket, now, message);
       return {
         duplicate: false,
         state: 'READY',

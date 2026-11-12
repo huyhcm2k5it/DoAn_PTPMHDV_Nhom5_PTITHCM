@@ -400,7 +400,7 @@
             }
           }
         },
-        "description": "DOCTOR reads require the current Appointment-owned doctor/visit grant projection; otherwise the request fails closed."
+        "description": "DOCTOR reads require the current Clinical-owned visit grant projection."
       }
     },
     "/api/v1/diagnostic-orders/{orderId}/specimens": {
@@ -1749,7 +1749,8 @@
         "operationId": "DI_012",
         "security": [
           {
-            "bearerAuth": []
+            "bearerAuth": [],
+            "authorizationLease": []
           }
         ],
         "parameters": [
@@ -1910,7 +1911,14 @@
             }
           }
         },
-        "description": "Cancellation is limited to a successfully settled, uncollected order and requires the current Appointment-owned doctor/visit grant projection. Billing owns refund execution."
+        "description": "Cancellation requires a successfully settled order without specimens and a current Clinical-owned grant for an unsigned visit. Billing owns refund execution.",
+        "x-authorization-lease": {
+          "action": "DI-012",
+          "maxAgeSeconds": 30,
+          "expiryLeewaySeconds": 0,
+          "expiredStatus": 401,
+          "expiredCode": "AUTHZ_LEASE_EXPIRED"
+        }
       }
     },
     "/api/v1/patients/{patientId}/published-results": {
@@ -2233,6 +2241,14 @@
           },
           "chargeState": {
             "type": "string"
+          },
+          "refundStatus": {
+            "enum": [
+              "PENDING_SYNC",
+              "REQUESTED",
+              "SUCCEEDED",
+              "FAILED"
+            ]
           },
           "amountVnd": {
             "type": "integer",

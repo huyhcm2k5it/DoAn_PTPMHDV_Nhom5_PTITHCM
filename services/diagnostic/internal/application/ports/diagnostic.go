@@ -50,7 +50,7 @@ type Results interface {
 // VisitGrantVerifier is implemented only by a trusted, current owner projection.
 // Absence is a fail-closed integration boundary.
 type VisitGrantVerifier interface {
-	VerifyVisitGrant(context.Context, string, string) error
+	VerifyVisitGrant(ctx context.Context, visitID, patientID, doctorUserID string, cancel bool, now time.Time) error
 }
 type Cancellation interface {
 	CancelOrder(context.Context, domain.Principal, string, string, domain.CancelInput, domain.ResultMeta) (domain.CancelData, error)
@@ -62,4 +62,8 @@ type PublishedResultsReader interface {
 
 type PublishedResultsRecords interface {
 	PublishedResultsForPatient(context.Context, string, int, int) (domain.PublishedResults, error)
+}
+
+type DoctorPublishedResultsRecords interface {
+	PublishedResultsForDoctor(ctx context.Context, patientID, doctorUserID string, page, limit int, now time.Time) (domain.PublishedResults, error)
 }

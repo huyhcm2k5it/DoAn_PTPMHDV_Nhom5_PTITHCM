@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:umc-care:visit-doctor-grant-changed:v1",
+  "allOf": [
+    {
+      "$ref": "urn:umc-care:common-envelope:v1"
+    },
+    {
+      "properties": {
+        "messageKind": {
+          "const": "EVENT"
+        },
+        "messageType": {
+          "const": "VisitDoctorGrantChanged"
+        },
+        "producer": {
+          "const": "clinical"
+        },
+        "payload": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "mode",
+                "sequence"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "CHECKPOINT"
+                },
+                "sequence": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "mode",
+                "sequence",
+                "visitId",
+                "patientId",
+                "doctorUserId",
+                "active",
+                "canCancel"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "UPSERT"
+                },
+                "sequence": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "visitId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "patientId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "doctorUserId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "active": {
+                  "type": "boolean"
+                },
+                "canCancel": {
+                  "type": "boolean"
+                }
+              },
+              "if": {
+                "properties": {
+                  "active": {
+                    "const": false
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "canCancel": {
+                    "const": false
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

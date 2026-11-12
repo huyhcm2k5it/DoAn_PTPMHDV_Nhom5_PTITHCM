@@ -33,7 +33,7 @@ func (s *Service) CancelOrder(ctx context.Context, p domain.Principal, id, key s
 		if !ok {
 			return domain.Fail("SERVICE_UNAVAILABLE", "Current doctor-visit grant projection unavailable")
 		}
-		if e = verifier.VerifyVisitGrant(ctx, o.VisitID, domain.ID(p.UserID)); e != nil {
+		if e = verifier.VerifyVisitGrant(ctx, o.VisitID, o.PatientID, domain.ID(p.UserID), true, s.now()); e != nil {
 			return e
 		}
 		if !p.LeaseExpiresAt.After(s.now()) {
@@ -47,6 +47,7 @@ func (s *Service) CancelOrder(ctx context.Context, p domain.Principal, id, key s
 		}
 		cancellationID := domain.NewID()
 		o.State = "CANCELLED"
+		o.RefundStatus = "PENDING_SYNC"
 		o.Version++
 		out = domain.CancelData{Order: o, RefundStatus: "PENDING_SYNC"}
 		if e = t.SaveOrder(ctx, o); e != nil {

@@ -31,7 +31,7 @@ Health live checks the process. Health ready checks Clinical's schema migration;
 
 ## Ticket handoff and fake fixtures
 
-The baseline command requires patientId although CL-002 accepts only ticketId/doctorId/version. The pre-claim ticket feed is not yet defined by Appointment. The operator-only importer is a provisional integration boundary; it does not add a public API or a new baseline event.
+The claim command requires patientId although CL-002 accepts only ticketId, doctorId and version. The worker reads versioned `QueueTicketChanged` snapshots from Appointment and still waits for an authoritative `QueueTicketClaimed` result before creating a visit. The operator-only importer remains available for isolated fixtures.
 
 ```powershell
 ./tools/huy/go.ps1 clinical run ./cmd/import-tickets -file services/clinical/tests/fixtures/tickets.json

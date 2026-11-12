@@ -162,12 +162,12 @@ Bảng 3.1 Đặc tả Use Case UC-01.1
 | --- | --- |
 | **Tên Use Case** | Đăng ký và xác minh tài khoản |
 | **Tác nhân** | Bệnh nhân |
-| **Mô tả chức năng** | Tài khoản ACTIVE gắn số điện thoại đã xác minh; người bệnh có thể đăng nhập. |
-| **Kênh và kích hoạt** | Web và Android. Người bệnh chọn đăng ký bằng số điện thoại. |
+| **Mô tả chức năng** | Tài khoản gắn với số điện thoại và được kích hoạt sau khi xác minh OTP qua email. Người bệnh đăng nhập bằng số điện thoại và mật khẩu. |
+| **Kênh và kích hoạt** | Web và Android. Người bệnh chọn đăng ký và nhập email để nhận OTP. |
 | **Điều kiện tiên quyết** | Số điện thoại chưa thuộc tài khoản đã kích hoạt. |
 | **Yêu cầu bảo đảm** | Không cấp phiên hoặc quyền cho tài khoản chưa xác minh; OTP hết hạn hoặc sai không được dùng lại. |
-| **Kịch bản chính** | 1. Bệnh nhân nhập số điện thoại và mật khẩu hợp lệ.  2. Hệ thống kiểm tra số điện thoại duy nhất, tạo tài khoản chờ xác minh và OTP REGISTER có hạn; adapter SMS giả lập chuyển mã vào hộp thư demo chỉ mở localhost.  3. Bệnh nhân nhập mã nhận được và gửi xác minh.  4. Hệ thống kiểm tra purpose, thời hạn, số lần thử và trạng thái đã dùng; đánh dấu OTP đã dùng rồi kích hoạt tài khoản.  5. Hệ thống thông báo hoàn tất; bệnh nhân đăng nhập bằng UC-01.2. |
-| **Kịch bản thay thế và ngoại lệ** | • 2a Số đã kích hoạt: không tạo tài khoản thứ hai; thông báo dùng đăng nhập hoặc quên mật khẩu.  • 3a Mã sai hoặc hết hạn: không kích hoạt; cho thử lại trong giới hạn hoặc gửi lại mã.  • 4a Mã đã dùng hay quá số lần sai: từ chối bằng mã lỗi ổn định và yêu cầu khởi tạo OTP mới. |
+| **Kịch bản chính** | 1. Bệnh nhân nhập số điện thoại, email hợp lệ và mật khẩu.  2. Identity kiểm tra số điện thoại, lưu tài khoản chờ xác minh và gửi OTP REGISTER đến email đã nhập.  3. Ứng dụng gửi số điện thoại, `purpose=REGISTER` và mã người bệnh đã nhận để xác minh.  4. Identity kiểm tra mục đích, thời hạn, số lần thử và trạng thái đã dùng, sau đó đánh dấu OTP đã dùng và kích hoạt tài khoản.  5. Bệnh nhân đăng nhập theo UC-01.2. |
+| **Kịch bản thay thế và ngoại lệ** | • 2a Số đã kích hoạt: không tạo tài khoản thứ hai, thông báo dùng đăng nhập hoặc quên mật khẩu.  • 2b Thiếu email hoặc email sai định dạng: trả 400. Nếu kênh gửi lỗi: trả 503.  • 3a Mã sai hoặc hết hạn: không kích hoạt. Người bệnh có thể thử lại trong giới hạn hoặc yêu cầu gửi mã mới đến email đã lưu.  • 4a Mã đã dùng hay quá số lần sai: từ chối bằng mã lỗi ổn định và yêu cầu khởi tạo OTP mới. |
 | **Kiểm chứng** | OTP sai, hết hạn hoặc replay không tạo tài khoản ACTIVE. |
 | **Truy vết** | SRS UC-01; BR-01; FR-01, FR-02; RL-01, RL-15; BAC-01; API IA-001..003. |
 
@@ -206,10 +206,10 @@ Bảng 3.3 Đặc tả Use Case UC-01.3
 | **Tác nhân** | Bệnh nhân |
 | **Mô tả chức năng** | Mật khẩu mới có hiệu lực; refresh session cũ bị thu hồi và authorization lease cũ hết hiệu lực tối đa sau 30 giây. |
 | **Kênh và kích hoạt** | Web và Android. Người bệnh chọn quên mật khẩu hoặc đổi mật khẩu. |
-| **Điều kiện tiên quyết** | Quên mật khẩu cần số điện thoại đã đăng ký; đổi mật khẩu cần phiên hợp lệ. |
+| **Điều kiện tiên quyết** | Để nhận OTP khi quên mật khẩu, tài khoản phải ACTIVE và có email đã lưu. Đổi mật khẩu cần phiên hợp lệ. |
 | **Yêu cầu bảo đảm** | Mật khẩu cũ còn nguyên nếu OTP hoặc mật khẩu hiện tại không hợp lệ. |
-| **Kịch bản chính** | 1. Với quên mật khẩu, bệnh nhân gửi số điện thoại; hệ thống tạo OTP RESET và chuyển tới hộp thư SMS giả lập.  2. Bệnh nhân nhập OTP RESET cùng mật khẩu mới; hệ thống kiểm mã theo mục đích, hạn và giới hạn thử.  3. Với đổi mật khẩu, bệnh nhân nhập mật khẩu hiện tại và mật khẩu mới trong phiên hợp lệ.  4. Hệ thống lưu hash mật khẩu mới, đánh dấu OTP đã dùng nếu có và thu hồi các phiên cũ.  5. Bệnh nhân đăng nhập lại bằng mật khẩu mới. |
-| **Kịch bản thay thế và ngoại lệ** | • 2a OTP REGISTER dùng cho RESET hoặc mã sai/hết hạn: từ chối, không đổi mật khẩu.  • 3a Mật khẩu hiện tại sai: giữ nguyên mật khẩu và phiên theo chính sách giới hạn thử.  • 4a Request lặp với cùng OTP đã dùng: không đổi lần hai. |
+| **Kịch bản chính** | 1. Với quên mật khẩu, bệnh nhân gửi số điện thoại. Identity tra cứu tài khoản ACTIVE và gửi OTP RESET đến email đã lưu.  2. Bệnh nhân gửi số điện thoại, OTP RESET và mật khẩu mới. Identity kiểm mã theo mục đích, hạn và giới hạn thử.  3. Với đổi mật khẩu, bệnh nhân nhập mật khẩu hiện tại và mật khẩu mới trong phiên hợp lệ.  4. Hệ thống lưu hash mật khẩu mới, đánh dấu OTP đã dùng nếu có và thu hồi các phiên cũ.  5. Bệnh nhân đăng nhập lại bằng mật khẩu mới. |
+| **Kịch bản thay thế và ngoại lệ** | • 1a Với số điện thoại hợp lệ, API trả cùng phản hồi 200 accepted kể cả khi không có tài khoản ACTIVE, thiếu email hoặc gửi mail thất bại. Phản hồi không xác nhận mã đã đến hộp thư.  • 2a OTP REGISTER dùng cho RESET hoặc mã sai/hết hạn: từ chối, không đổi mật khẩu.  • 3a Mật khẩu hiện tại sai: giữ nguyên mật khẩu và phiên theo chính sách giới hạn thử.  • 4a Request lặp với cùng OTP đã dùng: không đổi lần hai. |
 | **Kiểm chứng** | RESET thành công thu hồi phiên cũ; OTP dùng lại bị từ chối. |
 | **Truy vết** | SRS UC-01; BR-02; FR-02, FR-03; RL-01, RL-02; BAC-01; API IA-007..009. |
 
