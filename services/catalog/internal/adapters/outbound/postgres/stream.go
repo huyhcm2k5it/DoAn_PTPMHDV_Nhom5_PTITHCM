@@ -48,8 +48,12 @@ func (s *Store) PublishPending(ctx context.Context, publish func(context.Context
 		return false, err
 	}
 	defer tx.Rollback(ctx)
+	var publisherLock bool
+	if err = tx.QueryRow(ctx, `SELECT pg_try_advisory_xact_lock(7210431)`).Scan(&publisherLock); err != nil || !publisherLock {
+		return false, err
+	}
 	var message ports.Outgoing
-	err = tx.QueryRow(ctx, `SELECT message_id::text,destination,routing_key,payload FROM outbox WHERE status='PENDING' AND next_attempt_at<=now() ORDER BY created_at,message_id LIMIT 1 FOR UPDATE SKIP LOCKED`).Scan(&message.MessageID, &message.Exchange, &message.RoutingKey, &message.Body)
+	err = tx.QueryRow(ctx, `SELECT message_id::text,destination,routing_key,payload FROM outbox WHERE message_id=(SELECT message_id FROM outbox WHERE status='PENDING' ORDER BY (payload->'payload'->>'streamSequence')::bigint,CASE WHEN payload->'payload'->>'mode'='CHECKPOINT' THEN 1 ELSE 0 END,created_at,message_id LIMIT 1) AND next_attempt_at<=now() FOR UPDATE`).Scan(&message.MessageID, &message.Exchange, &message.RoutingKey, &message.Body)
 	if err == pgx.ErrNoRows {
 		return false, nil
 	}

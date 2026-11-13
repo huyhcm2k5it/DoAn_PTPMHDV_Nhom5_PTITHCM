@@ -53,3 +53,27 @@ test('future price and tombstones never become a current price', async () => {
   await checkpoint(2);
   assert.equal(await createCatalogPriceResolver(h.connection)({ schedule: { serviceId: sample.payload.fullSnapshot.itemId }, now }), null);
 });
+
+test('out-of-order snapshots heal only after every missing sequence is received', async () => {
+  await checkpoint(2);
+  await apply(event(2));
+  assert.equal((await h.connection.collection('projection_checkpoints').findOne({projectionName:'CatalogChanged'})).gap,true);
+  await apply(event(1));
+  const cp = await h.connection.collection('projection_checkpoints').findOne({projectionName:'CatalogChanged'});
+  assert.equal(cp.streamSequence,2);
+  assert.equal(cp.gap,false);
+  assert.ok(await createCatalogPriceResolver(h.connection)({schedule:{serviceId:sample.payload.fullSnapshot.itemId},now}));
+});
+test('concurrent Catalog deliveries retain a complete contiguous watermark', async () => {
+  await Promise.all([apply(event(3)),apply(event(1)),apply(event(2))]);
+  await checkpoint(3);
+  const cp = await h.connection.collection('projection_checkpoints').findOne({projectionName:'CatalogChanged'});
+  assert.equal(cp.streamSequence,3);
+  assert.equal(cp.gap,false);
+});
+test('legacy gaps remain closed and far jumps cannot grow unbounded state', async () => {
+  await h.connection.collection('projection_checkpoints').insertOne({projectionName:'CatalogChanged',streamSequence:2,gap:true});
+  await apply(event(1));await checkpoint(2);
+  assert.equal((await h.connection.collection('projection_checkpoints').findOne({projectionName:'CatalogChanged'})).gap,true);
+  await assert.rejects(apply(event(10003)),e=>e.code==='CATALOG_SEQUENCE_WINDOW_EXCEEDED');
+});

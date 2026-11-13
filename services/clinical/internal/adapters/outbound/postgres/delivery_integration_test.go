@@ -140,3 +140,44 @@ func TestOriginalRedeliveryAcknowledgesScheduledRetryWithoutRunningHandler(t *te
 		t.Fatal("leased retry did not apply projection")
 	}
 }
+
+func TestGrantPublisherOrderingAndConcurrentWorker(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	if _, err := db.pool.Exec(ctx, `TRUNCATE outbox`); err != nil {
+		t.Fatal(err)
+	}
+	first := "00000000-0000-4000-8000-000000000002"
+	second := "00000000-0000-4000-8000-000000000001"
+	for i, id := range []string{first, second} {
+		raw, _ := json.Marshal(map[string]any{"payload": map[string]any{"sequence": i + 1}})
+		if _, err := db.pool.Exec(ctx, `INSERT INTO outbox(message_id,aggregate_id,destination,routing_key,envelope,created_at) VALUES($1,$1,'umc.events.clinical.v1',$2,$3,'2000-01-01')`, id, grantRoute, raw); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sent, err := db.PublishPending(ctx, func(_ context.Context, out ports.Outgoing) error {
+		if out.MessageID != first {
+			t.Fatalf("grant sequence reordered: first=%s", out.MessageID)
+		}
+		next, nestedErr := db.PublishPending(ctx, func(context.Context, ports.Outgoing) error {
+			t.Fatal("concurrent publisher overtook pending predecessor")
+			return nil
+		})
+		if next || nestedErr != nil {
+			t.Fatalf("concurrent worker result=%v err=%v", next, nestedErr)
+		}
+		return nil
+	})
+	if !sent || err != nil {
+		t.Fatal(sent, err)
+	}
+	sent, err = db.PublishPending(ctx, func(_ context.Context, out ports.Outgoing) error {
+		if out.MessageID != second {
+			t.Fatal(out.MessageID)
+		}
+		return nil
+	})
+	if !sent || err != nil {
+		t.Fatal(sent, err)
+	}
+}

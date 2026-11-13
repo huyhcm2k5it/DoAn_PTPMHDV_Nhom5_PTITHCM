@@ -66,7 +66,22 @@ async function applyCatalogChanged({
     const cp = await checkpoints.findOne({ projectionName: 'CatalogChanged' }, { session });
     const previous = cp?.streamSequence ?? 0;
     const isCheckpoint = p.mode === 'CHECKPOINT';
-    const gap = Boolean(cp?.gap) || (isCheckpoint ? sequence > previous : sequence > previous + 1);
+    // Parallel deliveries may commit in a different order from the broker.
+    // Only observed entity sequences advance the contiguous watermark.
+    // A heartbeat proves freshness, never receipt of the missing entities.
+    const legacyGap = Boolean(cp?.legacyGap) || Boolean(cp?.gap && cp?.pendingSequences === undefined);
+    if (sequence > previous + 10000) {
+      throw failure(503, 'CATALOG_SEQUENCE_WINDOW_EXCEEDED', 'Catalog stream requires an owner snapshot.');
+    }
+    const pending = new Set(cp?.pendingSequences || []);
+    if (!isCheckpoint && sequence > previous) pending.add(sequence);
+    let contiguous = previous;
+    while (pending.delete(contiguous + 1)) contiguous++;
+    if (pending.size > 1024) {
+      throw failure(503, 'CATALOG_SEQUENCE_WINDOW_EXCEEDED', 'Catalog stream requires an owner snapshot.');
+    }
+    const checkpointSequence = Math.max(cp?.checkpointSequence || 0, isCheckpoint ? sequence : 0);
+    const gap = legacyGap || pending.size > 0 || checkpointSequence > contiguous;
     if (!isCheckpoint) {
       const entityKey = p.entityType + ':' + p.entityId;
       const contentHash = hash({
@@ -101,7 +116,10 @@ async function applyCatalogChanged({
       {
         $set: {
           projectionName: 'CatalogChanged',
-          streamSequence: Math.max(previous, sequence),
+          streamSequence: contiguous,
+          pendingSequences: [...pending].sort((a, b) => a - b),
+          checkpointSequence,
+          legacyGap,
           gap,
           updatedAt: now,
           ...(isCheckpoint ? { lastCheckpointAt: now } : {}),

@@ -79,6 +79,8 @@ async function setup(t) {
   await Schedule.create({
     id: 'schedule-1',
     doctorId: doctor,
+    doctorUserId: doctor,
+    departmentId: service,
     serviceId: service,
     startAt: new Date('2026-10-31T01:00:00Z'),
     endAt: new Date('2026-10-31T02:00:00Z'),
@@ -330,6 +332,8 @@ test('patient overlap lock rejects a second overlapping slot but allows adjacent
   await Schedule.create({
     id: 'schedule-2',
     doctorId: doctor,
+    doctorUserId: doctor,
+    departmentId: service,
     serviceId: service,
     startAt: new Date('2026-10-31T02:00:00Z'),
     endAt: new Date('2026-10-31T03:00:00Z'),
@@ -659,6 +663,8 @@ test('AP-013 reschedules atomically and AP-014 cancels with one refund request',
   await Schedule.create({
     id: 'schedule-2',
     doctorId: doctor,
+    doctorUserId: doctor,
+    departmentId: service,
     serviceId: service,
     startAt: new Date('2026-10-31T03:00:00Z'),
     endAt: new Date('2026-10-31T04:00:00Z'),
@@ -835,4 +841,43 @@ test('outbox publisher marks RequestCharge only after confirm', async (t) => {
   assert.ok(
     (await connection.collection('outbox').findOne({ message_type: 'RequestCharge' })).published_at,
   );
+});
+
+test('holds reject unusable clinical mapping without consuming capacity, then accept an admin repair', async (t) => {
+  const { connection, Schedule, Slot } = await setup(t);
+  const options = {
+    connection,
+    patientId: patientA,
+    principalId: ownerA,
+    slotId: 'slot-1',
+    idempotencyKey: 'mapping-repair',
+    now: new Date('2026-10-31T00:00:00Z'),
+    resolvePriceSnapshot: async () => ({ amountVnd: 100000, snapshotHash: 'mapping-test' }),
+  };
+  const trustedMapping = { doctorUserId: doctor, departmentId: service };
+  for (const invalidMapping of [
+    { $unset: { doctorUserId: '' } },
+    { $unset: { departmentId: '' } },
+    { $set: { doctorUserId: [doctor] } },
+    { $set: { departmentId: [service] } },
+    { $set: { doctorUserId: 'not-a-uuid' } },
+    { $set: { departmentId: '' } },
+  ]) {
+    // Raw collection writes reproduce malformed legacy data without schema coercion.
+    await Schedule.collection.updateOne({ id: 'schedule-1' }, { $set: trustedMapping });
+    await Schedule.collection.updateOne({ id: 'schedule-1' }, invalidMapping);
+    await assert.rejects(
+      createHold(options),
+      (error) => error.status === 409 && error.code === 'CLINICAL_MAPPING_UNAVAILABLE',
+    );
+    assert.equal((await Slot.findOne({ id: 'slot-1' }).lean()).heldCount, 0);
+    assert.equal(await connection.collection('holds').countDocuments({}), 0);
+    assert.equal(await connection.collection('idempotency_records').countDocuments({}), 0);
+  }
+  await Schedule.updateOne({ id: 'schedule-1' }, { $set: trustedMapping });
+  const result = await createHold(options);
+  const stored = await connection.collection('holds').findOne({ id: result.holdId });
+  assert.equal(stored.doctorUserId, doctor);
+  assert.equal(stored.departmentId, service);
+  assert.equal((await Slot.findOne({ id: 'slot-1' }).lean()).heldCount, 1);
 });

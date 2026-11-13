@@ -27,7 +27,9 @@ function clinicalTicketSnapshot(ticket) {
   ];
   if (ticket.ticketType === 'RETURN') ids.push('visitId');
   if (
-    !ids.every((key) => uuid.test(payload[key] || '')) ||
+    !ids.every(
+      (key) => typeof payload[key] === 'string' && uuid.test(payload[key]),
+    ) ||
     !['FIRST', 'RETURN'].includes(payload.ticketType) ||
     !['WAITING', 'CALLED', 'CLAIMED', 'IN_SERVICE', 'NO_SHOW', 'DONE'].includes(
       payload.state,

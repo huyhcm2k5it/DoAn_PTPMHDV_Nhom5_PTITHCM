@@ -95,9 +95,27 @@ func TestResultLeaseCheckedInsideTransaction(t *testing.T) {
 	m := &memory{objects: map[string]json.RawMessage{}}
 	id := domain.NewID()
 	_ = m.Put(context.Background(), "access", id, domain.Access{ActorType: "STAFF", Status: "ACTIVE", TokenVersion: 1, Capabilities: []string{"LAB_TECH"}})
-	p := domain.Principal{UserID: id, ActorType: "STAFF", TokenVersion: 1, Capabilities: []string{"LAB_TECH"}, LeaseAction: "DI-007", LeaseExpiresAt: now}
-	_, err := New(m, func() time.Time { return now }).CreateResult(context.Background(), p, domain.NewID(), domain.NewID(), domain.ResultCreateInput{})
+	p := domain.Principal{UserID: id, ActorType: "STAFF", TokenVersion: 1, Capabilities: []string{"LAB_TECH"}, LeaseAction: "DI-008", LeaseExpiresAt: now}
+	_, err := New(m, func() time.Time { return now }).UpdateResult(context.Background(), p, domain.NewID(), domain.NewID(), domain.ResultUpdateInput{ExpectedVersion: 1, Items: []domain.ResultItemInput{{TestCode: "CBC", ValueText: "1"}}})
 	if domain.Code(err) != "AUTHZ_LEASE_EXPIRED" {
 		t.Fatalf("expired lease accepted: %v", err)
+	}
+}
+
+func TestDocumentedBearerOnlyResultActions(t *testing.T) {
+	ctx := context.Background()
+	id := domain.NewID()
+	m := &memory{objects: map[string]json.RawMessage{}}
+	_ = m.Put(ctx, "access", id, domain.Access{ActorType: "STAFF", Status: "ACTIVE", TokenVersion: 1, Capabilities: []string{"LAB_TECH", "LAB_REVIEW"}})
+	s := New(m, time.Now)
+	p := domain.Principal{UserID: id, ActorType: "STAFF", TokenVersion: 1, Capabilities: []string{"LAB_TECH", "LAB_REVIEW"}}
+	for _, item := range []struct{ action, cap string }{{"DI-007", "LAB_TECH"}, {"DI-010", "LAB_REVIEW"}} {
+		if err := s.resultAccess(ctx, m, p, item.action, item.cap); err != nil {
+			t.Fatalf("Bearer-only %s rejected: %v", item.action, err)
+		}
+	}
+	p.TokenVersion = 2
+	if err := s.resultAccess(ctx, m, p, "DI-007", "LAB_TECH"); domain.Code(err) != "FORBIDDEN" {
+		t.Fatalf("revoked token accepted: %v", err)
 	}
 }

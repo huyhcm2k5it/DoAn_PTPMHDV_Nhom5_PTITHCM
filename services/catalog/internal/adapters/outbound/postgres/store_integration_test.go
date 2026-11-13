@@ -233,6 +233,46 @@ func TestCatalogStreamBootstrapCheckpoint(t *testing.T) {
 	if finalSequence != sequence {
 		t.Fatal("repeated bootstrap changed watermark", finalSequence, sequence)
 	}
+
+	// Bootstrap inserts share transaction timestamps. UUID order must never reorder
+	// their stream sequence or send a checkpoint ahead of its covered entities.
+	if _, e = db.pool.Exec(ctx, `DELETE FROM outbox WHERE message_type='CatalogChanged' AND payload->'payload'->>'mode'='CHECKPOINT' AND message_id NOT IN (SELECT message_id FROM outbox WHERE message_type='CatalogChanged' AND payload->'payload'->>'mode'='CHECKPOINT' ORDER BY created_at LIMIT 1)`); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = db.pool.Exec(ctx, `UPDATE outbox SET status='PENDING',created_at='2000-01-01',next_attempt_at=now(),message_id=('00000000-0000-4000-8000-' || lpad((100000-((payload->'payload'->>'streamSequence')::bigint)*10-CASE WHEN payload->'payload'->>'mode'='CHECKPOINT' THEN 1 ELSE 0 END)::text,12,'0'))::uuid WHERE message_type='CatalogChanged'`); e != nil {
+		t.Fatal(e)
+	}
+	var previous int64
+	checkpointSeen := false
+	for {
+		sent, err := db.PublishPending(ctx, func(_ context.Context, message ports.Outgoing) error {
+			var envelope struct {
+				Payload struct {
+					Sequence int64  `json:"streamSequence"`
+					Mode     string `json:"mode"`
+				} `json:"payload"`
+			}
+			if err := json.Unmarshal(message.Body, &envelope); err != nil {
+				return err
+			}
+			current := envelope.Payload.Sequence
+			if current < previous || (current == previous && checkpointSeen && envelope.Payload.Mode != "CHECKPOINT") {
+				t.Fatalf("outbox reordered stream: previous=%d checkpoint=%v next=%d mode=%s", previous, checkpointSeen, current, envelope.Payload.Mode)
+			}
+			if current != previous {
+				checkpointSeen = false
+			}
+			previous = current
+			checkpointSeen = checkpointSeen || envelope.Payload.Mode == "CHECKPOINT"
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !sent {
+			break
+		}
+	}
 }
 
 func TestCatalogOutboxAndIdentityProjection(t *testing.T) {

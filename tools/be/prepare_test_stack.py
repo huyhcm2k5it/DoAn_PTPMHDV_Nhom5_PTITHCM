@@ -70,6 +70,25 @@ def prepare():
     doc["name"] = "umc-be-test"
     doc["secrets"]["mongo-keyfile"]["file"] = "../../.runtime/be-test/mongo.key"
     services = doc["services"]
+    local_redis = {
+        "image": "redis:7.4-alpine",
+        "environment": {
+            "CATALOG_REDIS_PASSWORD": "${CATALOG_REDIS_PASSWORD:?set CATALOG_REDIS_PASSWORD}",
+            "APPOINTMENT_REDIS_PASSWORD": "${APPOINTMENT_REDIS_PASSWORD:?set APPOINTMENT_REDIS_PASSWORD}"
+        },
+        "entrypoint": [
+            "/bin/sh",
+            "-c"
+        ],
+        "command": [
+            "printf 'user default off\\nuser catalog on >%s ~umc:catalog:v1:* +hello +auth +ping +get +set +setnx\\nuser appointment on >%s ~umc:appointment:available:v1:* +hello +auth +ping +get +set +del +scan\\n' \"$${CATALOG_REDIS_PASSWORD}\" \"$${APPOINTMENT_REDIS_PASSWORD}\" > /tmp/cache-users.acl && exec redis-server --aclfile /tmp/cache-users.acl --maxmemory 128mb --maxmemory-policy allkeys-lru"
+        ],
+        "networks": [
+            "private"
+        ],
+        "restart": "unless-stopped"
+    }
+    services.setdefault("redis-catalog", local_redis)
     for name, service in services.items():
         service.pop("env_file", None)
         service.pop("restart", None)
@@ -96,6 +115,9 @@ def prepare():
                     env[prefix + "_DB_" + setting] = value
         if name == "gateway":
             service["ports"] = ["127.0.0.1:18080:8080"]
+    services["appointment"]["environment"]["APPOINTMENT_REDIS_URL"] = "redis://appointment:${APPOINTMENT_REDIS_PASSWORD}@redis-catalog:6379"
+    services["catalog"]["environment"]["REDIS_URL"] = "redis://catalog:${CATALOG_REDIS_PASSWORD}@redis-catalog:6379"
+    services["identity"]["environment"].update({"EMAIL_BACKEND": "dev_inbox", "ALLOW_DEV_OTP": "true"})
     services["rabbitmq"]["environment"] = {
         "RABBITMQ_DEFAULT_USER": "${RABBITMQ_USER}", "RABBITMQ_DEFAULT_PASS": "${RABBITMQ_PASSWORD}",
         "RABBITMQ_DEFAULT_VHOST": "/umc-be-test",
