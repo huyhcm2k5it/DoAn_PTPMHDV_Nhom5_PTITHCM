@@ -18,6 +18,7 @@ PHARMACY_EVENTS_EXCHANGE = "umc.events.pharmacy.v1"
 
 # Danh sách routing key mà Notification quan tâm
 BINDINGS = [
+    ("umc.events.identity.v1", "identity.identity-access-changed.v1"),
     (APPOINTMENT_EVENTS_EXCHANGE, "appointment.appointment-changed.v1"),
     (BILLING_EVENTS_EXCHANGE, "billing.billing-status-changed.v1"),
     (DIAGNOSTIC_EVENTS_EXCHANGE, "diagnostic.lab-result-published.v1"),

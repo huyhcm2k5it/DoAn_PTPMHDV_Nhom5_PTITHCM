@@ -74,6 +74,7 @@ async function setup(t) {
     await mongod.stop();
   });
   await ensureAppointmentStorage(connection);
+  await connection.collection('patient_access_projection').insertOne({ patientId: patientA, ownerUserId: ownerA, active: true, policyVersion: 1 });
   const Schedule = getScheduleModel(connection);
   const Slot = getSlotModel(connection);
   await Schedule.create({
@@ -880,4 +881,22 @@ test('holds reject unusable clinical mapping without consuming capacity, then ac
   assert.equal(stored.doctorUserId, doctor);
   assert.equal(stored.departmentId, service);
   assert.equal((await Slot.findOne({ id: 'slot-1' }).lean()).heldCount, 1);
+});
+
+test('reception booking sends the patient owner as charge recipient', async (t) => {
+  const { connection, Slot } = await setup(t);
+  const staff = '00000000-0000-4000-8000-000000000901';
+  const now = new Date('2026-10-31T00:00:00Z');
+  await Slot.updateOne({id: 'slot-1'}, {$set: {startAt: new Date('2026-10-31T04:00:00Z'), endAt: new Date('2026-10-31T04:30:00Z')}});
+  const hold = await createHold({ connection, patientId: patientA, slotId: 'slot-1', principalId: staff,
+    idempotencyKey: 'reception-hold', now, resolvePriceSnapshot: async () => ({ amountVnd: 100000, snapshotHash: 'a'.repeat(64) }) });
+  const created = await createAppointment({ connection, principalId: staff, patientId: patientA, holdId: hold.holdId,
+    idempotencyKey: 'reception-book', now });
+  const event = await connection.collection('outbox').findOne({message_type:'RequestCharge'});
+  assert.equal(event.payload.recipientUserId, ownerA);
+  await cancelAppointment({connection, appointmentId: created.appointmentId, principalId: staff,
+    patientId: patientA, reasonCode: 'PATIENT_REQUEST', expectedVersion: 1,
+    idempotencyKey: 'reception-cancel', now});
+  const changed = await connection.collection('outbox').findOne({message_type: 'AppointmentChanged'});
+  assert.equal(changed.payload.recipientUserId, ownerA);
 });

@@ -92,6 +92,7 @@ function getAppointmentModel(connection) {
       holdId: { type: String, required: true },
       patientId: { type: String, required: true },
       principalId: { type: String, required: true },
+      recipientUserId: String,
       slotId: { type: String, required: true },
       scheduleId: { type: String, required: true },
       doctorId: { type: String, required: true },

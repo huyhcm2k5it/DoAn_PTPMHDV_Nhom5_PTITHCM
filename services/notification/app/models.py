@@ -1,1 +1,1 @@
-from app.domain.models import Notification, MessageInbox, RetryJob, DeadLetter
+from app.domain.models import Notification, MessageInbox, RetryJob, DeadLetter, IdentityAccessProjection

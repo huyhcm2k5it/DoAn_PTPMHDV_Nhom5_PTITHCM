@@ -32,6 +32,9 @@ def digest(value):
 
 @transaction.atomic
 def route_event(routing_key, envelope):
+    if routing_key == "identity.identity-access-changed.v1":
+        from app.application.identity_projection import apply_identity_access
+        return apply_identity_access(envelope)
     route = ROUTES.get(routing_key)
     if not route or not isinstance(envelope,dict) or set(envelope) != REQUIRED:
         raise ValueError("Unknown notification routing key or invalid envelope")

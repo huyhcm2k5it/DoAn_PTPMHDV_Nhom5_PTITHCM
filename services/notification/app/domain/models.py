@@ -46,3 +46,16 @@ class DeadLetter(models.Model):
     reason = models.CharField(max_length=80)
     published_at = models.DateTimeField(null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class IdentityAccessProjection(models.Model):
+    """Minimal owner-published access state; no Identity database reads."""
+    user_id = models.UUIDField(primary_key=True)
+    version = models.PositiveBigIntegerField(default=0)
+    token_version = models.PositiveBigIntegerField(default=1)
+    status = models.CharField(max_length=16, default="BLOCKED")
+    actor_type = models.CharField(max_length=16, default="PATIENT")
+    capabilities = models.JSONField(default=list)
+    phone_verified = models.BooleanField(default=False)
+    body_hash = models.CharField(max_length=64, default="")
+    updated_at = models.DateTimeField(auto_now=True)
