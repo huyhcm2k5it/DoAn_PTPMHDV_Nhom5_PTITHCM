@@ -179,6 +179,9 @@ func TestCatalogStreamBootstrapCheckpoint(t *testing.T) {
 	if e = db.Seed(ctx); e != nil {
 		t.Fatal(e)
 	}
+	if _, e = db.pool.Exec(ctx, `TRUNCATE outbox; UPDATE catalog_stream SET sequence=0,generation=0,bootstrap_completed_at=NULL,checkpoint_at=NULL WHERE singleton=true`); e != nil {
+		t.Fatal(e)
+	}
 	if e = db.BootstrapCatalogStream(ctx); e != nil {
 		t.Fatal(e)
 	}
@@ -291,6 +294,9 @@ func TestCatalogOutboxAndIdentityProjection(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err = db.Seed(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.pool.Exec(ctx, `TRUNCATE outbox; UPDATE catalog_stream SET sequence=0,generation=0,bootstrap_completed_at=NULL,checkpoint_at=NULL WHERE singleton=true`); err != nil {
 		t.Fatal(err)
 	}
 	if err = db.BootstrapCatalogStream(ctx); err != nil {
