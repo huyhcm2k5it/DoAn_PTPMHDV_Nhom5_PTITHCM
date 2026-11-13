@@ -3,3 +3,6 @@ services/patient/** text=auto eol=lf
 services/appointment/** text=auto eol=lf
 services/pharmacy/** text=auto eol=lf
 apps/web/** text=auto eol=lf
+
+# Shell entrypoints must run on Linux after a Windows checkout.
+*.sh text eol=lf

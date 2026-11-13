@@ -48,6 +48,14 @@ class TestStackGeneration(unittest.TestCase):
         self.doc = yaml.safe_load(self.profile.read_text(encoding="utf-8"))
         self.values = dict(line.split("=", 1) for line in (self.runtime / "test.env").read_text(encoding="utf-8").splitlines())
 
+    def test_redis_is_local_even_when_main_profile_is_online(self):
+        self.assertIn('redis-catalog', self.doc['services'])
+        self.assertIn('~umc:appointment:available:v1:*', str(self.doc['services']['redis-catalog']))
+        self.assertIn('~umc:catalog:v1:*', str(self.doc['services']['redis-catalog']))
+        self.assertNotIn('UMC_REDIS_URL', str(self.doc))
+        self.assertIn('redis-catalog:6379', self.doc['services']['appointment']['environment']['APPOINTMENT_REDIS_URL'])
+        self.assertIn('redis-catalog:6379', self.doc['services']['catalog']['environment']['REDIS_URL'])
+
     def test_local_database_urls_and_gateway_matching_ports_are_complete(self):
         for owner, port in PORTS.items():
             with self.subTest(owner=owner):
@@ -105,6 +113,15 @@ class TestStackGeneration(unittest.TestCase):
         self.assertEqual(self.doc["services"]["gateway"]["ports"], ["127.0.0.1:18080:8080"])
         self.assertIn(".runtime/be-test/jwks.json", str(self.doc["services"]["gateway"]["volumes"]))
         self.assertEqual(set(self.doc["volumes"]), {"mongo_data", "rabbitmq_data", "postgres_data", "huy_postgres_data", "postgres_be_data"})
+
+    def test_catalog_seed_completes_before_owner_publishers_start(self):
+        with patch.object(starter, "ROOT", self.root), patch.object(starter, "prepare"), \
+             patch.object(starter, "configure"), patch.object(starter.subprocess, "run") as run:
+            starter.main(seed_catalog=True)
+        commands = [call.args[0] for call in run.call_args_list]
+        seed = next(i for i, cmd in enumerate(commands) if cmd[-4:] == ["run", "--rm", "catalog-migrate", "-seed"])
+        start = next(i for i, cmd in enumerate(commands) if cmd[-3:] == ["up", "-d", "--build"])
+        self.assertLess(seed, start)
 
     def test_start_uses_generated_values_despite_inherited_online_environment(self):
         hostile = {"DIAGNOSTIC_DATABASE_URL": "postgres://online.invalid/production",

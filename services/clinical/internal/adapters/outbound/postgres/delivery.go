@@ -18,8 +18,12 @@ func (p *Probe) PublishPending(ctx context.Context, publish func(context.Context
 		return false, e
 	}
 	defer tx.Rollback(ctx)
+	var publisherLock bool
+	if e = tx.QueryRow(ctx, `SELECT pg_try_advisory_xact_lock(7210432)`).Scan(&publisherLock); e != nil || !publisherLock {
+		return false, e
+	}
 	var m ports.Outgoing
-	e = tx.QueryRow(ctx, `SELECT message_id::text,destination,routing_key,envelope FROM outbox WHERE status='PENDING' ORDER BY created_at,message_id LIMIT 1 FOR UPDATE SKIP LOCKED`).Scan(&m.MessageID, &m.Exchange, &m.RoutingKey, &m.Body)
+	e = tx.QueryRow(ctx, `SELECT message_id::text,destination,routing_key,envelope FROM outbox WHERE status='PENDING' ORDER BY CASE WHEN routing_key='clinical.visit-doctor-grant-changed.v1' THEN (envelope->'payload'->>'sequence')::bigint ELSE 0 END,created_at,message_id LIMIT 1 FOR UPDATE`).Scan(&m.MessageID, &m.Exchange, &m.RoutingKey, &m.Body)
 	if errors.Is(e, pgx.ErrNoRows) {
 		return false, nil
 	}

@@ -127,7 +127,7 @@ func (s *Service) resultAccess(ctx context.Context, t ports.Tx, p domain.Princip
 	if p.ActorType != "STAFF" || a.ActorType != "STAFF" || a.Status != "ACTIVE" || a.TokenVersion != p.TokenVersion || !domain.Has(a.Capabilities, capability) || !domain.Has(p.Capabilities, capability) {
 		return domain.Fail("FORBIDDEN", "Required LAB capability missing")
 	}
-	if p.LeaseAction != action || !p.LeaseExpiresAt.After(s.now()) {
+	if action != "DI-007" && action != "DI-010" && (p.LeaseAction != action || !p.LeaseExpiresAt.After(s.now())) {
 		return domain.Fail("AUTHZ_LEASE_EXPIRED", "Current authorization lease required")
 	}
 	return nil

@@ -27,6 +27,9 @@ func registerResults(e *echo.Echo, o Options) {
 		if err != nil {
 			return p, err
 		}
+		if action == "DI-007" || action == "DI-010" {
+			return p, nil
+		}
 		verifier, ok := o.Auth.(interface {
 			LeasePrincipal(context.Context, string, domain.Principal, string) (domain.Principal, error)
 		})

@@ -119,6 +119,20 @@ async function createHold({
           'SCHEDULE_UNAVAILABLE',
           'Lịch khám không còn mở.',
         );
+      // Only an admin-owned schedule supplies the Identity doctor and department.
+      // Legacy schedules may exist without this mapping; they cannot be booked.
+      const uuid =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (
+        ![schedule.doctorUserId, schedule.departmentId].every(
+          (value) => typeof value === 'string' && uuid.test(value),
+        )
+      )
+        throw new ApiError(
+          409,
+          'CLINICAL_MAPPING_UNAVAILABLE',
+          'Schedule requires a trusted doctor user and department mapping before booking.',
+        );
       await Lock.updateOne(
         { patientId },
         { $set: { updatedAt: now }, $inc: { version: 1 } },

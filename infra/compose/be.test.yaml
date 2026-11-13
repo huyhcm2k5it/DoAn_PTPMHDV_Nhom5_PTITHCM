@@ -294,13 +294,14 @@ services:
       RABBITMQ_URL: ${IDENTITY_AMQP_URL}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set test secret}
       DEBUG: 'false'
-      ALLOW_DEV_OTP: 'false'
+      ALLOW_DEV_OTP: 'true'
       IDENTITY_DB_HOST: postgres
       IDENTITY_DB_PORT: '5432'
       IDENTITY_DB_NAME: identity_db
       IDENTITY_DB_USER: identity_owner
       IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD}
       IDENTITY_DB_SSLMODE: disable
+      EMAIL_BACKEND: dev_inbox
     volumes: &id001
     - ../../.runtime/be-test/jwt_public.pem:/run/config/jwt_public.pem:ro
     - ../../.runtime/be-test/jwt_private.pem:/run/secrets/identity_private.pem:ro
@@ -503,22 +504,6 @@ services:
         condition: service_healthy
     networks:
     - private
-  redis-catalog:
-    image: redis:7.4-alpine
-    environment:
-      CATALOG_REDIS_PASSWORD: ${CATALOG_REDIS_PASSWORD:?set CATALOG_REDIS_PASSWORD}
-      APPOINTMENT_REDIS_PASSWORD: ${APPOINTMENT_REDIS_PASSWORD:?set APPOINTMENT_REDIS_PASSWORD}
-    entrypoint:
-    - /bin/sh
-    - -c
-    command:
-    - printf 'user default off\nuser catalog on >%s ~umc:catalog:v1:* +hello +auth
-      +ping +get +set +setnx\nuser appointment on >%s ~umc:appointment:available:v1:*
-      +hello +auth +ping +get +set +del +scan\n' "$${CATALOG_REDIS_PASSWORD}" "$${APPOINTMENT_REDIS_PASSWORD}"
-      > /tmp/cache-users.acl && exec redis-server --aclfile /tmp/cache-users.acl --maxmemory
-      128mb --maxmemory-policy allkeys-lru
-    networks:
-    - private
   catalog-migrate:
     build: ../../services/catalog
     image: umc-care-catalog:local
@@ -545,9 +530,7 @@ services:
     environment:
       DATABASE_URL: ${CATALOG_DATABASE_URL:?set Catalog PostgreSQL URL}
       LISTEN_ADDR: :${CATALOG_PORT:?set CATALOG_PORT}
-      REDIS_ADDR: redis-catalog:6379
-      REDIS_USERNAME: catalog
-      REDIS_PASSWORD: ${CATALOG_REDIS_PASSWORD}
+      REDIS_URL: redis://catalog:${CATALOG_REDIS_PASSWORD}@redis-catalog:6379
       JWT_ISSUER: umc-care-identity
       JWT_AUDIENCE: umc-care-services
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
@@ -742,19 +725,36 @@ services:
       RABBITMQ_URL: ${IDENTITY_AMQP_URL}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set test secret}
       DEBUG: 'false'
-      ALLOW_DEV_OTP: 'false'
+      ALLOW_DEV_OTP: 'true'
       IDENTITY_DB_HOST: postgres
       IDENTITY_DB_PORT: '5432'
       IDENTITY_DB_NAME: identity_db
       IDENTITY_DB_USER: identity_owner
       IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD}
       IDENTITY_DB_SSLMODE: disable
+      EMAIL_BACKEND: dev_inbox
     volumes: *id001
     depends_on:
       identity:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+    networks:
+    - private
+  redis-catalog:
+    image: redis:7.4-alpine
+    environment:
+      CATALOG_REDIS_PASSWORD: ${CATALOG_REDIS_PASSWORD:?set CATALOG_REDIS_PASSWORD}
+      APPOINTMENT_REDIS_PASSWORD: ${APPOINTMENT_REDIS_PASSWORD:?set APPOINTMENT_REDIS_PASSWORD}
+    entrypoint:
+    - /bin/sh
+    - -c
+    command:
+    - printf 'user default off\nuser catalog on >%s ~umc:catalog:v1:* +hello +auth
+      +ping +get +set +setnx\nuser appointment on >%s ~umc:appointment:available:v1:*
+      +hello +auth +ping +get +set +del +scan\n' "$${CATALOG_REDIS_PASSWORD}" "$${APPOINTMENT_REDIS_PASSWORD}"
+      > /tmp/cache-users.acl && exec redis-server --aclfile /tmp/cache-users.acl --maxmemory
+      128mb --maxmemory-policy allkeys-lru
     networks:
     - private
 networks:

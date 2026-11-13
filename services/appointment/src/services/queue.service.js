@@ -7,7 +7,10 @@ const {
 } = require('../models/appointment.model.js');
 const { ApiError } = require('../core/errors.js');
 const { requestHash } = require('./holds.service.js');
-const { enqueueClinicalTicket } = require('./clinical-ticket-feed.js');
+const {
+  enqueueClinicalTicket,
+  clinicalTicketSnapshot,
+} = require('./clinical-ticket-feed.js');
 
 function vietnamDate(value) {
   const date = value instanceof Date ? value : new Date(value);
@@ -162,6 +165,20 @@ async function checkInAppointment({
           409,
           'CHECKIN_DATE_MISMATCH',
           'Check-in is allowed only on the appointment date.',
+        );
+      if (
+        !clinicalTicketSnapshot({
+          ...appointment,
+          appointmentId: appointment.id,
+          ticketType: 'FIRST',
+          state: 'WAITING',
+          version: 1,
+        })
+      )
+        throw new ApiError(
+          409,
+          'CLINICAL_MAPPING_UNAVAILABLE',
+          'Trusted doctor and department mapping is required before check-in.',
         );
       if (appointment.state === 'CHECKED_IN') {
         const existing = await QueueTicket.findOne({

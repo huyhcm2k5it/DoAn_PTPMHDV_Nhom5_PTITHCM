@@ -8,7 +8,7 @@ from configure_test_broker import configure
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def main():
+def main(seed_catalog=False):
     prepare()
     env_path = ROOT / ".runtime/be-test/test.env"
     # Compose gives the host environment priority over --env-file. Override every
@@ -21,8 +21,14 @@ def main():
     subprocess.run(compose + ["up", "-d", "--wait", "postgres", "mongo", "rabbitmq", "redis-catalog"],
                    check=True, cwd=ROOT, env=process_env)
     configure()
+    if seed_catalog:
+        subprocess.run(compose + ["build", "catalog-migrate"], check=True, cwd=ROOT, env=process_env)
+        subprocess.run(compose + ["run", "--rm", "catalog-migrate", "-seed"], check=True, cwd=ROOT, env=process_env)
     subprocess.run(compose + ["up", "-d", "--build"], check=True, cwd=ROOT, env=process_env)
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--seed-catalog", action="store_true", help="Seed fictional Catalog before starting owner publishers")
+    main(seed_catalog=parser.parse_args().seed_catalog)

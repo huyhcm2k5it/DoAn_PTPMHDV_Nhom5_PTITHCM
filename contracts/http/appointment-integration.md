@@ -5,6 +5,7 @@ This note covers AP-008 through AP-012. The HTTP implementation is intentionally
 ## Request and response boundary
 
 - `POST /api/v1/appointment-holds` accepts only `patientId` and `slotId`, plus a UUID `Idempotency-Key`. The server resolves the slot and accepted price snapshot locally.
+- New holds require valid `doctorUserId` (Identity subject) and `departmentId` UUIDs on the admin-owned schedule. A legacy or malformed schedule returns `409 CLINICAL_MAPPING_UNAVAILABLE` before capacity is reserved. An administrator must repair the schedule mapping; clients cannot supply it in the hold payload. Existing hold retries keep their stored idempotent response.
 - `DELETE /api/v1/appointment-holds/{holdId}` requires the caller's ownership/capability and the same idempotency key on retry.
 - `POST /api/v1/appointments` consumes an active hold and returns `202` with `requestId`, `appointmentId`, `PENDING_PAYMENT`, and `statusUrl`. It writes `RequestCharge` to the Appointment outbox in the same Mongo transaction.
 - AP-011 reports local `chargeSync`, `chargeStatus`, and `refundStatus`. `ChargePrepared` never means payment succeeded.
