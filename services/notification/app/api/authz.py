@@ -10,6 +10,8 @@ from functools import wraps
 from pathlib import Path
 import jwt
 from rest_framework.response import Response
+from django.db import DatabaseError
+from app.domain.models import IdentityAccessProjection
 
 ISSUER = os.getenv("JWT_ISSUER", "umc-care-identity")
 AUDIENCE = os.getenv("JWT_AUDIENCE", "umc-care-services")
@@ -83,6 +85,22 @@ def authenticate(request):
     except (ValueError, TypeError):
         raise AuthError(401, "UNAUTHENTICATED", "Token thiếu hoặc sai định dạng sub.")
 
+    token_version = claims.get("tokenVersion")
+    if (type(token_version) is not int or token_version < 1
+            or claims.get("action") or claims.get("tokenType") not in (None, "ACCESS")
+            or claims.get("actorType") not in ("PATIENT", "STAFF", "DOCTOR")):
+        raise AuthError(401, "UNAUTHENTICATED", "Valid access token required.")
+    try:
+        access = IdentityAccessProjection.objects.filter(user_id=user_id).first()
+    except DatabaseError:
+        raise AuthError(503, "ACCESS_PROJECTION_UNAVAILABLE", "Account access state is unavailable.")
+    if access is None:
+        raise AuthError(503, "ACCESS_PROJECTION_UNAVAILABLE", "Account access state is not synchronized.")
+    if access.status != "ACTIVE":
+        raise AuthError(403, "ACCOUNT_INACTIVE", "Account is not active.")
+    if access.token_version != token_version or access.actor_type != claims["actorType"]:
+        raise AuthError(401, "TOKEN_REVOKED", "Account access changed; sign in again.")
+
     capabilities = claims.get("capabilities") or []
     if not isinstance(capabilities, list):
         raise AuthError(401, "UNAUTHENTICATED", "Claim capabilities không hợp lệ.")
@@ -91,7 +109,7 @@ def authenticate(request):
         user_id=user_id,
         actor_type=str(claims.get("actorType") or ""),
         capabilities=tuple(str(item) for item in capabilities),
-        token_version=int(claims.get("tokenVersion") or 1),
+        token_version=token_version,
         claims=claims,
     )
 

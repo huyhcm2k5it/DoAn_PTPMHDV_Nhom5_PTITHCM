@@ -44,6 +44,25 @@ async function existingIdempotency(Idempotency, principalId, route, key, hash) {
   return row.response;
 }
 
+async function resolveRecipient(connection, patientId, session) {
+  const access = await connection
+    .collection('patient_access_projection')
+    .findOne({ patientId, active: true }, { session });
+  if (
+    !access ||
+    typeof access.ownerUserId !== 'string' ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      access.ownerUserId,
+    )
+  )
+    throw new ApiError(
+      503,
+      'AUTH_PROJECTION_UNAVAILABLE',
+      'Patient owner projection is required to route billing and notifications.',
+    );
+  return access.ownerUserId;
+}
+
 async function createAppointment({
   connection,
   principalId,
@@ -124,7 +143,13 @@ async function createAppointment({
         .lean();
       if (!slot)
         throw new ApiError(404, 'SLOT_NOT_FOUND', 'Slot không tồn tại.');
+      const recipientUserId = await resolveRecipient(
+        connection,
+        patientId,
+        session,
+      );
       const appointment = {
+        recipientUserId,
         id: appointmentId,
         requestId,
         sourceRevision: 1,
@@ -168,6 +193,8 @@ async function createAppointment({
               sourceId: appointmentId,
               sourceRevision: 1,
               patientId,
+              recipientUserId,
+              expiresAt: appointment.paymentDueAt.toISOString(),
               linesSnapshot: hold.priceSnapshot ? [hold.priceSnapshot] : [],
               amountVnd: hold.priceSnapshot?.amountVnd ?? null,
               snapshotHash: hold.priceSnapshot?.snapshotHash ?? null,
@@ -521,7 +548,11 @@ async function rescheduleAppointment({
               sourceId: appointmentId,
               appointmentId,
               patientId: appointment.patientId,
-              recipientUserId: appointment.principalId,
+              recipientUserId: await resolveRecipient(
+                connection,
+                appointment.patientId,
+                session,
+              ),
               sourceRevision: updated.sourceRevision,
               state: 'CONFIRMED',
               changeType: 'RESCHEDULED',
@@ -693,7 +724,11 @@ async function cancelAppointment({
               sourceId: appointmentId,
               appointmentId,
               patientId: appointment.patientId,
-              recipientUserId: appointment.principalId,
+              recipientUserId: await resolveRecipient(
+                connection,
+                appointment.patientId,
+                session,
+              ),
               sourceRevision: appointment.sourceRevision + 1,
               cancelledSourceRevision: appointment.sourceRevision,
               state: 'CANCELLED',
