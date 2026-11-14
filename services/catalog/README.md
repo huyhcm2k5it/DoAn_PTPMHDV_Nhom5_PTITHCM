@@ -72,3 +72,15 @@ python tools/huy/check_architecture.py
 Linux/CI có PostgreSQL riêng: set `TEST_DATABASE_URL` vào DB bắt đầu `umc_huy_test`, chạy `go test -tags=integration -count=1 -v ./internal/adapters/outbound/postgres`. Test không tự skip nếu thiếu DB. Unit test thường không được tính thay integration. Bộ DB test chứng minh seed lặp, nullable giá, concurrent key/overlap, rollback khi outbox lỗi, quyền bị thu hồi và cả 6 route qua RSA JWT thật trong fixture test. File response test thật dùng cho JSON Schema validation.
 
 Web feature và preview: `apps/web/src/features/catalog/README.md`, `tools/catalog-preview/README.md`. CI definition trong `.github/workflows/huy-go.yml`; xem kết quả của commit trên GitHub để biết job đã chạy hay chưa.
+
+## Repair a verified doctor mapping
+
+Run Catalog migrations before deploying this version: migration `000003_doctor_mapping` adds doctor revisions and the repair audit. It does not change existing account mappings automatically. Fresh demo seeds keep the doctor linked to the unprovided Identity account `...912` inactive.
+
+After verifying the target account with Identity and its ACTIVE DOCTOR projection in Catalog, an owner can repair a reviewed mapping with the Catalog database URL already loaded in `DATABASE_URL`:
+
+```powershell
+go run ./cmd/rebind-doctor -doctor-id CATALOG_DOCTOR_UUID -expected-user-id CURRENT_IDENTITY_UUID -identity-user-id VERIFIED_DOCTOR_UUID -operator huy -reason "Verified Identity mapping correction" -apply
+```
+
+The command checks the expected old mapping, rejects inactive/non-doctor target accounts, and commits the new revision, audit and CatalogChanged outbox together. Repeating the same successful repair returns the same event/sequence. Snapshot export retains the new doctor revision. A worker must publish the outbox; Appointment must separately repair its own legacy schedule/ticket mappings from verified owner data. This tool never writes another service's DB or manufactures a Clinical claim.

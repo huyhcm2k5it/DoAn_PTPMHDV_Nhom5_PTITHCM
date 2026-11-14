@@ -183,7 +183,7 @@ func catalogSnapshotEntities(ctx context.Context, tx pgx.Tx, at time.Time) ([]ca
 		return nil, err
 	}
 	rows.Close()
-	rows, err = tx.Query(ctx, `SELECT id::text,identity_user_id::text,department_id::text,display_name,status FROM doctors ORDER BY id`)
+	rows, err = tx.Query(ctx, `SELECT id::text,identity_user_id::text,department_id::text,display_name,status,revision FROM doctors ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -195,11 +195,12 @@ func catalogSnapshotEntities(ctx context.Context, tx pgx.Tx, at time.Time) ([]ca
 			DisplayName    string `json:"displayName"`
 			Status         string `json:"status"`
 		}
-		if err = rows.Scan(&v.ID, &v.IdentityUserID, &v.DepartmentID, &v.DisplayName, &v.Status); err != nil {
+		var revision int
+		if err = rows.Scan(&v.ID, &v.IdentityUserID, &v.DepartmentID, &v.DisplayName, &v.Status, &revision); err != nil {
 			rows.Close()
 			return nil, err
 		}
-		add("DOCTOR", v.ID, v.ID, 1, v, v.Status)
+		add("DOCTOR", v.ID, v.ID, revision, v, v.Status)
 	}
 	if err = rows.Err(); err != nil {
 		rows.Close()

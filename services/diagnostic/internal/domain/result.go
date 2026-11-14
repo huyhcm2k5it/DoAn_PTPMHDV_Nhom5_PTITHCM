@@ -46,8 +46,9 @@ type CancelInput struct {
 	ExpectedVersion int    `json:"expectedVersion"`
 }
 type CancelData struct {
-	Order        Order  `json:"order"`
-	RefundStatus string `json:"refundStatus"`
+	CancellationID string `json:"cancellationId"`
+	Order          Order  `json:"order"`
+	RefundStatus   string `json:"refundStatus"`
 }
 
 type PublishedResults struct {

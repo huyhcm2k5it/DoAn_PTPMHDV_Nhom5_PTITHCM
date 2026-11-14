@@ -19,3 +19,9 @@ Collection requires local ChargePrepared and a matching successful settlement fe
 Verification: `go test ./...`, `go vet ./...`, `go build ./...`; on Windows run `python tools/huy/test_diagnostic_postgres.py` for the isolated PostgreSQL HTTP/lifecycle suite and actual OpenAPI response fixtures. The Diagnostic integration writes the real `LabResultPublished` envelope; `python tools/huy/test_clinical_postgres.py` consumes it through Clinical's receiver when that fixture exists. Broker tests use `-tags=brokerintegration` and an isolated TEST_RABBITMQ_URL. CI validates both result-response fixtures against the OpenAPI contract and runs the cross-service wire test.
 
 Integration boundary: current repository's Catalog full entity/checkpoint publisher and live Identity/Billing handoffs must be available for a full team journey. Trusted bootstrap supports local verification but is not evidence of the complete group Gate3. No HTTP calls to Billing or cross-service database access are used.
+
+## Cancellation evidence for Billing
+
+DI-012 now returns `data.cancellationId`; pass this UUID as BI-007 `sourceId` (not the LAB order ID). Authorized DI-003 detail reads expose the same optional field for a CANCELLED order, so a lost response can be recovered through HTTP. Missing/invalid owner evidence fails closed; no replacement cancellation ID is invented.
+
+An identical cancellation retry checks current Identity, lease and read grant before returning its stored result. Signing the visit prevents a new cancellation but does not discard an already successful response. Revoking the grant still blocks both detail and replay. Older stored replay responses are hydrated from the existing owner cancellation record without creating another event. No Diagnostic migration is required for this response change. Billing remains the refund owner.
