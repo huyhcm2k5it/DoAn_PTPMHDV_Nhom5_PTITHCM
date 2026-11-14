@@ -115,6 +115,12 @@ func (s *Service) Detail(ctx context.Context, p domain.Principal, id string) (ou
 			}
 		}
 		out = domain.Detail{Order: o, Specimens: o.Specimens, Results: []domain.Result{}}
+		if o.State == "CANCELLED" {
+			out.CancellationID, e = cancellationID(ctx, t, o.ID)
+			if e != nil {
+				return e
+			}
+		}
 		if out.Specimens == nil {
 			out.Specimens = []domain.Specimen{}
 		}

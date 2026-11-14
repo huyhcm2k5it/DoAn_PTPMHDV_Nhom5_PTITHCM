@@ -35,7 +35,7 @@ func (s *Store) Ready(ctx context.Context) error {
 	if err := s.pool.QueryRow(ctx, "SELECT COALESCE(max(version),0) FROM schema_migrations").Scan(&version); err != nil {
 		return err
 	}
-	if version < 2 {
+	if version < 3 {
 		return domain.Fail("SERVICE_UNAVAILABLE", "Catalog stream migration is required")
 	}
 	return nil
@@ -55,7 +55,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 	for _, migration := range []struct {
 		version int
 		file    string
-	}{{1, "000001_catalog.up.sql"}, {2, "000002_catalog_stream.up.sql"}} {
+	}{{1, "000001_catalog.up.sql"}, {2, "000002_catalog_stream.up.sql"}, {3, "000003_doctor_mapping.up.sql"}} {
 		var exists bool
 		if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=$1)", migration.version).Scan(&exists); err != nil {
 			return err

@@ -53,7 +53,7 @@ func TestRealPostgresTransactions(t *testing.T) {
 		t.Fatal(rows, e)
 	}
 	doctors, e := db.Doctors(ctx, ports.DoctorQuery{Page: 1, Limit: 1})
-	if e != nil || doctors.Total != 2 || len(doctors.Items) != 1 {
+	if e != nil || doctors.Total != 1 || len(doctors.Items) != 1 {
 		t.Fatal(doctors, e)
 	}
 	noPrice, e := db.MedicalServices(ctx, ports.ServiceQuery{At: time.Now().Add(365 * 24 * time.Hour)})

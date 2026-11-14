@@ -276,9 +276,10 @@ type List struct {
 	Total int     `json:"total"`
 }
 type Detail struct {
-	Order     Order      `json:"order"`
-	Specimens []Specimen `json:"specimens"`
-	Results   []Result   `json:"results"`
+	CancellationID string     `json:"cancellationId,omitempty"`
+	Order          Order      `json:"order"`
+	Specimens      []Specimen `json:"specimens"`
+	Results        []Result   `json:"results"`
 }
 type SampleInput struct {
 	Barcode string `json:"barcode"`

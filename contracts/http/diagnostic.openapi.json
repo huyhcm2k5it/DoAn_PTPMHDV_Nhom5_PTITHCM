@@ -915,15 +915,6 @@
               "type": "string",
               "format": "uuid"
             }
-          },
-          {
-            "name": "X-Authorization-Lease",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            }
           }
         ],
         "responses": {
@@ -1434,15 +1425,6 @@
             "schema": {
               "type": "string",
               "format": "uuid"
-            }
-          },
-          {
-            "name": "X-Authorization-Lease",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "minLength": 1
             }
           }
         ],
@@ -2535,6 +2517,10 @@
             "items": {
               "$ref": "#/components/schemas/Result"
             }
+          },
+          "cancellationId": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "required": [
@@ -2574,6 +2560,10 @@
           "order": {
             "$ref": "#/components/schemas/Order"
           },
+          "cancellationId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "refundStatus": {
             "enum": [
               "NOT_REQUIRED",
@@ -2586,6 +2576,7 @@
         },
         "required": [
           "order",
+          "cancellationId",
           "refundStatus"
         ],
         "additionalProperties": false

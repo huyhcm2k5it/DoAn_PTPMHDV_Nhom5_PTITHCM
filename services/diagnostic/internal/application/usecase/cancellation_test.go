@@ -54,9 +54,52 @@ func TestCancellationNeedsGrantAndPreservesSpecimenHistory(t *testing.T) {
 	if out.Order.State != "CANCELLED" || out.RefundStatus != "PENDING_SYNC" || len(m.out) != 1 || m.out[0].MessageType != "LabCancelled" {
 		t.Fatalf("invalid cancellation %+v", out)
 	}
+	var wire map[string]json.RawMessage
+	raw, _ := json.Marshal(out)
+	_ = json.Unmarshal(raw, &wire)
+	var cancellationID string
+	_ = json.Unmarshal(wire["cancellationId"], &cancellationID)
+	var event struct {
+		CancellationID string `json:"cancellationId"`
+	}
+	_ = json.Unmarshal(m.out[0].Payload, &event)
+	if !domain.ValidID(cancellationID) || cancellationID != event.CancellationID {
+		t.Fatalf("HTTP response must expose the owner's Billing refund evidence ID: %s", raw)
+	}
 	again, err := s.CancelOrder(ctx, p, o.ID, key, in, domain.ResultMeta{CorrelationID: "test"})
 	if err != nil || again.Order.Version != out.Order.Version || len(m.out) != 1 {
 		t.Fatalf("invalid replay: %v", err)
+	}
+	detail, err := s.Detail(ctx, p, o.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ = json.Marshal(detail)
+	wire = nil
+	_ = json.Unmarshal(raw, &wire)
+	var recovered string
+	_ = json.Unmarshal(wire["cancellationId"], &recovered)
+	if recovered != cancellationID {
+		t.Fatalf("detail lost cancellation evidence: %s", raw)
+	}
+	// Persisted responses from older API versions lack the new field.
+	rk := doctor + ":DI-012:" + key
+	var old Replay
+	if err := load(ctx, m, "replay", rk, &old); err != nil {
+		t.Fatal(err)
+	}
+	old.Response, _ = json.Marshal(map[string]any{"order": out.Order, "refundStatus": out.RefundStatus})
+	_ = m.Put(ctx, "replay", rk, old)
+	again, err = s.CancelOrder(ctx, p, o.ID, key, in, domain.ResultMeta{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ = json.Marshal(again)
+	wire = nil
+	_ = json.Unmarshal(raw, &wire)
+	_ = json.Unmarshal(wire["cancellationId"], &recovered)
+	if recovered != cancellationID || len(m.out) != 1 {
+		t.Fatalf("legacy retry changed refund evidence: %s", raw)
 	}
 }
 

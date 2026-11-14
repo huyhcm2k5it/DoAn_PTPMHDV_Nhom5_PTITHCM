@@ -37,10 +37,10 @@ schemas['Result'] = obj({'id':uuid,'orderId':uuid,'specimenId':uuid,'revision':v
     'items':{'type':'array','items':ref('LabResultItem')}},
     ['id','orderId','specimenId','revision','state','enteredBy','version','items'])
 schemas['Detail'] = obj({'order':ref('Order'),'specimens':{'type':'array','items':ref('Specimen')},
-    'results':{'type':'array','items':ref('Result')}})
+    'results':{'type':'array','items':ref('Result')},'cancellationId':uuid},['order','specimens','results'])
 schemas['SpecimenData'] = obj({'specimen':ref('Specimen')})
 schemas['ResultData'] = obj({'result':ref('Result')})
-schemas['CancelData'] = obj({'order':ref('Order'),'refundStatus':{'enum':['NOT_REQUIRED','PENDING_SYNC','REQUESTED','SUCCEEDED','FAILED']}})
+schemas['CancelData'] = obj({'order':ref('Order'),'cancellationId':uuid,'refundStatus':{'enum':['NOT_REQUIRED','PENDING_SYNC','REQUESTED','SUCCEEDED','FAILED']}})
 schemas['PublishedResults'] = obj({'items':{'type':'array','items':ref('Result')},
     'total':{'type':'integer','minimum':0}})
 schemas['SampleInput'] = obj({'barcode':{'type':'string','maxLength':128},'note':{'type':'string','maxLength':500}},[])
@@ -73,10 +73,10 @@ doc={'openapi':'3.1.1','info':{'title':'UMC Care Diagnostic','version':'1.1.0',
        '/api/v1/diagnostic-orders/{orderId}/specimens':{'post':operation('DI_004','SpecimenDataResponse',201,[order_id,key],'SampleInput',errors)},
        '/api/v1/specimens/{specimenId}/reject':{'post':operation('DI_005','SpecimenDataResponse',200,[specimen_id,key],'RejectInput',errors)},
        '/api/v1/diagnostic-orders/{orderId}/recollect':{'post':operation('DI_006','SpecimenDataResponse',201,[order_id,key],'SampleInput',errors)},
-       '/api/v1/diagnostic-orders/{orderId}/results':{'post':operation('DI_007','ResultDataResponse',201,[order_id,key,lease],'ResultCreateInput',errors)},
+       '/api/v1/diagnostic-orders/{orderId}/results':{'post':operation('DI_007','ResultDataResponse',201,[order_id,key],'ResultCreateInput',errors)},
        '/api/v1/results/{resultId}':{'put':operation('DI_008','ResultDataResponse',200,[result_id,key,lease],'ResultUpdateInput',errors)},
        '/api/v1/results/{resultId}/submit-review':{'post':operation('DI_009','ResultDataResponse',200,[result_id,key,lease],'ReviewInput',errors)},
-       '/api/v1/results/{resultId}/return-rework':{'post':operation('DI_010','ResultDataResponse',200,[result_id,key,lease],'ReworkInput',errors)},
+       '/api/v1/results/{resultId}/return-rework':{'post':operation('DI_010','ResultDataResponse',200,[result_id,key],'ReworkInput',errors)},
        '/api/v1/results/{resultId}/publish':{'post':operation('DI_011','ResultDataResponse',200,[result_id,key,lease],'ReviewInput',errors)},
        '/api/v1/diagnostic-orders/{orderId}/cancel':{'post':operation('DI_012','CancelDataResponse',200,[order_id,key,lease],'CancelInput',errors)},
        '/api/v1/patients/{patientId}/published-results':{'get':operation('DI_013','PublishedResultsResponse',parameters=[patient_id,lease,
