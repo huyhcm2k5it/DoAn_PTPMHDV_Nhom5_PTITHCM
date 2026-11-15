@@ -1,4 +1,4 @@
-# QUY ĐỊNH GITHUB VÀ PHÂN QUYỀN THƯ MỤC — UMC CARE, NHÓM 5
+# QUY ĐỊNH GITHUB VÀ PHÂN QUYỀN THƯ MỤC — HQH Care, NHÓM 5
 
 **Thành viên:** Huy, Quân, Hưng. **Ngày lập:** 24/10/2026.
 

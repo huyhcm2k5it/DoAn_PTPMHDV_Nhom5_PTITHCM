@@ -1,4 +1,4 @@
-Đặc tả ca sử dụng UMC Care
+Đặc tả ca sử dụng HQH Care
 
 Hệ thống khám ngoại trú với 9 service
 
@@ -99,7 +99,7 @@ flowchart LR
     Doctor["Bác sĩ"]
     Staff["Nhân viên"]
 
-    subgraph UMCCare["UMC Care — Tài khoản, lịch hẹn và theo dõi"]
+    subgraph UMCCare["HQH Care — Tài khoản, lịch hẹn và theo dõi"]
         UC01_1(["UC-01.1 Đăng ký tài khoản"])
         UC01_2(["UC-01.2 Đăng nhập và đăng xuất"])
         UC01_3(["UC-01.3 Khôi phục mật khẩu"])
@@ -125,7 +125,7 @@ flowchart LR
     Doctor["Bác sĩ"]
     Staff["Nhân viên"]
 
-    subgraph UMCCareOps["UMC Care — Khám, xét nghiệm và vận hành"]
+    subgraph UMCCareOps["HQH Care — Khám, xét nghiệm và vận hành"]
         UC05_1(["UC-05.1 Tiếp nhận và gọi lượt"])
         UC06_1(["UC-06.1 Khám không LAB"])
         UC07_1(["UC-07.1 Chỉ định LAB"])
@@ -144,7 +144,7 @@ flowchart LR
 
 Hình 2. Khám, xét nghiệm, nhà thuốc, hoàn tiền và quản trị trên web.
 
-Trong sơ đồ, đường liên kết biểu thị actor tham gia vào ca; capability của STAFF được ghi trong đặc tả từng ca. Billing, Appointment, Diagnostic và các service khác nằm trong ranh giới UMC Care nên không vẽ thành actor.
+Trong sơ đồ, đường liên kết biểu thị actor tham gia vào ca; capability của STAFF được ghi trong đặc tả từng ca. Billing, Appointment, Diagnostic và các service khác nằm trong ranh giới HQH Care nên không vẽ thành actor.
 
 # 3 Đặc tả chi tiết
 
@@ -621,7 +621,7 @@ Catalog là context tham chiếu được chấp nhận trong phạm vi đồ á
 
 ### Ánh xạ eCommerce sang khám ngoại trú
 
-| **Ý tưởng từ eShop** | **Áp dụng vào UMC Care** | **Điều chỉnh theo miền y tế** |
+| **Ý tưởng từ eShop** | **Áp dụng vào HQH Care** | **Điều chỉnh theo miền y tế** |
 | --- | --- | --- |
 | Catalog | Catalog và projection danh mục/giá | Giá chụp theo thời điểm; định nghĩa test khác kết quả xét nghiệm. |
 | Basket dùng Redis | Cache danh mục và slot tham khảo | Giữ chỗ khám/thuốc không được mất khi Redis bị xóa; lưu MongoDB. |
@@ -707,7 +707,7 @@ Các ca người dùng không tăng chỉ vì thêm RabbitMQ/Redis: vẫn 19 ca 
 
 # Nguồn tham chiếu
 
-BRD UMC Care 5.0 ngày 17/10/2026; SRS UMC Care 5.0 ngày 17/10/2026; baseline 5.0 gồm 9 service 86 operation HTTP gồm 3 adapter phục hồi của nhóm.
+BRD HQH Care 5.0 ngày 17/10/2026; SRS HQH Care 5.0 ngày 17/10/2026; baseline 5.0 gồm 9 service 86 operation HTTP gồm 3 adapter phục hồi của nhóm.
 
 OMG Unified Modeling Language 2.5.1: https://www.omg.org/spec/UML/2.5.1/
 

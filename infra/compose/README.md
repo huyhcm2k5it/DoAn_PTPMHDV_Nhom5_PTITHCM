@@ -1,4 +1,4 @@
-# Triển khai UMC Care với dịch vụ dữ liệu online
+# Triển khai HQH Care với dịch vụ dữ liệu online
 
 Mục tiêu demo của nhóm là dùng cùng MongoDB Atlas, Neon, Aiven, CloudAMQP và một Redis online để ba máy thấy cùng dữ liệu và sự kiện. Docker Hub chỉ phân phối image ứng dụng; image không đồng bộ database hoặc queue. Mỗi service phải dùng credential và database đúng owner. Danh sách biến nằm ở [env theo owner](../../env/README.md).
 

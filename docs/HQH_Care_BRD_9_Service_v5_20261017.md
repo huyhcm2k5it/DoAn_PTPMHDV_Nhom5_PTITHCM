@@ -1,4 +1,4 @@
-UMC Care BRD
+HQH Care BRD
 
 Tài liệu yêu cầu nghiệp vụ cho hệ thống khám ngoại trú mô phỏng
 
@@ -14,7 +14,7 @@ Bản này xác định phạm vi nghiệp vụ để nhóm ba người xây d�
 
 # 1 Tóm tắt và quyết định phạm vi
 
-UMC Care mô phỏng một cơ sở khám ngoại trú. Người bệnh tự phục vụ trên web và Android; nhân viên dùng web để tiếp nhận, khám, xét nghiệm, cấp thuốc, thu phí và quản trị. Hệ thống dùng dữ liệu giả, không đại diện cho phần mềm chính thức của bệnh viện và không kết nối hệ thống bệnh viện thật.
+HQH Care mô phỏng một cơ sở khám ngoại trú. Người bệnh tự phục vụ trên web và Android; nhân viên dùng web để tiếp nhận, khám, xét nghiệm, cấp thuốc, thu phí và quản trị. Hệ thống dùng dữ liệu giả, không đại diện cho phần mềm chính thức của bệnh viện và không kết nối hệ thống bệnh viện thật.
 
 Kết quả cần chứng minh là hai hành trình chạy xuyên suốt: khám không LAB và khám có LAB. Cả hai phải đi qua dữ liệu thật của dịch vụ, xử lý được các nhánh đổi/hủy, phí/hoàn và sai sót mẫu/toa; không chỉ là giao diện tĩnh.
 
@@ -273,7 +273,7 @@ Catalog là context tham chiếu được chấp nhận trong phạm vi đồ á
 
 ## Ánh xạ eCommerce sang khám ngoại trú
 
-| **Ý tưởng từ eShop** | **Áp dụng vào UMC Care** | **Điều chỉnh theo miền y tế** |
+| **Ý tưởng từ eShop** | **Áp dụng vào HQH Care** | **Điều chỉnh theo miền y tế** |
 | --- | --- | --- |
 | Catalog | Catalog và projection danh mục/giá | Giá chụp theo thời điểm; định nghĩa test khác kết quả xét nghiệm. |
 | Basket dùng Redis | Cache danh mục và slot tham khảo | Giữ chỗ khám/thuốc không được mất khi Redis bị xóa; lưu MongoDB. |
@@ -316,7 +316,7 @@ Baseline có 86 operation HTTP: 83 endpoint client/tác vụ đi Gateway và 3 a
 
 # 11 Nguồn và phê duyệt
 
-Nguồn xây dựng: bốn tài liệu UMC Care v4 do nhóm cung cấp và hai tài liệu học phần microservice [S1] [S2]. Bản 5.0 chốt 9 service, phân công 3 người và hợp đồng dữ liệu/API đồng bộ.
+Nguồn xây dựng: bốn tài liệu HQH Care v4 do nhóm cung cấp và hai tài liệu học phần microservice [S1] [S2]. Bản 5.0 chốt 9 service, phân công 3 người và hợp đồng dữ liệu/API đồng bộ.
 
 | **Vai trò** | **Người duyệt** | **Ngày / quyết định** |
 | --- | --- | --- |

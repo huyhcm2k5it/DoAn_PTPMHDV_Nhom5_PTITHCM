@@ -1,4 +1,4 @@
-# UMC Care web
+# HQH Care web
 
 React and TypeScript shell for the Patient and Appointment flows, with Huy's Catalog feature kept under its owner-managed directory.
 

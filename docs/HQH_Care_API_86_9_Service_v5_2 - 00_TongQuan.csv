@@ -1,6 +1,6 @@
 ,,,,
-API UMC Care · 9 service / 86 HTTP,,,,
-UMC Care · hợp đồng API v5.2 đã rà soát · 17/10/2026 · chưa biểu thị trạng thái đã code,,,,
+API HQH Care · 9 service / 86 HTTP,,,,
+HQH Care · hợp đồng API v5.2 đã rà soát · 17/10/2026 · chưa biểu thị trạng thái đã code,,,,
 ,,,,
 Service,Người phụ trách,Backend,DB riêng,HTTP operations
 Identity,Hưng,Django,PostgreSQL,14

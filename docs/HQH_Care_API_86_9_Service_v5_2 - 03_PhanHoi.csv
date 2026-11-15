@@ -1,6 +1,6 @@
 ,,,,,
 "Response HTTP · success, lỗi và dữ liệu trả về",,,,,
-UMC Care · hợp đồng API v5.2 đã rà soát · 17/10/2026 · chưa biểu thị trạng thái đã code,,,,,
+HQH Care · hợp đồng API v5.2 đã rà soát · 17/10/2026 · chưa biểu thị trạng thái đã code,,,,,
 ,,,,,
 API ID,HTTP status,Loại,Error code,Ý nghĩa,Dữ liệu / schema
 IA-001,201,Thành công,,Tài khoản chờ xác minh và Identity đã chuyển OTP REGISTER cho kênh gửi email đã cấu hình. meta.correlationId dùng để truy vết yêu cầu.,"userId: string:uuid, status: string, otpExpiresAt: string:date-time"

@@ -1,4 +1,4 @@
-# Hồ sơ bàn giao UMC Care cho nhóm Huy Quân Hưng
+# Hồ sơ bàn giao HQH Care cho nhóm Huy Quân Hưng
 
 **Mục đích:** gom phân công, quy định đang áp dụng và checklist bàn giao để ba thành viên cùng tra cứu.
 
@@ -17,7 +17,7 @@
 - [Tracker 24 task tuần 4–5](quan-week4-5-status.csv) — trạng thái theo bằng chứng local và gate liên owner.
 
 - [Quy định GitHub và phân quyền thư mục lập ngày 24/10](../QUY_DINH_GITHUB_NHOM5_HUY_QUAN_HUNG_20261024.md): nguồn quy tắc chi tiết về nhánh, review, owner và conflict.
-- [BRD](../UMC_Care_BRD_9_Service_v5_20261017.md), [SRS](../UMC_Care_SRS_9_Service_v5_20261017.md), [UC](../UMC_Care_UC_9_Service_v5_20261017.md), [ERD](../UMC_Care_ERD_9_Service_v5_20261017.md): baseline nghiệp vụ.
+- [BRD](../HQH_Care_BRD_9_Service_v5_20261017.md), [SRS](../HQH_Care_SRS_9_Service_v5_20261017.md), [UC](../HQH_Care_UC_9_Service_v5_20261017.md), [ERD](../HQH_Care_ERD_9_Service_v5_20261017.md): baseline nghiệp vụ.
 
 ## Quy tắc cập nhật hồ sơ
 

@@ -1,4 +1,4 @@
-# ĐẶC TẢ HỢP ĐỒNG XÁC THỰC VÀ PHÂN QUYỀN (JWT & CAPABILITIES) — UMC CARE
+# ĐẶC TẢ HỢP ĐỒNG XÁC THỰC VÀ PHÂN QUYỀN (JWT & CAPABILITIES) — HQH Care
 
 - **Owner phụ trách phát hành:** Hưng (Identity Service)
 - **Các bên tiêu thụ:** Envoy Gateway, 8 microservices, Web Shell (Quân), Android App (Hưng)

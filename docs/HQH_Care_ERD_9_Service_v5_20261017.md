@@ -1,4 +1,4 @@
-THIẾT KẾ CƠ SỞ DỮ LIỆU & SƠ ĐỒ ERD CHI TIẾT — HỆ THỐNG UMC CARE (v5.0)
+THIẾT KẾ CƠ SỞ DỮ LIỆU & SƠ ĐỒ ERD CHI TIẾT — HỆ THỐNG HQH Care (v5.0)
 
 **Phiên bản:** 5.0 (Đồng bộ BRD, SRS, UC, OpenAPI 86 & AsyncAPI 18 Events / 5 Commands ngày 17/10/2026. Bản tích hợp bổ sung QueueTicketChanged và VisitDoctorGrantChanged)
 
@@ -838,7 +838,7 @@ Table refunds {
 
 **Định danh nguồn:** Bộ `(source_type, source_id, source_revision)` được lưu tại `charges` và bất biến sau khi tạo khoản thu. Mọi saga của cùng khoản thu dùng bộ nguồn đó qua `charge_id`. Khi lập thông điệp settlement, Billing đọc bộ nguồn từ khoản thu. Trường `settlementId` của thông điệp lấy từ ID của saga. Khoản thu tham chiếu saga hiện tại qua `settlement_saga_id` để đọc trạng thái, còn payment tham chiếu saga của lần thử qua `saga_id`. Bệnh nhân của nguồn được lưu một lần tại `charge_sources` và dùng chung cho mọi revision.
 
-**Dữ liệu chụp:** `charges.price_snapshot` giữ giá tại thời điểm phát sinh. Billing lưu số tiền đã được xác lập và hash do service sở hữu nguồn gửi. Diagnostic tính hash từ các dòng cùng số tiền, còn Pharmacy tính từ các dòng thuốc. Saga đọc hash qua khoản thu. Luồng cấp biên nhận ghi số tiền khi thanh toán thành công. [Cấp biên nhận](../services/billing/app/application/settlement_service.py) · [SRS](UMC_Care_SRS_9_Service_v5_20261017.md)
+**Dữ liệu chụp:** `charges.price_snapshot` giữ giá tại thời điểm phát sinh. Billing lưu số tiền đã được xác lập và hash do service sở hữu nguồn gửi. Diagnostic tính hash từ các dòng cùng số tiền, còn Pharmacy tính từ các dòng thuốc. Saga đọc hash qua khoản thu. Luồng cấp biên nhận ghi số tiền khi thanh toán thành công. [Cấp biên nhận](../services/billing/app/application/settlement_service.py) · [SRS](HQH_Care_SRS_9_Service_v5_20261017.md)
 
 **Số tiền khoản thu:** `charges.amount_vnd` cố định sau khi tạo khoản thu. Mỗi lần thử thanh toán lấy số tiền và phiên bản nguồn từ khoản thu qua `charge_id`.
 

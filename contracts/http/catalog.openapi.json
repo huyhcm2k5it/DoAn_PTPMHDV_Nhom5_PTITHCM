@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.1",
   "info": {
-    "title": "UMC Care - Catalog",
+    "title": "HQH Care - Catalog",
     "version": "0.1.0",
     "description": "Week-one implementation contract from API86 v5.2 / ERD v5. Health endpoints are technical and documented separately. JWT/lease claims and event envelope require integration agreement with Identity/Gateway owners."
   },

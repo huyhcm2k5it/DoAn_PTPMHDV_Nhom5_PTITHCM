@@ -1,6 +1,6 @@
 ,,,,,,,
 20 integration events · thông báo việc đã xảy ra,,,,,,,
-UMC Care · hợp đồng API v5.2 đã rà soát · 17/10/2026 · chưa biểu thị trạng thái đã code,,,,,,,
+HQH Care · hợp đồng API v5.2 đã rà soát · 17/10/2026 · chưa biểu thị trạng thái đã code,,,,,,,
 ,,,,,,,
 Event,Producer,Consumer,Payload fields (? = tùy chọn),Exchange,Routing key,Queue nhận,Quy tắc nghiệp vụ
 ChargePaid,Billing,Appointment Diagnostic Pharmacy,"chargeId, sourceType, sourceId, sourceRevision, settlementId, fence, transactionId, amountVnd, paidAt",umc.events.{producer}.v1,billing.charge-paid.v1,"evt.appointment.v1, evt.diagnostic.v1, evt.pharmacy.v1","chargeId, sourceType, sourceId, sourceRevision, settlementId, fence, transactionId, amountVnd, paidAt. Chốt nguồn đúng fence; cùng transaction tiền và receipt"
