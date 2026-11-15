@@ -1,1 +1,11 @@
-from app.domain.models import Notification, MessageInbox, RetryJob, DeadLetter, IdentityAccessProjection
+from app.domain.models import (
+    DeadLetter,
+    IdentityAccessProjection,
+    LegacyMessageInbox,
+    LegacyNotification,
+    MessageInbox,
+    Notification,
+    NotificationDeliveryKey,
+    ReceivedMessage,
+    RetryJob,
+)

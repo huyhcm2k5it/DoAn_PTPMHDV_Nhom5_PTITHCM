@@ -10,7 +10,7 @@ from app.auth.jwt_auth import (
     patient_scope_error,
     require_staff,
 )
-from app.domain.models import Charge, Payment, SettlementSaga, Refund, Receipt
+from app.domain.models import Charge, Payment, Refund, Receipt
 
 CHARGE_STATES = ("OPEN", "PAID", "VOID")
 
@@ -131,7 +131,7 @@ def charges_list_view(request):
     assert page is not None
     assert limit is not None
 
-    queryset = Charge.objects.all().order_by("-created_at")
+    queryset = Charge.objects.select_related("source", "settlement_saga").order_by("-created_at")
     if state:
         queryset = queryset.filter(state=state)
     queryset = apply_window(queryset, parsed_from, parsed_to)
@@ -158,7 +158,7 @@ def charge_detail_view(request, charge_id):
     correlation_id = get_correlation_id(request)
 
     try:
-        charge = Charge.objects.get(id=charge_id)
+        charge = Charge.objects.select_related("source", "settlement_saga").get(id=charge_id)
     except Charge.DoesNotExist:
         return Response({
             "error": {
@@ -173,7 +173,7 @@ def charge_detail_view(request, charge_id):
 
     # Truy vấn xuôi qua Model để Pylance nhận diện kiểu chuẩn xác
     latest_payment = Payment.objects.filter(charge=charge).order_by("-attempted_at").first()
-    latest_saga = SettlementSaga.objects.filter(charge=charge).order_by("-created_at").first()
+    latest_saga = charge.settlement_saga
     latest_refund = Refund.objects.filter(charge=charge).order_by("-updated_at").first()
     latest_receipt = Receipt.objects.filter(charge=charge).order_by("-issued_at").first()
     latest_receipt_id = str(latest_receipt.id) if latest_receipt else None
@@ -200,7 +200,7 @@ def charge_detail_view(request, charge_id):
                 "id": str(latest_payment.id),
                 "receiptId": latest_receipt_id,
                 "transactionId": latest_payment.transaction_id,
-                "amountVnd": latest_payment.amount_vnd,
+                "amountVnd": charge.amount_vnd,
                 "state": latest_payment.state,
                 "method": latest_payment.method,
                 "paidAt": latest_payment_paid_at,
@@ -237,7 +237,7 @@ def patient_charges_list_view(request, patient_id):
     if not can_read_patient_resource(request.principal, patient_id):
         return patient_scope_error(request)
 
-    queryset = Charge.objects.filter(patient_id=patient_id).order_by("-created_at")
+    queryset = Charge.objects.select_related("source", "settlement_saga").filter(source__patient_id=patient_id).order_by("-created_at")
     if state:
         queryset = queryset.filter(state=state)
 

@@ -1,16 +1,18 @@
 import uuid
+
+from tests.fixtures import create_charge, create_saga
 from django.test import TestCase
 from django.utils import timezone
-from app.domain.models import Charge, Payment, SettlementSaga, BillingEventOutbox, Receipt
+from app.domain.models import Payment, BillingEventOutbox, Receipt
 from app.application.settlement_service import apply_settlement_reserved
 
 
 class CanonicalSettlementWire(TestCase):
     def test_csv_state_without_undocumented_response_fields_commits(self):
         source_id = uuid.uuid4()
-        charge = Charge.objects.create(patient_id=uuid.uuid4(), source_type="LAB_ORDER", source_id=source_id, amount_vnd=1000, snapshot_hash="a"*64)
-        saga = SettlementSaga.objects.create(charge=charge, source_type="LAB_ORDER", source_id=source_id, amount_hash="a"*64)
-        payment = Payment.objects.create(charge=charge, saga=saga, transaction_id="TXN_REAL_WIRE", amount_vnd=1000)
+        charge = create_charge(patient_id=uuid.uuid4(), source_type="LAB_ORDER", source_id=source_id, amount_vnd=1000, snapshot_hash="a"*64)
+        saga = create_saga(charge)
+        payment = Payment.objects.create(charge=charge, saga=saga, transaction_id="TXN_REAL_WIRE")
         event = {"messageId":str(uuid.uuid4()),"messageKind":"EVENT","messageType":"SettlementReserved","schemaVersion":1,"producer":"diagnostic","aggregateId":str(source_id),"aggregateVersion":2,"correlationId":str(uuid.uuid4()),"causationId":str(uuid.uuid4()),"requestId":str(uuid.uuid4()),"occurredAt":timezone.now().isoformat(),"payload":{"settlementId":str(saga.id),"sourceId":str(source_id),"sourceRevision":1,"state":"ACCEPTED","fence":1,"lockedAt":timezone.now().isoformat()}}
         from app.application.settlement_service import apply_query_settlement
         query = {**event, "messageId":str(uuid.uuid4()),"messageKind":"COMMAND","messageType":"QuerySettlement",

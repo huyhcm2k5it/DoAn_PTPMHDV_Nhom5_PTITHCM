@@ -14,8 +14,8 @@ def drain_outbox():
 
 
 def decision_payload(saga, payment=None):
-    result = {"settlementId": str(saga.id), "sourceId": str(saga.source_id),
-              "sourceRevision": saga.source_revision, "decisionVersion": saga.decision_version,
+    result = {"settlementId": str(saga.id), "sourceId": str(saga.charge.source_id),
+              "sourceRevision": saga.charge.source_revision, "decisionVersion": saga.decision_version,
               "state": saga.state if saga.state in ("SUCCEEDED", "FAILED") else "UNKNOWN"}
     if saga.fence is not None:
         result["fence"] = saga.fence
@@ -38,16 +38,20 @@ def apply_settlement_reserved(envelope):
     from app.domain.models import Charge, Payment, Receipt, SettlementSaga, MessageInbox
     from app.infrastructure.message_delivery import validate, digest, positive_int, make_envelope, OWNERS
     payload = validate(envelope, "SettlementReserved", "EVENT")
-    saga = SettlementSaga.objects.select_for_update().get(id=payload["settlementId"])
-    charge = Charge.objects.select_for_update().get(id=saga.charge_id)
-    if envelope["producer"] != OWNERS.get(saga.source_type):
+    # Match the charge -> saga lock order used when starting a payment.
+    saga_id = payload["settlementId"]
+    charge_id = SettlementSaga.objects.values_list("charge_id", flat=True).get(id=saga_id)
+    charge = Charge.objects.select_for_update().get(id=charge_id)
+    saga = SettlementSaga.objects.select_for_update().get(id=saga_id, charge=charge)
+    saga.charge = charge
+    if envelope["producer"] != OWNERS.get(saga.charge.source_type):
         raise ValueError("Wrong source producer")
-    if payload.get("sourceId") != str(saga.source_id) or payload.get("sourceRevision") != saga.source_revision:
+    if payload.get("sourceId") != str(saga.charge.source_id) or payload.get("sourceRevision") != saga.charge.source_revision:
         raise ValueError("Reservation source mismatch")
     # CSV04's response contains sourceId/revision/state/fence, not the request's fields.
     # Validate extensions when present; never require undocumented fields to commit.
-    for key, value in {"chargeId":str(charge.id), "sourceType":saga.source_type,
-                       "attemptVersion":saga.version, "amountHash":saga.amount_hash}.items():
+    for key, value in {"chargeId":str(charge.id), "sourceType":saga.charge.source_type,
+                       "attemptVersion":saga.version, "amountHash":charge.snapshot_hash}.items():
         if key in payload and payload[key] != value:
             raise ValueError("Reservation attempt mismatch")
     fingerprint = digest(payload)
@@ -57,11 +61,15 @@ def apply_settlement_reserved(envelope):
             raise ValueError("Message identity conflict")
         return "DUPLICATE"
     payment = Payment.objects.select_for_update().get(saga=saga)
+    if payment.charge_id != charge.id:
+        raise ValueError("Payment belongs to another charge")
     if saga.state in ("FAILED", "SUCCEEDED"):
         if saga.state == "SUCCEEDED" and payload.get("fence") != saga.fence:
             raise ValueError("Fence conflict")
         enqueue_decision(saga, payment, envelope)
     else:
+        if charge.settlement_saga_id != saga.id:
+            raise ValueError("Reservation is not for the current saga")
         state = payload.get("state")
         if state not in ("ACCEPTED", "REJECTED") or payment.state != "PENDING":
             raise ValueError("Invalid reservation state")
@@ -70,7 +78,6 @@ def apply_settlement_reserved(envelope):
         if state == "REJECTED":
             saga.state = "FAILED"
             payment.state = "FAILED"
-            charge.settlement_state = "FAILED"
             payment.save(update_fields=["state"])
         else:
             fence = positive_int(payload.get("fence"))
@@ -80,12 +87,9 @@ def apply_settlement_reserved(envelope):
             saga.state = "SUCCEEDED"
             payment.state = "SUCCEEDED"
             payment.fence = fence
-            payment.settlement_id = saga.id
             payment.paid_at = now
-            payment.save(update_fields=["state", "fence", "settlement_id", "paid_at"])
+            payment.save(update_fields=["state", "fence", "paid_at"])
             charge.state = "PAID"
-            charge.settlement_state = "SUCCEEDED"
-            charge.settlement_id = saga.id
             Receipt.objects.get_or_create(payment=payment, defaults={
                 "charge":charge, "receipt_no":"REC-"+payment.id.hex.upper(),
                 "amount_vnd":charge.amount_vnd})
@@ -115,7 +119,7 @@ def apply_settlement_reserved(envelope):
                     payload=make_envelope("BillingStatusChanged", status_payload, charge.id, charge.version + 1, cause=envelope))
         saga.save(update_fields=["fence","state","updated_at","decision_version"])
         charge.version += 1
-        charge.save(update_fields=["state","settlement_state","settlement_id","updated_at","version"])
+        charge.save(update_fields=["state", "updated_at", "version"])
         enqueue_decision(saga, payment, envelope)
     MessageInbox.objects.create(message_id=envelope["messageId"],
                                 handler="SettlementReserved", body_hash=fingerprint)
@@ -128,10 +132,10 @@ def apply_query_settlement(envelope):
     from app.infrastructure.message_delivery import validate, digest, OWNERS
     p = validate(envelope, "QuerySettlement", "COMMAND")
     saga = SettlementSaga.objects.select_for_update().get(id=p["settlementId"])
-    if (envelope["producer"] != OWNERS.get(saga.source_type)
-            or p.get("sourceType") != saga.source_type
-            or p.get("sourceId") != str(saga.source_id)
-            or p.get("sourceRevision") != saga.source_revision):
+    if (envelope["producer"] != OWNERS.get(saga.charge.source_type)
+            or p.get("sourceType") != saga.charge.source_type
+            or p.get("sourceId") != str(saga.charge.source_id)
+            or p.get("sourceRevision") != saga.charge.source_revision):
         raise ValueError("Settlement query source mismatch")
     fingerprint = digest(p)
     prior = MessageInbox.objects.filter(message_id=envelope["messageId"]).first()

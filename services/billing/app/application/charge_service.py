@@ -1,7 +1,7 @@
 import uuid
 from django.db import transaction
 from django.utils.dateparse import parse_datetime
-from app.domain.models import Charge, BillingEventOutbox, MessageInbox
+from app.domain.models import Charge, ChargeSource, BillingEventOutbox, MessageInbox
 from app.infrastructure.message_delivery import validate, digest, positive_int, make_envelope, OWNERS
 
 
@@ -21,13 +21,19 @@ def handle_request_charge(envelope, delivery_context=None):
         if inbox.body_hash != fingerprint:
             raise ValueError("Message identity conflict")
         return "DUPLICATE"
-    snapshot = {key: payload.get(key) for key in ("patientId", "recipientUserId", "amountVnd", "linesSnapshot", "expiresAt")}
     snapshot_hash = payload.get("snapshotHash")
     if not isinstance(snapshot_hash, str) or len(snapshot_hash) != 64 or any(c not in "0123456789abcdef" for c in snapshot_hash):
         raise ValueError("Immutable owner snapshotHash required")
+    source_id = uuid.UUID(str(payload["sourceId"]))
+    patient_id = uuid.UUID(str(payload["patientId"]))
+    charge_source, _ = ChargeSource.objects.select_for_update().get_or_create(
+        source_type=source, source_id=source_id, defaults={"patient_id": patient_id},
+    )
+    if charge_source.patient_id != patient_id:
+        raise ValueError("Charge source patient conflict")
     charge, created = Charge.objects.select_for_update().get_or_create(
-        source_type=source, source_id=payload["sourceId"], source_revision=payload["sourceRevision"],
-        defaults={"patient_id":payload["patientId"], "recipient_user_id":payload["recipientUserId"],
+        source_type=source, source_id=source_id, source_revision=payload["sourceRevision"],
+        defaults={"recipient_user_id":payload["recipientUserId"],
             "amount_vnd":payload["amountVnd"], "price_snapshot":payload.get("linesSnapshot", []),
             "snapshot_hash":snapshot_hash, "expires_at":parse_datetime(payload["expiresAt"]) if payload.get("expiresAt") else None})
     if not created and charge.snapshot_hash != snapshot_hash:

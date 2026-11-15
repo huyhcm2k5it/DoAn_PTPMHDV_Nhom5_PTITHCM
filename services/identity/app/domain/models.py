@@ -36,6 +36,12 @@ class User(models.Model):
 
     class Meta:
         db_table = "users"
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(actor_type__in=("PATIENT", "DOCTOR", "STAFF")),
+                name="chk_identity_user_actor_type",
+            ),
+        ]
 
     def set_password(self, raw_password):
         self.password_hash = make_password(raw_password)
