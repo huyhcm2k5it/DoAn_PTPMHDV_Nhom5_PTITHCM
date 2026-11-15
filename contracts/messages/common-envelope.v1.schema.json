@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:umc-care:common-envelope:v1",
-  "title": "UMC Care v1 12-field Message Envelope",
+  "title": "HQH Care v1 12-field Message Envelope",
   "type": "object",
   "additionalProperties": false,
   "required": [

@@ -114,7 +114,7 @@ def validate_documents(rows, documents, parameter_rows=(), response_rows=()):
     return sorted(set(errors))
 
 def read_csv(root,name):
-    with (root/'docs'/('UMC_Care_API_86_9_Service_v5_2 - '+name+'.csv')).open(encoding='utf-8-sig',newline='') as stream:return list(csv.reader(stream))[5:]
+    with (root/'docs'/('HQH_Care_API_86_9_Service_v5_2 - '+name+'.csv')).open(encoding='utf-8-sig',newline='') as stream:return list(csv.reader(stream))[5:]
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--root',type=Path,default=Path(__file__).resolve().parents[2]);parser.add_argument('--service',action='append');parser.add_argument('--strict',action='store_true');args=parser.parse_args()

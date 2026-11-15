@@ -1,6 +1,6 @@
 ,,,,,,,,,,,,,,,
 86 HTTP operations · 83 Gateway + 3 adapter nội bộ,,,,,,,,,,,,,,,
-UMC Care · hợp đồng API v5.2 đã rà soát · 17/10/2026 · chưa biểu thị trạng thái đã code,,,,,,,,,,,,,,,
+HQH Care · hợp đồng API v5.2 đã rà soát · 17/10/2026 · chưa biểu thị trạng thái đã code,,,,,,,,,,,,,,,
 ,,,,,,,,,,,,,,,
 API ID,Service,Người làm,Method,Route,Ý định HTTP,Xác thực,Actor / capability,Số tham số,Success,Dữ liệu trả về,HTTP lỗi,Poll khi 202,Gateway,Mô tả nghiệp vụ,Lý do POST nghiệp vụ
 IA-001,Identity,Hưng,POST,/api/v1/auth/register,AUTH_COMMAND,Public,PATIENT (chưa đăng nhập),4,201,"userId: string:uuid, status: string, otpExpiresAt: string:date-time","400, 409, 429, 503",,Có,"Tạo tài khoản PATIENT với số điện thoại, email và mật khẩu. Gửi OTP REGISTER đến email đã nhập. Tài khoản chưa xác minh không được đăng nhập.",

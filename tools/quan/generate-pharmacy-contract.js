@@ -281,7 +281,7 @@ for (const [operationId, method, suffix, status, response, body, params] of defi
 }
 const spec = {
   openapi: '3.1.1',
-  info: { title: 'UMC Care Pharmacy PH-001..008', version: '5.2.0' },
+  info: { title: 'HQH Care Pharmacy PH-001..008', version: '5.2.0' },
   paths,
   components: {
     securitySchemes: {

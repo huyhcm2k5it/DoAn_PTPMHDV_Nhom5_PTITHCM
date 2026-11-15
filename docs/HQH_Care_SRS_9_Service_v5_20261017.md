@@ -1,4 +1,4 @@
-UMC Care SRS
+HQH Care SRS
 
 Đặc tả yêu cầu phần mềm và hợp đồng triển khai · nhóm ba người
 
@@ -637,7 +637,7 @@ Catalog là context tham chiếu được chấp nhận trong phạm vi đồ á
 
 ## Ánh xạ eCommerce sang khám ngoại trú
 
-| **Ý tưởng từ eShop** | **Áp dụng vào UMC Care** | **Điều chỉnh theo miền y tế** |
+| **Ý tưởng từ eShop** | **Áp dụng vào HQH Care** | **Điều chỉnh theo miền y tế** |
 | --- | --- | --- |
 | Catalog | Catalog và projection danh mục/giá | Giá chụp theo thời điểm; định nghĩa test khác kết quả xét nghiệm. |
 | Basket dùng Redis | Cache danh mục và slot tham khảo | Giữ chỗ khám/thuốc không được mất khi Redis bị xóa; lưu MongoDB. |

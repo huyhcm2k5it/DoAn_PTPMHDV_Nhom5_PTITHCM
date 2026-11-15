@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.1",
   "info": {
-    "title": "UMC Care patient",
+    "title": "HQH Care patient",
     "version": "v5.2-be-20261108",
     "description": "Normative API86 baseline reconciled with concrete DTOs. This is a local contract, not evidence that runtime conforms. Recovery adapters remain disabled."
   },

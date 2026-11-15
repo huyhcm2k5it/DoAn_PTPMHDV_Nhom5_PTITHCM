@@ -1,6 +1,6 @@
 ,,,,,,,
 5 RabbitMQ commands · yêu cầu owner xử lý,,,,,,,
-UMC Care · hợp đồng API v5.2 đã rà soát · 17/10/2026 · chưa biểu thị trạng thái đã code,,,,,,,
+HQH Care · hợp đồng API v5.2 đã rà soát · 17/10/2026 · chưa biểu thị trạng thái đã code,,,,,,,
 ,,,,,,,
 Command,Producer,Owner nhận,Payload fields (? = tùy chọn),Exchange,Routing key,Queue nhận,Phản hồi / quy tắc
 RequestCharge,Appointment Diagnostic Pharmacy,Billing,"requestId, sourceType, sourceId, sourceRevision, patientId, recipientUserId, linesSnapshot, amountVnd, snapshotHash",umc.commands.{producer}.v1,billing.request-charge.v1,cmd.billing.v1,"requestId, sourceType, sourceId, sourceRevision, patientId, recipientUserId, linesSnapshot, amountVnd, snapshotHash → ChargePrepared"

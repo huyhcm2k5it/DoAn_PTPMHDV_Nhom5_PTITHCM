@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.1",
   "info": {
-    "title": "UMC Care Diagnostic",
+    "title": "HQH Care Diagnostic",
     "version": "1.1.0",
     "description": "DI-001–013. LAB_TECH collects specimens and writes drafts; LAB_REVIEW returns/publishes with two-person review. Patient reads expose only PUBLISHED results. State aliases preserve existing API values; DI-001 recovery remains disabled by default (private service token only)."
   },

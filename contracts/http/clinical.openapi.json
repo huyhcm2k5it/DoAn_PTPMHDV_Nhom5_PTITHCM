@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.1",
   "info": {
-    "title": "UMC Care Clinical",
+    "title": "HQH Care Clinical",
     "version": "1.2.0",
     "description": "CL-001–011. Transactional lab registry, draft and final prescriptions, visit signing, and paginated signed medical records. Signing and patient record reads require current authorization leases; unresolved LAB blocks signing. Patient reads expose only signed notes and FINAL prescriptions."
   },

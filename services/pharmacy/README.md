@@ -40,7 +40,7 @@ The package's own npm test is the small health/worker-routing suite, not the ful
 
 Setup, safe migration, seed and queue migration: [Compose README](../../infra/compose/README.md).
 Contract/routing/expected results, local evidence and pending owner integration:
-[week 4 handoff](../../docs/ban-giao-umc-care/quan-week4-pharmacy.md).
+[week 4 handoff](../../docs/ban-giao-hqh-care/quan-week4-pharmacy.md).
 
 Status: locally verified implementation awaiting actual producer/receiver, broker,
 Gateway/Identity and full Billing integration. No PAID/FINAL fixtures should be imported

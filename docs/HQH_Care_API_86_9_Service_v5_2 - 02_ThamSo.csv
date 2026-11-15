@@ -1,6 +1,6 @@
 ,,,,,,
 Tham số request · path / query / header / body,,,,,,
-UMC Care · hợp đồng API v5.2 đã rà soát · 17/10/2026 · chưa biểu thị trạng thái đã code,,,,,,
+HQH Care · hợp đồng API v5.2 đã rà soát · 17/10/2026 · chưa biểu thị trạng thái đã code,,,,,,
 ,,,,,,
 API ID,Vị trí,Trường,Kiểu,Bắt buộc,Ràng buộc / mặc định,Mô tả
 IA-001,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.

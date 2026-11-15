@@ -4,28 +4,28 @@
   "approvalNote": "Implementation authorized by user; human producer/consumer review still required before shared merge.",
   "sources": [
     {
-      "path": "docs/UMC_Care_API_86_9_Service_v5_2 - 01_HTTP_86.csv",
-      "sha256": "18acce8518b4c009ded95e92c4b890929a6d0e5dfb3045124ce9ca8c48af5194"
+      "path": "docs/HQH_Care_API_86_9_Service_v5_2 - 01_HTTP_86.csv",
+      "sha256": "8ccf1faa1ffc4c368ac3f0b58b1c36aded76adb0d23eb32db9ea0bbb5707d8ce"
     },
     {
-      "path": "docs/UMC_Care_API_86_9_Service_v5_2 - 02_ThamSo.csv",
-      "sha256": "0e6ec9df48f205fa4f674adb91b077dddeea48b4cdbc2696e534ecf597673b36"
+      "path": "docs/HQH_Care_API_86_9_Service_v5_2 - 02_ThamSo.csv",
+      "sha256": "3dca22647f2d545c0fbe43f1ff179694e1319ab59bcd6e536ac753ace342706c"
     },
     {
-      "path": "docs/UMC_Care_API_86_9_Service_v5_2 - 03_PhanHoi.csv",
-      "sha256": "159ab73dc1cd37af64ef4dd27561191f7cbaa12bcb0ca4a3807b11600b60a606"
+      "path": "docs/HQH_Care_API_86_9_Service_v5_2 - 03_PhanHoi.csv",
+      "sha256": "1c83fe75419d3d41e1972f55026c9ad39acbe49570fa12025a4a7be2581da09d"
     },
     {
-      "path": "docs/UMC_Care_API_86_9_Service_v5_2 - 04_Events_18.csv",
-      "sha256": "dbcf17b15e03f8e397d05c4e5957ff61f2df9909997ec187565695b2357ae5f8"
+      "path": "docs/HQH_Care_API_86_9_Service_v5_2 - 04_Events_18.csv",
+      "sha256": "14a7b4126b7a2b002ed8e7679120fb231d4b83eee64b0d818d54986ea61b0417"
     },
     {
-      "path": "docs/UMC_Care_API_86_9_Service_v5_2 - 05_Commands_5.csv",
-      "sha256": "07634828774731a01e91d0e84b8537b2d94173f40c8060190741a72cc059863f"
+      "path": "docs/HQH_Care_API_86_9_Service_v5_2 - 05_Commands_5.csv",
+      "sha256": "7109d0ae503095403d92a8c99fb90ff9efc8b6d60677e1f221253b8f0309fe17"
     },
     {
-      "path": "docs/UMC_Care_API_86_9_Service_v5_2 - 06_QuyUoc.csv",
-      "sha256": "bee089e62e588d300772ab3b82a6dcc4ed72905f7a3a806f2ed7f6f1679188c8"
+      "path": "docs/HQH_Care_API_86_9_Service_v5_2 - 06_QuyUoc.csv",
+      "sha256": "a5a02736ee8ec126ead23e12a4663f5c67ae768e6308a7a8f822fb6847fc9d77"
     }
   ],
   "decisions": {

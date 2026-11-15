@@ -63,7 +63,7 @@ def operation(id,response,status=200,parameters=None,body=None,errors=None):
         result['requestBody']={'required':True,'content':{'application/json':{'schema':ref(body)}}}
     return result
 
-doc={'openapi':'3.1.1','info':{'title':'UMC Care Clinical week 2','version':'1.0.0','description':'CL-001–004 from CSV v5.2. Writes use Idempotency-Key. Worklist date filters use UTC. Patient detail is available only for owned SIGNED visits, with the final saved note. No clinical draft data appears in logs.'},'paths':{
+doc={'openapi':'3.1.1','info':{'title':'HQH Care Clinical week 2','version':'1.0.0','description':'CL-001–004 from CSV v5.2. Writes use Idempotency-Key. Worklist date filters use UTC. Patient detail is available only for owned SIGNED visits, with the final saved note. No clinical draft data appears in logs.'},'paths':{
     '/api/v1/clinical/worklist':{'get':operation('CL_001','WorklistResponse',parameters=[parameter('date','query',{'type':'string','format':'date'}),parameter('state','query',{'type':'string','enum':states}),parameter('page','query',{'type':'integer','minimum':1,'maximum':1000000,'default':1}),parameter('limit','query',{'type':'integer','minimum':1,'maximum':100,'default':20}),parameter('operationId','query',uuid)])},
     '/api/v1/visits/start':{'post':operation('CL_002','StartResponse',202,[key],'StartInput',[400,401,403,404,409,503])},
     '/api/v1/visits/{visitId}':{'get':operation('CL_003','VisitDetailResponse',parameters=[visit_id])},

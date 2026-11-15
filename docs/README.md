@@ -10,4 +10,4 @@
 
 ## Hồ sơ bàn giao nhóm
 
-- [Hồ sơ bàn giao chung UMC Care cho Huy, Quân, Hưng](ban-giao-umc-care/README.md): phạm vi, quy định chung và checklist giao nhận cho cả nhóm.
+- [Hồ sơ bàn giao chung HQH Care cho Huy, Quân, Hưng](ban-giao-hqh-care/README.md): phạm vi, quy định chung và checklist giao nhận cho cả nhóm.

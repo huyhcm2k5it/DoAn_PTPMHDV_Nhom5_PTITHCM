@@ -1,4 +1,4 @@
-# PHÂN CÔNG VÀ LỊCH TRIỂN KHAI UMC CARE
+# PHÂN CÔNG VÀ LỊCH TRIỂN KHAI HQH Care
 
 **Nhóm:** Huy – Quân – Hưng | **Thời gian:** 19 tháng 10 đến 23 tháng 11 năm 2026  
 **Mục đích:** Giao việc đến từng API, màn hình, tích hợp và kiểm thử để ba thành viên có thể bắt đầu code ngay, cùng theo dõi một bản tích hợp chạy được mỗi tuần. Tài liệu này là kế hoạch; trạng thái hoàn thành chỉ được xác nhận bằng PR, CI và demo thực tế.
@@ -139,6 +139,6 @@
 
 ## 6. Nguồn tài liệu đối chiếu
 
-* **Tài liệu dự án UMC Care:** BRD, SRS, UC, ERD v5 ngày 17/10/2026; API workbook v5.2; Tài liệu kiến trúc và Saga UMC Care.
+* **Tài liệu dự án HQH Care:** BRD, SRS, UC, ERD v5 ngày 17/10/2026; API workbook v5.2; Tài liệu kiến trúc và Saga HQH Care.
 * **Quy chuẩn quản lý nhánh & GitHub:** [GitHub Docs - About protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches).
 * **Kiến trúc Android chuẩn:** [Android Developers - Architecture recommendations](https://developer.android.com/topic/architecture/recommendations).

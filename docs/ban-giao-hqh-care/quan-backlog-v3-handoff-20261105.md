@@ -5,8 +5,8 @@
 - Nhánh làm việc: `quan`, baseline `fc84795`.
 - Thay đổi hiện đang ở working tree local, **chưa commit/push**.
 - Kế hoạch nguồn: `C:\Users\admin\Documents\ChatGPT\HDV\UMC_Care_Tai_Lieu_Local_20261024\docs\superpowers\plans\2026-11-05-quan-hoan-thien-backlog-v3.md`.
-- Quy định bàn giao: `docs/ban-giao-umc-care/QUY_DINH_CHUNG.md`, `CHECKLIST_BAN_GIAO.md`.
-- Bảng máy đọc: `docs/ban-giao-umc-care/quan-backlog-v3-status.csv`.
+- Quy định bàn giao: `docs/ban-giao-hqh-care/QUY_DINH_CHUNG.md`, `CHECKLIST_BAN_GIAO.md`.
+- Bảng máy đọc: `docs/ban-giao-hqh-care/quan-backlog-v3-status.csv`.
 
 ## Trạng thái 27 task
 

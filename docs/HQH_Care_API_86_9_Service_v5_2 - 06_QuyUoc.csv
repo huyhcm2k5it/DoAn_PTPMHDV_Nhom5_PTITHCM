@@ -1,6 +1,6 @@
 ,,
 Quy ước thiết kế và đối chiếu slide,,
-UMC Care · hợp đồng API v5.2 đã rà soát · 17/10/2026 · chưa biểu thị trạng thái đã code,,
+HQH Care · hợp đồng API v5.2 đã rà soát · 17/10/2026 · chưa biểu thị trạng thái đã code,,
 ,,
 Chủ đề,Quy ước áp dụng,Căn cứ / kiểm tra
 Phạm vi,"Giữ 86 API ID/method/route của mốc v5; 83 qua Gateway, 3 adapter nội bộ tắt mặc định.",Không đổi phạm vi nghiệp vụ; contract chi tiết v5.2 là nguồn code API.

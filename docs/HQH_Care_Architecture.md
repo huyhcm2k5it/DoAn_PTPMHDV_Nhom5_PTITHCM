@@ -1,4 +1,4 @@
-# UMC CARE
+# HQH Care
 
 ## KIẾN TRÚC TỔNG THỂ HỆ THỐNG
 
@@ -19,7 +19,7 @@ Phán quyết thiết kế: phù hợp hướng học phần và yêu cầu hai 
 
 Đề cương INT1448 “Phát triển phần mềm hướng dịch vụ” nêu CLO1 (hiểu phân tích/thiết kế SOAP, REST, Microservice), CLO2 (áp dụng phát triển cho bài toán cụ thể), CLO3 (trình bày kết quả); báo cáo cuối kỳ 40% và trình bày mã nguồn/demo, bảo vệ 30%. Slide có Gateway, IPC, Saga, DDD/CQRS, API composition/BFF/GraphQL và triển khai. Đây là các nội dung học, không có căn cứ để coi mọi công nghệ trong slide là bắt buộc cho cùng một đồ án.
 
-| **Nguồn yêu cầu**                 | **Cách UMC Care thể hiện**                                                                                                  | **Minh chứng phải có**                                                                 |
+| **Nguồn yêu cầu**                 | **Cách HQH Care thể hiện**                                                                                                  | **Minh chứng phải có**                                                                 |
 |-----------------------------------|-----------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|
 | CLO1 — phân tích/thiết kế         | BRD → SRS/UC → bounded context/ERD → OpenAPI/event contract; giải thích chọn REST/Microservice, so sánh SOAP ở phần bảo vệ. | Ma trận FR–UC–API–service; sơ đồ context/container/sequence; ADR.                      |
 | CLO2 — phát triển                 | 9 service tách dữ liệu, web + Android; Gateway; message bus; Saga, outbox/inbox; Docker Compose.                            | Source, migration/index, Compose health, test contract/integration/E2E, bản demo chạy. |
@@ -40,7 +40,7 @@ Phán quyết thiết kế: phù hợp hướng học phần và yêu cầu hai 
 
 # 3. Bối cảnh và thành phần triển khai
 
-### Hình 1. Bối cảnh hệ thống UMC Care
+### Hình 1. Bối cảnh hệ thống HQH Care
 
 ```mermaid
 flowchart LR
@@ -51,7 +51,7 @@ flowchart LR
     WEB["Web<br/>Đầy đủ 3 actor"]
     ANDROID["Android<br/>PATIENT tối giản"]
     GATEWAY["Envoy Gateway<br/>HTTP API /api/v1"]
-    UMC["UMC Care<br/>9 service"]
+    UMC["HQH Care<br/>9 service"]
 
     PATIENT --> WEB
     PATIENT --> ANDROID
