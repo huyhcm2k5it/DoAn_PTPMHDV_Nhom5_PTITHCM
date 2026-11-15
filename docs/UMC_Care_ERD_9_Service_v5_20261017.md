@@ -18,49 +18,51 @@ THIẾT KẾ CƠ SỞ DỮ LIỆU & SƠ ĐỒ ERD CHI TIẾT — HỆ THỐNG UM
 
 **Không FK / Không JOIN xuyên Service:** Mọi tham chiếu sang thực thể của service khác đều là **LREF (Logical Reference)** lưu dưới dạng UUID opaque. Việc kiểm tra quyền hoặc đồng bộ dữ liệu đọc được thực hiện qua **Local Projections** cập nhật từ 20 Integration Events và 5 Commands trên RabbitMQ.
 
-**Cách đọc DBML:** Mỗi khối ERD ở Phần 1 mô tả một service và có thể dán riêng vào trình hỗ trợ DBML. Với MongoDB, `Table` biểu diễn collection và `pk` là khóa logic trong tài liệu. Các tham chiếu nội bộ MongoDB và LREF xuyên service nằm trong ghi chú. `ref` biểu diễn khóa ngoại nội bộ PostgreSQL. Bảng kỹ thuật và quy tắc có điều kiện được mô tả trong từ điển dữ liệu.
+**Quy ước sơ đồ:** Mỗi sơ đồ ở Phần 1 mô tả dữ liệu của một service. Sơ đồ PostgreSQL thể hiện khóa ngoại nội bộ. Sơ đồ MongoDB thể hiện các collection, khóa và tham chiếu logic. Mục 0.3 mô tả các tham chiếu logic xuyên service (LREF). Từ điển dữ liệu ghi các bảng kỹ thuật và ràng buộc có điều kiện.
+
+**Phạm vi thiết kế:** Sơ đồ ERD và từ điển dữ liệu mô tả thiết kế đích. Trong từ điển PostgreSQL, dấu `?` chỉ cột nullable. Danh sách giá trị trong ngoặc mô tả miền nghiệp vụ của cột, ví dụ `text (enum)` là cột `text` có tập giá trị nghiệp vụ. Phần 3 tập hợp các khóa ứng viên và phụ thuộc hàm để chuẩn bị đánh giá 3NF.
 
 **Định dạng chuẩn:** Khóa chính id kiểu uuid; thời gian lưu theo UTC (ngày nghiệp vụ tính theo Asia/Ho\_Chi\_Minh); tiền tệ kiểu số nguyên bigint / int64 (VND); kiểm soát đồng thời bằng version (Optimistic Concurrency) và SELECT FOR UPDATE / Mongo Transaction cho các thao tác giữ chỗ, trừ tồn, thu/hoàn tiền.
 
 ## 0.2. Sơ đồ Liên kết Logic xuyên Service (Cross-Service LREF & Event/Command Topology)
 
-Dán riêng khối này vào trình hỗ trợ DBML System Architecture. Đường nét đứt biểu diễn LREF theo bảng mục 0.3. Các đường AMQP biểu diễn luồng trao đổi qua RabbitMQ.
+![Sơ đồ liên kết logic xuyên service](./UMC_Care_Lien_ket_Service.svg)
 
-```dbml
----
-diagram_type: arch
----
+Hình trên là bản tổng quan để chèn vào báo cáo. Mã Mermaid bên dưới thể hiện các LREF trong bảng 0.3 và một số luồng thông báo tiêu biểu. Copy nội dung trong khối vào **draw.io → Arrange → Insert → Mermaid**. Mũi tên nét đứt đi từ service sở hữu dữ liệu đến service lưu tham chiếu; mũi tên liền chỉ chiều event qua RabbitMQ. Các đường Billing gắn `source_type` là LREF, không phải event.
 
-Server "Identity" as identity [database: 'identity_db / PostgreSQL']
-Server "Patient" as patient [database: 'patient_db / MongoDB']
-Server "Catalog" as catalog [database: 'catalog_db / PostgreSQL']
-Server "Appointment" as appointment [database: 'appointment_db / MongoDB']
-Server "Clinical" as clinical [database: 'clinical_db / PostgreSQL']
-Server "Diagnostic" as diagnostic [database: 'diagnostic_db / PostgreSQL']
-Server "Pharmacy" as pharmacy [database: 'pharmacy_db / MongoDB']
-Server "Billing" as billing [database: 'billing_db / PostgreSQL']
-Server "Notification" as notification [database: 'notification_db / PostgreSQL']
+Sơ đồ event chỉ minh họa các event đến Notification, không phải toàn bộ topology. Danh sách đầy đủ producer, consumer và command nằm trong [hợp đồng messages](../contracts/be-baseline-manifest.json). Các bội số bên dưới được giữ theo bảng 0.3; khóa duy nhất của Billing còn bao gồm `source_revision`.
 
-// Liên kết logic. Bội số và khóa tham chiếu xem mục 0.3.
-Link: identity - patient [style: dashed, lref: 'patients.ownerUserId']
-Link: identity - catalog [style: dashed, lref: 'doctors.identity_user_id']
-Link: identity - notification [style: dashed, lref: 'notifications.recipient_user_id']
-Link: patient - appointment [style: dashed, lref: 'appointments.patientId']
-Link: catalog - appointment [style: dashed, lref: 'schedules.doctorId, schedules.serviceId']
-Link: catalog - pharmacy [style: dashed, lref: 'inventory.medicineId']
-Link: catalog - diagnostic [style: dashed, lref: 'lab_orders.test_codes, lab_orders.test_snapshot']
-Link: appointment - clinical [style: dashed, lref: 'visits.appointment_id']
-Link: clinical - diagnostic [style: dashed, lref: 'lab_orders.clinical_request_id, lab_orders.visit_id']
-Link: clinical - pharmacy [style: dashed, lref: 'prescription_projection.(prescriptionId, revision)']
+```mermaid
+flowchart LR
+    ID["1. Identity<br/>PostgreSQL · Hưng<br/>users · staff_capabilities"]
+    PA["2. Patient<br/>MongoDB · Quân<br/>patients · profile_audit"]
+    CA["3. Catalog<br/>PostgreSQL · Huy<br/>doctors · medical_services<br/>medicines · lab_tests"]
+    AP["4. Appointment<br/>MongoDB · Quân<br/>schedules · slots · holds<br/>appointments · queue_tickets"]
+    CL["5. Clinical<br/>PostgreSQL · Huy<br/>visits · lab_requests<br/>prescriptions"]
+    DI["6. Diagnostic<br/>PostgreSQL · Huy<br/>lab_orders · specimens<br/>results · reviews"]
+    PH["7. Pharmacy<br/>MongoDB · Quân<br/>inventory · prescription_projection<br/>medication_holds · dispenses"]
+    BI["8. Billing<br/>PostgreSQL · Hưng<br/>charge_sources · charges · settlement_sagas<br/>payments · receipts · refunds"]
+    NO["9. Notification<br/>PostgreSQL · Hưng<br/>notifications · inbox"]
 
-// Luồng command/event đi qua RabbitMQ.
-Link: appointment - billing [proto: AMQP, source_type: 'APPOINTMENT']
-Link: diagnostic - billing [proto: AMQP, source_type: 'LAB_ORDER']
-Link: pharmacy - billing [proto: AMQP, source_type: 'MED_HOLD']
-Link: appointment - notification [proto: AMQP, event: 'AppointmentChanged']
-Link: diagnostic - notification [proto: AMQP, event: 'LabResultPublished']
-Link: pharmacy - notification [proto: AMQP, event: 'MedicationDispensed']
-Link: billing - notification [proto: AMQP, event: 'BillingStatusChanged']
+    ID -. "ownerUserId · 1 : 0..N" .-> PA
+    ID -. "identity_user_id · 1 : 0..1" .-> CA
+    ID -. "recipient_user_id · 1 : 0..N" .-> NO
+    CA -. "doctorId / serviceId · 1 : 0..N" .-> AP
+    CA -. "medicineId · 1 : 0..1" .-> PH
+    CA -. "test_snapshot · N : N" .-> DI
+    PA -. "patientId · 1 : 0..N" .-> AP
+    AP -. "appointment_id · 1 : 0..1" .-> CL
+    CL -. "clinical_request_id · 1 : 0..1" .-> DI
+    CL -. "visit_id · 1 : 0..1 tại Diagnostic" .-> DI
+    CL -. "prescriptionId + revision · 1 : 0..1" .-> PH
+    AP -. "source_id · APPOINTMENT · 1 : 0..1 nguồn thu" .-> BI
+    DI -. "source_id · LAB_ORDER · 1 : 0..1 nguồn thu" .-> BI
+    PH -. "source_id · MED_HOLD · 1 : 0..1 nguồn thu" .-> BI
+
+    AP -->|"Event: AppointmentChanged"| NO
+    DI -->|"Event: LabResultPublished"| NO
+    PH -->|"Event: MedicationDispensed"| NO
+    BI -->|"Event: BillingStatusChanged"| NO
 ```
 
 ## 0.3. Bảng tổng hợp Liên kết Logic xuyên Service (Cross-Service LREF)
@@ -71,13 +73,13 @@ Link: billing - notification [proto: AMQP, event: 'BillingStatusChanged']
 | Identity.users → Catalog.doctors | 1 : 0..1 | identity\_user\_id (UQ LREF); quyền/scope vẫn thuộc Identity. |
 | Catalog.doctors / medical\_services → Appointment.schedules | 1 : 0..N | doctorId / serviceId (LREF); giữ snapshot trường cần hiển thị. |
 | Catalog.medicines → Pharmacy.inventory | 1 : 0..1 | medicineId (UQ LREF); tồn kho thực tế chỉ lưu ở Pharmacy. |
-| Catalog.lab\_tests → Diagnostic.lab\_orders | N : N | Qua test\_codes / test\_snapshot (lưu mã, đơn vị, khoảng tham chiếu, giá tại thời điểm chỉ định). |
+| Catalog.lab\_tests → Diagnostic.lab\_orders | N : N | Qua test\_snapshot giữ mã, đơn vị và khoảng tham chiếu tại thời điểm chỉ định. Giá được ghi trong price\_snapshot. |
 | Patient.patients → Appointment.appointments | 1 : 0..N | patientId (LREF). |
 | Appointment.appointments → Clinical.visits | 1 : 0..1 | appointment\_id (UQ LREF); lượt khám RETURN tiếp tục dùng cùng visitId. |
 | Clinical.lab\_requests → Diagnostic.lab\_orders | 1 : 0..1 | clinical\_request\_id (UQ LREF); khi đang PENDING sẽ chặn ký kết luận Visit. |
-| Clinical.visits → Diagnostic.lab\_orders | 1 : 0..N | visit\_id (LREF). |
+| Clinical.visits → Diagnostic.diagnostic\_visit\_subjects | 1 : 0..1 | visit\_id (LREF). Một lượt khám ánh xạ đến một bệnh nhân. Nhiều order có thể tham chiếu cùng ánh xạ. |
 | Clinical.prescriptions → Pharmacy.prescription\_projection | 1 : 0..1 | UQ(prescriptionId, revision) cho mỗi bản FINAL. |
-| Appointment / Diagnostic / Pharmacy → Billing.charges | 1 : 0..1 | UQ(source\_type, source\_id, source\_revision); không tạo FK đa hình. |
+| Appointment / Diagnostic / Pharmacy → Billing.charge\_sources | 1 : 0..1 | Bộ (source\_type, source\_id) định danh nguồn. Nguồn có thể có nhiều charge, tối đa một charge cho mỗi source\_revision. |
 | Identity.users → Notification.notifications | 1 : 0..N | recipient\_user\_id (LREF); tuyệt đối không dùng patientId làm userId. |
 
 # PHẦN 1: CHI TIẾT ERD & TỪ ĐIỂN DỮ LIỆU CỦA 9 MICROSERVICES
@@ -96,11 +98,11 @@ Project identity_db {
 Table users {
   id uuid [pk]
   phone text [not null, unique]
-  email varchar(255) [null, note: 'Địa chỉ nhận OTP. IA-001 bắt buộc email hợp lệ.']
+  email varchar(255) [null]
   password_hash text [not null]
   actor_type text [not null]
   status text [not null]
-  phone_verified_at timestamptz [null, note: 'Tên trường hiện hành. Identity ghi khi xác minh OTP đăng ký qua email.']
+  phone_verified_at timestamptz [null]
   version int [not null]
   token_version int [not null]
   access_version int [not null]
@@ -114,7 +116,7 @@ Table otp_requests {
   id uuid [pk]
   user_id uuid [null, ref: > users.id]
   phone text [not null]
-  email varchar(255) [null, note: 'Địa chỉ đích của lần gửi OTP. Tra cứu mã theo phone và purpose.']
+  email varchar(255) [null]
   purpose text [not null]
   code_hash text [not null]
   expires_at timestamptz [not null]
@@ -145,7 +147,7 @@ Table staff_capabilities {
   capability text [not null]
   scope_key text [not null]
   enabled boolean [not null]
-  assigned_by uuid [not null, ref: > users.id]
+  assigned_by uuid [null, ref: > users.id]
   assigned_at timestamptz [not null]
 
   indexes {
@@ -155,9 +157,9 @@ Table staff_capabilities {
 
 Table audit_events {
   id uuid [pk]
-  actor_user_id uuid [null, ref: > users.id]
+  actor_user_id uuid [null]
   action text [not null]
-  target_id uuid [null, note: 'LREF']
+  target_id uuid [null]
   before_after jsonb [null]
   correlation_id uuid [not null]
   at timestamptz [not null]
@@ -165,8 +167,6 @@ Table audit_events {
   indexes {
     (actor_user_id, at)
   }
-
-  Note: 'Append-only. Không lưu OTP hoặc password hash.'
 }
 ```
 
@@ -177,8 +177,8 @@ Table audit_events {
 | users | id: uuid PK; phone: text UQ; email: varchar(255)?; password\_hash: text; actor\_type: text; status: text; phone\_verified\_at: timestamptz?; version: int; token\_version: int; access\_version: int | UQ(phone); CHECK actor\_type IN ('PATIENT','DOCTOR','STAFF'); chỉ tài khoản ACTIVE mới được tạo phiên. API đăng ký yêu cầu email hợp lệ để nhận OTP. DB cho phép email NULL và không đặt UNIQUE cho email. Identity ghi phone\_verified\_at khi xác minh OTP đăng ký qua email. |
 | otp\_requests | id: uuid PK; user\_id: uuid FK?; phone: text; email: varchar(255)?; purpose: text; code\_hash: text; expires\_at: timestamptz; used\_at: timestamptz?; attempts: int | FK user\_id -> users.id (khi có); INDEX(phone, purpose, expires\_at); giới hạn thử ≤ 5 lần trong transaction; job dọn dữ liệu quá hạn. Email là địa chỉ đích của lần gửi. Identity vẫn tra cứu mã theo phone và purpose. |
 | sessions | id: uuid PK; user\_id: uuid FK; refresh\_hash: text UQ; expires\_at: timestamptz; revoked\_at: timestamptz?; device\_id: text? | FK user\_id -> users.id; UQ(refresh\_hash); INDEX(user\_id, expires\_at). Đổi/reset mật khẩu thu hồi toàn bộ phiên cũ. |
-| staff\_capabilities | id: uuid PK; user\_id: uuid FK; capability: text; scope\_key: text; enabled: boolean; assigned\_by: uuid FK; assigned\_at: timestamptz | FK user\_id, assigned\_by -> users.id; UQ(user\_id, capability, scope\_key); quyền ADMIN chỉ cấp cho tài khoản quản trị chỉ định. |
-| audit\_events | id: uuid PK; actor\_user\_id: uuid FK?; action: text; target\_id: uuid? LREF; before\_after: jsonb?; correlation\_id: uuid; at: timestamptz | INDEX(actor\_user\_id, at); bảng bất biến (append-only), tuyệt đối không ghi mã OTP hoặc password hash vào log/audit. |
+| staff\_capabilities | id: uuid PK; user\_id: uuid FK; capability: text; scope\_key: text; enabled: boolean; assigned\_by: uuid FK?; assigned\_at: timestamptz | FK user\_id, assigned\_by -> users.id; UQ(user\_id, capability, scope\_key); quyền ADMIN chỉ cấp cho tài khoản quản trị chỉ định. |
+| audit\_events | id: uuid PK; actor\_user\_id: uuid?; action: text; target\_id: uuid? LREF; before\_after: jsonb?; correlation\_id: uuid; at: timestamptz | INDEX(actor\_user\_id, at); bảng bất biến (append-only), tuyệt đối không ghi mã OTP hoặc password hash vào log/audit. |
 | **Bảng kỹ thuật** | outbox, inbox, idempotency\_records, retry\_jobs, dead\_letters | Phát sự kiện IdentityAccessChanged qua outbox trong cùng SQL transaction khi thay đổi quyền/trạng thái. |
 
 ## 2. Patient Service (patient\_db — MongoDB · Owner: Quân · Node.js/TS)
@@ -189,13 +189,12 @@ Table audit_events {
 
 ```dbml
 Project patient_db {
-  Note: 'Mô hình document MongoDB. Table biểu diễn collection. PK là khóa logic và các tham chiếu được ghi chú.'
 }
 
 Table patients {
   id uuid [pk]
-  ownerUserId uuid [not null, note: 'LREF']
-  relation string [not null, note: 'Giá trị: SELF, OTHER.']
+  ownerUserId uuid [not null]
+  relation string [not null]
   fullName string [not null]
   birthDate date [not null]
   sex string [null]
@@ -215,8 +214,8 @@ Table patients {
 
 Table profile_audit {
   id uuid [pk]
-  patientId uuid [not null, note: 'Tham chiếu nội bộ: patients.id.']
-  actorUserId uuid [not null, note: 'LREF']
+  patientId uuid [not null, ref: > patients.id]
+  actorUserId uuid [not null]
   action string [not null]
   changedFields string[] [not null]
   at date [not null]
@@ -224,8 +223,6 @@ Table profile_audit {
   indexes {
     (patientId, at)
   }
-
-  Note: 'Chỉ lưu tên trường thay đổi trong changedFields.'
 }
 ```
 
@@ -257,7 +254,7 @@ Table departments {
 
 Table doctors {
   id uuid [pk]
-  identity_user_id uuid [not null, unique, note: 'LREF']
+  identity_user_id uuid [not null, unique]
   department_id uuid [not null, ref: > departments.id]
   display_name text [not null]
   status text [not null]
@@ -294,23 +291,23 @@ Table lab_tests {
 
 Table price_versions {
   id uuid [pk]
-  item_type text [not null, note: 'Giá trị: EXAM, LAB, MEDICINE.']
-  item_id uuid [not null, note: 'Tham chiếu theo item_type: EXAM → medical_services.id, LAB → lab_tests.id, MEDICINE → medicines.id.']
+  item_type text [not null]
+  item_id uuid [not null]
   revision int [not null]
   amount_vnd bigint [not null]
   effective_from timestamptz [not null]
   effective_to timestamptz [null]
-  created_by uuid [not null, note: 'LREF']
+  created_by uuid [not null]
 
   indexes {
     (item_type, item_id, revision) [unique]
+    (item_type, item_id, effective_from) [unique]
   }
 
   checks {
     `amount_vnd >= 0`
+    `effective_to IS NULL OR effective_to > effective_from`
   }
-
-  Note: 'Các khoảng hiệu lực của cùng (item_type, item_id) không được chồng lấn.'
 }
 ```
 
@@ -323,7 +320,7 @@ Table price_versions {
 | medical\_services | id: uuid PK; department\_id: uuid FK; code: text UQ; name: text; status: text | FK department\_id -> departments.id; UQ(code). Giá lưu tại price\_versions. |
 | medicines | id: uuid PK; code: text UQ; name: text; unit: text; strength: text?; form: text?; status: text | UQ(code). Chỉ chứa định nghĩa danh mục; tồn kho thực tế thuộc Pharmacy. |
 | lab\_tests | id: uuid PK; code: text UQ; name: text; specimen\_type: text; unit: text?; reference\_range: text?; revision: int; status: text | UQ(code). Khi chỉ định LAB, snapshot mã, đơn vị và khoảng tham chiếu vào order. |
-| price\_versions | id: uuid PK; item\_type: text (EXAM|LAB|MEDICINE); item\_id: uuid; revision: int; amount\_vnd: bigint; effective\_from: timestamptz; effective\_to: timestamptz?; created\_by: uuid LREF | UQ(item\_type, item\_id, revision); CHECK amount\_vnd >= 0; dùng khóa/advisory lock khi phát hành giá tương lai để chặn khoảng thời gian hiệu lực chồng lấn. |
+| price\_versions | id: uuid PK; item\_type: text (EXAM\|LAB\|MEDICINE); item\_id: uuid; revision: int; amount\_vnd: bigint; effective\_from: timestamptz; effective\_to: timestamptz?; created\_by: uuid LREF | UQ(item\_type, item\_id, revision); UQ(item\_type, item\_id, effective\_from); CHECK amount\_vnd >= 0. Khoảng hiệu lực dùng [effective\_from, effective\_to), ngày kết thúc phải lớn hơn ngày bắt đầu khi có giá trị. Ràng buộc loại trừ chặn hai khoảng giá chồng nhau cho cùng mặt hàng. |
 | **Bảng kỹ thuật** | outbox, inbox, user\_access\_projection, idempotency\_records, retry\_jobs, dead\_letters | Phát CatalogChanged (UPSERT/TOMBSTONE và CHECKPOINT mỗi 10s kèm streamSequence). Cache Redis umc:catalog:v1:{generation}:{filterHash} TTL 60s. |
 
 ## 4. Appointment Service (appointment\_db — MongoDB · Owner: Quân · Node.js/TS)
@@ -334,13 +331,12 @@ Table price_versions {
 
 ```dbml
 Project appointment_db {
-  Note: 'Mô hình document MongoDB. Table biểu diễn collection. PK là khóa logic và các tham chiếu được ghi chú.'
 }
 
 Table schedules {
   id uuid [pk]
-  doctorId uuid [not null, note: 'LREF']
-  serviceId uuid [not null, note: 'LREF']
+  doctorId uuid [not null]
+  serviceId uuid [not null]
   room string [not null]
   startAt date [not null]
   endAt date [not null]
@@ -356,7 +352,7 @@ Table schedules {
 
 Table slots {
   id uuid [pk]
-  scheduleId uuid [not null, note: 'Tham chiếu nội bộ: schedules.id.']
+  scheduleId uuid [not null, ref: > schedules.id]
   startAt date [not null]
   endAt date [not null]
   capacity int [not null]
@@ -367,15 +363,13 @@ Table slots {
   indexes {
     (scheduleId, startAt) [unique]
   }
-
-  Note: 'heldCount + confirmedCount không vượt capacity.'
 }
 
 Table holds {
   id uuid [pk]
-  slotId uuid [not null, note: 'Tham chiếu nội bộ: slots.id.']
-  patientId uuid [not null, note: 'LREF']
-  status string [not null, note: 'Giá trị: HELD, CONSUMED, RELEASED, EXPIRED.']
+  slotId uuid [not null, ref: > slots.id]
+  patientId uuid [not null]
+  status string [not null]
   expiresAt date [not null]
   principalId string [not null]
   idempotencyKey string [not null]
@@ -390,18 +384,18 @@ Table holds {
 
 Table appointments {
   id uuid [pk]
-  holdId uuid [not null, unique, note: 'Tham chiếu nội bộ: holds.id (tối đa một lịch hẹn mỗi hold).']
-  patientId uuid [not null, note: 'LREF']
-  slotId uuid [not null, note: 'Tham chiếu nội bộ: slots.id.']
-  serviceId uuid [not null, note: 'LREF']
-  doctorId uuid [not null, note: 'LREF']
+  holdId uuid [not null, unique, ref: - holds.id]
+  patientId uuid [not null]
+  slotId uuid [not null, ref: > slots.id]
+  serviceId uuid [not null]
+  doctorId uuid [not null]
   priceSnapshotVnd int64 [not null]
   state string [not null]
   version int [not null]
   slotHistory object[] [not null]
-  chargeId uuid [null, note: 'LREF']
+  chargeId uuid [null]
   expiresAt date [not null]
-  priceVersion uuid [not null, note: 'LREF']
+  priceVersion uuid [not null]
   settlementId uuid [null]
   settlementState string [not null]
   settlementVersion int [not null]
@@ -409,14 +403,14 @@ Table appointments {
 
 Table queue_tickets {
   id uuid [pk]
-  appointmentId uuid [not null, note: 'Tham chiếu nội bộ: appointments.id.']
-  ticketType string [not null, note: 'Giá trị: FIRST, RETURN.']
-  visitId uuid [null, note: 'LREF']
+  appointmentId uuid [not null, ref: > appointments.id]
+  ticketType string [not null]
+  visitId uuid [null]
   returnRound int [not null]
-  state string [not null, note: 'Giá trị: WAITING, CALLED, CLAIMED, NO_SHOW, DONE.']
+  state string [not null]
   calledAt date [null]
-  claimId uuid [null, note: 'Chỉ mục duy nhất có điều kiện cho claimId hợp lệ.']
-  claimedBy uuid [null, note: 'LREF']
+  claimId uuid [null]
+  claimedBy uuid [null]
   noShowReason string [null]
   version int [not null]
 
@@ -426,8 +420,8 @@ Table queue_tickets {
 }
 
 Table patient_time_locks {
-  patientId uuid [pk, note: 'LREF']
-  intervals object[] [not null, note: 'Mảng tài liệu nhúng [{holdId, appointmentId?, startAt, endAt, state}]. holdId và appointmentId tham chiếu nội bộ. Mỗi patientId có một document.']
+  patientId uuid [pk]
+  intervals object[] [not null]
   version int [not null]
 }
 ```
@@ -457,16 +451,16 @@ Project clinical_db {
 
 Table visits {
   id uuid [pk]
-  appointment_id uuid [not null, unique, note: 'LREF']
-  doctor_user_id uuid [not null, note: 'LREF']
+  appointment_id uuid [not null, unique]
+  doctor_user_id uuid [not null]
   state text [not null]
   version int [not null]
   started_at timestamptz [not null]
   signed_at timestamptz [null]
-  patient_id uuid [not null, note: 'LREF']
-  department_id uuid [not null, note: 'LREF']
+  patient_id uuid [not null]
+  department_id uuid [not null]
   return_round int [not null]
-  claim_id uuid [not null, note: 'LREF']
+  claim_id uuid [not null, unique]
 }
 
 Table visit_notes {
@@ -477,7 +471,7 @@ Table visit_notes {
   findings text [not null]
   assessment text [not null]
   diagnosis text [not null]
-  author_user_id uuid [not null, note: 'LREF']
+  author_user_id uuid [not null]
   saved_at timestamptz [not null]
 
   indexes {
@@ -489,27 +483,29 @@ Table prescriptions {
   id uuid [pk]
   visit_id uuid [not null, ref: > visits.id]
   revision int [not null]
-  state text [not null, note: 'Giá trị: DRAFT, FINAL, DELETED.']
+  state text [not null]
   version int [not null]
   finalized_at timestamptz [null]
-  finalized_by uuid [null, note: 'LREF']
+  finalized_by uuid [null]
 
   indexes {
     (visit_id, revision) [unique]
   }
-
-  Note: 'Toa DRAFT có thể chưa có dòng thuốc. Khi FINAL phải có ít nhất một dòng thuốc và visit đã SIGNED. Tối đa một bản FINAL hiệu lực trên mỗi visit.'
 }
 
 Table prescription_items {
   id uuid [pk]
   prescription_id uuid [not null, ref: > prescriptions.id]
-  medicine_id uuid [not null, note: 'LREF']
-  medicine_code_snapshot string [not null]
-  name_snapshot string [not null]
-  dose_text string [not null]
+  medicine_id uuid [not null]
+  medicine_code_snapshot text [not null]
+  name_snapshot text [not null]
+  dose_text text [not null]
   quantity int [not null]
   instruction text [not null]
+
+  indexes {
+    (prescription_id, medicine_code_snapshot) [unique]
+  }
 
   checks {
     `quantity > 0`
@@ -519,29 +515,30 @@ Table prescription_items {
 Table lab_requests {
   id uuid [pk]
   visit_id uuid [not null, ref: > visits.id]
-  request_key string [not null]
-  request_hash string [not null]
-  state text [not null, note: 'Giá trị: PENDING, CREATED, FAILED.']
-  order_id uuid [null, note: 'LREF']
+  request_hash text [not null]
+  state text [not null]
+  order_id uuid [null]
   test_snapshot jsonb [not null]
   version int [not null]
   created_at timestamptz [not null]
 
   indexes {
-    (visit_id, request_key) [unique]
+    (visit_id, request_hash) [unique]
   }
 }
 ```
 
 ### Từ điển dữ liệu — Clinical Service
 
+**Quy tắc dòng thuốc:** Bộ kiểm tra của Clinical từ chối `MedicineCode` trùng trong một toa. Thiết kế đích áp dụng quy tắc theo mã đã chụp trên dòng thuốc. Tên thuốc được lưu cùng nội dung tại thời điểm lập toa. [Bộ kiểm tra toa](../services/clinical/internal/domain/treatment.go)
+
 | **Bảng (Table)** | **Thuộc tính & Kiểu dữ liệu** | **Khóa, Chỉ mục & Quy tắc bất biến (Invariants)** |
 | --- | --- | --- |
-| visits | id: uuid PK; appointment\_id: uuid LREF UQ; doctor\_user\_id: uuid LREF; state: enum; version: int; started\_at: UTC; signed\_at: UTC?; patient\_id: uuid LREF; department\_id: uuid LREF; return\_round: int; claim\_id: uuid LREF | UQ(appointment\_id) — mỗi lịch hẹn có tối đa 1 visit duy nhất; lượt quay lại RETURN sau xét nghiệm tiếp tục dùng cùng visit.id và không thu phí khám mới. |
-| visit\_notes | id: uuid PK; visit\_id: uuid FK; revision: int; symptoms: text; findings: text; assessment: text; diagnosis: text; author\_user\_id: uuid LREF; saved\_at: UTC | FK visit\_id -> visits.id; UQ(visit\_id, revision). Bản nháp không hiển thị cho bệnh nhân. |
-| prescriptions | id: uuid PK; visit\_id: uuid FK; revision: int; state: DRAFT|FINAL|DELETED; version: int; finalized\_at: UTC?; finalized\_by: uuid LREF? | FK visit\_id -> visits.id; UQ(visit\_id, revision). Chỉ được ký FINAL sau khi visit đã SIGNED; tối đa 1 bản FINAL hiệu lực và bất biến sau khi ký. |
-| prescription\_items | id: uuid PK; prescription\_id: uuid FK; medicine\_id: uuid LREF; medicine\_code\_snapshot: string; name\_snapshot: string; dose\_text: string; quantity: int; instruction: text | FK prescription\_id -> prescriptions.id; CHECK quantity > 0. Toa FINAL bắt buộc có ít nhất 1 dòng thuốc. |
-| lab\_requests | id: uuid PK; visit\_id: uuid FK; request\_key: string; request\_hash: string; state: PENDING|CREATED|FAILED; order\_id: uuid LREF?; test\_snapshot: jsonb; version: int; created\_at: UTC | FK visit\_id -> visits.id; UQ(visit\_id, request\_key). Ghi PENDING + outbox CreateLabOrder trong cùng transaction khóa visit. Còn PENDING hoặc order chưa PUBLISHED/CANCELLED thì **cấm ký Visit**. Trạng thái FAILED trong DB ánh xạ thành REJECTED trên LabOrderResolved và CL-003; timeout vẫn PENDING, không coi là FAILED. |
+| visits | id: uuid PK; appointment\_id: uuid LREF UQ; doctor\_user\_id: uuid LREF; state: text (enum); version: int; started\_at: timestamptz; signed\_at: timestamptz?; patient\_id: uuid LREF; department\_id: uuid LREF; return\_round: int; claim\_id: uuid LREF UQ | UQ(claim\_id); UQ(appointment\_id) — mỗi lịch hẹn có tối đa 1 visit duy nhất; lượt quay lại RETURN sau xét nghiệm tiếp tục dùng cùng visit.id và không thu phí khám mới. |
+| visit\_notes | id: uuid PK; visit\_id: uuid FK; revision: int; symptoms: text; findings: text; assessment: text; diagnosis: text; author\_user\_id: uuid LREF; saved\_at: timestamptz | FK visit\_id -> visits.id; UQ(visit\_id, revision). Bản nháp không hiển thị cho bệnh nhân. |
+| prescriptions | id: uuid PK; visit\_id: uuid FK; revision: int; state: text (DRAFT\|FINAL\|DELETED); version: int; finalized\_at: timestamptz?; finalized\_by: uuid LREF? | FK visit\_id -> visits.id; UQ(visit\_id, revision). Chỉ được ký FINAL sau khi visit đã SIGNED; tối đa 1 bản FINAL hiệu lực và bất biến sau khi ký. |
+| prescription\_items | id: uuid PK; prescription\_id: uuid FK; medicine\_id: uuid LREF; medicine\_code\_snapshot: text; name\_snapshot: text; dose\_text: text; quantity: int; instruction: text | FK prescription\_id -> prescriptions.id; UQ(prescription\_id, medicine\_code\_snapshot); CHECK quantity > 0. Toa FINAL bắt buộc có ít nhất 1 dòng thuốc. |
+| lab\_requests | id: uuid PK; visit\_id: uuid FK; request\_hash: text; state: text (PENDING\|CREATED\|FAILED); order\_id: uuid LREF?; test\_snapshot: jsonb; version: int; created\_at: timestamptz | FK visit\_id -> visits.id; UQ(visit\_id, request\_hash). Ghi PENDING + outbox CreateLabOrder trong cùng transaction khóa visit. Còn PENDING hoặc order chưa PUBLISHED/CANCELLED thì **cấm ký Visit**. Trạng thái FAILED trong DB ánh xạ thành REJECTED trên LabOrderResolved và CL-003; timeout vẫn PENDING, không coi là FAILED. |
 | **Bảng kỹ thuật** | start\_requests, lab\_status\_projection, catalog\_projection, patient\_access\_projection, user\_access\_projection, projection\_checkpoints, outbox, inbox, idempotency\_records, retry\_jobs, dead\_letters | start\_requests giữ trạng thái gọi ClaimQueueTicket; lab\_status\_projection theo dõi trạng thái order từ Diagnostic để mở RETURN\_READY và kiểm điều kiện ký. |
 
 ## 6. Diagnostic Service (diagnostic\_db — PostgreSQL · Owner: Huy · Go)
@@ -555,34 +552,35 @@ Project diagnostic_db {
   database_type: 'PostgreSQL'
 }
 
+Table diagnostic_visit_subjects {
+  visit_id uuid [pk]
+  patient_id uuid [not null]
+}
+
 Table lab_orders {
   id uuid [pk]
-  visit_id uuid [not null, note: 'LREF']
-  test_codes jsonb [not null]
+  visit_id uuid [not null, ref: > diagnostic_visit_subjects.visit_id]
   state text [not null]
-  charge_id uuid [null, note: 'LREF']
+  charge_id uuid [null]
   created_at timestamptz [not null]
   version int [not null]
-  clinical_request_id uuid [not null, unique, note: 'LREF']
-  patient_id uuid [not null, note: 'LREF']
+  clinical_request_id uuid [not null, unique]
   test_snapshot jsonb [not null]
   price_snapshot jsonb [not null]
   settlement_id uuid [null]
   settlement_state text [not null]
   settlement_version int [not null]
-
-  Note: 'Một order có thể chưa có mẫu. Chỉ hủy trước khi có specimen.'
 }
 
 Table specimens {
   id uuid [pk]
   order_id uuid [not null, ref: > lab_orders.id]
   sequence int [not null]
-  state text [not null, note: 'Giá trị: COLLECTED, REJECTED.']
-  barcode string [not null, unique]
+  state text [not null]
+  barcode text [not null, unique]
   collected_at timestamptz [not null]
-  collected_by uuid [not null, note: 'LREF']
-  reject_reason string [null]
+  collected_by uuid [not null]
+  reject_reason text [null]
   version int [not null]
 
   indexes {
@@ -595,28 +593,32 @@ Table results {
   order_id uuid [not null, ref: > lab_orders.id]
   specimen_id uuid [not null, ref: > specimens.id]
   revision int [not null]
-  state text [not null, note: 'Giá trị: DRAFT, REVIEW, REWORK, PUBLISHED.']
-  entered_by uuid [not null, note: 'LREF']
+  state text [not null]
+  entered_by uuid [not null]
   submitted_at timestamptz [null]
   published_at timestamptz [null]
   version int [not null]
-  contributor_user_ids uuid[] [not null]
 
   indexes {
     (order_id, revision) [unique]
   }
+}
 
-  Note: 'Specimen phải thuộc cùng order. Kết quả PUBLISHED là bất biến.'
+Table result_contributors {
+  result_id uuid [not null, ref: > results.id]
+  contributor_user_id uuid [not null]
+
+  indexes {
+    (result_id, contributor_user_id) [pk]
+  }
 }
 
 Table result_items {
   id uuid [pk]
   result_id uuid [not null, ref: > results.id]
-  test_code string [not null]
-  value_text string [not null]
-  unit string [null]
-  reference_range string [null]
-  flag string [null]
+  test_code text [not null]
+  value_text text [not null]
+  flag text [null]
 
   indexes {
     (result_id, test_code) [unique]
@@ -626,24 +628,26 @@ Table result_items {
 Table reviews {
   id uuid [pk]
   result_id uuid [not null, ref: > results.id]
-  reviewer_user_id uuid [not null, note: 'LREF']
+  reviewer_user_id uuid [not null]
   decision text [not null]
   reason text [null]
   reviewed_at timestamptz [not null]
-
-  Note: 'Reviewer không được có trong results.contributor_user_ids.'
 }
 ```
 
 ### Từ điển dữ liệu — Diagnostic Service
 
+**Dữ liệu chụp:** Mã, tên, đơn vị và khoảng tham chiếu của xét nghiệm được giữ trong `test_snapshot`. Danh sách mã và thông tin diễn giải cho dòng kết quả được đọc từ snapshot. Mỗi mã xuất hiện tối đa một lần trong snapshot của order. Bệnh nhân của lượt khám được lưu cục bộ trong `diagnostic_visit_subjects` và dùng qua `visit_id`. `price_snapshot` lưu giá tại thời điểm phát sinh. [Cấu trúc snapshot Diagnostic](../services/diagnostic/internal/domain/diagnostic.go)
+
 | **Bảng (Table)** | **Thuộc tính & Kiểu dữ liệu** | **Khóa, Chỉ mục & Quy tắc bất biến (Invariants)** |
 | --- | --- | --- |
-| lab\_orders | id: uuid PK; visit\_id: uuid LREF; test\_codes: jsonb; state: enum; charge\_id: uuid LREF?; created\_at: UTC; version: int; clinical\_request\_id: uuid LREF UQ; patient\_id: uuid LREF; test\_snapshot: jsonb; price\_snapshot: jsonb; settlement\_id: uuid?; settlement\_state: enum; settlement\_version: int | UQ(clinical\_request\_id). Chỉ tạo từ command CreateLabOrder của Clinical; ghi order + RequestCharge + LabOrderResolved trong cùng transaction với inbox. Chỉ được hủy trước khi có bất kỳ specimen nào. |
-| specimens | id: uuid PK; order\_id: uuid FK; sequence: int; state: COLLECTED|REJECTED; barcode: string UQ; collected\_at: UTC; collected\_by: uuid LREF; reject\_reason: string?; version: int | FK order\_id -> lab\_orders.id; UQ(order\_id, sequence); UQ(barcode). Chỉ lấy mẫu khi order đã PAID (xác minh qua settlement\_decisions cục bộ). Mẫu lỗi REJECTED được lấy lại (recollect) tăng sequence trong cùng order, không thu phí lần 2. |
-| results | id: uuid PK; order\_id: uuid FK; specimen\_id: uuid FK; revision: int; state: enum (DRAFT|REVIEW|REWORK|PUBLISHED); entered\_by: uuid LREF; submitted\_at: UTC?; published\_at: UTC?; version: int; contributor\_user\_ids: uuid[] | FK order\_id -> lab\_orders.id; FK specimen\_id -> specimens.id (phải cùng order\_id); UQ(order\_id, revision). Bản PUBLISHED là bất biến. |
-| result\_items | id: uuid PK; result\_id: uuid FK; test\_code: string; value\_text: string; unit: string?; reference\_range: string?; flag: string? | FK result\_id -> results.id; UQ(result\_id, test\_code). |
-| reviews | id: uuid PK; result\_id: uuid FK; reviewer\_user\_id: uuid LREF; decision: enum; reason: text?; reviewed\_at: UTC | FK result\_id -> results.id. **Quy tắc 2 người bắt buộc:** reviewer\_user\_id không được nằm trong mảng results.contributor\_user\_ids (trả 409 SELF\_REVIEW\_FORBIDDEN nếu vi phạm). |
+| diagnostic\_visit\_subjects | visit\_id: uuid PK LREF; patient\_id: uuid LREF | Mỗi lượt khám gắn với một hồ sơ bệnh nhân. Giữ ánh xạ cục bộ khi nhận chỉ định từ Clinical. |
+| lab\_orders | id: uuid PK; visit\_id: uuid FK; state: text (enum); charge\_id: uuid LREF?; created\_at: timestamptz; version: int; clinical\_request\_id: uuid LREF UQ; test\_snapshot: jsonb; price\_snapshot: jsonb; settlement\_id: uuid?; settlement\_state: text (enum); settlement\_version: int | FK visit\_id -> diagnostic\_visit\_subjects.visit\_id; UQ(clinical\_request\_id). Chỉ tạo từ command CreateLabOrder của Clinical; ghi order + RequestCharge + LabOrderResolved trong cùng transaction với inbox. Chỉ được hủy trước khi có bất kỳ specimen nào. |
+| specimens | id: uuid PK; order\_id: uuid FK; sequence: int; state: text (COLLECTED\|REJECTED); barcode: text UQ; collected\_at: timestamptz; collected\_by: uuid LREF; reject\_reason: text?; version: int | FK order\_id -> lab\_orders.id; UQ(order\_id, sequence); UQ(barcode). Chỉ lấy mẫu khi order đã PAID (xác minh qua settlement\_decisions cục bộ). Mẫu lỗi REJECTED được lấy lại (recollect) tăng sequence trong cùng order, không thu phí lần 2. |
+| results | id: uuid PK; order\_id: uuid FK; specimen\_id: uuid FK; revision: int; state: text (DRAFT\|REVIEW\|REWORK\|PUBLISHED); entered\_by: uuid LREF; submitted\_at: timestamptz?; published\_at: timestamptz?; version: int | FK order\_id -> lab\_orders.id; FK specimen\_id -> specimens.id (phải cùng order\_id); UQ(order\_id, revision). Bản PUBLISHED là bất biến. |
+| result\_contributors | result\_id: uuid FK; contributor\_user\_id: uuid LREF | PK(result\_id, contributor\_user\_id). Ghi nhận mỗi người đóng góp một lần cho từng kết quả. |
+| result\_items | id: uuid PK; result\_id: uuid FK; test\_code: text; value\_text: text; flag: text? | FK result\_id -> results.id; UQ(result\_id, test\_code). Đơn vị và khoảng tham chiếu lấy từ snapshot bất biến của order. Mã xét nghiệm phải thuộc snapshot đó. |
+| reviews | id: uuid PK; result\_id: uuid FK; reviewer\_user\_id: uuid LREF; decision: text (enum); reason: text?; reviewed\_at: timestamptz | FK result\_id -> results.id. **Quy tắc 2 người bắt buộc:** reviewer\_user\_id không được nằm trong result\_contributors của cùng kết quả (trả 409 SELF\_REVIEW\_FORBIDDEN nếu vi phạm). |
 | **Bảng kỹ thuật** | settlement\_decisions, command\_results, catalog\_projection, patient\_access\_projection, user\_access\_projection, projection\_checkpoints, outbox, inbox, idempotency\_records, retry\_jobs, dead\_letters | Lưu settlement\_decisions để đối chiếu fence trước khi lấy mẫu; phát LabResultPublished và LabCancelled. |
 
 ## 7. Pharmacy Service (pharmacy\_db — MongoDB · Owner: Quân · Node.js/TS)
@@ -654,36 +658,33 @@ Table reviews {
 
 ```dbml
 Project pharmacy_db {
-  Note: 'Mô hình document MongoDB. Table biểu diễn collection. PK là khóa logic và các tham chiếu được ghi chú.'
 }
 
 Table inventory {
   id uuid [pk]
-  medicineId uuid [not null, unique, note: 'LREF']
+  medicineId uuid [not null, unique]
   onHand int [not null]
   reserved int [not null]
   version int [not null]
   updatedAt date [not null]
-
-  Note: '0 <= reserved <= onHand. Giữ, nhả và cấp phát toàn toa trong Mongo transaction.'
 }
 
 Table stock_receipts {
   id uuid [pk]
   receiptKey string [not null, unique]
-  actorUserId uuid [not null, note: 'LREF']
-  items object[] [not null, note: 'Mảng tài liệu nhúng [{medicineId, quantity, batchRef}]. medicineId đối chiếu inventory.medicineId.']
+  actorUserId uuid [not null]
+  items object[] [not null]
   receivedAt date [not null]
 }
 
 Table prescription_projection {
   id uuid [pk]
-  prescriptionId uuid [not null, note: 'LREF']
+  prescriptionId uuid [not null]
   revision int [not null]
-  visitId uuid [not null, note: 'LREF']
+  visitId uuid [not null]
   linesSnapshot object[] [not null]
   sourceEventId uuid [not null]
-  patientId uuid [not null, note: 'LREF']
+  patientId uuid [not null]
 
   indexes {
     (prescriptionId, revision) [unique]
@@ -692,16 +693,16 @@ Table prescription_projection {
 
 Table medication_holds {
   id uuid [pk]
-  prescriptionId uuid [not null, note: 'LREF. Đối chiếu prescription_projection theo (prescriptionId, revision). Mỗi bản chiếu có tối đa một hold, dùng attemptNo khi giữ lại.']
+  prescriptionId uuid [not null]
   revision int [not null]
   attemptNo int [not null]
-  status string [not null, note: 'Giá trị: HELD, SETTLEMENT_LOCKED, COMMITTED, RELEASED, EXPIRED.']
+  status string [not null]
   itemsSnapshot object[] [not null]
   expiresAt date [not null]
-  chargeId uuid [null, note: 'LREF']
+  chargeId uuid [null]
   version int [not null]
   attemptHistory object[] [not null]
-  patientId uuid [not null, note: 'LREF']
+  patientId uuid [not null]
   settlementId uuid [null]
   settlementState string [not null]
   settlementVersion int [not null]
@@ -713,11 +714,11 @@ Table medication_holds {
 
 Table dispenses {
   id uuid [pk]
-  holdId uuid [not null, unique, note: 'Tham chiếu nội bộ: medication_holds.id (tối đa một lượt cấp phát mỗi hold).']
-  prescriptionId uuid [not null, note: 'LREF']
+  holdId uuid [not null, unique, ref: - medication_holds.id]
+  prescriptionId uuid [not null]
   revision int [not null]
-  actorUserId uuid [not null, note: 'LREF']
-  itemsSnapshot object[] [not null, note: 'Mỗi dòng thuốc trong mảng đối chiếu inventory.medicineId. Một lần cấp phát có thể chứa nhiều thuốc.']
+  actorUserId uuid [not null]
+  itemsSnapshot object[] [not null]
   dispensedAt date [not null]
   attemptNo int [not null]
 
@@ -725,6 +726,8 @@ Table dispenses {
     (prescriptionId, revision) [unique]
   }
 }
+
+Ref: prescription_projection.(prescriptionId, revision) - medication_holds.(prescriptionId, revision)
 ```
 
 ### Từ điển dữ liệu — Pharmacy Service
@@ -749,19 +752,26 @@ Project billing_db {
   database_type: 'PostgreSQL'
 }
 
+Table charge_sources {
+  source_type text [not null]
+  source_id uuid [not null]
+  patient_id uuid [not null]
+
+  indexes {
+    (source_type, source_id) [pk]
+  }
+}
+
 Table charges {
   id uuid [pk]
-  patient_id uuid [not null, note: 'LREF']
   source_type text [not null]
-  source_id uuid [not null, note: 'LREF. Nguồn được chọn bởi source_type: APPOINTMENT, LAB_ORDER hoặc MED_HOLD.']
+  source_id uuid [not null]
   source_revision int [not null]
   amount_vnd bigint [not null]
-  state text [not null, note: 'Giá trị: OPEN, PAID, VOID.']
+  state text [not null]
   price_snapshot jsonb [not null]
   version int [not null]
   snapshot_hash text [not null]
-  settlement_id uuid [null]
-  settlement_state text [not null]
   settlement_saga_id uuid [null, ref: > settlement_sagas.id]
 
   indexes {
@@ -773,20 +783,16 @@ Table charges {
   }
 }
 
+Ref: charges.(source_type, source_id) > charge_sources.(source_type, source_id)
+
 Table settlement_sagas {
   id uuid [pk]
   charge_id uuid [not null, ref: > charges.id]
-  source_type text [not null]
-  source_id uuid [not null, note: 'LREF đến nguồn được chọn bởi source_type.']
-  source_revision int [not null]
-  state text [not null, note: 'Giá trị: REQUESTED, RESERVED, IN_DOUBT, SUCCEEDED, FAILED.']
+  state text [not null]
   fence int [null]
-  amount_hash text [not null]
   decision_version int [not null]
   deadline_at timestamptz [not null]
   version int [not null]
-
-  Note: 'Unique có điều kiện trên charge_id đối với REQUESTED, RESERVED và IN_DOUBT.'
 }
 
 Table payments {
@@ -794,23 +800,18 @@ Table payments {
   charge_id uuid [not null, ref: > charges.id]
   saga_id uuid [not null, unique, ref: - settlement_sagas.id]
   transaction_id text [not null, unique]
-  amount_vnd bigint [not null]
-  state text [not null, note: 'Giá trị: PENDING, SUCCEEDED, FAILED.']
+  state text [not null]
   method text [not null]
   attempted_at timestamptz [not null]
   paid_at timestamptz [null]
-  source_revision int [not null]
-  settlement_id uuid [not null]
   idempotency_key text [not null]
   fence int [not null]
-
-  Note: 'Unique có điều kiện trên charge_id khi state = SUCCEEDED.'
 }
 
 Table receipts {
   id uuid [pk]
-  payment_id uuid [not null, unique, ref: - payments.id, note: 'Mỗi payment có tối đa một receipt. Chỉ tạo receipt khi payment SUCCEEDED.']
-  charge_id uuid [not null, ref: > charges.id]
+  payment_id uuid [not null, unique, ref: - payments.id]
+  charge_id uuid [not null, unique, ref: - charges.id]
   receipt_no text [not null, unique]
   amount_vnd bigint [not null]
   issued_at timestamptz [not null]
@@ -819,10 +820,10 @@ Table receipts {
 Table refunds {
   id uuid [pk]
   charge_id uuid [not null, ref: > charges.id]
-  cancellation_id uuid [not null, note: 'LREF']
+  cancellation_id uuid [not null]
   reason_code text [not null]
   amount_vnd bigint [not null]
-  state text [not null, note: 'Giá trị: REQUESTED, SUCCEEDED, FAILED.']
+  state text [not null]
   attempts jsonb [not null]
   version int [not null]
   updated_at timestamptz [not null]
@@ -835,13 +836,20 @@ Table refunds {
 
 ### Từ điển dữ liệu — Billing Service
 
+**Định danh nguồn:** Bộ `(source_type, source_id, source_revision)` được lưu tại `charges` và bất biến sau khi tạo khoản thu. Mọi saga của cùng khoản thu dùng bộ nguồn đó qua `charge_id`. Khi lập thông điệp settlement, Billing đọc bộ nguồn từ khoản thu. Trường `settlementId` của thông điệp lấy từ ID của saga. Khoản thu tham chiếu saga hiện tại qua `settlement_saga_id` để đọc trạng thái, còn payment tham chiếu saga của lần thử qua `saga_id`. Bệnh nhân của nguồn được lưu một lần tại `charge_sources` và dùng chung cho mọi revision.
+
+**Dữ liệu chụp:** `charges.price_snapshot` giữ giá tại thời điểm phát sinh. Billing lưu số tiền đã được xác lập và hash do service sở hữu nguồn gửi. Diagnostic tính hash từ các dòng cùng số tiền, còn Pharmacy tính từ các dòng thuốc. Saga đọc hash qua khoản thu. Luồng cấp biên nhận ghi số tiền khi thanh toán thành công. [Cấp biên nhận](../services/billing/app/application/settlement_service.py) · [SRS](UMC_Care_SRS_9_Service_v5_20261017.md)
+
+**Số tiền khoản thu:** `charges.amount_vnd` cố định sau khi tạo khoản thu. Mỗi lần thử thanh toán lấy số tiền và phiên bản nguồn từ khoản thu qua `charge_id`.
+
 | **Bảng (Table)** | **Thuộc tính & Kiểu dữ liệu** | **Khóa, Chỉ mục & Quy tắc bất biến (Invariants)** |
 | --- | --- | --- |
-| charges | id: uuid PK; patient\_id: uuid LREF; source\_type: text; source\_id: uuid LREF; source\_revision: int; amount\_vnd: bigint; state: text (OPEN|PAID|VOID); price\_snapshot: jsonb; version: int; snapshot\_hash: text; settlement\_id: uuid?; settlement\_state: text; settlement\_saga\_id: uuid FK? | UQ(source\_type, source\_id, source\_revision); CHECK amount\_vnd >= 0. Tạo duy nhất qua handler RequestCharge và trả ChargePrepared. Không tự sửa giá lịch sử khi Catalog đổi giá. |
-| settlement\_sagas | id: uuid PK; charge\_id: uuid FK; source\_type: text; source\_id: uuid; source\_revision: int; state: text (REQUESTED|RESERVED|IN\_DOUBT|SUCCEEDED|FAILED); fence: int?; amount\_hash: text; decision\_version: int; deadline\_at: timestamptz; version: int | Partial UQ(charge\_id) với trạng thái chưa terminal (mỗi charge chỉ có tối đa 1 saga đang hoạt động). Quá 60s chưa có phản hồi chuyển IN\_DOUBT (không tự động chuyển FAILED chỉ vì timeout). |
-| payments | id: uuid PK; charge\_id: uuid FK; saga\_id: uuid FK UQ; transaction\_id: text UQ; amount\_vnd: bigint; state: text (PENDING|SUCCEEDED|FAILED); method: text; attempted\_at: timestamptz; paid\_at: timestamptz?; source\_revision: int; settlement\_id: uuid; idempotency\_key: text; fence: int | FK charge\_id -> charges.id; FK saga\_id -> settlement\_sagas.id; UQ(transaction\_id); Partial UQ(charge\_id) WHERE state = 'SUCCEEDED'. Chỉ chuyển SUCCEEDED sau khi nhận SettlementReserved(ACCEPTED) kèm fence hợp lệ. |
-| receipts | id: uuid PK; payment\_id: uuid FK UQ; charge\_id: uuid FK; receipt\_no: text UQ; amount\_vnd: bigint; issued\_at: timestamptz | FK payment\_id -> payments.id; FK charge\_id -> charges.id; UQ(payment\_id), UQ(receipt\_no). Ghi cùng SQL transaction với payment SUCCEEDED và outbox; bất biến sau khi cấp. |
-| refunds | id: uuid PK; charge\_id: uuid FK; cancellation\_id: uuid LREF; reason\_code: text; amount\_vnd: bigint; state: text (REQUESTED|SUCCEEDED|FAILED); attempts: jsonb; version: int; updated\_at: timestamptz | FK charge\_id -> charges.id; UQ(charge\_id, cancellation\_id, reason\_code). Dùng SELECT FOR UPDATE trên charge khi thực thi hoàn để bảo đảm tổng tiền hoàn thành công ≤ số tiền đã thu. |
+| charge\_sources | source\_type: text; source\_id: uuid LREF; patient\_id: uuid LREF | PK(source\_type, source\_id). Một nguồn thu gắn với một bệnh nhân xuyên suốt các revision. |
+| charges | id: uuid PK; source\_type: text FK; source\_id: uuid FK; source\_revision: int; amount\_vnd: bigint; state: text (OPEN\|PAID\|VOID); price\_snapshot: jsonb; version: int; snapshot\_hash: text; settlement\_saga\_id: uuid FK? | FK(source\_type, source\_id) -> charge\_sources. Saga hiện tại phải thuộc khoản thu này. Trạng thái settlement lấy từ saga hiện tại, hoặc NONE khi chưa có saga. UQ(source\_type, source\_id, source\_revision); CHECK amount\_vnd >= 0. Tạo duy nhất qua handler RequestCharge và trả ChargePrepared. Không tự sửa giá lịch sử khi Catalog đổi giá. |
+| settlement\_sagas | id: uuid PK; charge\_id: uuid FK; state: text (REQUESTED\|RESERVED\|IN\_DOUBT\|SUCCEEDED\|FAILED); fence: int?; decision\_version: int; deadline\_at: timestamptz; version: int | FK charge\_id trỏ đến charges.id. Partial UQ(charge\_id) giới hạn mỗi charge có tối đa một saga đang hoạt động. Quá 60s chưa có phản hồi thì chuyển IN\_DOUBT (không tự động chuyển FAILED chỉ vì timeout). |
+| payments | id: uuid PK; charge\_id: uuid FK; saga\_id: uuid FK UQ; transaction\_id: text UQ; state: text (PENDING\|SUCCEEDED\|FAILED); method: text; attempted\_at: timestamptz; paid\_at: timestamptz?; idempotency\_key: text; fence: int | FK charge\_id -> charges.id; FK saga\_id -> settlement\_sagas.id; charge\_id phải trùng khoản thu của saga; UQ(saga\_id); UQ(transaction\_id); Partial UQ(charge\_id) WHERE state = 'SUCCEEDED'. Số tiền và phiên bản nguồn lấy từ charges. Chỉ chuyển SUCCEEDED sau khi nhận SettlementReserved(ACCEPTED) kèm fence hợp lệ. |
+| receipts | id: uuid PK; payment\_id: uuid FK UQ; charge\_id: uuid FK UQ; receipt\_no: text UQ; amount\_vnd: bigint; issued\_at: timestamptz | FK payment\_id -> payments.id; FK charge\_id -> charges.id. Khoản thu phải trùng với khoản thu của payment. Mỗi khoản thu có tối đa một payment SUCCEEDED và tối đa một biên nhận. Ghi biên nhận cùng SQL transaction với payment SUCCEEDED và outbox. Biên nhận bất biến sau khi cấp. |
+| refunds | id: uuid PK; charge\_id: uuid FK; cancellation\_id: uuid LREF; reason\_code: text; amount\_vnd: bigint; state: text (REQUESTED\|SUCCEEDED\|FAILED); attempts: jsonb; version: int; updated\_at: timestamptz | FK charge\_id -> charges.id; UQ(charge\_id, cancellation\_id, reason\_code). Dùng SELECT FOR UPDATE trên charge khi thực thi hoàn để bảo đảm tổng tiền hoàn thành công ≤ số tiền đã thu. |
 | **Bảng kỹ thuật** | command\_results, catalog\_projection, patient\_access\_projection, user\_access\_projection, projection\_checkpoints, outbox, inbox, idempotency\_records, retry\_jobs, dead\_letters | Phát ReserveSettlement (command) và các events ChargePrepared, ChargePaid, BillingStatusChanged, SettlementDecision. |
 
 ## 9. Notification Service (notification\_db — PostgreSQL · Owner: Hưng · Django)
@@ -857,30 +865,31 @@ Project notification_db {
 
 Table notifications {
   id uuid [pk]
-  recipient_user_id uuid [not null, note: 'LREF']
-  event_id uuid [not null]
+  recipient_user_id uuid [not null]
+  event_id uuid [not null, unique, ref: - received_messages.message_id]
   kind text [not null]
   subject_ref text [not null]
   message_code text [not null]
   created_at timestamptz [not null]
   read_at timestamptz [null]
-  source_aggregate_id uuid [not null]
-  source_version int [not null]
 
   indexes {
-    (recipient_user_id, event_id, kind) [unique]
     (recipient_user_id, created_at [desc])
   }
+}
 
-  Note: 'Chỉ lưu mã thông báo và tham chiếu, ghi cùng transaction với inbox.'
+Table received_messages {
+  message_id uuid [pk]
+  command_id uuid [null]
+  payload_hash text [not null]
+  source_aggregate_id uuid [not null]
+  source_version int [not null]
 }
 
 Table inbox {
-  message_id uuid [not null]
+  message_id uuid [not null, ref: > received_messages.message_id]
   consumer_name text [not null]
-  command_id uuid [null]
-  payload_hash text [not null]
-  state text [not null, note: 'Giá trị: PROCESSED, RETRY_SCHEDULED.']
+  state text [not null]
   outcome_ref text [null]
   processed_at timestamptz [not null]
 
@@ -894,8 +903,9 @@ Table inbox {
 
 | **Bảng (Table)** | **Thuộc tính & Kiểu dữ liệu** | **Khóa, Chỉ mục & Quy tắc bất biến (Invariants)** |
 | --- | --- | --- |
-| notifications | id: uuid PK; recipient\_user\_id: uuid LREF; event\_id: uuid; kind: text; subject\_ref: text; message\_code: text; created\_at: timestamptz; read\_at: timestamptz?; source\_aggregate\_id: uuid; source\_version: int | UQ(recipient\_user\_id, event\_id, kind); INDEX(recipient\_user\_id, created\_at DESC). Ghi cùng SQL transaction với inbox; chỉ lưu mã thông điệp (message\_code) và ID tham chiếu, không sao chép chẩn đoán, kết quả xét nghiệm hay tên thuốc. |
-| inbox | message\_id: uuid; consumer\_name: text; command\_id: uuid?; payload\_hash: text; state: text (PROCESSED|RETRY\_SCHEDULED); outcome\_ref: text?; processed\_at: timestamptz | UQ(message\_id, consumer\_name) chống xử lý lặp mọi bản tin từ AppointmentChanged, LabResultPublished, MedicationDispensed, BillingStatusChanged. |
+| notifications | id: uuid PK; recipient\_user\_id: uuid LREF; event\_id: uuid FK UQ; kind: text; subject\_ref: text; message\_code: text; created\_at: timestamptz; read\_at: timestamptz? | UQ(event\_id); INDEX(recipient\_user\_id, created\_at DESC). Mỗi event gửi cho một người nhận và tạo tối đa một thông báo. Ghi metadata, inbox và thông báo trong cùng SQL transaction; chỉ lưu mã thông điệp (message\_code) và ID tham chiếu, không sao chép chẩn đoán, kết quả xét nghiệm hay tên thuốc. |
+| received\_messages | message\_id: uuid PK; command\_id: uuid?; payload\_hash: text; source\_aggregate\_id: uuid; source\_version: int | Metadata và hash được lưu một lần cho mỗi message đã tiếp nhận. Từ chối message lặp ID có nội dung khác. |
+| inbox | message\_id: uuid FK; consumer\_name: text; state: text (PROCESSED\|RETRY\_SCHEDULED); outcome\_ref: text?; processed\_at: timestamptz | UQ(message\_id, consumer\_name) chống xử lý lặp mọi bản tin từ AppointmentChanged, LabResultPublished, MedicationDispensed, BillingStatusChanged. |
 | **Bảng kỹ thuật** | user\_access\_projection, idempotency\_records, retry\_jobs, dead\_letters | Không có bảng outbox nghiệp vụ vì Notification là consumer cuối. |
 
 # PHẦN 2: TỔNG HỢP CÁC BẢNG KĨ THUẬT BẤT ĐỒNG BỘ (TECHNICAL TABLES & PROJECTIONS)
@@ -912,3 +922,48 @@ Table inbox {
 | settlement\_sagas & settlement\_decisions | Billing (sagas) & Appt/Diag/Pharm (decisions) | Bảo vệ giao dịch thu tiền hai pha qua RabbitMQ. Nếu SettlementDecision(FAILED) đến trước ReserveSettlement, owner ghi ngay **tombstone FAILED** vào settlement\_decisions để chặn lệnh reserve đến muộn khóa lại nguồn. Trạng thái UNKNOWN không bao giờ tự mở khóa SETTLEMENT\_LOCKED. |
 | user\_access\_projection & patient\_access\_projection | Các Consumer Services | Đồng bộ từ IdentityAccessChanged và PatientAccessChanged. Kiểm tra quyền cục bộ kết hợp với Authorization Lease (hạn tối đa 30s) mà không cần gọi HTTP chéo về Identity hay Patient. |
 | catalog\_projection & projection\_checkpoints | Appt, Clin, Diag, Pharm, Bill | UQ(entity\_type, entity\_id) và UQ(producer, stream\_id). Theo dõi CHECKPOINT mỗi 10s từ Catalog; nếu phát hiện gap hoặc checkpoint trễ quá 30s thì chặn tạo báo giá mới bằng mã lỗi 503 PRICE\_PROJECTION\_STALE. |
+
+# PHẦN 3: KHÓA ỨNG VIÊN VÀ PHỤ THUỘC HÀM CỦA THIẾT KẾ ĐÍCH
+
+Phạm vi gồm 32 bảng PostgreSQL trong thiết kế đích, kể cả `notification_db.inbox`. Bảng dưới mô tả thiết kế đích. Các collection MongoDB được đánh giá theo cách truy cập và tính nhất quán của document nhúng.
+
+Mỗi khóa `K` trong bảng có phụ thuộc hàm `K → *`, nghĩa là khóa xác định các thuộc tính còn lại của hàng. Khóa ứng viên được xác định từ PK và UNIQUE vô điều kiện trên các cột bắt buộc của từng bảng. Index thường, UNIQUE trên cột nullable và UNIQUE có điều kiện không bảo đảm tính duy nhất và đầy đủ của khóa trên toàn bảng.
+
+Để đạt 3NF, với mỗi FD không tầm thường `X → A`, `X` phải là siêu khóa hoặc `A` phải thuộc một khóa ứng viên. Kết quả đánh giá dựa trên các bất biến được ghi trong thiết kế đích. Snapshot, audit và lịch sử dạng JSON được xem là một giá trị khi chúng được lưu, đọc và đối soát như một đơn vị nghiệp vụ.
+
+| Service | Bảng | Khóa ứng viên và FD `K → *` | Căn cứ đánh giá |
+| --- | --- | --- | --- |
+| Identity | `users` | `id`, `phone` | Email nullable và không unique. |
+| Identity | `otp_requests` | `id` | Index `(phone, purpose, expires_at)` là index tra cứu. Email là địa chỉ đích của lần gửi. |
+| Identity | `sessions` | `id`, `refresh_hash` | Một user có thể có nhiều session. |
+| Identity | `staff_capabilities` | `id`, `(user_id, capability, scope_key)` | Người cấp quyền có thể null sau khi tài khoản bị xóa. |
+| Identity | `audit_events` | `id` | `before_after` là một nội dung audit theo sự kiện, được lưu và đọc cùng bản ghi. |
+| Catalog | `departments` | `id`, `code` | Mã khoa duy nhất toàn bảng. |
+| Catalog | `doctors` | `id`, `identity_user_id` | `department_id` là FK nội bộ. |
+| Catalog | `medical_services` | `id`, `code` | Lịch sử giá nằm trong `price_versions`. |
+| Catalog | `medicines` | `id`, `code` | Mã thuốc duy nhất toàn bảng. |
+| Catalog | `lab_tests` | `id`, `code` | Catalog lưu định nghĩa hiện hành theo mã. Phiên bản đã sử dụng được giữ trong snapshot nghiệp vụ. |
+| Catalog | `price_versions` | `id`, `(item_type, item_id, revision)`, `(item_type, item_id, effective_from)` | Mỗi revision và mỗi mốc bắt đầu xác định một giá của mặt hàng. Các khoảng cùng mặt hàng không chồng nhau. |
+| Clinical | `visits` | `id`, `appointment_id`, `claim_id` | Mỗi lịch hẹn và mỗi lượt nhận khám xác định tối đa một visit. |
+| Clinical | `visit_notes` | `id`, `(visit_id, revision)` | Revision phân biệt các bản ghi chú của cùng lượt khám. |
+| Clinical | `prescriptions` | `id`, `(visit_id, revision)` | Thiết kế đích cấp revision duy nhất trong phạm vi visit, cho cả toa DRAFT, FINAL và DELETED. Quy tắc tối đa một toa FINAL áp dụng cho tập toa FINAL. |
+| Clinical | `prescription_items` | `id`, `(prescription_id, medicine_code_snapshot)` | Mỗi toa lưu tối đa một dòng cho mỗi mã thuốc. Tên và mã đã chụp lưu theo thời điểm lập dòng. |
+| Clinical | `lab_requests` | `id`, `(visit_id, request_hash)` | Hash của lệnh tạo chỉ định được lưu với yêu cầu. Khóa ghép theo visit và hash khớp ràng buộc trong migration. |
+| Diagnostic | `diagnostic_visit_subjects` | `visit_id` | Lượt khám xác định hồ sơ bệnh nhân. Cả hai định danh là LREF. |
+| Diagnostic | `lab_orders` | `id`, `clinical_request_id` | Mỗi khóa xác định snapshot xét nghiệm và snapshot giá của order. Mã xét nghiệm được suy ra từ snapshot. Bệnh nhân được đọc qua ánh xạ lượt khám. |
+| Diagnostic | `specimens` | `id`, `barcode`, `(order_id, sequence)` | Mỗi `id` xác định một `order_id` theo cấu trúc mẫu trong ERD. |
+| Diagnostic | `results` | `id`, `(order_id, revision)` | Bất biến cùng order cho FD `specimen_id → order_id`. FD này đáp ứng 3NF vì `order_id` thuộc khóa ứng viên `(order_id, revision)`. Thành viên đóng góp được lưu ở `result_contributors`. |
+| Diagnostic | `result_contributors` | `(result_id, contributor_user_id)` | Khóa ghép ghi nhận một người đóng góp một lần cho cùng kết quả. |
+| Diagnostic | `result_items` | `id`, `(result_id, test_code)` | Mã xét nghiệm phân biệt các dòng trong cùng kết quả. Đơn vị và khoảng tham chiếu thuộc snapshot của order. |
+| Diagnostic | `reviews` | `id` | Mỗi hàng ghi nhận một quyết định duyệt. Sau yêu cầu làm lại, cùng người có thể duyệt lại nếu đủ điều kiện. |
+| Billing | `charge_sources` | `(source_type, source_id)` | Nguồn thu xác định bệnh nhân qua mọi revision. ID nguồn và bệnh nhân là LREF xuyên service. |
+| Billing | `charges` | `id`, `(source_type, source_id, source_revision)` | Mỗi khóa xác định số tiền được chấp nhận, snapshot giá và hash do nguồn cung cấp. Hợp đồng lưu hash như giá trị đối soát của nguồn và service nguồn có thể dùng đầu vào tính hash khác nhau. |
+| Billing | `settlement_sagas` | `id` | ID xác định thông tin lần điều phối. Bộ nguồn và hash được đọc từ khoản thu qua `charge_id`. Unique theo charge giới hạn các saga đang hoạt động. |
+| Billing | `payments` | `id`, `saga_id`, `transaction_id` | Mỗi khóa `→ *`. Thiết kế lưu phiên bản nguồn và số tiền tại `charges` để loại bỏ `charge_id → (source_revision, amount_vnd)` khỏi payment. Unique theo charge chỉ áp dụng với payment `SUCCEEDED`. |
+| Billing | `receipts` | `id`, `payment_id`, `charge_id`, `receipt_no` | Mỗi khóa xác định chứng từ. `charge_id` là khóa vì mỗi khoản thu có tối đa một biên nhận. Số tiền tại thời điểm cấp được giữ cùng chứng từ. |
+| Billing | `refunds` | `id`, `(charge_id, cancellation_id, reason_code)` | `attempts` được lưu như nội dung lịch sử của khoản hoàn. |
+| Notification | `notifications` | `id`, `event_id` | Mỗi khóa xác định người nhận, nội dung và trạng thái đọc. Mỗi sự kiện thông báo có một người nhận. Metadata của sự kiện được đọc qua `event_id` từ `received_messages`. |
+| Notification | `received_messages` | `message_id` | ID xác định hash và metadata của envelope đã được chấp nhận. |
+| Notification | `inbox` | `(message_id, consumer_name)` | Khóa ghép xác định trạng thái xử lý của từng consumer. Hash và thông tin nguồn thuộc message trong `received_messages`. |
+
+**Kết quả:** Thiết kế đích đáp ứng 3NF đối với các phụ thuộc hàm đã xác định trong phạm vi trên. Các phép tách giữ liên kết bằng khóa gốc: khoản thu giữ khóa nguồn và khóa saga, order giữ khóa lượt khám, người đóng góp giữ khóa kết quả, còn thông báo và inbox giữ khóa message. Sơ đồ và từ điển dữ liệu ghi nhận khóa và miền giá trị. Các bất biến nghiệp vụ như saga phải thuộc đúng khoản thu hoặc mã xét nghiệm phải nằm trong snapshot của order được kiểm tra trong giao dịch ghi tương ứng khi triển khai.
