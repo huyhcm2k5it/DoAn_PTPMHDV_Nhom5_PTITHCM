@@ -94,7 +94,7 @@ type LabRequest struct {
 	OrderID       string         `json:"orderId,omitempty"`
 	ReasonCode    string         `json:"reasonCode,omitempty"`
 	RequestHash   string         `json:"-"`
-	SourceVersion int            `json:"-"`
+	SourceVersion int            `json:"sourceVersion"`
 	Tests         []TestSnapshot `json:"tests"`
 }
 type LabTerminal struct {

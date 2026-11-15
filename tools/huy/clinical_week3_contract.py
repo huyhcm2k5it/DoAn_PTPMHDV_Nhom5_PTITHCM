@@ -17,8 +17,9 @@ def extend(doc, obj, ref, uuid, version, date_time, operation, parameter, key, v
         'items':obj({'testId':uuid,'revision':version})},'replacesRequestId':uuid,'expectedSourceVersion':version},['tests'])
     s['LabInput']['dependentRequired']={'replacesRequestId':['expectedSourceVersion'],'expectedSourceVersion':['replacesRequestId']}
     test_snapshot=obj({'testId':uuid,'revision':version,'code':text,'name':text,'unit':text,'referenceRange':text})
-    s['LabRequest'] = obj({'requestId':uuid,'visitId':uuid,'state':{'enum':['PENDING','CREATED','REJECTED','FAILED','SUPERSEDED']},
-        'orderId':uuid,'reasonCode':text,'tests':{'type':'array','items':test_snapshot}},['requestId','visitId','state','tests'])
+    s['LabRequest'] = obj({'requestId':uuid,'visitId':uuid,'state':{'enum':['PENDING','CREATED','REJECTED','FAILED','SUPERSEDED','PUBLISHED','CANCELLED']},
+        'sourceVersion':{'type':'integer','minimum':0,'maximum':2147483647},
+        'orderId':uuid,'reasonCode':text,'tests':{'type':'array','items':test_snapshot}},['requestId','visitId','state','sourceVersion','tests'])
     s['LabPending'] = obj({'requestId':uuid,'state':{'const':'PENDING'},
         'statusUrl':{'type':'string','format':'uri-reference'}})
     s['PrescriptionData'] = obj({'prescription':ref('Prescription')})

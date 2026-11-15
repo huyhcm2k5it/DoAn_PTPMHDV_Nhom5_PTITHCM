@@ -14,6 +14,15 @@ assert any(x['name']=='X-Authorization-Lease' and x['required'] for x in doc['pa
 assert doc['components']['schemas']['MedicalRecord']['properties']['visit']['$ref']=='#/components/schemas/Visit'
 def validator(name):
     return Draft202012Validator({'$ref':'#/components/schemas/'+name,'components':doc['components']},format_checker=FormatChecker())
+
+for state in ['PENDING','CREATED','REJECTED','FAILED','SUPERSEDED','PUBLISHED','CANCELLED']:
+    request={'requestId':'11111111-0000-0000-0000-000000000001',
+             'visitId':'11111111-0000-0000-0000-000000000002',
+             'state':state,'sourceVersion':0 if state=='PENDING' else 1,'tests':[]}
+    validator('LabRequest').validate(request)
+    missing_version=dict(request);del missing_version['sourceVersion']
+    assert list(validator('LabRequest').iter_errors(missing_version))
+    assert list(validator('LabRequest').iter_errors(dict(request,sourceVersion=-1)))
 draft={'symptoms':'','findings':'','assessment':'','diagnosis':'','expectedVersion':1}
 validator('DraftInput').validate(draft)
 for bad in [{k:v for k,v in draft.items() if k!='diagnosis'},dict(draft,expectedVersion=0),dict(draft,symptoms=None),dict(draft,patientId='spoof')]:

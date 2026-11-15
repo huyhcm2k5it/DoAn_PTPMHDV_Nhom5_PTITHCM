@@ -2413,8 +2413,15 @@
               "CREATED",
               "REJECTED",
               "FAILED",
-              "SUPERSEDED"
+              "SUPERSEDED",
+              "PUBLISHED",
+              "CANCELLED"
             ]
+          },
+          "sourceVersion": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
           },
           "orderId": {
             "type": "string",
@@ -2471,6 +2478,7 @@
           "requestId",
           "visitId",
           "state",
+          "sourceVersion",
           "tests"
         ],
         "additionalProperties": false
