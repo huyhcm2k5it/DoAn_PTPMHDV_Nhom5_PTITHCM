@@ -23,19 +23,22 @@ func (p *Probe) Migrate(ctx context.Context) error {
 	if _, e = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('diagnostic:migrate',0));CREATE TABLE IF NOT EXISTS schema_migrations(version text PRIMARY KEY)`); e != nil {
 		return e
 	}
-	var exists bool
-	if e = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version='000001_diagnostic')`).Scan(&exists); e != nil {
-		return e
-	}
-	if !exists {
-		b, readErr := migrations.Files.ReadFile("000001_diagnostic.up.sql")
+	for _, version := range []string{"000001_diagnostic", "000002_visit_subjects"} {
+		var exists bool
+		if e = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=$1)`, version).Scan(&exists); e != nil {
+			return e
+		}
+		if exists {
+			continue
+		}
+		b, readErr := migrations.Files.ReadFile(version + ".up.sql")
 		if readErr != nil {
 			return readErr
 		}
 		if _, e = tx.Exec(ctx, string(b)); e != nil {
 			return e
 		}
-		if _, e = tx.Exec(ctx, `INSERT INTO schema_migrations VALUES('000001_diagnostic')`); e != nil {
+		if _, e = tx.Exec(ctx, `INSERT INTO schema_migrations VALUES($1)`, version); e != nil {
 			return e
 		}
 	}
@@ -43,7 +46,7 @@ func (p *Probe) Migrate(ctx context.Context) error {
 }
 func (p *Probe) BusinessReady(ctx context.Context) error {
 	var b bool
-	e := p.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version='000001_diagnostic')`).Scan(&b)
+	e := p.pool.QueryRow(ctx, `SELECT count(*)=2 FROM schema_migrations WHERE version IN ('000001_diagnostic','000002_visit_subjects')`).Scan(&b)
 	if e != nil || !b {
 		return domain.Fail("SERVICE_UNAVAILABLE", "Diagnostic migrations required")
 	}
@@ -82,7 +85,10 @@ func (t diagnosticTx) Put(ctx context.Context, kind, key string, v any) error {
 	return e
 }
 func (t diagnosticTx) Orders(ctx context.Context) ([]domain.Order, error) {
-	rows, e := t.tx.Query(ctx, `SELECT body FROM lab_orders ORDER BY id FOR UPDATE`)
+	rows, e := t.tx.Query(ctx, `SELECT orders.body,orders.visit_id::text,subject.patient_id::text
+		FROM lab_orders AS orders
+		JOIN diagnostic_visit_subjects AS subject ON subject.visit_id=orders.visit_id
+		ORDER BY orders.id FOR UPDATE OF orders`)
 	if e != nil {
 		return nil, e
 	}
@@ -91,13 +97,16 @@ func (t diagnosticTx) Orders(ctx context.Context) ([]domain.Order, error) {
 	for rows.Next() {
 		var b []byte
 		var s domain.Stored
-		if e = rows.Scan(&b); e != nil {
+		var visitID, patientID string
+		if e = rows.Scan(&b, &visitID, &patientID); e != nil {
 			return nil, e
 		}
 		if e = json.Unmarshal(b, &s); e != nil {
 			return nil, e
 		}
-		items = append(items, s.Value())
+		o := s.Value()
+		o.VisitID, o.PatientID = visitID, patientID
+		items = append(items, o)
 	}
 	return items, rows.Err()
 }
@@ -145,14 +154,15 @@ func (t diagnosticTx) publishedResults(ctx context.Context, patientID, doctorUse
 		       result.key AS result_id,
 		       (result.value->'result'->>'publishedAt')::timestamptz AS published_at
 		FROM lab_orders AS orders
+		JOIN diagnostic_visit_subjects AS subject ON subject.visit_id=orders.visit_id
 		JOIN objects AS relation ON relation.kind='result-order' AND relation.key=orders.id::text
 		JOIN objects AS result ON result.kind='result' AND result.key=relation.value#>>'{}'
-		WHERE orders.body->'order'->>'patientId'=$1
+		WHERE subject.patient_id=$1::uuid
 		  AND ($4='' OR EXISTS (
 		      SELECT 1 FROM objects AS assignment
 		      WHERE assignment.kind='visit_grant'
-		        AND assignment.key=orders.body->'order'->>'visitId'
-		        AND assignment.value->>'patientId'=$1
+		        AND assignment.key=orders.visit_id::text
+		        AND assignment.value->>'patientId'=subject.patient_id::text
 		        AND assignment.value->>'doctorUserId'=$4
 		        AND assignment.value->'active'='true'::jsonb
 		  ))
@@ -172,13 +182,34 @@ func (t diagnosticTx) publishedResults(ctx context.Context, patientID, doctorUse
 	return out, err
 }
 func (t diagnosticTx) SaveOrder(ctx context.Context, o domain.Order) error {
+	if !domain.ValidID(o.VisitID) || !domain.ValidID(o.PatientID) {
+		return domain.Fail("STATE_CONFLICT", "LAB order requires a valid visit and patient")
+	}
 	b, e := json.Marshal(o.Stored())
 	if e != nil {
 		return e
 	}
-	_, e = t.tx.Exec(ctx, `INSERT INTO lab_orders(id,clinical_request_id,body)VALUES($1,$2,$3)ON CONFLICT(id)DO UPDATE SET body=EXCLUDED.body`, o.ID, o.RequestID, b)
+	if _, e = t.tx.Exec(ctx, `INSERT INTO diagnostic_visit_subjects(visit_id,patient_id)
+		VALUES($1,$2) ON CONFLICT(visit_id) DO NOTHING`, o.VisitID, o.PatientID); e != nil {
+		return e
+	}
+	var patient string
+	if e = t.tx.QueryRow(ctx, `SELECT patient_id::text FROM diagnostic_visit_subjects
+		WHERE visit_id=$1 FOR SHARE`, o.VisitID).Scan(&patient); e != nil {
+		return e
+	}
+	if patient != domain.ID(o.PatientID) {
+		return domain.Fail("STATE_CONFLICT", "LAB visit already belongs to another patient")
+	}
+	tag, e := t.tx.Exec(ctx, `INSERT INTO lab_orders(id,clinical_request_id,visit_id,body)
+		VALUES($1,$2,$3,$4::jsonb #- '{order,visitId}' #- '{order,patientId}')
+		ON CONFLICT(id) DO UPDATE SET body=EXCLUDED.body
+		WHERE lab_orders.visit_id=EXCLUDED.visit_id AND lab_orders.clinical_request_id=EXCLUDED.clinical_request_id`, o.ID, o.RequestID, o.VisitID, b)
 	if e != nil {
 		return e
+	}
+	if tag.RowsAffected() != 1 {
+		return domain.Fail("STATE_CONFLICT", "LAB order visit or clinical request cannot change")
 	}
 	for _, s := range o.Specimens {
 		var prior string
