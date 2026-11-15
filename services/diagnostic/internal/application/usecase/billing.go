@@ -85,8 +85,11 @@ func (s *Service) billing(ctx context.Context, t ports.Tx, m domain.Envelope) er
 			RequestID, SourceType, SourceID, ChargeID, State, ReasonCode string
 			SourceRevision                                               int
 		}
-		if strictJSON(m.Payload, &p) != nil || p.SourceType != "LAB_ORDER" || !domain.ValidID(p.SourceID) || !domain.ValidID(p.RequestID) || !domain.Has([]string{"CREATED", "REJECTED"}, p.State) {
+		if strictJSON(m.Payload, &p) != nil || !domain.Has([]string{"APPOINTMENT", "LAB_ORDER", "MED_HOLD"}, p.SourceType) || !domain.ValidID(p.SourceID) || !domain.ValidID(p.RequestID) || !domain.Has([]string{"CREATED", "REJECTED"}, p.State) {
 			return domain.Fail("INVALID_MESSAGE", "Invalid charge preparation")
+		}
+		if p.SourceType != "LAB_ORDER" {
+			return nil
 		}
 		o, e := orders(ctx, t, p.SourceID)
 		if e != nil {
@@ -198,6 +201,12 @@ func (s *Service) billing(ctx context.Context, t ports.Tx, m domain.Envelope) er
 			}
 		}
 		o, e := orders(ctx, t, p.SourceID)
+		// Shared decisions have no sourceType. A LAB order commits before its
+		// RequestCharge can reach Billing, so absent sources belong elsewhere.
+		// A storage failure cannot establish absence and must still be retried.
+		if domain.Code(e) == "NOT_FOUND" {
+			return nil
+		}
 		if e != nil {
 			return domain.Fail("SERVICE_UNAVAILABLE", "Order not synchronized")
 		}
@@ -224,8 +233,11 @@ func (s *Service) billing(ctx context.Context, t ports.Tx, m domain.Envelope) er
 			AmountVND                                                   int64
 			PaidAt                                                      time.Time
 		}
-		if strictJSON(m.Payload, &p) != nil || p.SourceType != "LAB_ORDER" || !domain.ValidID(p.ChargeID) || !domain.ValidID(p.SourceID) || !domain.ValidID(p.SettlementID) || (strings.TrimSpace(p.TransactionID) == "" || len(p.TransactionID) > 100) || p.PaidAt.IsZero() {
+		if strictJSON(m.Payload, &p) != nil || !domain.Has([]string{"APPOINTMENT", "LAB_ORDER", "MED_HOLD"}, p.SourceType) || !domain.ValidID(p.ChargeID) || !domain.ValidID(p.SourceID) || !domain.ValidID(p.SettlementID) || (strings.TrimSpace(p.TransactionID) == "" || len(p.TransactionID) > 100) || p.PaidAt.IsZero() {
 			return domain.Fail("INVALID_MESSAGE", "Invalid paid evidence")
+		}
+		if p.SourceType != "LAB_ORDER" {
+			return nil
 		}
 		o, e := orders(ctx, t, p.SourceID)
 		if e != nil {

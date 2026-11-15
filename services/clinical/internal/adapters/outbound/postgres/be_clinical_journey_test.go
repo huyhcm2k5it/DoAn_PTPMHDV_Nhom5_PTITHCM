@@ -45,7 +45,25 @@ func TestRejectedLabRequiresRevisionedResubmit(t *testing.T) {
 	if _, err = app.RequestLab(ctx, p, visit, domain.NewID(), input, domain.Meta{}); domain.Code(err) != "STATE_CONFLICT" {
 		t.Fatalf("stale replacement accepted: %v", err)
 	}
-	input.ExpectedSourceVersion = 1
+	// A client must obtain the replacement version from the public detail, not SQL.
+	detail, err := app.Detail(ctx, p, visit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rawDetail, err := json.Marshal(detail)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wire struct {
+		LabRequests []struct {
+			RequestID     string `json:"requestId"`
+			SourceVersion *int   `json:"sourceVersion"`
+		} `json:"labRequests"`
+	}
+	if err = json.Unmarshal(rawDetail, &wire); err != nil || len(wire.LabRequests) != 1 || wire.LabRequests[0].SourceVersion == nil || *wire.LabRequests[0].SourceVersion != 1 {
+		t.Fatalf("detail does not expose LAB replacement version: %s err=%v", rawDetail, err)
+	}
+	input.ExpectedSourceVersion = *wire.LabRequests[0].SourceVersion
 	key := domain.NewID()
 	next, err := app.RequestLab(ctx, p, visit, key, input, domain.Meta{})
 	if err != nil {

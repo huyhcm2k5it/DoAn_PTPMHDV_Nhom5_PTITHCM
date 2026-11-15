@@ -85,6 +85,12 @@ func (s *Store) ApplyIdentityAccessChanged(ctx context.Context, exchange, routin
 	}
 	var sourceVersion int64
 	var existingHash string
+	// Row locks cannot serialize first deliveries while the projection is absent.
+	// Lock the canonical user ID before reading so equal-version conflicts are
+	// checked even when two consumer instances insert the first row concurrently.
+	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, "identity-user:"+strings.ToLower(p.UserID)); err != nil {
+		return err
+	}
 	err = tx.QueryRow(ctx, `SELECT source_version,payload_hash FROM user_access_projection WHERE user_id=$1 FOR UPDATE`, p.UserID).Scan(&sourceVersion, &existingHash)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return err

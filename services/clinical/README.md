@@ -84,6 +84,8 @@ CL-005–010 add durable LAB requests, prescription drafts and visit/prescriptio
 
 CreateLabOrder is stored in the same PostgreSQL transaction as the pending request and visit version. LabOrderResolved is consumed only from Diagnostic's event exchange/routing key. No response from Diagnostic means pending, which blocks signing. Clinical does not call Diagnostic or Billing synchronously. The LAB request hash uses Go JSON canonical map key ordering and excludes requestHash itself.
 
+To replace a REJECTED or FAILED LAB request, read `labRequests[].sourceVersion` from CL-003 visit detail, then send CL-005 with `replacesRequestId`, that value as `expectedSourceVersion`, and a new Idempotency-Key. PENDING requests expose version 0 and cannot be replaced. A version mismatch returns 409; reload detail before retrying. Detail also reports PUBLISHED and CANCELLED terminal LAB states.
+
 Prescription names come from Clinical's trusted Catalog projection. Draft updates replace lines using expectedVersion; quantity must be a positive integer. Visit signing locks the visit and checks all registered LAB requests. FINAL requires a signed visit, at least one line, and no other FINAL prescription. Signed notes and FINAL prescriptions are immutable. Patient detail filters out draft/deleted prescriptions and internal LAB requests.
 
 CL-011 supports the PATIENT owner after checking the active PatientAccess projection and a current CL-011 authorization lease. DOCTOR access fails closed with 503 until the current doctor/visit assignment projection is supplied by the owning service; Clinical does not infer permission from a historical ticket snapshot.
