@@ -42,7 +42,7 @@ class NotificationWorkerRecoveryTests(TransactionTestCase):
             "aggregateVersion": 1, "correlationId": str(uuid.uuid4()),
             "causationId": None, "requestId": None,
             "occurredAt": timezone.now().isoformat(),
-            "payload": {"recipientUserId": str(uuid.uuid4()), "holdId": str(uuid.uuid4())},
+            "payload": {"recipientUserId": str(uuid.uuid4()), "prescriptionId": str(uuid.uuid4())},
         }
         attempts = []
         acknowledgements = []
@@ -68,7 +68,10 @@ class NotificationWorkerRecoveryTests(TransactionTestCase):
                 control = connection.copy(alias="ack_control")
                 try:
                     with control.cursor() as cursor:
-                        cursor.execute("SELECT COUNT(*) FROM notification_app_messageinbox WHERE message_id=%s", [event["messageId"]])
+                        cursor.execute(
+                            "SELECT COUNT(*) FROM inbox WHERE message_id=%s AND consumer_name=%s",
+                            [event["messageId"], "notification"],
+                        )
                         acknowledgements.append((kwargs["delivery_tag"], cursor.fetchone()[0]))
                 finally:
                     control.close()

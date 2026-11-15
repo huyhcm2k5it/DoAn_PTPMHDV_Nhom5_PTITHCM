@@ -1,6 +1,8 @@
 import os
 import tempfile
 import uuid
+
+from tests.fixtures import create_charge, create_saga
 from datetime import datetime, timedelta, timezone as dt_timezone
 from pathlib import Path
 
@@ -10,7 +12,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from app.domain.models import Charge, Payment
+from app.domain.models import Payment
 
 _PRIVATE_KEY = None
 
@@ -88,7 +90,7 @@ class BillingServiceTests(APITestCase):
         """Khởi tạo dữ liệu mẫu cho mỗi test case."""
         self.patient_id = uuid.uuid4()
         self.appointment_id = uuid.uuid4()
-        self.charge = Charge.objects.create(
+        self.charge = create_charge(
             patient_id=self.patient_id,
             source_type="APPOINTMENT",
             source_id=self.appointment_id,
@@ -167,7 +169,8 @@ class BillingServiceTests(APITestCase):
         # Kiểm tra Payment và Saga đã được lưu vào database
         payment = Payment.objects.get(transaction_id=tx_id)
         self.assertEqual(payment.state, "PENDING")
-        self.assertEqual(payment.amount_vnd, 150000)
+        detail = self.client.get(data["statusUrl"], **patient(self.patient_id)).json()["data"]
+        self.assertEqual(detail["latestPayment"]["amountVnd"], 150000)
 
     def test_simulate_payment_missing_idempotency_key(self):
         """BI-004: Thiếu header Idempotency-Key trả về 400 VALIDATION_ERROR."""
@@ -188,8 +191,8 @@ class BillingServiceTests(APITestCase):
         tx_id = "TX_DUPLICATE_001"
         Payment.objects.create(
             charge=self.charge,
+            saga=create_saga(self.charge),
             transaction_id=tx_id,
-            amount_vnd=150000,
             state="PENDING",
             idempotency_key=str(uuid.uuid4())
         )
@@ -239,8 +242,10 @@ class BillingServiceTests(APITestCase):
         # Giả lập đối soát hoàn tất: Charge chuyển sang PAID, Payment chuyển sang SUCCEEDED
         self.charge.refresh_from_db()
         self.charge.state = "PAID"
-        self.charge.settlement_state = "SUCCEEDED"
-        self.charge.save(update_fields=["state", "settlement_state"])
+        self.charge.save(update_fields=["state"])
+        saga = self.charge.settlement_saga
+        saga.state = "SUCCEEDED"
+        saga.save(update_fields=["state"])
 
         payment = Payment.objects.get(id=res1.json()["data"]["paymentId"])
         payment.state = "SUCCEEDED"

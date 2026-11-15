@@ -1,19 +1,19 @@
 {
   "metadata": {
     "title": "Dữ liệu minh họa hành trình bệnh nhân HQH Care",
-    "version": "1.0",
-    "purpose": "Dữ liệu giả dành cho đọc và chuẩn bị demo, không phải seed hoặc chứng cứ chạy hệ thống.",
+    "version": "2.0",
+    "purpose": "Dữ liệu giả minh họa ERD 3NF và hành trình đã hoàn thành, không phải seed hoặc bằng chứng hệ thống đã chạy.",
     "time_zone": "UTC",
     "business_date": "2026-11-10",
     "limitations": [
-      "Các bản ghi biểu diễn một trạng thái giả định đã hoàn thành và không xác nhận API, worker hay email đã chạy.",
-      "Các nhóm Clinical và Diagnostic kết hợp trường nghiệp vụ từ ERD và mô hình hiện tại; Diagnostic thực tế lưu aggregate trong body JSON. Đây không phải bản dump database.",
-      "Mật khẩu, mã OTP, token, khóa ký, hash, ID sự kiện, projection, inbox, outbox, idempotency, audit kỹ thuật và bằng chứng settlement đầy đủ phải do service tạo hoặc xử lý trong môi trường thử nghiệm.",
-      "Không nạp trực tiếp file vào database. Thời gian và giá là giả lập cố định, có thể đã hết hiệu lực khi chạy demo."
+      "Kịch bản lịch sử ngày 10/11/2026 dùng UTC; ngày này không đại diện cho lịch trống hiện tại.",
+      "Dữ liệu phản ánh thiết kế ERD 3NF; Clinical và Diagnostic hiện có thể lưu dữ liệu dưới dạng aggregate/JSON khác thiết kế đích. Đây không phải bản dump database.",
+      "Hash, ID sự kiện và envelope bên dưới được tạo cho ví dụ và không chứng minh producer, consumer hoặc settlement đã hoạt động.",
+      "Không nạp trực tiếp vào database; token, mật khẩu, OTP, khóa ký và các bằng chứng kỹ thuật thực tế do service tạo trong môi trường thử nghiệm."
     ],
     "identity_note": "Tài khoản, email miền example.invalid và số bắt đầu 000 là giả. Tài khoản chỉ thể hiện trạng thái minh họa, không thể dùng đăng nhập hoặc nhận OTP.",
     "review_note": "Người nhập và người duyệt xét nghiệm là hai tài khoản STAFF khác nhau.",
-    "references_note": "Các ID UUID được sinh cố định cho bộ dữ liệu này, không khớp với seed hiện có."
+    "references_note": "Các UUID cũ được giữ nguyên; UUID mới được tạo cố định cho ví dụ, không khớp seed hiện có."
   },
   "services": {
     "identity": {
@@ -433,12 +433,11 @@
       ],
       "lab_requests": [
         {
-          "request_id": "5d6178aa-7acf-548a-96c5-f22304704d6b",
           "visit_id": "9fa26179-4de2-5c99-bbeb-d51a510023bf",
           "state": "PUBLISHED",
           "order_id": "7ff6d0c1-5655-55b4-9b9f-a611b0c6c9e0",
-          "source_version": 1,
-          "tests": [
+          "id": "5d6178aa-7acf-548a-96c5-f22304704d6b",
+          "test_snapshot": [
             {
               "testId": "d6c115e9-3634-5be8-867a-ae4d6218ac79",
               "revision": 1,
@@ -447,27 +446,33 @@
               "unit": "đơn vị",
               "referenceRange": "khoảng tham chiếu mẫu"
             }
-          ]
+          ],
+          "version": 1,
+          "request_hash": "fe2405190f43d0d711d2aa789f9f10dcebe2e48be68171346510ed8eedb664db",
+          "created_at": "2026-11-10T02:05:00Z"
         }
       ],
       "prescriptions": [
         {
           "id": "2a3e6767-445f-5b0c-837e-a3e530995f19",
           "visit_id": "9fa26179-4de2-5c99-bbeb-d51a510023bf",
-          "patient_id": "1cb1d7ec-2620-5e26-9f12-02bf4150f774",
           "revision": 1,
           "state": "FINAL",
           "version": 2,
-          "lines": [
-            {
-              "medicineCode": "DEMO-MED-01",
-              "nameSnapshot": "Thuốc mẫu A",
-              "doseText": "1 viên mỗi lần",
-              "quantity": 10,
-              "instruction": "Theo hướng dẫn bác sĩ"
-            }
-          ],
-          "finalized_at": "2026-11-10T03:01:00Z"
+          "finalized_at": "2026-11-10T03:01:00Z",
+          "finalized_by": "ffd26cd4-cbc2-5473-a5c0-7a9c4e64f480"
+        }
+      ],
+      "prescription_items": [
+        {
+          "id": "07003b0f-3bea-5497-99b3-330f2610fc39",
+          "prescription_id": "2a3e6767-445f-5b0c-837e-a3e530995f19",
+          "medicine_id": "b3c064cd-acd4-5cc2-9ba9-bc9d0c6a486f",
+          "medicine_code_snapshot": "DEMO-MED-01",
+          "name_snapshot": "Thuốc mẫu A",
+          "dose_text": "1 viên mỗi lần",
+          "quantity": 10,
+          "instruction": "Theo hướng dẫn bác sĩ"
         }
       ]
     },
@@ -475,17 +480,13 @@
       "lab_orders": [
         {
           "id": "7ff6d0c1-5655-55b4-9b9f-a611b0c6c9e0",
-          "requestId": "5d6178aa-7acf-548a-96c5-f22304704d6b",
-          "visitId": "9fa26179-4de2-5c99-bbeb-d51a510023bf",
-          "patientId": "1cb1d7ec-2620-5e26-9f12-02bf4150f774",
-          "doctorId": "543e4e87-7dcb-5612-b685-ce84b3d721f5",
+          "visit_id": "9fa26179-4de2-5c99-bbeb-d51a510023bf",
+          "clinical_request_id": "5d6178aa-7acf-548a-96c5-f22304704d6b",
           "state": "PUBLISHED",
+          "charge_id": "48536d14-1ff6-52f6-8c8b-3d7dbda4ad11",
+          "created_at": "2026-11-10T02:05:00Z",
           "version": 4,
-          "sourceRevision": 1,
-          "chargeId": "48536d14-1ff6-52f6-8c8b-3d7dbda4ad11",
-          "chargeState": "PAID",
-          "amountVnd": 100000,
-          "tests": [
+          "test_snapshot": [
             {
               "testId": "d6c115e9-3634-5be8-867a-ae4d6218ac79",
               "revision": 1,
@@ -495,7 +496,7 @@
               "referenceRange": "khoảng tham chiếu mẫu"
             }
           ],
-          "linesSnapshot": [
+          "price_snapshot": [
             {
               "itemId": "d6c115e9-3634-5be8-867a-ae4d6218ac79",
               "code": "DEMO-LAB-01",
@@ -506,7 +507,9 @@
               "revision": 1
             }
           ],
-          "createdAt": "2026-11-10T02:05:00Z"
+          "settlement_id": "210f8913-a2f9-5065-8e91-6b3c36bc3957",
+          "settlement_state": "SUCCEEDED",
+          "settlement_version": 1
         }
       ],
       "specimens": [
@@ -531,10 +534,7 @@
           "entered_by": "bbfcfdc6-595d-5ff9-aee2-c53f62dbbff7",
           "submitted_at": "2026-11-10T02:35:00Z",
           "published_at": "2026-11-10T02:45:00Z",
-          "version": 3,
-          "contributor_user_ids": [
-            "bbfcfdc6-595d-5ff9-aee2-c53f62dbbff7"
-          ]
+          "version": 3
         }
       ],
       "result_items": [
@@ -543,8 +543,6 @@
           "result_id": "9f28496b-fff0-5c58-9002-c90d60e78fca",
           "test_code": "DEMO-LAB-01",
           "value_text": "Giá trị mẫu",
-          "unit": "đơn vị",
-          "reference_range": "khoảng tham chiếu mẫu",
           "flag": "NORMAL"
         }
       ],
@@ -555,6 +553,18 @@
           "reviewer_user_id": "efb2cfb8-7b50-58ef-9dbe-d9da81688061",
           "decision": "PUBLISH",
           "reviewed_at": "2026-11-10T02:45:00Z"
+        }
+      ],
+      "diagnostic_visit_subjects": [
+        {
+          "visit_id": "9fa26179-4de2-5c99-bbeb-d51a510023bf",
+          "patient_id": "1cb1d7ec-2620-5e26-9f12-02bf4150f774"
+        }
+      ],
+      "result_contributors": [
+        {
+          "result_id": "9f28496b-fff0-5c58-9002-c90d60e78fca",
+          "contributor_user_id": "bbfcfdc6-595d-5ff9-aee2-c53f62dbbff7"
         }
       ]
     },
@@ -679,7 +689,6 @@
       "charges": [
         {
           "id": "f49461f3-ec23-5d35-847b-13130bad8fe1",
-          "patient_id": "1cb1d7ec-2620-5e26-9f12-02bf4150f774",
           "recipient_user_id": "9367c90c-9e4f-5d6b-b2a8-c55c2c85a610",
           "source_type": "APPOINTMENT",
           "source_id": "93440dea-6eac-54c1-a067-333e6d91b0d6",
@@ -690,13 +699,11 @@
             "amountVnd": 150000
           },
           "version": 2,
-          "settlement_id": "659d1f0c-b064-5765-9e3b-1c0292136f61",
-          "settlement_state": "SUCCEEDED",
-          "settlement_saga_id": "659d1f0c-b064-5765-9e3b-1c0292136f61"
+          "settlement_saga_id": "659d1f0c-b064-5765-9e3b-1c0292136f61",
+          "snapshot_hash": "20294e6ca7a9d1b93629c1ca4e0b68ac3c44f6fcdde56eedc0a58c367eb5aed0"
         },
         {
           "id": "48536d14-1ff6-52f6-8c8b-3d7dbda4ad11",
-          "patient_id": "1cb1d7ec-2620-5e26-9f12-02bf4150f774",
           "recipient_user_id": "9367c90c-9e4f-5d6b-b2a8-c55c2c85a610",
           "source_type": "LAB_ORDER",
           "source_id": "7ff6d0c1-5655-55b4-9b9f-a611b0c6c9e0",
@@ -707,13 +714,11 @@
             "amountVnd": 100000
           },
           "version": 2,
-          "settlement_id": "210f8913-a2f9-5065-8e91-6b3c36bc3957",
-          "settlement_state": "SUCCEEDED",
-          "settlement_saga_id": "210f8913-a2f9-5065-8e91-6b3c36bc3957"
+          "settlement_saga_id": "210f8913-a2f9-5065-8e91-6b3c36bc3957",
+          "snapshot_hash": "97739a2ce52796970575b6510f1370c993ba340b08807d571a43a61b042b0aed"
         },
         {
           "id": "eed9245f-27e8-563a-b4c4-d55f831f1692",
-          "patient_id": "1cb1d7ec-2620-5e26-9f12-02bf4150f774",
           "recipient_user_id": "9367c90c-9e4f-5d6b-b2a8-c55c2c85a610",
           "source_type": "MED_HOLD",
           "source_id": "fba000c8-114e-5266-b5a5-cdfc13ded52c",
@@ -724,44 +729,37 @@
             "amountVnd": 20000
           },
           "version": 2,
-          "settlement_id": "c04145ba-8f8d-5015-a769-f6deeb8b8f3c",
-          "settlement_state": "SUCCEEDED",
-          "settlement_saga_id": "c04145ba-8f8d-5015-a769-f6deeb8b8f3c"
+          "settlement_saga_id": "c04145ba-8f8d-5015-a769-f6deeb8b8f3c",
+          "snapshot_hash": "ea351776261bf0d0cd4d7e2944f0cb5ed2c5a105a6414490a30d6274f2b0c4e8"
         }
       ],
       "settlement_sagas": [
         {
           "id": "659d1f0c-b064-5765-9e3b-1c0292136f61",
           "charge_id": "f49461f3-ec23-5d35-847b-13130bad8fe1",
-          "source_type": "APPOINTMENT",
-          "source_id": "93440dea-6eac-54c1-a067-333e6d91b0d6",
-          "source_revision": 1,
           "state": "SUCCEEDED",
           "fence": 1,
           "decision_version": 1,
-          "version": 3
+          "version": 3,
+          "deadline_at": "2026-11-10T01:14:00Z"
         },
         {
           "id": "210f8913-a2f9-5065-8e91-6b3c36bc3957",
           "charge_id": "48536d14-1ff6-52f6-8c8b-3d7dbda4ad11",
-          "source_type": "LAB_ORDER",
-          "source_id": "7ff6d0c1-5655-55b4-9b9f-a611b0c6c9e0",
-          "source_revision": 1,
           "state": "SUCCEEDED",
           "fence": 1,
           "decision_version": 1,
-          "version": 3
+          "version": 3,
+          "deadline_at": "2026-11-10T02:11:00Z"
         },
         {
           "id": "c04145ba-8f8d-5015-a769-f6deeb8b8f3c",
           "charge_id": "eed9245f-27e8-563a-b4c4-d55f831f1692",
-          "source_type": "MED_HOLD",
-          "source_id": "fba000c8-114e-5266-b5a5-cdfc13ded52c",
-          "source_revision": 1,
           "state": "SUCCEEDED",
           "fence": 1,
           "decision_version": 1,
-          "version": 3
+          "version": 3,
+          "deadline_at": "2026-11-10T03:06:00Z"
         }
       ],
       "payments": [
@@ -770,42 +768,36 @@
           "charge_id": "f49461f3-ec23-5d35-847b-13130bad8fe1",
           "saga_id": "659d1f0c-b064-5765-9e3b-1c0292136f61",
           "transaction_id": "DEMO-TXN-1",
-          "amount_vnd": 150000,
           "state": "SUCCEEDED",
           "method": "SIMULATION",
           "attempted_at": "2026-11-10T01:13:00Z",
           "paid_at": "2026-11-10T01:13:00Z",
-          "source_revision": 1,
-          "settlement_id": "659d1f0c-b064-5765-9e3b-1c0292136f61",
-          "fence": 1
+          "fence": 1,
+          "idempotency_key": "DEMO-DEMO-TXN-1"
         },
         {
           "id": "2f151272-75d1-5620-b327-929fc7a7549d",
           "charge_id": "48536d14-1ff6-52f6-8c8b-3d7dbda4ad11",
           "saga_id": "210f8913-a2f9-5065-8e91-6b3c36bc3957",
           "transaction_id": "DEMO-TXN-2",
-          "amount_vnd": 100000,
           "state": "SUCCEEDED",
           "method": "SIMULATION",
           "attempted_at": "2026-11-10T02:10:00Z",
           "paid_at": "2026-11-10T02:10:00Z",
-          "source_revision": 1,
-          "settlement_id": "210f8913-a2f9-5065-8e91-6b3c36bc3957",
-          "fence": 1
+          "fence": 1,
+          "idempotency_key": "DEMO-DEMO-TXN-2"
         },
         {
           "id": "4a959117-2c76-53b1-8f5d-d04a1b14c00b",
           "charge_id": "eed9245f-27e8-563a-b4c4-d55f831f1692",
           "saga_id": "c04145ba-8f8d-5015-a769-f6deeb8b8f3c",
           "transaction_id": "DEMO-TXN-3",
-          "amount_vnd": 20000,
           "state": "SUCCEEDED",
           "method": "SIMULATION",
           "attempted_at": "2026-11-10T03:05:00Z",
           "paid_at": "2026-11-10T03:05:00Z",
-          "source_revision": 1,
-          "settlement_id": "c04145ba-8f8d-5015-a769-f6deeb8b8f3c",
-          "fence": 1
+          "fence": 1,
+          "idempotency_key": "DEMO-DEMO-TXN-3"
         }
       ],
       "receipts": [
@@ -833,38 +825,119 @@
           "amount_vnd": 20000,
           "issued_at": "2026-11-10T03:05:00Z"
         }
+      ],
+      "charge_sources": [
+        {
+          "source_type": "APPOINTMENT",
+          "source_id": "93440dea-6eac-54c1-a067-333e6d91b0d6",
+          "patient_id": "1cb1d7ec-2620-5e26-9f12-02bf4150f774"
+        },
+        {
+          "source_type": "LAB_ORDER",
+          "source_id": "7ff6d0c1-5655-55b4-9b9f-a611b0c6c9e0",
+          "patient_id": "1cb1d7ec-2620-5e26-9f12-02bf4150f774"
+        },
+        {
+          "source_type": "MED_HOLD",
+          "source_id": "fba000c8-114e-5266-b5a5-cdfc13ded52c",
+          "patient_id": "1cb1d7ec-2620-5e26-9f12-02bf4150f774"
+        }
       ]
     },
     "notification": {
       "notifications": [
         {
           "id": "9f4907bf-e454-51e9-8306-c3d685899d92",
-          "user_id": "9367c90c-9e4f-5d6b-b2a8-c55c2c85a610",
           "kind": "DIAGNOSTIC",
-          "title": "Có kết quả xét nghiệm mới",
-          "body": "Mở ứng dụng để xem trạng thái đã được hệ thống xác nhận.",
-          "payload": {
-            "orderId": "7ff6d0c1-5655-55b4-9b9f-a611b0c6c9e0",
-            "publishedAt": "2026-11-10T02:45:00Z"
-          },
           "created_at": "2026-11-10T02:45:00Z",
-          "read_at": null
+          "read_at": null,
+          "recipient_user_id": "9367c90c-9e4f-5d6b-b2a8-c55c2c85a610",
+          "event_id": "e4ecf400-e25c-5796-8e5c-2a134d920322",
+          "message_code": "LabResultPublished",
+          "subject_ref": "7ff6d0c1-5655-55b4-9b9f-a611b0c6c9e0"
         },
         {
           "id": "90c9de7a-1c80-5e52-a2af-1ce84c26713f",
-          "user_id": "9367c90c-9e4f-5d6b-b2a8-c55c2c85a610",
           "kind": "PHARMACY",
-          "title": "Đã cấp phát đơn thuốc",
-          "body": "Mở ứng dụng để xem trạng thái đã được hệ thống xác nhận.",
+          "created_at": "2026-11-10T03:10:00Z",
+          "read_at": null,
+          "recipient_user_id": "9367c90c-9e4f-5d6b-b2a8-c55c2c85a610",
+          "event_id": "906e1980-15a5-5192-a422-ddf3a1a2269b",
+          "message_code": "MedicationDispensed",
+          "subject_ref": "2a3e6767-445f-5b0c-837e-a3e530995f19"
+        }
+      ],
+      "received_messages": [
+        {
+          "message_id": "e4ecf400-e25c-5796-8e5c-2a134d920322",
+          "command_id": null,
+          "payload_hash": "6d643152d8dbcec0f6aac8b16fe9eb98ab31c21c411df618b792c7f8ce59d515",
+          "source_aggregate_id": "7ff6d0c1-5655-55b4-9b9f-a611b0c6c9e0",
+          "source_version": 4
+        },
+        {
+          "message_id": "906e1980-15a5-5192-a422-ddf3a1a2269b",
+          "command_id": null,
+          "payload_hash": "63dbac11d03db300870705969401915385a645fd7febbf013f3593e5d3888877",
+          "source_aggregate_id": "fba000c8-114e-5266-b5a5-cdfc13ded52c",
+          "source_version": 4
+        }
+      ],
+      "inbox": [
+        {
+          "message_id": "e4ecf400-e25c-5796-8e5c-2a134d920322",
+          "consumer_name": "notification",
+          "state": "PROCESSED",
+          "outcome_ref": "9f4907bf-e454-51e9-8306-c3d685899d92",
+          "processed_at": "2026-11-10T02:45:00Z"
+        },
+        {
+          "message_id": "906e1980-15a5-5192-a422-ddf3a1a2269b",
+          "consumer_name": "notification",
+          "state": "PROCESSED",
+          "outcome_ref": "90c9de7a-1c80-5e52-a2af-1ce84c26713f",
+          "processed_at": "2026-11-10T03:10:00Z"
+        }
+      ],
+      "illustrative_envelopes": [
+        {
+          "messageId": "e4ecf400-e25c-5796-8e5c-2a134d920322",
+          "messageKind": "EVENT",
+          "messageType": "LabResultPublished",
+          "schemaVersion": 1,
+          "producer": "diagnostic",
+          "aggregateId": "7ff6d0c1-5655-55b4-9b9f-a611b0c6c9e0",
+          "aggregateVersion": 4,
+          "correlationId": "42c0fb84-01bc-5b48-a5d1-38f9da905573",
+          "causationId": null,
+          "requestId": null,
+          "occurredAt": "2026-11-10T02:45:00Z",
+          "payload": {
+            "orderId": "7ff6d0c1-5655-55b4-9b9f-a611b0c6c9e0",
+            "publishedAt": "2026-11-10T02:45:00Z",
+            "recipientUserId": "9367c90c-9e4f-5d6b-b2a8-c55c2c85a610"
+          }
+        },
+        {
+          "messageId": "906e1980-15a5-5192-a422-ddf3a1a2269b",
+          "messageKind": "EVENT",
+          "messageType": "MedicationDispensed",
+          "schemaVersion": 1,
+          "producer": "pharmacy",
+          "aggregateId": "fba000c8-114e-5266-b5a5-cdfc13ded52c",
+          "aggregateVersion": 4,
+          "correlationId": "77c37cdf-7187-5b38-ab67-2e1f00cf8501",
+          "causationId": null,
+          "requestId": null,
+          "occurredAt": "2026-11-10T03:10:00Z",
           "payload": {
             "prescriptionId": "2a3e6767-445f-5b0c-837e-a3e530995f19",
             "holdId": "fba000c8-114e-5266-b5a5-cdfc13ded52c",
             "revision": 1,
             "attemptNo": 1,
-            "dispensedAt": "2026-11-10T03:10:00Z"
-          },
-          "created_at": "2026-11-10T03:10:00Z",
-          "read_at": null
+            "dispensedAt": "2026-11-10T03:10:00Z",
+            "recipientUserId": "9367c90c-9e4f-5d6b-b2a8-c55c2c85a610"
+          }
         }
       ]
     }

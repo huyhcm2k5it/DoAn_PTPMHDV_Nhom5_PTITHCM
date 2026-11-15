@@ -115,13 +115,9 @@ def settle_payment(
 
             saga = SettlementSaga.objects.create(
                 charge=charge,
-                source_type=charge.source_type,
-                source_id=charge.source_id,
-                source_revision=charge.source_revision,
                 state="REQUESTED",
                 version=(SettlementSaga.objects.filter(charge=charge).order_by("-version").values_list("version", flat=True).first() or 0) + 1,
                 fence=None,
-                amount_hash=charge.snapshot_hash,
                 deadline_at=timezone.now() + timedelta(seconds=60)
             )
 
@@ -129,25 +125,20 @@ def settle_payment(
                 charge=charge,
                 saga=saga,
                 transaction_id=transaction_id,
-                amount_vnd=charge.amount_vnd,
                 state="PENDING",
                 method=method,
                 idempotency_key=idempotency_key,
-                settlement_id=saga.id,
-                source_revision=charge.source_revision,
                 fence=0
             )
 
             reserve = {"settlementId": str(saga.id), "chargeId": str(charge.id), "sourceType": charge.source_type,
                 "sourceId": str(charge.source_id), "sourceRevision": charge.source_revision,
-                "amountHash": saga.amount_hash, "attemptVersion": saga.version}
+                "amountHash": charge.snapshot_hash, "attemptVersion": saga.version}
             BillingEventOutbox.objects.create(event_type="ReserveSettlement", exchange="umc.commands.billing.v1",
                 routing_key=OWNERS[charge.source_type] + ".reserve-settlement.v1",
                 payload=make_envelope("ReserveSettlement", reserve, saga.id, saga.version, kind="COMMAND"))
-            charge.settlement_id = saga.id
-            charge.settlement_saga_id = saga.id
-            charge.settlement_state = "REQUESTED"
-            charge.save(update_fields=["settlement_saga_id", "settlement_state", "settlement_id"])
+            setattr(charge, "settlement_saga", saga)
+            charge.save(update_fields=["settlement_saga"])
 
             data = payment_data(payment, request_id)
             idempotency.remember(scope, idempotency_key, payload, data)

@@ -62,7 +62,7 @@ def revenue_report_view(request):
         state="SUCCEEDED",
         paid_at__gte=window_start,
         paid_at__lt=window_end
-    ).aggregate(total=Sum("amount_vnd"))["total"] or 0
+    ).aggregate(total=Sum("charge__amount_vnd"))["total"] or 0
 
     # Lưu ý: chưa có cột thời điểm hoàn tất riêng nên tạm dùng updated_at của refund SUCCEEDED.
     refunded_vnd = Refund.objects.filter(

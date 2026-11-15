@@ -2,7 +2,7 @@ import uuid
 from unittest.mock import patch
 from django.test import TestCase
 from django.utils import timezone
-from app.domain.models import Charge, BillingEventOutbox
+from app.domain.models import Charge, ChargeSource, BillingEventOutbox
 from app.worker.consumer import handle_request_charge
 
 
@@ -16,4 +16,17 @@ class ChargeWireTests(TestCase):
             handle_request_charge(event);handle_request_charge(event)
         self.assertEqual(Charge.objects.count(),1)
         self.assertEqual(BillingEventOutbox.objects.count(),1)
-        self.assertEqual(BillingEventOutbox.objects.first().payload["payload"]["state"],"CREATED")
+        self.assertEqual(BillingEventOutbox.objects.get().payload["payload"]["state"],"CREATED")
+
+    def test_source_owner_is_shared_across_revisions(self):
+        first = envelope()
+        handle_request_charge(first)
+        revision = envelope(payload={**first["payload"], "sourceRevision": 2})
+        handle_request_charge(revision)
+        wrong_owner = envelope(payload={
+            **first["payload"], "sourceRevision": 3, "patientId": str(uuid.uuid4()),
+        })
+        with self.assertRaisesRegex(ValueError, "Charge source patient conflict"):
+            handle_request_charge(wrong_owner)
+        self.assertEqual(ChargeSource.objects.count(), 1)
+        self.assertEqual(Charge.objects.count(), 2)

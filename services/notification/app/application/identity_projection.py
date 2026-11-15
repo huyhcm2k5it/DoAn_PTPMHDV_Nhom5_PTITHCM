@@ -2,7 +2,8 @@
 import uuid
 from django.db import transaction
 from django.utils.dateparse import parse_datetime
-from app.domain.models import IdentityAccessProjection, MessageInbox
+from app.application.messages import digest, receive
+from app.domain.models import IdentityAccessProjection
 
 PAYLOAD_FIELDS = {'userId', 'status', 'actorType', 'capabilities', 'tokenVersion', 'phoneVerified', 'version'}
 
@@ -53,14 +54,8 @@ def validate(envelope):
 
 @transaction.atomic
 def apply_identity_access(envelope):
-    from app.worker.consumer import digest
     payload = validate(envelope)
-    fingerprint = digest(envelope)
-    inbox, created = MessageInbox.objects.get_or_create(message_id=envelope['messageId'],
-                                                       defaults={'body_hash': fingerprint})
-    if not created:
-        if inbox.body_hash != fingerprint:
-            raise ValueError('Duplicate message content conflict')
+    if receive(envelope, "identity_access") is None:
         return 'REPLAYED'
     # Create the row before locking so concurrent first deliveries serialize too.
     IdentityAccessProjection.objects.get_or_create(user_id=payload['userId'])

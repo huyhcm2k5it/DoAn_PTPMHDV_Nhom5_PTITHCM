@@ -8,26 +8,23 @@ import uuid
 from datetime import timedelta
 from django.db import connections, transaction, OperationalError
 from django.utils import timezone
-from app.domain.models import Notification, MessageInbox, RetryJob, DeadLetter
+from app.application.messages import digest, receive
+from app.application.presentation import MESSAGES
+from app.domain.models import (
+    DeadLetter, LegacyNotification, Notification, NotificationDeliveryKey, RetryJob,
+)
 from app.worker.event_bus import get_rabbitmq_connection, NOTIFICATION_QUEUE, BINDINGS
 
 logger = logging.getLogger(__name__)
 ROUTES = {
-    "appointment.appointment-changed.v1": ("AppointmentChanged", "appointment", "APPOINTMENT", "Lịch khám có cập nhật"),
-    "billing.billing-status-changed.v1": ("BillingStatusChanged", "billing", "BILLING", "Viện phí có cập nhật"),
-    "diagnostic.lab-result-published.v1": ("LabResultPublished", "diagnostic", "DIAGNOSTIC", "Có kết quả xét nghiệm mới"),
-    "pharmacy.medication-dispensed.v1": ("MedicationDispensed", "pharmacy", "PHARMACY", "Đã cấp phát đơn thuốc"),
+    "appointment.appointment-changed.v1": ("AppointmentChanged", "appointment", "APPOINTMENT"),
+    "billing.billing-status-changed.v1": ("BillingStatusChanged", "billing", "BILLING"),
+    "diagnostic.lab-result-published.v1": ("LabResultPublished", "diagnostic", "DIAGNOSTIC"),
+    "pharmacy.medication-dispensed.v1": ("MedicationDispensed", "pharmacy", "PHARMACY"),
 }
-SAFE_FIELDS = ("appointmentId", "chargeId", "paymentId", "refundId", "orderId", "holdId",
-               "prescriptionId", "revision", "attemptNo", "state", "changeType", "version",
-               "dispensedAt", "publishedAt")
 REQUIRED = {"messageId", "messageKind", "messageType", "schemaVersion", "producer",
             "aggregateId", "aggregateVersion", "correlationId", "causationId",
             "requestId", "occurredAt", "payload"}
-
-
-def digest(value):
-    return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(",",":")).encode()).hexdigest()
 
 
 @transaction.atomic
@@ -38,7 +35,7 @@ def route_event(routing_key, envelope):
     route = ROUTES.get(routing_key)
     if not route or not isinstance(envelope,dict) or set(envelope) != REQUIRED:
         raise ValueError("Unknown notification routing key or invalid envelope")
-    kind, producer, notification_kind, title = route
+    kind, producer, notification_kind = route
     if (envelope["messageKind"] != "EVENT" or envelope["messageType"] != kind
             or envelope["producer"] != producer or type(envelope["schemaVersion"]) is not int
             or envelope["schemaVersion"] != 1):
@@ -47,23 +44,26 @@ def route_event(routing_key, envelope):
     uuid.UUID(str(envelope["aggregateId"]))
     if type(envelope["aggregateVersion"]) is not int or envelope["aggregateVersion"] < 1:
         raise ValueError("Invalid aggregate version")
-    body_hash = digest(envelope)
-    prior = MessageInbox.objects.filter(message_id=envelope["messageId"]).first()
-    if prior:
-        if prior.body_hash != body_hash:
-            raise ValueError("Duplicate message content conflict")
-        return "REPLAYED"
     payload = envelope["payload"]
     if not isinstance(payload,dict):
         raise ValueError("Object payload required")
     recipient = uuid.UUID(str(payload["recipientUserId"]))
+    subject_field, _ = MESSAGES[kind]
+    subject_ref = str(uuid.UUID(str(payload[subject_field])))
+    inbox = receive(envelope, "notification")
+    if inbox is None:
+        return "REPLAYED"
     key = digest([producer,kind,envelope["aggregateId"],envelope["aggregateVersion"],str(recipient)])
-    Notification.objects.get_or_create(dedupe_key=key, defaults={
-        "user_id":recipient, "kind":notification_kind, "title":title,
-        "body":"Mở ứng dụng để xem trạng thái đã được hệ thống xác nhận.",
-        "payload":{k:payload[k] for k in SAFE_FIELDS if k in payload},
-    })
-    MessageInbox.objects.create(message_id=envelope["messageId"], body_hash=body_hash)
+    if LegacyNotification.objects.filter(dedupe_key=key).exists():
+        return "APPLIED"
+    _, created = NotificationDeliveryKey.objects.get_or_create(pk=key)
+    if created:
+        notification = Notification.objects.create(
+            event_id=inbox.message_id, recipient_user_id=recipient, kind=notification_kind,
+            subject_ref=subject_ref, message_code=kind,
+        )
+        inbox.outcome_ref = str(notification.id)
+        inbox.save(update_fields=["outcome_ref"])
     return "APPLIED"
 
 

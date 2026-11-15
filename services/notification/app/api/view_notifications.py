@@ -8,7 +8,8 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from app.api.authz import authenticated
-from app.domain.models import Notification
+from app.application.presentation import present
+from app.domain.models import LegacyNotification, Notification
 
 MAX_IDEMPOTENCY_KEY = 100
 
@@ -22,12 +23,16 @@ def validation_error(request, message):
     }, status=400)
 
 def serialize(notification):
+    if isinstance(notification, LegacyNotification):
+        title, body, payload = notification.title, notification.body, notification.payload
+    else:
+        title, body, payload = present(notification.message_code, notification.subject_ref)
     return {
         "id": str(notification.id),
         "kind": notification.kind,
-        "title": notification.title,
-        "body": notification.body,
-        "payload": notification.payload,
+        "title": title,
+        "body": body,
+        "payload": payload,
         "readAt": notification.read_at.isoformat() if notification.read_at else None,
         "createdAt": notification.created_at.isoformat(),
     }
@@ -55,13 +60,24 @@ def notifications_list_view(request):
             return validation_error(request, "unreadOnly chỉ nhận true hoặc false.")
         unread_only = unread_raw.lower() == "true"
 
-    queryset = Notification.objects.filter(user_id=request.principal.user_id).order_by("-created_at")
+    user_id = request.principal.user_id
+    current = Notification.objects.filter(recipient_user_id=user_id)
+    legacy = LegacyNotification.objects.filter(user_id=user_id)
     if unread_only:
-        queryset = queryset.filter(read_at__isnull=True)
+        current = current.filter(read_at__isnull=True)
+        legacy = legacy.filter(read_at__isnull=True)
 
-    total = queryset.count()
+    total = current.count() + legacy.count()
     start = (page - 1) * limit
-    items = [serialize(item) for item in queryset[start:start + limit]]
+    keys = list(
+        current.values_list("created_at", "id").union(
+            legacy.values_list("created_at", "id"), all=True,
+        ).order_by("-created_at", "-id")[start:start + limit]
+    )
+    ids = [item_id for _, item_id in keys]
+    by_id = legacy.in_bulk(ids)
+    by_id.update(current.in_bulk(ids))
+    items = [serialize(by_id[item_id]) for item_id in ids if item_id in by_id]
 
     return Response({
         "data": {"items": items, "total": total},
@@ -87,11 +103,16 @@ def mark_read_view(request, notification_id):
         )
 
     with transaction.atomic():
+        user_id = request.principal.user_id
         notification = (
             Notification.objects.select_for_update()
-            .filter(id=notification_id, user_id=request.principal.user_id)
+            .filter(id=notification_id, recipient_user_id=user_id)
             .first()
         )
+        if notification is None:
+            notification = LegacyNotification.objects.select_for_update().filter(
+                id=notification_id, user_id=user_id,
+            ).first()
         if not notification:
             # Không phân biệt "không tồn tại" với "của người khác" để không lộ dữ liệu
             return Response({

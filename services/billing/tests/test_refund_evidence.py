@@ -1,8 +1,10 @@
 import uuid
+
+from tests.fixtures import create_charge
 from typing import Any, cast
 from django.test import TestCase
 from rest_framework.test import APIClient
-from app.domain.models import BillingEventOutbox, Charge
+from app.domain.models import BillingEventOutbox
 from app.application.refund_service import apply_source_cancellation
 from app.infrastructure.message_delivery import make_envelope
 from tests.test_billing import cashier
@@ -15,7 +17,7 @@ class RefundEvidenceTests(TestCase):
 
     def test_lab_cancellation_refund_emits_all_transitions_once(self):
         order_id, visit_id, cancellation_id = (str(uuid.uuid4()) for _ in range(3))
-        charge = Charge.objects.create(
+        charge = create_charge(
             patient_id=uuid.uuid4(), recipient_user_id=uuid.uuid4(), source_type="LAB_ORDER",
             source_id=order_id, amount_vnd=1000, state="PAID", version=5,
         )
@@ -51,7 +53,7 @@ class RefundEvidenceTests(TestCase):
             self.assertEqual(event["payload"]["chargeId"], str(charge.id))
 
     def test_random_cancellation_is_not_refund_evidence(self):
-        charge = Charge.objects.create(patient_id=uuid.uuid4(),source_type="APPOINTMENT",
+        charge = create_charge(patient_id=uuid.uuid4(),source_type="APPOINTMENT",
             source_id=uuid.uuid4(),amount_vnd=1000,state="PAID")
         client = cast(Any, APIClient())
         response = cast(Any, client.post("/api/v1/refunds", {
