@@ -328,6 +328,15 @@
             "description": "Optional. Missing/unsafe value is replaced by a server UUID."
           },
           {
+            "name": "X-Authorization-Lease",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": ""
+          },
+          {
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
@@ -1124,6 +1133,7 @@
                 "enum": [
                   "VALIDATION_ERROR",
                   "UNAUTHENTICATED",
+                  "AUTHZ_LEASE_EXPIRED",
                   "FORBIDDEN",
                   "OVERLAPPING_PRICE_PERIOD",
                   "IDEMPOTENCY_CONFLICT",

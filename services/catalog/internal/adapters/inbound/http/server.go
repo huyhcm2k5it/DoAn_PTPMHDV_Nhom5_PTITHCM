@@ -36,7 +36,7 @@ func New(cfg Config, app ports.Catalog, auth Authenticator) *echo.Echo {
 		switch code {
 		case "VALIDATION_ERROR":
 			status = 400
-		case "UNAUTHENTICATED":
+		case "UNAUTHENTICATED", "AUTHZ_LEASE_EXPIRED":
 			status = 401
 		case "FORBIDDEN":
 			status = 403

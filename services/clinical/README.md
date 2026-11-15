@@ -8,7 +8,7 @@ Owner: Huy. Go/Echo/pgx, with domain and application ports independent from driv
 | CL-002 `POST /api/v1/visits/start` | Atomically writes PENDING start request, idempotency response and ClaimQueueTicket outbox. Returns `202`, `Location` and `statusUrl`; no visit exists yet. |
 | CL-003 `GET /api/v1/visits/{visitId}` | Assigned doctor reads drafts. A patient can read only their owned SIGNED visit and its latest saved note. |
 | CL-004 `PUT /api/v1/visits/{visitId}/draft` | Replaces all four fields using expectedVersion and Idempotency-Key, creates an immutable note revision and increments visit version. |
-| CL-011 `GET /api/v1/patients/{patientId}/medical-records` | Paginated, no-store records for the patient owner: signed visits, the latest note saved by signing time, FINAL prescriptions and published LAB references only. |
+| CL-011 `GET /api/v1/patients/{patientId}/medical-records` | Paginated, no-store records for the patient owner or a doctor with a current active treatment relationship: signed visits, the latest note saved by signing time, FINAL prescriptions and published LAB references only. |
 
 An ACCEPTED QueueTicketClaimed event creates one FIRST visit per appointment; RETURN resumes the same eligible visit once. REJECTED creates no visit. Both message ID and business result are deduplicated; conflicting terminal results are quarantined. A stale draft returns 409 and SIGNED visits cannot be edited.
 
@@ -88,7 +88,7 @@ To replace a REJECTED or FAILED LAB request, read `labRequests[].sourceVersion` 
 
 Prescription names come from Clinical's trusted Catalog projection. Draft updates replace lines using expectedVersion; quantity must be a positive integer. Visit signing locks the visit and checks all registered LAB requests. FINAL requires a signed visit, at least one line, and no other FINAL prescription. Signed notes and FINAL prescriptions are immutable. Patient detail filters out draft/deleted prescriptions and internal LAB requests.
 
-CL-011 supports the PATIENT owner after checking the active PatientAccess projection and a current CL-011 authorization lease. DOCTOR access fails closed with 503 until the current doctor/visit assignment projection is supplied by the owning service; Clinical does not infer permission from a historical ticket snapshot.
+CL-011 requires an active Identity/PatientAccess projection and a current CL-011 lease. PATIENT reads only their owned profile. DOCTOR reads signed patient history only while Clinical has an unsigned visit assigned to that doctor with an active visit_doctor_grants row. The visit and grant are locked for the read transaction; signing or revoking the current relationship prevents subsequent history reads. A signed historical visit alone grants no full-history access. Missing grant evidence for an open assigned visit returns 503; no current relationship or revoked authority returns 404. This policy is distinct from Diagnostic per-visit published-result access after signing.
 
 `cmd/import-catalog -file trusted-catalog.json` is an operator-only bootstrap while the shared Catalog entity stream is being wired. Input is an array of `{ "kind": "MEDICINE" | "LAB_TEST", "entity": { "id", "code", "name", "unit", "referenceRange", "revision", "status" } }`. Import checks monotonic revisions and rejects conflicting content at the same revision. No public HTTP bootstrap endpoint exists. Medicine/test full CatalogChanged snapshots keep this projection current. Price/checkpoint messages are not used for financial decisions in Clinical; Diagnostic owns lab pricing.
 

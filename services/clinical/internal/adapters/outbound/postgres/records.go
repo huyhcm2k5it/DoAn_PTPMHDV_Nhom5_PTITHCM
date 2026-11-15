@@ -2,8 +2,37 @@ package postgres
 
 import (
 	"context"
+	"errors"
+	"github.com/jackc/pgx/v5"
 	"umccare/clinical/internal/domain"
 )
+
+// A current, unrevoked care relationship permits signed history reads. A
+// historical signed visit alone never grants access to the whole patient file.
+func (t clinicalTx) AuthorizePatientHistory(ctx context.Context, doctor, patient string) error {
+	var visit string
+	err := t.tx.QueryRow(ctx, `SELECT v.id::text FROM visits v
+		JOIN visit_doctor_grants g ON g.visit_id=v.id
+		WHERE v.patient_id=$1 AND v.doctor_user_id=$2 AND v.state<>'SIGNED' AND g.active
+		ORDER BY v.id LIMIT 1 FOR SHARE OF v,g`, patient, doctor).Scan(&visit)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	var missing bool
+	err = t.tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM visits v
+		LEFT JOIN visit_doctor_grants g ON g.visit_id=v.id
+		WHERE v.patient_id=$1 AND v.doctor_user_id=$2 AND v.state<>'SIGNED' AND g.visit_id IS NULL)`, patient, doctor).Scan(&missing)
+	if err != nil {
+		return err
+	}
+	if missing {
+		return domain.Fail("SERVICE_UNAVAILABLE", "Current visit grant is missing")
+	}
+	return domain.Fail("NOT_FOUND", "Patient records not found")
+}
 
 func (t clinicalTx) PatientRecords(ctx context.Context, patientID string, page, limit int) (out domain.MedicalRecords, err error) {
 	out.Items = []domain.MedicalRecord{}

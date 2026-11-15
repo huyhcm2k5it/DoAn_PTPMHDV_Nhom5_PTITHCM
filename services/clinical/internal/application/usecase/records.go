@@ -26,9 +26,14 @@ func (s *Service) Records(ctx context.Context, p domain.Principal, patientID str
 			return domain.Fail("NOT_FOUND", "Patient not found")
 		}
 		if p.ActorType == "DOCTOR" {
-			return domain.Fail("SERVICE_UNAVAILABLE", "Current doctor-patient grant projection unavailable")
-		}
-		if access.OwnerUserID != domain.ID(p.UserID) {
+			guard, ok := tx.(ports.DoctorPatientRecordsAccess)
+			if !ok {
+				return domain.Fail("SERVICE_UNAVAILABLE", "Current doctor-patient grant unavailable")
+			}
+			if e := guard.AuthorizePatientHistory(ctx, domain.ID(p.UserID), domain.ID(patientID)); e != nil {
+				return e
+			}
+		} else if access.OwnerUserID != domain.ID(p.UserID) {
 			return domain.Fail("NOT_FOUND", "Patient not found")
 		}
 		reader, ok := tx.(ports.MedicalRecordsReader)

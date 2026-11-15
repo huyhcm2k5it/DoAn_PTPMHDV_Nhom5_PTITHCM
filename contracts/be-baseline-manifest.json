@@ -5,27 +5,27 @@
   "sources": [
     {
       "path": "docs/UMC_Care_API_86_9_Service_v5_2 - 01_HTTP_86.csv",
-      "sha256": "cec0aea1ab77207b6b5508a6e90c1e8103f01af8f47f466dde6a9ef1f72a12ed"
+      "sha256": "18acce8518b4c009ded95e92c4b890929a6d0e5dfb3045124ce9ca8c48af5194"
     },
     {
       "path": "docs/UMC_Care_API_86_9_Service_v5_2 - 02_ThamSo.csv",
-      "sha256": "594cbdcd95b7f1052f3a30ee8cd3f753b3e5c7e6305e14cd52d5c8b197874886"
+      "sha256": "0e6ec9df48f205fa4f674adb91b077dddeea48b4cdbc2696e534ecf597673b36"
     },
     {
       "path": "docs/UMC_Care_API_86_9_Service_v5_2 - 03_PhanHoi.csv",
-      "sha256": "66714083b2d8920bfaf311b20b5df51094ff09c8c487c26a43f9aadb50028888"
+      "sha256": "159ab73dc1cd37af64ef4dd27561191f7cbaa12bcb0ca4a3807b11600b60a606"
     },
     {
       "path": "docs/UMC_Care_API_86_9_Service_v5_2 - 04_Events_18.csv",
-      "sha256": "20cf4f3b32e8c7455695cc9ac1b1e7cf1033971d0de24162fa3192260b141454"
+      "sha256": "dbcf17b15e03f8e397d05c4e5957ff61f2df9909997ec187565695b2357ae5f8"
     },
     {
       "path": "docs/UMC_Care_API_86_9_Service_v5_2 - 05_Commands_5.csv",
-      "sha256": "c7a5ef712909eee9c3c954ce36ea92f6a1a0e181447ea6126618f7b2380d538e"
+      "sha256": "07634828774731a01e91d0e84b8537b2d94173f40c8060190741a72cc059863f"
     },
     {
       "path": "docs/UMC_Care_API_86_9_Service_v5_2 - 06_QuyUoc.csv",
-      "sha256": "12994e5c9e00f259742090efc95c93b6a3e6c74f534fa92f4ac7f62cd55fe272"
+      "sha256": "bee089e62e588d300772ab3b82a6dcc4ed72905f7a3a806f2ed7f6f1679188c8"
     }
   ],
   "decisions": {
@@ -466,7 +466,7 @@
       "path": "/api/v1/clinical/worklist",
       "actor": "DOCTOR",
       "success": "200",
-      "errors": "400, 401, 403, 503",
+      "errors": "400, 401, 403, 404, 503",
       "poll": "",
       "profile": "normal"
     },

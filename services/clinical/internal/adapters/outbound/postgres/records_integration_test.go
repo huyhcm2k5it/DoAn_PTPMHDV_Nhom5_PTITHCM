@@ -71,6 +71,28 @@ func TestMedicalRecordsOwnerLeaseAndSignedOnly(t *testing.T) {
 	if _, err = app.Records(ctx, p, patient, 1, 20); domain.Code(err) != "SERVICE_UNAVAILABLE" {
 		t.Fatal("unverified doctor grant accepted", err)
 	}
+	if _, err = db.pool.Exec(ctx, `INSERT INTO visit_doctor_grants(visit_id,active) VALUES($1,true),($2,true)`, draft, signed); err != nil {
+		t.Fatal(err)
+	}
+	result, err = app.Records(ctx, p, patient, 1, 20)
+	if err != nil || result.Total != 1 || len(result.Items) != 1 || result.Items[0].Visit.ID != signed {
+		t.Fatalf("current treating doctor cannot read signed history: %+v %v", result, err)
+	}
+	if _, err = db.pool.Exec(ctx, `UPDATE visit_doctor_grants SET active=false WHERE visit_id=$1`, draft); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = app.Records(ctx, p, patient, 1, 20); domain.Code(err) != "NOT_FOUND" {
+		t.Fatal("historical signed grant bypassed revoked current relationship", err)
+	}
+	if _, err = db.pool.Exec(ctx, `UPDATE visit_doctor_grants SET active=true WHERE visit_id=$1`, draft); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.pool.Exec(ctx, `UPDATE visits SET state='SIGNED',signed_at=now() WHERE id=$1`, draft); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = app.Records(ctx, p, patient, 1, 20); domain.Code(err) != "NOT_FOUND" {
+		t.Fatal("signed historical assignment granted full patient history", err)
+	}
 	p.UserID, p.ActorType, p.LeaseExpiresAt = owner, "PATIENT", now.Add(-time.Second)
 	if _, err = app.Records(ctx, p, patient, 1, 20); domain.Code(err) != "AUTHZ_LEASE_EXPIRED" {
 		t.Fatal("expired lease accepted", err)

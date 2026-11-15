@@ -79,7 +79,7 @@ func testHTTP(t *testing.T, db *Store) {
 	call("GET", "/api/v1/catalog/lab-tests", pharmacy, "", nil, 403, "Error")
 	call("GET", "/api/v1/catalog/lab-tests", lab, "", nil, 200, "")
 	call("GET", "/api/v1/catalog/medicines", lab, "", nil, 403, "")
-	call("POST", "/api/v1/prices", admin, "", raw, 403, "")
+	call("POST", "/api/v1/prices", admin, "", raw, 401, "Error")
 	tooPrecise := input
 	tooPrecise.EffectiveFrom = tooPrecise.EffectiveFrom.Add(time.Nanosecond)
 	invalidRaw, _ := json.Marshal(tooPrecise)

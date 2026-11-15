@@ -43,7 +43,7 @@ schemas['ResultData'] = obj({'result':ref('Result')})
 schemas['CancelData'] = obj({'order':ref('Order'),'cancellationId':uuid,'refundStatus':{'enum':['NOT_REQUIRED','PENDING_SYNC','REQUESTED','SUCCEEDED','FAILED']}})
 schemas['PublishedResults'] = obj({'items':{'type':'array','items':ref('Result')},
     'total':{'type':'integer','minimum':0}})
-schemas['SampleInput'] = obj({'barcode':{'type':'string','maxLength':128},'note':{'type':'string','maxLength':500}},[])
+schemas['SampleInput'] = obj({'barcode':{'type':'string','maxLength':128}},[])
 schemas['RecoveryOrderInput'] = obj({'visitId':uuid,'testCodes':{'type':'array','minItems':1,'maxItems':100,'items':{'type':'string','minLength':1,'maxLength':100}}})
 schemas['RecoveryOrderData'] = obj({'order':ref('Order'),'chargeStatus':text})
 schemas['RejectInput'] = obj({'reasonCode':{'type':'string','minLength':1,'maxLength':128},'expectedVersion':version})
@@ -68,7 +68,7 @@ doc={'openapi':'3.1.1','info':{'title':'UMC Care Diagnostic','version':'1.1.0',
        '/api/v1/diagnostic-orders':{
            'post':di001,
            'get':operation('DI_002','ListResponse',parameters=[
-               parameter('state','query',{'type':'string'}),parameter('date','query',{'type':'string','format':'date'}),parameter('page','query',{'type':'integer','minimum':1}),parameter('limit','query',{'type':'integer','minimum':1,'maximum':100})])},
+               parameter('state','query',{'type':'string'}),parameter('page','query',{'type':'integer','minimum':1}),parameter('limit','query',{'type':'integer','minimum':1,'maximum':100})])},
        '/api/v1/diagnostic-orders/{orderId}':{'get':operation('DI_003','DetailResponse',parameters=[order_id])},
        '/api/v1/diagnostic-orders/{orderId}/specimens':{'post':operation('DI_004','SpecimenDataResponse',201,[order_id,key],'SampleInput',errors)},
        '/api/v1/specimens/{specimenId}/reject':{'post':operation('DI_005','SpecimenDataResponse',200,[specimen_id,key],'RejectInput',errors)},

@@ -132,9 +132,9 @@ AP-006,409,Lỗi,"SCHEDULE_VERSION_CONFLICT, BOOKED_CAPACITY_CONFLICT",SCHEDULE_
 AP-006,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
 CA-004,201,Thành công,,Hoàn tất thao tác tạo phiên bản giá tương lai cho khám/lab/thuốc. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"priceVersionId: string:uuid, revision: integer, effectiveFrom: string:date-time"
 CA-004,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
-CA-004,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+CA-004,401,Lỗi,"UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",Access token hoặc lease không hợp lệ/hết hạn; lấy lease mới khi cần.,ErrorResponse
 CA-004,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
-CA-004,409,Lỗi,OVERLAPPING_PRICE_PERIOD,OVERLAPPING_PRICE_PERIOD: Khoảng hiệu lực giá giao nhau với phiên bản hiện có.,ErrorResponse
+CA-004,409,Lỗi,"OVERLAPPING_PRICE_PERIOD, IDEMPOTENCY_CONFLICT",OVERLAPPING_PRICE_PERIOD: Khoảng hiệu lực giá giao nhau với phiên bản hiện có.,ErrorResponse
 CA-004,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
 AP-008,201,Thành công,,Hoàn tất thao tác giữ slot nguyên tử. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"holdId: string:uuid, expiresAt: string:date-time, state: string"
 AP-008,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
@@ -219,12 +219,13 @@ CL-001,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn th�
 CL-001,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 CL-001,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
 CL-001,404,Lỗi,START_REQUEST_NOT_FOUND,START_REQUEST_NOT_FOUND: Không thấy operationId start visit thuộc quyền người gọi.,ErrorResponse
+CL-001,404,Lỗi,START_REQUEST_NOT_FOUND,Không tìm thấy yêu cầu bắt đầu hoặc yêu cầu thuộc bác sĩ khác.,ErrorResponse
 CL-002,202,Thành công,,Đã nhận lệnh và commit local/outbox; kết quả liên service còn chờ. Client đọc Location hoặc data.statusUrl để theo dõi.,"requestId: string:uuid, operationId: string:uuid, state: string, statusUrl: string:uri-reference"
 CL-002,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
 CL-002,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
 CL-002,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 CL-002,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
-CL-002,409,Lỗi,"TICKET_VERSION_CONFLICT, TICKET_ALREADY_CLAIMED",TICKET_VERSION_CONFLICT: Phiên bản vé không còn khớp.; TICKET_ALREADY_CLAIMED: Vé đã được claim bởi lượt khám khác.,ErrorResponse
+CL-002,409,Lỗi,"TICKET_VERSION_CONFLICT, TICKET_ALREADY_CLAIMED, IDEMPOTENCY_CONFLICT",TICKET_VERSION_CONFLICT: Phiên bản vé không còn khớp.; TICKET_ALREADY_CLAIMED: Vé đã được claim bởi lượt khám khác.,ErrorResponse
 CL-002,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
 CL-003,200,Thành công,,Hoàn tất thao tác chi tiết visit. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"visit: Visit, notes: VisitNote[], prescriptions: Prescription[], labRequests: LabRequestStatus[]"
 CL-003,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
@@ -237,53 +238,53 @@ CL-004,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu
 CL-004,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
 CL-004,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 CL-004,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
-CL-004,409,Lỗi,"VISIT_VERSION_CONFLICT, VISIT_ALREADY_SIGNED",VISIT_VERSION_CONFLICT: Lượt khám đã đổi kể từ phiên bản client đọc.; VISIT_ALREADY_SIGNED: Lượt khám đã được ký; không sửa bản nháp.,ErrorResponse
+CL-004,409,Lỗi,"VISIT_VERSION_CONFLICT, VISIT_ALREADY_SIGNED, IDEMPOTENCY_CONFLICT",VISIT_VERSION_CONFLICT: Lượt khám đã đổi kể từ phiên bản client đọc.; VISIT_ALREADY_SIGNED: Lượt khám đã được ký; không sửa bản nháp.,ErrorResponse
 CL-004,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
 CL-005,202,Thành công,,Đã nhận lệnh và commit local/outbox; kết quả liên service còn chờ. Client đọc Location hoặc data.statusUrl để theo dõi.,"requestId: string:uuid, state: string, statusUrl: string:uri-reference"
 CL-005,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
 CL-005,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
 CL-005,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 CL-005,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
-CL-005,409,Lỗi,"VISIT_NOT_ACTIVE, LAB_REQUEST_DUPLICATE",VISIT_NOT_ACTIVE: Lượt khám chưa hoặc không còn cho phép chỉ định LAB.; LAB_REQUEST_DUPLICATE: Yêu cầu LAB trùng khóa/requestHash của lượt khám.,ErrorResponse
+CL-005,409,Lỗi,"VISIT_NOT_ACTIVE, LAB_REQUEST_DUPLICATE, IDEMPOTENCY_CONFLICT",VISIT_NOT_ACTIVE: Lượt khám chưa hoặc không còn cho phép chỉ định LAB.; LAB_REQUEST_DUPLICATE: Yêu cầu LAB trùng khóa/requestHash của lượt khám.,ErrorResponse
 CL-005,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
 CL-006,201,Thành công,,Hoàn tất thao tác tạo toa draft. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,prescription: Prescription
 CL-006,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
 CL-006,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
 CL-006,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 CL-006,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
-CL-006,409,Lỗi,STATE_CONFLICT,STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
+CL-006,409,Lỗi,"STATE_CONFLICT, IDEMPOTENCY_CONFLICT",STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
 CL-006,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
 CL-007,200,Thành công,,Hoàn tất thao tác sửa toa draft. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,prescription: Prescription
 CL-007,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
 CL-007,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
 CL-007,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 CL-007,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
-CL-007,409,Lỗi,STATE_CONFLICT,STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
+CL-007,409,Lỗi,"STATE_CONFLICT, IDEMPOTENCY_CONFLICT",STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
 CL-007,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
 CL-008,200,Thành công,,Hoàn tất thao tác xóa toa draft. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"prescriptionId: string:uuid, state: string"
 CL-008,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
 CL-008,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
 CL-008,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 CL-008,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
-CL-008,409,Lỗi,STATE_CONFLICT,STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
+CL-008,409,Lỗi,"STATE_CONFLICT, IDEMPOTENCY_CONFLICT",STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
 CL-008,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
 CL-009,200,Thành công,,Hoàn tất thao tác ký toa final. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,prescription: Prescription
 CL-009,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
-CL-009,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+CL-009,401,Lỗi,"UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",Access token hoặc lease không hợp lệ/hết hạn; lấy lease mới khi cần.,ErrorResponse
 CL-009,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 CL-009,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
-CL-009,409,Lỗi,"PRESCRIPTION_NOT_DRAFT, PRICE_VERSION_CONFLICT",PRESCRIPTION_NOT_DRAFT: Toa không ở trạng thái DRAFT để sửa/chốt.; PRICE_VERSION_CONFLICT: Bản giá/toa client sử dụng không còn hiệu lực.,ErrorResponse
+CL-009,409,Lỗi,"STATE_CONFLICT, IDEMPOTENCY_CONFLICT",Trạng thái hoặc phiên bản đã đổi; tải lại dữ liệu trước khi tạo ý định mới.,ErrorResponse
 CL-009,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
-CL-010,200,Thành công,,Hoàn tất thao tác ký kết luận và kết thúc. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,visit: Visit
+CL-010,200,Thành công,,Hoàn tất thao tác ký kết luận và kết thúc. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"visitId: uuid, version: integer:int32, state: VisitState"
 CL-010,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
-CL-010,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+CL-010,401,Lỗi,"UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",Access token hoặc lease không hợp lệ/hết hạn; lấy lease mới khi cần.,ErrorResponse
 CL-010,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 CL-010,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
-CL-010,409,Lỗi,"VISIT_NOT_READY, LAB_RESULT_PENDING",VISIT_NOT_READY: Lượt khám chưa đủ điều kiện ký hoàn tất.; LAB_RESULT_PENDING: Còn yêu cầu/order LAB chưa có kết quả kết thúc.,ErrorResponse
+CL-010,409,Lỗi,"VISIT_VERSION_CONFLICT, LAB_PENDING, STATE_CONFLICT, IDEMPOTENCY_CONFLICT",Trạng thái hoặc phiên bản đã đổi; tải lại dữ liệu trước khi tạo ý định mới.,ErrorResponse
 CL-010,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
-CL-011,200,Thành công,,Hoàn tất thao tác bản khám đã ký. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"items: Visit[], total: integer:int32"
+CL-011,200,Thành công,,Hoàn tất thao tác bản khám đã ký. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"items: MedicalRecord[], total: integer:int32"
 CL-011,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
-CL-011,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+CL-011,401,Lỗi,"UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",Access token hoặc lease không hợp lệ/hết hạn; lấy lease mới khi cần.,ErrorResponse
 CL-011,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 CL-011,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
 CL-011,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
@@ -292,7 +293,7 @@ DI-001,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu
 DI-001,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
 DI-001,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 DI-001,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
-DI-001,409,Lỗi,STATE_CONFLICT,STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
+DI-001,409,Lỗi,"STATE_CONFLICT, IDEMPOTENCY_CONFLICT",STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
 DI-001,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
 DI-002,200,Thành công,,Hoàn tất thao tác hàng chờ lab. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"items: LabOrder[], total: integer:int32"
 DI-002,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
@@ -310,67 +311,67 @@ DI-004,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu
 DI-004,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
 DI-004,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 DI-004,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
-DI-004,409,Lỗi,"ORDER_NOT_PAID, SPECIMEN_ALREADY_COLLECTED",ORDER_NOT_PAID: Order LAB chưa có bằng chứng PAID/fence trong Diagnostic.; SPECIMEN_ALREADY_COLLECTED: Mẫu đã được lấy; thao tác tạo/hủy không còn hợp lệ.,ErrorResponse
+DI-004,409,Lỗi,"ORDER_NOT_PAID, SPECIMEN_ALREADY_COLLECTED, IDEMPOTENCY_CONFLICT",ORDER_NOT_PAID: Order LAB chưa có bằng chứng PAID/fence trong Diagnostic.; SPECIMEN_ALREADY_COLLECTED: Mẫu đã được lấy; thao tác tạo/hủy không còn hợp lệ.,ErrorResponse
 DI-004,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
 DI-005,200,Thành công,,Hoàn tất thao tác từ chối mẫu có lý do. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,specimen: Specimen
 DI-005,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
 DI-005,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
 DI-005,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 DI-005,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
-DI-005,409,Lỗi,SPECIMEN_ALREADY_PROCESSED,"SPECIMEN_ALREADY_PROCESSED: Mẫu đã đi tiếp quy trình, không thể từ chối ở trạng thái này.",ErrorResponse
+DI-005,409,Lỗi,"SPECIMEN_ALREADY_PROCESSED, IDEMPOTENCY_CONFLICT","SPECIMEN_ALREADY_PROCESSED: Mẫu đã đi tiếp quy trình, không thể từ chối ở trạng thái này.",ErrorResponse
 DI-005,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
 DI-006,201,Thành công,,Hoàn tất thao tác tạo mẫu lấy lại. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,specimen: Specimen
 DI-006,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
 DI-006,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
 DI-006,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 DI-006,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
-DI-006,409,Lỗi,STATE_CONFLICT,STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
+DI-006,409,Lỗi,"STATE_CONFLICT, IDEMPOTENCY_CONFLICT",STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
 DI-006,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
 DI-007,201,Thành công,,Hoàn tất thao tác tạo kết quả draft. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,result: LabResult
 DI-007,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
 DI-007,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
 DI-007,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 DI-007,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
-DI-007,409,Lỗi,STATE_CONFLICT,STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
+DI-007,409,Lỗi,"STATE_CONFLICT, IDEMPOTENCY_CONFLICT",STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
 DI-007,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
 DI-008,200,Thành công,,Hoàn tất thao tác sửa draft/rework. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,result: LabResult
 DI-008,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
-DI-008,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+DI-008,401,Lỗi,"UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",Access token hoặc lease không hợp lệ/hết hạn; lấy lease mới khi cần.,ErrorResponse
 DI-008,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 DI-008,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
-DI-008,409,Lỗi,"RESULT_VERSION_CONFLICT, RESULT_ALREADY_PUBLISHED",RESULT_VERSION_CONFLICT: Kết quả LAB đã đổi kể từ phiên bản client đọc.; RESULT_ALREADY_PUBLISHED: Kết quả đã công bố và bất biến.,ErrorResponse
+DI-008,409,Lỗi,"STATE_CONFLICT, IDEMPOTENCY_CONFLICT",Trạng thái hoặc phiên bản đã đổi; tải lại dữ liệu trước khi tạo ý định mới.,ErrorResponse
 DI-008,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
 DI-009,200,Thành công,,Hoàn tất thao tác gửi duyệt. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,result: LabResult
 DI-009,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
-DI-009,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+DI-009,401,Lỗi,"UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",Access token hoặc lease không hợp lệ/hết hạn; lấy lease mới khi cần.,ErrorResponse
 DI-009,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 DI-009,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
-DI-009,409,Lỗi,RESULT_INCOMPLETE,RESULT_INCOMPLETE: Kết quả thiếu chỉ số hoặc dữ liệu bắt buộc để gửi duyệt.,ErrorResponse
+DI-009,409,Lỗi,"STATE_CONFLICT, IDEMPOTENCY_CONFLICT",Trạng thái hoặc phiên bản đã đổi; tải lại dữ liệu trước khi tạo ý định mới.,ErrorResponse
 DI-009,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
 DI-010,200,Thành công,,Hoàn tất thao tác trả sửa có lý do. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,result: LabResult
 DI-010,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
 DI-010,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
 DI-010,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 DI-010,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
-DI-010,409,Lỗi,RESULT_NOT_IN_REVIEW,RESULT_NOT_IN_REVIEW: Kết quả không ở trạng thái chờ duyệt.,ErrorResponse
+DI-010,409,Lỗi,"STATE_CONFLICT, IDEMPOTENCY_CONFLICT",Trạng thái hoặc phiên bản đã đổi; tải lại dữ liệu trước khi tạo ý định mới.,ErrorResponse
 DI-010,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
 DI-011,200,Thành công,,Hoàn tất thao tác reviewer khác người nhập duyệt và công bố trong một lệnh. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,result: LabResult
 DI-011,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
-DI-011,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+DI-011,401,Lỗi,"UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",Access token hoặc lease không hợp lệ/hết hạn; lấy lease mới khi cần.,ErrorResponse
 DI-011,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 DI-011,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
-DI-011,409,Lỗi,"SELF_REVIEW_FORBIDDEN, RESULT_NOT_IN_REVIEW",SELF_REVIEW_FORBIDDEN: Người nhập/sửa revision này không được tự duyệt nó.; RESULT_NOT_IN_REVIEW: Kết quả không ở trạng thái chờ duyệt.,ErrorResponse
+DI-011,409,Lỗi,"STATE_CONFLICT, IDEMPOTENCY_CONFLICT",Trạng thái hoặc phiên bản đã đổi; tải lại dữ liệu trước khi tạo ý định mới.,ErrorResponse
 DI-011,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
 DI-012,200,Thành công,,Hoàn tất thao tác hủy trước mẫu. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"order: LabOrder, refundStatus: string"
 DI-012,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
-DI-012,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+DI-012,401,Lỗi,"UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",Access token hoặc lease không hợp lệ/hết hạn; lấy lease mới khi cần.,ErrorResponse
 DI-012,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 DI-012,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
-DI-012,409,Lỗi,SPECIMEN_ALREADY_COLLECTED,SPECIMEN_ALREADY_COLLECTED: Mẫu đã được lấy; thao tác tạo/hủy không còn hợp lệ.,ErrorResponse
+DI-012,409,Lỗi,"STATE_CONFLICT, IDEMPOTENCY_CONFLICT",Trạng thái hoặc phiên bản đã đổi; tải lại dữ liệu trước khi tạo ý định mới.,ErrorResponse
 DI-012,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
 DI-013,200,Thành công,,Hoàn tất thao tác kết quả đã công bố. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"items: LabResult[], total: integer:int32"
 DI-013,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
-DI-013,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
+DI-013,401,Lỗi,"UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",Access token hoặc lease không hợp lệ/hết hạn; lấy lease mới khi cần.,ErrorResponse
 DI-013,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 DI-013,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
 DI-013,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse

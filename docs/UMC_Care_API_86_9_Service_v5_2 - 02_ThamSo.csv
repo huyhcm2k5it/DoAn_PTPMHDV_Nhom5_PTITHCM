@@ -97,6 +97,7 @@ CA-004,body,itemId,string:uuid,Có,,ID mục danh mục thuộc itemType.
 CA-004,body,amountVnd,integer:int64,Có,minimum=0,"Số tiền nguyên VND của giá, charge hoặc refund theo operation; không dùng số thực."
 CA-004,body,effectiveFrom,string:date-time,Có,,Thời điểm bắt đầu hiệu lực của bản giá.
 CA-004,body,effectiveTo,string:date-time,Không,,"Thời điểm kết thúc hiệu lực của bản giá, nếu có."
+CA-004,header,X-Authorization-Lease,string,Có,RS256; action=CA-004; lifetime<=30s; no leeway,Lease do Identity cấp; cùng sub/tokenVersion với access token.
 AP-008,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
 AP-008,body,patientId,string:uuid,Có,,ID hồ sơ bệnh nhân; server kiểm quyền chủ sở hữu hoặc capability tương ứng.
 AP-008,body,slotId,string:uuid,Có,,"ID slot muốn giữ; số chỗ hiển thị chỉ tham khảo, transaction giữ chỗ quyết định."
@@ -160,6 +161,8 @@ CL-005,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. 
 CL-005,body,tests,object[],Có,minItems=1,"Danh sách xét nghiệm được chỉ định; mỗi dòng gồm testId và revision, ít nhất một dòng."
 CL-005,body,tests[].testId,string:uuid,Có,,Trong mỗi phần tử: ID xét nghiệm trong Catalog đã được chọn cho chỉ định.
 CL-005,body,tests[].revision,integer,Có,,Trong mỗi phần tử: Phiên bản định nghĩa xét nghiệm đã chọn; Clinical đối chiếu với Catalog projection trước khi chỉ định.
+CL-005,body,replacesRequestId,string:uuid,Không,Bắt buộc cùng expectedSourceVersion,ID yêu cầu REJECTED/FAILED cần thay thế.
+CL-005,body,expectedSourceVersion,integer,Không,minimum=1; bắt buộc cùng replacesRequestId,Lấy sourceVersion từ CL-003; sai phiên bản trả 409.
 CL-006,path,visitId,string:uuid,Có,,ID lượt khám; Clinical kiểm quyền bác sĩ hoặc bệnh nhân trước khi trả dữ liệu.
 CL-006,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
 CL-006,body,lines,PrescriptionLine[],Có,,Các dòng thuốc của toa; mỗi dòng tuân theo PrescriptionLine và bản FINAL không được sửa đè.
@@ -183,24 +186,25 @@ CL-008,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. 
 CL-009,path,prescriptionId,string:uuid,Có,,"ID toa thuốc cần xem, sửa hoặc giữ toàn bộ thuốc."
 CL-009,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
 CL-009,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+CL-009,header,X-Authorization-Lease,string,Có,RS256; action=CL-009; lifetime<=30s; no leeway,Lease do Identity cấp; cùng sub/tokenVersion với access token.
 CL-010,path,visitId,string:uuid,Có,,ID lượt khám; Clinical kiểm quyền bác sĩ hoặc bệnh nhân trước khi trả dữ liệu.
 CL-010,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
 CL-010,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+CL-010,header,X-Authorization-Lease,string,Có,RS256; action=CL-010; lifetime<=30s; no leeway,Lease do Identity cấp; cùng sub/tokenVersion với access token.
 CL-011,path,patientId,string:uuid,Có,,ID hồ sơ bệnh nhân; server kiểm quyền chủ sở hữu hoặc capability tương ứng.
 CL-011,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
 CL-011,query,limit,integer,Không,minimum=1; maximum=100; default=20,Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema.
+CL-011,header,X-Authorization-Lease,string,Có,RS256; action=CL-011; lifetime<=30s; no leeway,Lease do Identity cấp; cùng sub/tokenVersion với access token.
 DI-001,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
 DI-001,body,visitId,string:uuid,Có,,ID lượt khám; Clinical kiểm quyền bác sĩ hoặc bệnh nhân trước khi trả dữ liệu.
 DI-001,body,testCodes,string[],Có,,Các mã xét nghiệm của adapter phục hồi nội bộ; luồng chính dùng CL-005.
 DI-002,query,state,string,Không,,Trạng thái dùng lọc danh sách; giá trị phải thuộc state machine của tài nguyên.
-DI-002,query,date,string:date,Không,,Ngày cần xem ca hoặc slot trống theo định dạng date.
 DI-002,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
 DI-002,query,limit,integer,Không,minimum=1; maximum=100; default=20,Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema.
 DI-003,path,orderId,string:uuid,Có,,"ID order LAB cần lấy mẫu, hủy hoặc xem trạng thái."
 DI-004,path,orderId,string:uuid,Có,,"ID order LAB cần lấy mẫu, hủy hoặc xem trạng thái."
 DI-004,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
 DI-004,body,barcode,string,Không,,Mã nhận dạng mẫu; server bảo đảm không trùng trong phạm vi mẫu.
-DI-004,body,note,string,Không,,Ghi chú nghiệp vụ cho thao tác lấy mẫu.
 DI-005,path,specimenId,string:uuid,Có,,ID mẫu LAB cần từ chối hoặc xem.
 DI-005,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
 DI-005,body,reasonCode,string,Có,,"Mã lý do nghiệp vụ cho thao tác hủy, từ chối hoặc hoàn; được ghi vào audit."
@@ -225,9 +229,11 @@ DI-008,body,items[].unit,string,Không,,Trong mỗi phần tử: Đơn vị hi�
 DI-008,body,items[].referenceRange,string,Không,,Trong mỗi phần tử: Khoảng tham chiếu đã chụp cho chỉ số LAB nếu có.
 DI-008,body,items[].flag,string,Không,,Trong mỗi phần tử: Cờ diễn giải kết quả LAB nếu có.
 DI-008,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+DI-008,header,X-Authorization-Lease,string,Có,RS256; action=DI-008; lifetime<=30s; no leeway,Lease do Identity cấp; cùng sub/tokenVersion với access token.
 DI-009,path,resultId,string:uuid,Có,,"ID bộ kết quả LAB cần sửa, gửi duyệt hoặc công bố."
 DI-009,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
 DI-009,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+DI-009,header,X-Authorization-Lease,string,Có,RS256; action=DI-009; lifetime<=30s; no leeway,Lease do Identity cấp; cùng sub/tokenVersion với access token.
 DI-010,path,resultId,string:uuid,Có,,"ID bộ kết quả LAB cần sửa, gửi duyệt hoặc công bố."
 DI-010,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
 DI-010,body,reason,string,Có,,Lý do trả kết quả về trạng thái REWORK.
@@ -235,13 +241,16 @@ DI-010,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client 
 DI-011,path,resultId,string:uuid,Có,,"ID bộ kết quả LAB cần sửa, gửi duyệt hoặc công bố."
 DI-011,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
 DI-011,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+DI-011,header,X-Authorization-Lease,string,Có,RS256; action=DI-011; lifetime<=30s; no leeway,Lease do Identity cấp; cùng sub/tokenVersion với access token.
 DI-012,path,orderId,string:uuid,Có,,"ID order LAB cần lấy mẫu, hủy hoặc xem trạng thái."
 DI-012,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
 DI-012,body,reasonCode,string,Có,,"Mã lý do nghiệp vụ cho thao tác hủy, từ chối hoặc hoàn; được ghi vào audit."
 DI-012,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
+DI-012,header,X-Authorization-Lease,string,Có,RS256; action=DI-012; lifetime<=30s; no leeway,Lease do Identity cấp; cùng sub/tokenVersion với access token.
 DI-013,path,patientId,string:uuid,Có,,ID hồ sơ bệnh nhân; server kiểm quyền chủ sở hữu hoặc capability tương ứng.
 DI-013,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
 DI-013,query,limit,integer,Không,minimum=1; maximum=100; default=20,Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema.
+DI-013,header,X-Authorization-Lease,string,Có,RS256; action=DI-013; lifetime<=30s; no leeway,Lease do Identity cấp; cùng sub/tokenVersion với access token.
 PH-001,query,code,string,Không,,Mã danh mục dùng tra cứu chính xác.
 PH-001,query,name,string,Không,,Chuỗi tên dùng tìm bác sĩ hoặc danh mục theo API.
 PH-001,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
