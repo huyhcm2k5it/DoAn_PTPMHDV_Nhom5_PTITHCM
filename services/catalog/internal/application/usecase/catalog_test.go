@@ -302,7 +302,7 @@ func TestPriceAuthorizationRecheckedInsideTransaction(t *testing.T) {
 	tx = &priceTx{}
 	s = New(r, txs{tx}, clock{now})
 	tx.onLock = func() { s.clock = clock{now.Add(31 * time.Second)} }
-	if _, err := s.CreatePrice(context.Background(), p, domain.NewID(), input, ports.Meta{}); domain.Code(err) != "FORBIDDEN" || tx.inserts != 0 {
+	if _, err := s.CreatePrice(context.Background(), p, domain.NewID(), input, ports.Meta{}); domain.Code(err) != "AUTHZ_LEASE_EXPIRED" || tx.inserts != 0 {
 		t.Fatalf("expired lease was accepted after item lock: %v", err)
 	}
 }

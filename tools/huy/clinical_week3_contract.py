@@ -54,3 +54,5 @@ def extend(doc, obj, ref, uuid, version, date_time, operation, parameter, key, v
                         parameter('limit','query',{'type':'integer','minimum':1,'maximum':100,'default':20})],errors=[400,401,403,404,503])},
     })
     doc['info'].update(title='UMC Care Clinical',version='1.2.0',description='CL-001–011. Transactional lab registry, draft and final prescriptions, visit signing, and paginated signed medical records. Signing and patient record reads require current authorization leases; unresolved LAB blocks signing. Patient reads expose only signed notes and FINAL prescriptions.')
+
+    doc['paths']['/api/v1/patients/{patientId}/medical-records']['get']['description'] = 'PATIENT must own the active profile. DOCTOR requires an unsigned Clinical visit assigned to the caller and an active Clinical-owned visit grant; the visit and grant remain locked during the read. Historical signed assignments alone do not permit full history. Missing current grant evidence returns 503; revoked/absent relationships return 404. Only SIGNED notes, FINAL prescriptions and published LAB references are returned.'

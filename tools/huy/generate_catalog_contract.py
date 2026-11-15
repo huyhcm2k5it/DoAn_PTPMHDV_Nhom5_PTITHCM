@@ -31,7 +31,7 @@ schemas = {
     "Medicine": obj({"id": uuid, "code": string, "name": string, "unit": string, "strength": string, "form": string, "status": status, "price": price_ref}, ["id", "code", "name", "unit", "status", "price"]),
     "LabTest": obj({"id": uuid, "code": string, "name": string, "specimenType": string, "unit": string, "referenceRange": string, "revision": {"type": "integer", "minimum": 1}, "status": status, "price": price_ref}, ["id", "code", "name", "specimenType", "revision", "status", "price"]),
     "Meta": obj({"correlationId": {"type": "string", "minLength": 1, "maxLength": 100}}),
-    "Error": obj({"error": obj({"code": {"type": "string", "enum": ["VALIDATION_ERROR", "UNAUTHENTICATED", "FORBIDDEN", "OVERLAPPING_PRICE_PERIOD", "IDEMPOTENCY_CONFLICT", "SERVICE_UNAVAILABLE", "NOT_FOUND", "METHOD_NOT_ALLOWED"]}, "message": string}), "meta": ref("Meta")}),
+    "Error": obj({"error": obj({"code": {"type": "string", "enum": ["VALIDATION_ERROR", "UNAUTHENTICATED", "AUTHZ_LEASE_EXPIRED", "FORBIDDEN", "OVERLAPPING_PRICE_PERIOD", "IDEMPOTENCY_CONFLICT", "SERVICE_UNAVAILABLE", "NOT_FOUND", "METHOD_NOT_ALLOWED"]}, "message": string}), "meta": ref("Meta")}),
 }
 
 def envelope(schema):
@@ -62,7 +62,7 @@ def operation(code, summary, response, description, params=None, protected=False
         errors[409] = "OVERLAPPING_PRICE_PERIOD or IDEMPOTENCY_CONFLICT"
     responses = {str(k): {"description": v, "headers": headers, "content": {"application/json": {"schema": ref("Error")}}} for k, v in errors.items()}
     responses["201" if create else "200"] = {"description": "Created (also on an idempotent replay)" if create else "Success", "headers": headers, "content": {"application/json": {"schema": ref(response)}}}
-    result = {"operationId": code, "summary": summary, "description": description, "tags": ["Catalog"], "parameters": [correlation, *(params or [])], "security": [{"bearerAuth": [], **({"authorizationLease": []} if create else {})}] if protected else [], "responses": responses}
+    result = {"operationId": code, "summary": summary, "description": description, "tags": ["Catalog"], "parameters": [correlation, *([parameter("X-Authorization-Lease", string, "header", True)] if create else []), *(params or [])], "security": [{"bearerAuth": [], **({"authorizationLease": []} if create else {})}] if protected else [], "responses": responses}
     if create:
         result["x-authorization-lease"] = {"action": code.replace("_", "-"), "maxAgeSeconds": 30, "expiryLeewaySeconds": 0, "expiredStatus": 401, "expiredCode": "AUTHZ_LEASE_EXPIRED"}
         result["requestBody"] = {"required": True, "content": {"application/json": {"schema": ref("PriceInput"), "example": {"itemType": "EXAM", "itemId": "00000000-0000-4000-8000-000000000201", "amountVnd": 150000, "effectiveFrom": "2026-11-10T02:00:00Z", "effectiveTo": "2026-11-11T02:00:00Z"}}}}

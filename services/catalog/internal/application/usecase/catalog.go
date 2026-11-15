@@ -143,8 +143,11 @@ func (s *Service) authorizePriceTx(ctx context.Context, tx ports.PriceTx, p doma
 	if err != nil {
 		return err
 	}
-	if access.Status != "ACTIVE" || access.ActorType != "STAFF" || access.TokenVersion != p.TokenVersion || !domain.Has(access.Capabilities, "ADMIN") || !domain.Has(p.Capabilities, "ADMIN") || !p.LeaseExpiresAt.After(s.clock.Now()) {
-		return domain.Fail("FORBIDDEN", "Administrator access or authorization lease is no longer valid")
+	if access.Status != "ACTIVE" || access.ActorType != "STAFF" || access.TokenVersion != p.TokenVersion || !domain.Has(access.Capabilities, "ADMIN") || !domain.Has(p.Capabilities, "ADMIN") {
+		return domain.Fail("FORBIDDEN", "Administrator access is no longer valid")
+	}
+	if !p.LeaseExpiresAt.After(s.clock.Now()) {
+		return domain.Fail("AUTHZ_LEASE_EXPIRED", "Authorization lease expired")
 	}
 	return nil
 }
@@ -154,7 +157,7 @@ func (s *Service) CreatePrice(ctx context.Context, p domain.Principal, key strin
 		return
 	}
 	if p.LeaseAction != "CA-004" || !p.LeaseExpiresAt.After(s.clock.Now()) {
-		err = domain.Fail("FORBIDDEN", "A current CA-004 authorization lease is required")
+		err = domain.Fail("AUTHZ_LEASE_EXPIRED", "A current CA-004 authorization lease is required")
 		return
 	}
 	if !domain.ValidID(key) {
@@ -178,7 +181,7 @@ func (s *Service) CreatePrice(ctx context.Context, p domain.Principal, key strin
 			return e
 		}
 		if !p.LeaseExpiresAt.After(s.clock.Now()) {
-			return domain.Fail("FORBIDDEN", "Authorization lease expired while processing the request")
+			return domain.Fail("AUTHZ_LEASE_EXPIRED", "Authorization lease expired while processing the request")
 		}
 		if found {
 			if e = s.authorizePriceTx(ctx, tx, p); e != nil {
@@ -204,7 +207,7 @@ func (s *Service) CreatePrice(ctx context.Context, p domain.Principal, key strin
 			return e
 		}
 		if !p.LeaseExpiresAt.After(s.clock.Now()) {
-			return domain.Fail("FORBIDDEN", "Authorization lease expired while waiting for the item")
+			return domain.Fail("AUTHZ_LEASE_EXPIRED", "Authorization lease expired while waiting for the item")
 		}
 		if e = input.Validate(s.clock.Now()); e != nil {
 			return e
@@ -236,7 +239,7 @@ func (s *Service) CreatePrice(ctx context.Context, p domain.Principal, key strin
 			return e
 		}
 		if !p.LeaseExpiresAt.After(s.clock.Now()) {
-			return domain.Fail("FORBIDDEN", "Authorization lease expired before committing the price")
+			return domain.Fail("AUTHZ_LEASE_EXPIRED", "Authorization lease expired before committing the price")
 		}
 		changed = true
 		return nil

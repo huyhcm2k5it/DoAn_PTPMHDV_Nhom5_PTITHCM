@@ -9,6 +9,10 @@ type MedicalRecordsReader interface {
 	PatientRecords(context.Context, string, int, int) (domain.MedicalRecords, error)
 }
 
+type DoctorPatientRecordsAccess interface {
+	AuthorizePatientHistory(context.Context, string, string) error
+}
+
 type MedicalRecords interface {
 	Records(context.Context, domain.Principal, string, int, int) (domain.MedicalRecords, error)
 }

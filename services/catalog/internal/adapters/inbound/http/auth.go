@@ -46,7 +46,7 @@ func (j *JWT) Authenticate(_ context.Context, raw, lease string, requireLease bo
 	if requireLease {
 		l, e := j.parse(lease, j.leaseKey)
 		if e != nil || l.Subject != p.UserID || l.Action != "CA-004" || l.TokenVersion != p.TokenVersion || l.IssuedAt == nil || l.ExpiresAt == nil || l.ExpiresAt.Time.Sub(l.IssuedAt.Time) > 30*time.Second || !l.ExpiresAt.Time.After(l.IssuedAt.Time) {
-			return domain.Principal{}, domain.Fail("FORBIDDEN", "A valid authorization lease of at most 30 seconds is required")
+			return domain.Principal{}, domain.Fail("AUTHZ_LEASE_EXPIRED", "A valid authorization lease of at most 30 seconds is required")
 		}
 		p.LeaseAction = l.Action
 		p.LeaseExpiresAt = l.ExpiresAt.Time
