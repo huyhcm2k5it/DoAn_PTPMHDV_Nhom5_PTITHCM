@@ -38,7 +38,12 @@ import { PrescriptionDetail } from '../features/pharmacy/pages/PrescriptionDetai
 import { PatientMedicationStatus } from '../features/pharmacy/pages/PatientMedicationStatus';
 import { withAuthRedirect } from './runtime';
 import type { WebRuntime } from './runtime';
+import { LoginPage } from '../features/identity/LoginPage';
 import './app.css';
+import { RegisterPage } from '../features/identity/RegisterPage';
+import { VerifyOtpPage } from '../features/identity/VerifyOtpPage';
+import { ForgotPasswordPage } from '../features/identity/ForgotPasswordPage';
+import { ResetPasswordPage } from '../features/identity/ResetPasswordPage';
 
 const noAdapter = async (): Promise<Response> => {
   throw new Error(
@@ -183,6 +188,12 @@ function AppRoutes({
 }) {
   return (
     <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/register/verify" element={<VerifyOtpPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/forgot-password/reset" element={<ResetPasswordPage />} />
+
       <Route element={<AppLayout session={session} />}>
         <Route path="/" element={<Navigate to="/patient/profiles" replace />} />
         <Route

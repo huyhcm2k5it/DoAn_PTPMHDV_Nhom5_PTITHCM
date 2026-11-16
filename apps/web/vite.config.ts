@@ -7,4 +7,9 @@ export default defineConfig({
     include: ['tests/**/*.test.{ts,tsx}'],
     restoreMocks: true,
   },
+  server: {
+    proxy: {
+      '/api/v1': 'http://127.0.0.1:8080',
+    },
+  },
 });
