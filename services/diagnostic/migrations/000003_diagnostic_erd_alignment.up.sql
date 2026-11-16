@@ -115,10 +115,14 @@ CREATE TABLE result_contributors (
 );
 
 INSERT INTO result_contributors(result_id,contributor_user_id)
-SELECT (value->'result'->>'id')::uuid, contributor.value::uuid
-FROM objects
-CROSS JOIN LATERAL jsonb_array_elements_text(CASE WHEN jsonb_typeof(value->'contributors')='array' THEN value->'contributors' ELSE '[]'::jsonb END) AS contributor(value)
-WHERE kind='result'
+SELECT (result_record.value->'result'->>'id')::uuid, contributor.value::uuid
+FROM objects AS result_record
+CROSS JOIN LATERAL jsonb_array_elements_text(
+  CASE WHEN jsonb_typeof(result_record.value->'contributors')='array'
+       THEN result_record.value->'contributors'
+       ELSE '[]'::jsonb END
+) AS contributor(value)
+WHERE result_record.kind='result'
 ON CONFLICT DO NOTHING;
 
 CREATE TABLE result_items (

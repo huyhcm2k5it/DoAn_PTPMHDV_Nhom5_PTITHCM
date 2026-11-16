@@ -22,7 +22,7 @@ func TestDoctorResultsFilterBeforePaginationAndHonorRevocation(t *testing.T) {
 		tx := raw.(diagnosticTx)
 		active, canCancel := true, false
 		for i, assigned := range []string{doctor, domain.NewID()} {
-			visit, order, result := domain.NewID(), domain.NewID(), domain.NewID()
+			visit, order, result, specimen := domain.NewID(), domain.NewID(), domain.NewID(), domain.NewID()
 			if i == 0 {
 				own, ownVisit = result, visit
 			}
@@ -30,14 +30,14 @@ func TestDoctorResultsFilterBeforePaginationAndHonorRevocation(t *testing.T) {
 			if _, err := projection.ApplyVisitGrant(ctx, tx, domain.Envelope{AggregateID: visit, AggregateVersion: i + 1, OccurredAt: now}, grant, now); err != nil {
 				return err
 			}
-			if err := tx.SaveOrder(ctx, domain.Order{ID: order, RequestID: domain.NewID(), VisitID: visit, PatientID: patient, State: "PUBLISHED"}); err != nil {
+			if err := tx.SaveOrder(ctx, domain.Order{ID: order, RequestID: domain.NewID(), VisitID: visit, PatientID: patient, State: "PUBLISHED", Specimens: []domain.Specimen{{ID: specimen, OrderID: order, State: "COLLECTED", Sequence: 1, Barcode: "LAB-" + specimen, Version: 1, CollectedBy: assigned, CollectedAt: now}}}); err != nil {
 				return err
 			}
 			at := now.Add(time.Duration(i) * time.Second)
-			if err := tx.Put(ctx, "result-order", order, result); err != nil {
+			if err := tx.Put(ctx, "result", result, map[string]any{"result": domain.Result{ID: result, OrderID: order, SpecimenID: specimen, Revision: 1, State: "PUBLISHED", EnteredBy: assigned, PublishedAt: &at, Version: 1}}); err != nil {
 				return err
 			}
-			if err := tx.Put(ctx, "result", result, map[string]any{"result": domain.Result{ID: result, OrderID: order, State: "PUBLISHED", PublishedAt: &at}}); err != nil {
+			if err := tx.Put(ctx, "result-order", order, result); err != nil {
 				return err
 			}
 		}

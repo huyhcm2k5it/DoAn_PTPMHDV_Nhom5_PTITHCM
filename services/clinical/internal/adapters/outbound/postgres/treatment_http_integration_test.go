@@ -113,7 +113,33 @@ func TestTreatmentRealHTTP(t *testing.T) {
 	if prescriptionEnvelope.AggregateID != prescriptionPayload.PrescriptionID || prescriptionEnvelope.AggregateVersion != prescriptionPayload.Revision {
 		t.Fatalf("PrescriptionFinalized wire aggregate must identify the prescription revision: aggregate=%s version=%d payload=%+v", prescriptionEnvelope.AggregateID, prescriptionEnvelope.AggregateVersion, prescriptionPayload)
 	}
-	call("POST", "/api/v1/visits/"+labVisit+"/lab-orders", domain.LabInput{Tests: []domain.TestSelection{{TestID: test, Revision: 1}}}, "", 202, "LabResponse")
+	var rxState, finalizedBy string
+	var revision, prescriptionItemCount int
+	if e = db.pool.QueryRow(ctx, `SELECT state,revision,finalized_by::text,(SELECT count(*) FROM prescription_items WHERE prescription_id=prescriptions.id) FROM prescriptions WHERE id=$1`, rx).Scan(&rxState, &revision, &finalizedBy, &prescriptionItemCount); e != nil {
+		t.Fatal("normalized prescription header was not persisted", e)
+	}
+	if rxState != "FINAL" || revision < 1 || finalizedBy != doctorUser || prescriptionItemCount != 1 {
+		t.Fatalf("normalized prescription header/items mismatch: state=%s revision=%d finalizedBy=%s items=%d", rxState, revision, finalizedBy, prescriptionItemCount)
+	}
+	var storedMedicineID, storedMedicineCode, storedName, storedDose string
+	var storedQuantity int
+	if e = db.pool.QueryRow(ctx, `SELECT medicine_id::text,medicine_code_snapshot,name_snapshot,dose_text,quantity FROM prescription_items WHERE prescription_id=$1`, rx).Scan(&storedMedicineID, &storedMedicineCode, &storedName, &storedDose, &storedQuantity); e != nil {
+		t.Fatal("normalized prescription item was not readable", e)
+	}
+	if storedMedicineID != medicine || storedMedicineCode != medicine || storedName != "Trusted drug" || storedDose != "one daily" || storedQuantity != 2 {
+		t.Fatalf("prescription item snapshot changed: medicine=%s code=%s name=%s dose=%s quantity=%d", storedMedicineID, storedMedicineCode, storedName, storedDose, storedQuantity)
+	}
+	labResponse := call("POST", "/api/v1/visits/"+labVisit+"/lab-orders", domain.LabInput{Tests: []domain.TestSelection{{TestID: test, Revision: 1}}}, "", 202, "LabResponse")
+	labRequestID := labResponse["data"].(map[string]any)["requestId"].(string)
+	var labState, requestHash, snapshotTestID string
+	var labVersion, snapshotCount int
+	var labCreatedAt time.Time
+	if e = db.pool.QueryRow(ctx, `SELECT state,request_hash,version,jsonb_array_length(test_snapshot),test_snapshot->0->>'testId',created_at FROM lab_requests WHERE id=$1`, labRequestID).Scan(&labState, &requestHash, &labVersion, &snapshotCount, &snapshotTestID, &labCreatedAt); e != nil {
+		t.Fatal("normalized Clinical lab request was not persisted", e)
+	}
+	if labState != "PENDING" || requestHash == "" || labVersion != 1 || snapshotCount != 1 || snapshotTestID != test || labCreatedAt.IsZero() {
+		t.Fatalf("normalized lab request snapshot mismatch: state=%s hash=%s version=%d tests=%d testId=%s createdAt=%s", labState, requestHash, labVersion, snapshotCount, snapshotTestID, labCreatedAt)
+	}
 	var wire []byte
 	if e = db.pool.QueryRow(ctx, `SELECT envelope FROM outbox WHERE envelope->>'messageType'='CreateLabOrder' AND envelope->'payload'->>'visitId'=$1`, labVisit).Scan(&wire); e != nil {
 		t.Fatal(e)

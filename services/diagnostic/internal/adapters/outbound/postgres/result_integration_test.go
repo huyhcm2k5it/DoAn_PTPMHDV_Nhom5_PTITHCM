@@ -96,6 +96,28 @@ func TestResultLifecycleRealHTTPAndPostgres(t *testing.T) {
 	request(tech, "DI-009", "POST", path+"/submit-review", map[string]any{"expectedVersion": 5}, 200)
 	published := request(reviewer, "DI-011", "POST", path+"/publish", map[string]any{"expectedVersion": 6}, 200)
 	request(tech, "DI-008", "PUT", path, map[string]any{"items": items, "expectedVersion": 7}, 409)
+	var resultState string
+	var revision, version, specimens, storedItems, contributors, reviews int
+	var isPublished bool
+	if err = db.pool.QueryRow(context.Background(), `SELECT r.state,r.revision,r.version,(r.published_at IS NOT NULL),
+		(SELECT count(*) FROM specimens WHERE id=r.specimen_id),
+		(SELECT count(*) FROM result_items WHERE result_id=r.id),
+		(SELECT count(*) FROM result_contributors WHERE result_id=r.id),
+		(SELECT count(*) FROM reviews WHERE result_id=r.id)
+		FROM results AS r WHERE r.id=$1`, id).Scan(&resultState, &revision, &version, &isPublished, &specimens, &storedItems, &contributors, &reviews); err != nil {
+		t.Fatal("normalized Diagnostic result was not persisted", err)
+	}
+	if resultState != "PUBLISHED" || revision != 3 || version != 7 || !isPublished || specimens != 1 || storedItems != 1 || contributors != 1 || reviews != 2 {
+		t.Fatalf("normalized Diagnostic rows mismatch: state=%s revision=%d version=%d published=%t specimens=%d items=%d contributors=%d reviews=%d", resultState, revision, version, isPublished, specimens, storedItems, contributors, reviews)
+	}
+	var storedTestCode, storedValue string
+	if err = db.pool.QueryRow(context.Background(), `SELECT test_code,value_text FROM result_items WHERE result_id=$1`, id).Scan(&storedTestCode, &storedValue); err != nil || storedTestCode != "CBC" || storedValue != "private-result" {
+		t.Fatalf("normalized result item did not round-trip: code=%s value=%s error=%v", storedTestCode, storedValue, err)
+	}
+	var legacyBodyColumnCount int
+	if err = db.pool.QueryRow(context.Background(), `SELECT count(*) FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='lab_orders' AND column_name='body'`).Scan(&legacyBodyColumnCount); err != nil || legacyBodyColumnCount != 0 {
+		t.Fatalf("legacy JSONB lab_orders.body should be absent after normalization: columns=%d error=%v", legacyBodyColumnCount, err)
+	}
 	var raw []byte
 	if err = db.pool.QueryRow(context.Background(), `SELECT envelope FROM outbox WHERE envelope->>'messageType'='LabResultPublished'`).Scan(&raw); err != nil {
 		t.Fatal(err)

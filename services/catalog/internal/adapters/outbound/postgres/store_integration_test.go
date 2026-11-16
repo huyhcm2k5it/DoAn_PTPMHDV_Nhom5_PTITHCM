@@ -48,6 +48,14 @@ func TestRealPostgresTransactions(t *testing.T) {
 	if e = db.Seed(ctx); e != nil {
 		t.Fatal("seed is not repeatable", e)
 	}
+	var seedCreator string
+	if e = db.pool.QueryRow(ctx, `SELECT created_by::text FROM price_versions WHERE id='00000000-0000-4000-8000-000000000504'`).Scan(&seedCreator); e != nil || seedCreator != "00000000-0000-4000-8000-000000000901" {
+		t.Fatalf("seeded price creator was not persisted: creator=%s error=%v", seedCreator, e)
+	}
+	var nullableFieldCount int
+	if e = db.pool.QueryRow(ctx, `SELECT count(*) FROM information_schema.columns WHERE table_schema=current_schema() AND is_nullable='YES' AND ((table_name='medicines' AND column_name IN ('strength','form')) OR (table_name='lab_tests' AND column_name IN ('unit','reference_range')))`).Scan(&nullableFieldCount); e != nil || nullableFieldCount != 4 {
+		t.Fatalf("optional Catalog fields must remain nullable: count=%d error=%v", nullableFieldCount, e)
+	}
 	rows, e := db.Departments(ctx)
 	if e != nil || len(rows) != 2 {
 		t.Fatal(rows, e)
@@ -158,6 +166,21 @@ func TestRealPostgresTransactions(t *testing.T) {
 	}
 	if _, e = app.CreatePrice(ctx, admin, domain.NewID(), input, ports.Meta{}); domain.Code(e) != "FORBIDDEN" {
 		t.Fatal("revoked privilege accepted", e)
+	}
+	optionalMedicine, optionalTest := domain.NewID(), domain.NewID()
+	if _, e = db.pool.Exec(ctx, `INSERT INTO medicines(id,code,name,unit,strength,form,status) VALUES($1,'NULLABLE_MEDICINE','Nullable medicine','unit',NULL,NULL,'ACTIVE')`, optionalMedicine); e != nil {
+		t.Fatal("nullable medicine fields could not be stored", e)
+	}
+	if _, e = db.pool.Exec(ctx, `INSERT INTO lab_tests(id,code,name,specimen_type,unit,reference_range,revision,status) VALUES($1,'NULLABLE_TEST','Nullable test','BLOOD',NULL,NULL,1,'ACTIVE')`, optionalTest); e != nil {
+		t.Fatal("nullable lab test fields could not be stored", e)
+	}
+	medicines, e := db.Medicines(ctx, ports.SearchQuery{Q: "NULLABLE_MEDICINE"}, time.Now().UTC())
+	if e != nil || len(medicines) != 1 || medicines[0].Strength != "" || medicines[0].Form != "" {
+		t.Fatalf("nullable medicine fields did not round-trip: %+v error=%v", medicines, e)
+	}
+	labTests, e := db.LabTests(ctx, ports.SearchQuery{Q: "NULLABLE_TEST"}, time.Now().UTC())
+	if e != nil || len(labTests) != 1 || labTests[0].Unit != "" || labTests[0].ReferenceRange != "" {
+		t.Fatalf("nullable lab test fields did not round-trip: %+v error=%v", labTests, e)
 	}
 }
 
