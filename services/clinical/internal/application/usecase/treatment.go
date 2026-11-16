@@ -173,6 +173,8 @@ func resolveLines(ctx context.Context, tx ports.TreatmentTx, lines []domain.Pres
 		if m.Status != "ACTIVE" {
 			return nil, domain.Fail("STATE_CONFLICT", "Medicine is inactive")
 		}
+		line.ID = domain.NewID()
+		line.MedicineID = m.ID
 		line.NameSnapshot = m.Name
 		out[i] = line
 	}
@@ -211,7 +213,11 @@ func (s *Service) CreatePrescription(ctx context.Context, p domain.Principal, id
 		if e != nil {
 			return e
 		}
-		out = domain.Prescription{ID: domain.NewID(), VisitID: v.ID, PatientID: v.PatientID, State: "DRAFT", Version: 1, Revision: 1, Lines: lines}
+		revision, e := tx.NextPrescriptionRevision(ctx, v.ID, "", 0)
+		if e != nil {
+			return e
+		}
+		out = domain.Prescription{ID: domain.NewID(), VisitID: v.ID, PatientID: v.PatientID, State: "DRAFT", Version: 1, Revision: revision, Lines: lines}
 		if e = tx.SavePrescription(ctx, out); e != nil {
 			return e
 		}
@@ -256,11 +262,15 @@ func (s *Service) mutatePrescription(ctx context.Context, p domain.Principal, id
 		if rx.State != "DRAFT" || rx.Version != version {
 			return domain.Fail("STATE_CONFLICT", "Prescription changed or is immutable")
 		}
+		revision, e := tx.NextPrescriptionRevision(ctx, v.ID, rx.ID, rx.Revision)
+		if e != nil {
+			return e
+		}
+		rx.Revision = revision
 		if e = fn(tx, v, &rx); e != nil {
 			return e
 		}
 		rx.Version++
-		rx.Revision++
 		if e = tx.SavePrescription(ctx, rx); e != nil {
 			return e
 		}
@@ -318,9 +328,10 @@ func (s *Service) FinalizePrescription(ctx context.Context, p domain.Principal, 
 		}
 		rx.State = "FINAL"
 		rx.FinalizedAt = &now
-		event := s.event(v, "PrescriptionFinalized", "EVENT", map[string]any{"prescriptionId": rx.ID, "revision": rx.Revision + 1, "visitId": v.ID, "patientId": v.PatientID, "itemsSnapshot": rx.Lines, "finalizedAt": now}, meta)
+		rx.FinalizedBy = domain.ID(p.UserID)
+		event := s.event(v, "PrescriptionFinalized", "EVENT", map[string]any{"prescriptionId": rx.ID, "revision": rx.Revision, "visitId": v.ID, "patientId": v.PatientID, "itemsSnapshot": rx.Lines, "finalizedAt": now}, meta)
 		event.AggregateID = rx.ID
-		event.AggregateVersion = rx.Revision + 1
+		event.AggregateVersion = rx.Revision
 		return tx.AppendMessage(ctx, event, "umc.events.clinical.v1", "clinical.prescription-finalized.v1")
 	})
 }

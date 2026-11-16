@@ -41,12 +41,12 @@ func TestMedicalRecordsOwnerLeaseAndSignedOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = db.pool.Exec(ctx, `INSERT INTO prescriptions(id,visit_id,patient_id,state,version,revision,lines,finalized_at) VALUES($1,$2,$3,'FINAL',1,1,'[]'::jsonb,$4),($5,$2,$3,'DRAFT',1,1,'[]'::jsonb,NULL)`, domain.NewID(), signed, patient, now.Add(-time.Minute), domain.NewID())
+	_, err = db.pool.Exec(ctx, `INSERT INTO prescriptions(id,visit_id,state,version,revision,finalized_at,finalized_by) VALUES($1,$2,'FINAL',1,1,$3,$4),($5,$2,'DRAFT',1,2,NULL,NULL)`, domain.NewID(), signed, now.Add(-time.Minute), doctor, domain.NewID())
 	if err != nil {
 		t.Fatal(err)
 	}
 	request, order, cancelledRequest, cancelledOrder := domain.NewID(), domain.NewID(), domain.NewID(), domain.NewID()
-	_, err = db.pool.Exec(ctx, `INSERT INTO lab_requests(request_id,visit_id,state,order_id,request_hash,tests) VALUES($1,$2,'PUBLISHED',$3,'request-a','[]'::jsonb),($4,$2,'CANCELLED',$5,'request-b','[]'::jsonb)`, request, signed, order, cancelledRequest, cancelledOrder)
+	_, err = db.pool.Exec(ctx, `INSERT INTO lab_requests(id,visit_id,state,order_id,request_hash,test_snapshot) VALUES($1,$2,'PUBLISHED',$3,'request-a','[]'::jsonb),($4,$2,'CANCELLED',$5,'request-b','[]'::jsonb)`, request, signed, order, cancelledRequest, cancelledOrder)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -35,8 +35,8 @@ func (s *Store) Ready(ctx context.Context) error {
 	if err := s.pool.QueryRow(ctx, "SELECT COALESCE(max(version),0) FROM schema_migrations").Scan(&version); err != nil {
 		return err
 	}
-	if version < 3 {
-		return domain.Fail("SERVICE_UNAVAILABLE", "Catalog stream migration is required")
+	if version < 4 {
+		return domain.Fail("SERVICE_UNAVAILABLE", "Catalog schema migrations are required")
 	}
 	return nil
 }
@@ -55,7 +55,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 	for _, migration := range []struct {
 		version int
 		file    string
-	}{{1, "000001_catalog.up.sql"}, {2, "000002_catalog_stream.up.sql"}, {3, "000003_doctor_mapping.up.sql"}} {
+	}{{1, "000001_catalog.up.sql"}, {2, "000002_catalog_stream.up.sql"}, {3, "000003_doctor_mapping.up.sql"}, {4, "000004_catalog_erd_alignment.up.sql"}} {
 		var exists bool
 		if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=$1)", migration.version).Scan(&exists); err != nil {
 			return err
@@ -150,7 +150,7 @@ func (s *Store) Medicines(ctx context.Context, q ports.SearchQuery, at time.Time
 	if q.Status == "" {
 		q.Status = "ACTIVE"
 	}
-	rows, err := s.pool.Query(ctx, `SELECT m.id::text,m.code,m.name,m.unit,m.strength,m.form,m.status,`+priceJSON+` FROM medicines m LEFT JOIN LATERAL(SELECT * FROM price_versions WHERE item_type='MEDICINE' AND item_id=m.id AND effective_from<=$3 AND (effective_to IS NULL OR effective_to>$3) ORDER BY revision DESC LIMIT 1)p ON true WHERE m.status=$2 AND(m.name ILIKE '%'||$1||'%' OR m.code ILIKE '%'||$1||'%') ORDER BY m.name,m.id`, q.Q, q.Status, at)
+	rows, err := s.pool.Query(ctx, `SELECT m.id::text,m.code,m.name,m.unit,COALESCE(m.strength,''),COALESCE(m.form,''),m.status,`+priceJSON+` FROM medicines m LEFT JOIN LATERAL(SELECT * FROM price_versions WHERE item_type='MEDICINE' AND item_id=m.id AND effective_from<=$3 AND (effective_to IS NULL OR effective_to>$3) ORDER BY revision DESC LIMIT 1)p ON true WHERE m.status=$2 AND(m.name ILIKE '%'||$1||'%' OR m.code ILIKE '%'||$1||'%') ORDER BY m.name,m.id`, q.Q, q.Status, at)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +173,7 @@ func (s *Store) LabTests(ctx context.Context, q ports.SearchQuery, at time.Time)
 	if q.Status == "" {
 		q.Status = "ACTIVE"
 	}
-	rows, err := s.pool.Query(ctx, `SELECT m.id::text,m.code,m.name,m.specimen_type,m.unit,m.reference_range,m.revision,m.status,`+priceJSON+` FROM lab_tests m LEFT JOIN LATERAL(SELECT * FROM price_versions WHERE item_type='LAB' AND item_id=m.id AND effective_from<=$3 AND (effective_to IS NULL OR effective_to>$3) ORDER BY revision DESC LIMIT 1)p ON true WHERE m.status=$2 AND(m.name ILIKE '%'||$1||'%' OR m.code ILIKE '%'||$1||'%') ORDER BY m.name,m.id`, q.Q, q.Status, at)
+	rows, err := s.pool.Query(ctx, `SELECT m.id::text,m.code,m.name,m.specimen_type,COALESCE(m.unit,''),COALESCE(m.reference_range,''),m.revision,m.status,`+priceJSON+` FROM lab_tests m LEFT JOIN LATERAL(SELECT * FROM price_versions WHERE item_type='LAB' AND item_id=m.id AND effective_from<=$3 AND (effective_to IS NULL OR effective_to>$3) ORDER BY revision DESC LIMIT 1)p ON true WHERE m.status=$2 AND(m.name ILIKE '%'||$1||'%' OR m.code ILIKE '%'||$1||'%') ORDER BY m.name,m.id`, q.Q, q.Status, at)
 	if err != nil {
 		return nil, err
 	}

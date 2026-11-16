@@ -44,23 +44,26 @@ schemas['CancelData'] = obj({'order':ref('Order'),'cancellationId':uuid,'refundS
 schemas['PublishedResults'] = obj({'items':{'type':'array','items':ref('Result')},
     'total':{'type':'integer','minimum':0}})
 schemas['SampleInput'] = obj({'barcode':{'type':'string','maxLength':128}},[])
-schemas['RecoveryOrderInput'] = obj({'visitId':uuid,'testCodes':{'type':'array','minItems':1,'maxItems':100,'items':{'type':'string','minLength':1,'maxLength':100}}})
-schemas['RecoveryOrderData'] = obj({'order':ref('Order'),'chargeStatus':text})
+schemas['RecoveryOrderInput'] = obj({'requestId':uuid,'requestHash':{'type':'string','minLength':64,'maxLength':64}},['requestId','requestHash'])
+schemas['RecoveryOrderData'] = obj({'requestId':uuid,'state':{'type':'string','const':'PENDING'}},['requestId','state'])
 schemas['RejectInput'] = obj({'reasonCode':{'type':'string','minLength':1,'maxLength':128},'expectedVersion':version})
 schemas['ResultCreateInput'] = obj({'items':{'type':'array','minItems':1,'maxItems':100,'items':ref('LabResultItemInput')}})
 schemas['ResultUpdateInput'] = obj({'items':{'type':'array','minItems':1,'maxItems':100,'items':ref('LabResultItemInput')},'expectedVersion':version})
 schemas['ReviewInput'] = obj({'expectedVersion':version})
 schemas['ReworkInput'] = obj({'reason':{'type':'string','minLength':1,'maxLength':2000},'expectedVersion':version})
 schemas['CancelInput'] = obj({'reasonCode':{'type':'string','minLength':1,'maxLength':128},'expectedVersion':version})
-for name in ['List','Detail','SpecimenData','ResultData','CancelData','PublishedResults','RecoveryOrderData']:
+for name in ['List','Detail','SpecimenData','ResultData','CancelData','PublishedResults']:
     schemas[name+'Response']=obj({'data':ref(name),'meta':ref('Meta')})
+schemas['RecoveryOrderDataResponse']=obj({'data':ref('RecoveryOrderData')},['data'])
 order_id=parameter('orderId','path',uuid,True)
 specimen_id=parameter('specimenId','path',uuid,True)
 result_id=parameter('resultId','path',uuid,True)
 patient_id=parameter('patientId','path',uuid,True)
 lease=parameter('X-Authorization-Lease','header',{'type':'string','minLength':1},True)
 errors=[400,401,403,404,409,503]
-di001 = operation('DI_001','RecoveryOrderDataResponse',201,[key],'RecoveryOrderInput',errors)
+di001 = operation('DI_001','RecoveryOrderDataResponse',202,[],'RecoveryOrderInput',errors)
+di001['responses']['202']['description'] = 'Verified Clinical command accepted for recovery; normal flow remains asynchronous.'
+di001['responses']['202'].pop('headers',None)
 di001.update({'security':[{'serviceAuth':[]}],'x-enabled-by-default':False,'x-visibility':'private','x-owner-evidence-required':True})
 doc={'openapi':'3.1.1','info':{'title':'HQH Care Diagnostic','version':'1.1.0',
      'description':'DI-001–013. LAB_TECH collects specimens and writes drafts; LAB_REVIEW returns/publishes with two-person review. Patient reads expose only PUBLISHED results. State aliases preserve existing API values; DI-001 recovery remains disabled by default (private service token only).'},
