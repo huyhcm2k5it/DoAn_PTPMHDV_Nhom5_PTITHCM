@@ -75,7 +75,7 @@ func TestRejectedLabRequiresRevisionedResubmit(t *testing.T) {
 	}
 	var state string
 	var count int
-	db.pool.QueryRow(ctx, `SELECT state FROM lab_requests WHERE request_id=$1`, req.RequestID).Scan(&state)
+	db.pool.QueryRow(ctx, `SELECT state FROM lab_requests WHERE id=$1`, req.RequestID).Scan(&state)
 	db.pool.QueryRow(ctx, `SELECT count(*) FROM lab_requests WHERE visit_id=$1`, visit).Scan(&count)
 	if state != "SUPERSEDED" || count != 2 {
 		t.Fatalf("replacement registry state=%s count=%d", state, count)

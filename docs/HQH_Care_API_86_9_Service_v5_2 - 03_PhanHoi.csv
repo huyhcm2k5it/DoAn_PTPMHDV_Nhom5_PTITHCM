@@ -288,7 +288,7 @@ CL-011,401,Lỗi,"UNAUTHENTICATED, AUTHZ_LEASE_EXPIRED",Access token hoặc leas
 CL-011,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 CL-011,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
 CL-011,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
-DI-001,201,Thành công,,Hoàn tất thao tác adapter phục hồi tắt mặc định. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"order: LabOrder, chargeStatus: string"
+DI-001,202,Chấp nhận,,Đã xác minh yêu cầu Clinical và tiếp nhận lệnh phục hồi; order/charge tiếp tục theo luồng xử lý bất đồng bộ.,"requestId: string:uuid, state: PENDING"
 DI-001,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
 DI-001,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
 DI-001,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse

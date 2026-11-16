@@ -23,20 +23,11 @@
               "type": "string",
               "pattern": "^[A-Za-z0-9._:-]{1,128}$"
             }
-          },
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
           }
         ],
         "responses": {
-          "201": {
-            "description": "Success",
+          "202": {
+            "description": "Verified Clinical command accepted for recovery; normal flow remains asynchronous.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2626,40 +2617,37 @@
       "RecoveryOrderInput": {
         "type": "object",
         "properties": {
-          "visitId": {
+          "requestId": {
             "type": "string",
             "format": "uuid"
           },
-          "testCodes": {
-            "type": "array",
-            "minItems": 1,
-            "maxItems": 100,
-            "items": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 100
-            }
+          "requestHash": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
           }
         },
         "required": [
-          "visitId",
-          "testCodes"
+          "requestId",
+          "requestHash"
         ],
         "additionalProperties": false
       },
       "RecoveryOrderData": {
         "type": "object",
         "properties": {
-          "order": {
-            "$ref": "#/components/schemas/Order"
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
           },
-          "chargeStatus": {
-            "type": "string"
+          "state": {
+            "type": "string",
+            "const": "PENDING"
           }
         },
         "required": [
-          "order",
-          "chargeStatus"
+          "requestId",
+          "state"
         ],
         "additionalProperties": false
       },
@@ -2878,15 +2866,9 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/RecoveryOrderData"
-          },
-          "meta": {
-            "$ref": "#/components/schemas/Meta"
           }
         },
-        "required": [
-          "data",
-          "meta"
-        ],
+        "required": ["data"],
         "additionalProperties": false
       }
     }

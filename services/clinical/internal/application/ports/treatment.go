@@ -9,6 +9,7 @@ type TreatmentTx interface {
 	ClinicalTx
 	Prescription(context.Context, string) (domain.Prescription, error)
 	Prescriptions(context.Context, string) ([]domain.Prescription, error)
+	NextPrescriptionRevision(context.Context, string, string, int) (int, error)
 	SavePrescription(context.Context, domain.Prescription) error
 	Medicine(context.Context, string) (domain.CatalogEntity, error)
 	LabTest(context.Context, string) (domain.CatalogEntity, error)

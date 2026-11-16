@@ -47,7 +47,7 @@ func TestCancellationHTTPReturnsStableRefundEvidenceWithCurrentAuthorization(t *
 	}
 	grant(1, true, true)
 	var version int
-	if err := db.pool.QueryRow(ctx, "SELECT (body->'order'->>'version')::int FROM lab_orders WHERE id=$1", o.ID).Scan(&version); err != nil {
+	if err := db.pool.QueryRow(ctx, "SELECT version FROM lab_orders WHERE id=$1", o.ID).Scan(&version); err != nil {
 		t.Fatal(err)
 	}
 	signingKey, err := rsa.GenerateKey(rand.Reader, 2048)

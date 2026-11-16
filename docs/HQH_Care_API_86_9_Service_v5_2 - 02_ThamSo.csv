@@ -195,9 +195,8 @@ CL-011,path,patientId,string:uuid,Có,,ID hồ sơ bệnh nhân; server kiểm q
 CL-011,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
 CL-011,query,limit,integer,Không,minimum=1; maximum=100; default=20,Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema.
 CL-011,header,X-Authorization-Lease,string,Có,RS256; action=CL-011; lifetime<=30s; no leeway,Lease do Identity cấp; cùng sub/tokenVersion với access token.
-DI-001,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
-DI-001,body,visitId,string:uuid,Có,,ID lượt khám; Clinical kiểm quyền bác sĩ hoặc bệnh nhân trước khi trả dữ liệu.
-DI-001,body,testCodes,string[],Có,,Các mã xét nghiệm của adapter phục hồi nội bộ; luồng chính dùng CL-005.
+DI-001,body,requestId,string:uuid,Có,,ID của lệnh Clinical đã được xác minh; retry phải dùng đúng requestId này.
+DI-001,body,requestHash,string,Có,length=64,Hash SHA-256 của nội dung lệnh Clinical đã được xác minh; không nhận visitId hoặc mã xét nghiệm do caller tự khai.
 DI-002,query,state,string,Không,,Trạng thái dùng lọc danh sách; giá trị phải thuộc state machine của tài nguyên.
 DI-002,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
 DI-002,query,limit,integer,Không,minimum=1; maximum=100; default=20,Số bản ghi tối đa mỗi trang; tuân theo giới hạn và mặc định trong schema.
