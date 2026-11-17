@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import type { SubmitEvent } from 'react';
+import type { FormEvent } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { AuthIntro } from './AuthIntro';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { loginUser } from '../../app/runtime';
 import './login.css';
 
 export function LoginPage() {
+  const navigate = useNavigate();
   const [phone, setPhone] = useState('');
   const [loginView, setLoginView] = useState<'patient' | 'staff'>('patient');
   const [password, setPassword] = useState('');
@@ -13,12 +15,14 @@ export function LoginPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isSubmitting) return;
 
     // Bỏ khoảng trắng như cách backend đang chuẩn hóa số điện thoại.
-    const normalizedPhone = phone.replace(/\s/g, '');
+    const normalizedPhone = phone.trim().replace(/\s/g, '');
 
     if (!normalizedPhone || !password) {
       setError('Vui lòng nhập số điện thoại và mật khẩu.');
@@ -32,10 +36,74 @@ export function LoginPage() {
       return;
     }
 
+    const passwordLength = Array.from(password).length;
+    if (passwordLength < 8 || passwordLength > 128) {
+      setError('Mật khẩu phải có từ 8 đến 128 ký tự.');
+      setNotice('');
+      return;
+    }
+
     setError('');
-    setNotice(
-      'Thông tin hợp lệ. Chức năng đăng nhập sẽ được kết nối ở bước tiếp theo.',
-    );
+    setNotice('');
+    setIsSubmitting(true);
+
+    try {
+      const session = await loginUser(normalizedPhone, password, rememberMe);
+
+      // Phân quyền điều hướng theo quyền thực nhận từ server
+      if (session.actorType === 'DOCTOR') {
+        navigate('/doctor/clinical');
+      } else if (session.actorType === 'STAFF') {
+        if (session.capabilities.includes('RECEPTION')) {
+          navigate('/staff/reception');
+        } else if (session.capabilities.includes('CASHIER')) {
+          navigate('/staff/cashier');
+        } else if (session.capabilities.includes('PHARMACY')) {
+          navigate('/staff/pharmacy');
+        } else if (session.capabilities.includes('ADMIN')) {
+          navigate('/staff/schedules');
+        } else if (
+          session.capabilities.some(
+            (c) => c === 'LAB_TECH' || c === 'LAB_REVIEW',
+          )
+        ) {
+          navigate('/staff/diagnostic');
+        } else {
+          setError(
+            'Tài khoản nhân viên chưa được cấp quyền truy cập module nào.',
+          );
+        }
+      } else {
+        // PATIENT
+        navigate('/patient/profiles');
+      }
+    } catch (err: unknown) {
+      const errorObj = err as {
+        status?: number;
+        code?: string;
+        message?: string;
+      };
+      if (errorObj?.code === 'UNAUTHENTICATED' || errorObj?.status === 401) {
+        setError('Số điện thoại hoặc mật khẩu không chính xác.');
+      } else if (
+        errorObj?.code === 'RATE_LIMITED' ||
+        errorObj?.status === 429
+      ) {
+        setError('Bạn đã thử đăng nhập quá nhiều lần. Vui lòng thử lại sau.');
+      } else if (
+        errorObj?.code === 'VALIDATION_ERROR' ||
+        errorObj?.status === 400
+      ) {
+        setError('Thông tin đăng nhập không hợp lệ. Vui lòng kiểm tra lại.');
+      } else {
+        setError(
+          errorObj?.message ||
+            'Không thể kết nối đến máy chủ xác thực. Vui lòng thử lại sau.',
+        );
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -76,7 +144,11 @@ export function LoginPage() {
               type="button"
               className={loginView === 'patient' ? 'is-active' : ''}
               aria-pressed={loginView === 'patient'}
-              onClick={() => setLoginView('patient')}
+              onClick={() => {
+                setLoginView('patient');
+                setError('');
+                setNotice('');
+              }}
             >
               Bệnh nhân
             </button>
@@ -85,7 +157,11 @@ export function LoginPage() {
               type="button"
               className={loginView === 'staff' ? 'is-active' : ''}
               aria-pressed={loginView === 'staff'}
-              onClick={() => setLoginView('staff')}
+              onClick={() => {
+                setLoginView('staff');
+                setError('');
+                setNotice('');
+              }}
             >
               Bác sĩ / Nhân viên y tế
             </button>
@@ -181,8 +257,13 @@ export function LoginPage() {
               </p>
             )}
 
-            <button className="login-submit" type="submit">
-              Đăng nhập ngay <span aria-hidden="true">→</span>
+            <button
+              className="login-submit"
+              type="submit"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Đang đăng nhập…' : 'Đăng nhập ngay'}{' '}
+              <span aria-hidden="true">→</span>
             </button>
           </form>
 
