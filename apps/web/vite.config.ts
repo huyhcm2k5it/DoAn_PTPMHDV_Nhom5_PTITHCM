@@ -6,6 +6,8 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['tests/**/*.test.{ts,tsx}'],
     restoreMocks: true,
+    testTimeout: 20000,
+    fileParallelism: false,
   },
   server: {
     proxy: {

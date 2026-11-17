@@ -1,0 +1,790 @@
+/* Patient Profile - Exact Figma Frame 02 (1:3399) Styling */
+
+.patient-page-layout {
+  display: flex;
+  flex-direction: column;
+}
+
+.patient-header-banner {
+  margin-bottom: 24px;
+}
+
+.patient-master-detail {
+  display: grid;
+  grid-template-columns: 332px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .patient-master-detail {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Cột trái: Gia đình của bạn (332px wide in Figma 1:3441) */
+.family-panel {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.family-panel-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--navy);
+  margin: 0 0 4px;
+}
+
+.family-panel-subtitle {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 16px;
+}
+
+.family-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+/* Profile Card in List: 300px width, 104px height, rounded 9px in Figma 1:3444 */
+.family-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  min-height: 104px;
+  text-align: left;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.family-card:hover {
+  border-color: #b0c9db;
+  background: #fbfdff;
+}
+
+.family-card.is-selected {
+  border: 1px solid transparent;
+  background: var(--primary-light); /* #eaf4fa */
+}
+
+.family-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+  margin: 0 0 4px;
+}
+
+.family-card-meta {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+  margin: 0 0 4px;
+}
+
+.family-card.is-selected .family-card-meta,
+.family-card.is-selected .family-card-meta.meta-highlight {
+  color: var(--primary); /* #006699 in Figma */
+}
+
+.family-card-sub,
+.family-card-subtext {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0;
+}
+
+/* Nút + Thêm hồ sơ người thân (44px height in Figma 1:3456) */
+.add-family-btn,
+.add-relative-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 44px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  margin-bottom: 12px;
+}
+
+.add-family-btn:hover,
+.add-relative-btn:hover {
+  background: var(--primary-light);
+  border-color: var(--primary);
+}
+
+.family-panel-note,
+.family-note {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 0;
+  padding: 0 4px;
+}
+
+/* Cột phải: Chi tiết hồ sơ / Thông tin cá nhân (784px wide in Figma 1:3459) */
+.profile-detail-panel {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.profile-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.profile-detail-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--navy);
+  margin: 0 0 4px;
+}
+
+.profile-detail-desc,
+.profile-detail-subtitle {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 20px;
+}
+
+.profile-badge {
+  background: var(--primary-light);
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.profile-save-success {
+  background: var(--teal-light);
+  color: var(--teal-accent);
+  border: 1px solid #b7e8dc;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Form Fields Grid - 2 columns of 358px inputs in Figma */
+.profile-form-grid,
+.patient-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px 20px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 640px) {
+  .profile-form-grid,
+  .patient-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.profile-form-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-form-field.is-full {
+  grid-column: 1 / -1;
+}
+
+.profile-form-field label,
+.form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.profile-form-field input,
+.profile-form-field select,
+.form-input,
+.form-select {
+  width: 100%;
+  height: 44px;
+  padding: 0 12px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--navy);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+}
+
+.profile-form-field input:focus,
+.profile-form-field select:focus,
+.form-input:focus,
+.form-select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(0, 102, 153, 0.1);
+}
+
+.profile-form-field input[readonly],
+.profile-form-field input:disabled {
+  background: #f8fafc;
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+/* Actions Bar in Figma: Delete/Cancel red on left, Save primary on right */
+.profile-form-actions,
+.profile-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.btn-delete-profile {
+  background: none;
+  border: none;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--danger);
+  cursor: pointer;
+  padding: 8px 0;
+  margin-right: auto;
+}
+
+.btn-delete-profile:hover {
+  text-decoration: underline;
+}
+
+.save-profile-btn,
+.btn-save-profile {
+  height: 44px;
+  min-width: 150px;
+  padding: 0 24px;
+  background: var(--primary);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.save-profile-btn:hover:not(:disabled),
+.btn-save-profile:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.save-profile-btn:disabled,
+.btn-save-profile:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   Patient Home Dashboard (Figma Frames 25:2 & 25:11)
+   ========================================================================== */
+
+.home-container {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  width: 100%;
+  max-width: 1136px;
+}
+
+/* 1. Lời chào (Hero Banner - Figma 25:7 / 25:16) */
+.home-hero-banner {
+  background: var(--primary-light); /* #eaf4fa */
+  border-radius: 12px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+  border: 1px solid rgba(0, 102, 153, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.home-eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--primary); /* #006699 */
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.home-hero-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--navy); /* #142d4d */
+  line-height: 1.25;
+  margin: 0;
+}
+
+.home-hero-desc {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--muted); /* #62738b */
+  line-height: 1.5;
+  margin: 0;
+}
+
+.home-btn-primary {
+  background: var(--primary);
+  color: #ffffff;
+  border-radius: 8px;
+  padding: 12px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 6px rgba(0, 102, 153, 0.15);
+}
+
+.home-btn-primary:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 102, 153, 0.25);
+}
+
+.home-btn-arrow {
+  transition: transform 0.2s ease;
+}
+
+.home-btn-primary:hover .home-btn-arrow {
+  transform: translateX(4px);
+}
+
+.home-btn-sm {
+  padding: 10px 18px;
+  font-size: 13px;
+}
+
+.home-hero-note {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  margin: 0;
+}
+
+/* 2. Lịch khám sắp tới (Figma 25:8 / 25:17) */
+.home-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.home-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 40px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.home-title-with-toggle {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.home-section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--navy);
+  margin: 0;
+}
+
+.home-section-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.home-section-link:hover {
+  color: var(--primary-hover);
+  text-decoration: underline;
+}
+
+.home-state-switch {
+  display: inline-flex;
+  background: #f1f5f9;
+  border-radius: 20px;
+  padding: 3px;
+  gap: 4px;
+  border: 1px solid var(--line);
+}
+
+.home-switch-pill {
+  border: none;
+  background: transparent;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 16px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.home-switch-pill.is-active {
+  background: #ffffff;
+  color: var(--primary);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Card có lịch khám (Figma 25:2 - 25:188) */
+.home-appointment-card {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 200px;
+  transition: all 0.2s ease;
+}
+
+.home-appointment-card:hover {
+  border-color: #b0c9db;
+  box-shadow: 0 4px 16px rgba(0, 102, 153, 0.06);
+}
+
+.home-card-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.home-appt-code {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.home-badge-confirmed {
+  background: #e4f5f0;
+  color: var(--alert); /* #087568 in Figma */
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.home-card-main {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.home-datetime-badge {
+  background: var(--primary-light);
+  border-radius: 8px;
+  padding: 12px 18px;
+  color: var(--primary);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+  min-width: 140px;
+}
+
+.home-time-text {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.home-date-text {
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.home-appt-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.home-patient-name {
+  font-size: 14px;
+  color: var(--navy);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.home-doctor-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--navy);
+  margin: 0;
+}
+
+.home-doctor-dept {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.home-card-footer {
+  font-size: 12px;
+  color: var(--muted);
+  border-top: 1px dashed var(--line);
+  padding-top: 14px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.home-inline-icon {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+/* Card rỗng khi chưa có lịch (Figma 25:11 - 25:204) */
+.home-empty-card {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 36px 24px;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.home-empty-icon-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--primary-light);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-empty-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--navy);
+  margin: 0;
+}
+
+.home-empty-desc {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.home-empty-note {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
+
+/* 3. Truy cập nhanh (Figma 25:9 / 25:18) */
+.home-shortcuts-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.home-shortcut-card {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.home-shortcut-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0, 102, 153, 0.08);
+}
+
+.home-shortcut-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--primary-light);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.home-shortcut-card:hover .home-shortcut-icon {
+  background: var(--primary);
+  color: #ffffff;
+  transform: scale(1.05);
+}
+
+.home-shortcut-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+  margin: 0 0 4px;
+}
+
+.home-shortcut-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* Hiệu ứng chuyển động Stagger mượt mà */
+@keyframes homeFadeUp {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleInSubtle {
+  0% {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.home-animate-hero {
+  animation: homeFadeUp 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.home-animate-upcoming {
+  animation: homeFadeUp 0.32s cubic-bezier(0.16, 1, 0.3, 1) 0.06s both;
+}
+
+.home-animate-shortcuts {
+  animation: homeFadeUp 0.32s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both;
+}
+
+.animate-scale-in {
+  animation: scaleInSubtle 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Responsive Breakpoints theo Figma 25:20 (768px) & 25:28 (360px) */
+@media (max-width: 800px) {
+  .home-shortcuts-grid {
+    grid-template-columns: 1fr;
+  }
+  .home-hero-banner {
+    padding: 24px 20px;
+  }
+  .home-hero-title {
+    font-size: 26px;
+  }
+  .home-card-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-animate-hero,
+  .home-animate-upcoming,
+  .home-animate-shortcuts,
+  .animate-scale-in {
+    animation: none !important;
+  }
+  .home-btn-primary,
+  .home-shortcut-card {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+/* Slide animation when switching between family profiles */
+@keyframes panelSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-panel-slide {
+  animation: panelSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-panel-slide {
+    animation: none !important;
+  }
+}
+
+

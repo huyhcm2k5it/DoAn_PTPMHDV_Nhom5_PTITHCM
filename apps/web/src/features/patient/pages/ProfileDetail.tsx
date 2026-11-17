@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import type { PatientApi, PatientProfile } from '../types';
 import { Loading } from '../../../shared/ui/Loading';
 import { ErrorPanel } from '../../../shared/ui/ErrorPanel';
+import '../patient.css';
 
 export function ProfileDetail({
   api,
@@ -50,19 +51,22 @@ export function ProfileDetail({
           onRetry={() => setRetry((value) => value + 1)}
         />
       ) : state.data ? (
-        <>
+        <div style={{ marginTop: '16px' }}>
           <div className="page-heading">
             <div>
               <p className="eyebrow">CHI TIẾT HỒ SƠ</p>
               <h1 id="profile-heading">{state.data.fullName}</h1>
               <p>
                 {state.data.relation === 'SELF'
-                  ? 'Hồ sơ của tôi'
-                  : 'Hồ sơ được liên kết'}
+                  ? 'Hồ sơ của tôi (Chính chủ)'
+                  : 'Hồ sơ người thân đã liên kết'}
               </p>
             </div>
-            <span className="status-pill">Đang hoạt động</span>
+            <span className="status-pill">
+              {state.data.relation === 'SELF' ? 'Mặc định' : 'Người thân'}
+            </span>
           </div>
+
           <dl className="detail-grid">
             <div>
               <dt>Ngày sinh</dt>
@@ -71,6 +75,12 @@ export function ProfileDetail({
             <div>
               <dt>Giới tính</dt>
               <dd>{state.data.sex || 'Chưa cập nhật'}</dd>
+            </div>
+            <div>
+              <dt>Quan hệ</dt>
+              <dd>
+                {state.data.relation === 'SELF' ? 'Bản thân' : 'Người thân'}
+              </dd>
             </div>
             <div>
               <dt>Số điện thoại liên hệ</dt>
@@ -85,13 +95,22 @@ export function ProfileDetail({
               <dd>{state.data.bhytSelfDeclared || 'Chưa cập nhật'}</dd>
             </div>
           </dl>
-          <Link
-            className="button button-secondary"
-            to={`/patient/profiles/${encodeURIComponent(state.data.id)}/edit`}
-          >
-            Chỉnh sửa hồ sơ
-          </Link>
-        </>
+
+          <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+            <Link
+              className="button button-primary"
+              to={`/patient/appointments/new?patientId=${encodeURIComponent(state.data.id)}`}
+            >
+              Đặt lịch khám với hồ sơ này
+            </Link>
+            <Link
+              className="button button-secondary"
+              to={`/patient/profiles/${encodeURIComponent(state.data.id)}/edit`}
+            >
+              Chỉnh sửa hồ sơ
+            </Link>
+          </div>
+        </div>
       ) : null}
     </section>
   );
