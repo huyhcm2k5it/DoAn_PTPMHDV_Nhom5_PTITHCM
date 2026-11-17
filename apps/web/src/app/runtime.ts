@@ -186,7 +186,9 @@ export async function fetchAuthorizationLease(action: string): Promise<string> {
   }
 
   if (!response.ok) {
-    throw new Error(`Không thể lấy authorization lease (HTTP ${response.status}).`);
+    throw new Error(
+      `Không thể lấy authorization lease (HTTP ${response.status}).`,
+    );
   }
 
   const json = await response.json();
@@ -380,10 +382,7 @@ function notifyListeners() {
 function notifyUnauthorized() {
   clearAuthSession();
   notifyListeners();
-  if (
-    typeof window !== 'undefined' &&
-    window.location.pathname !== '/login'
-  ) {
+  if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
     window.location.href = '/login';
   }
 }

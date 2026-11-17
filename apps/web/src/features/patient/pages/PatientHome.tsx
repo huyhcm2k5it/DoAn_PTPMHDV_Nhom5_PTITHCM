@@ -27,7 +27,10 @@ export function PatientHome({
   return (
     <div className="home-container" aria-label="Trang chủ bệnh nhân">
       {/* 1. Lời chào (Figma 25:7 / 25:16) */}
-      <section className="home-hero-banner home-animate-hero" aria-labelledby="hero-title">
+      <section
+        className="home-hero-banner home-animate-hero"
+        aria-labelledby="hero-title"
+      >
         <span className="home-eyebrow">CHĂM SÓC SỨC KHỎE</span>
         <h1 id="hero-title" className="home-hero-title">
           Chào bạn!
@@ -61,7 +64,11 @@ export function PatientHome({
               Lịch khám sắp tới
             </h2>
             {/* Nút chuyển đổi nhanh để duyệt cả 2 kịch bản Figma 25:2 và 25:11 */}
-            <div className="home-state-switch" role="group" aria-label="Kịch bản hiển thị lịch">
+            <div
+              className="home-state-switch"
+              role="group"
+              aria-label="Kịch bản hiển thị lịch"
+            >
               <button
                 type="button"
                 className={`home-switch-pill ${hasAppointment ? 'is-active' : ''}`}

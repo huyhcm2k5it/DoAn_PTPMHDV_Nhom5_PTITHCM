@@ -306,7 +306,7 @@ function AppLayout({ session }: { session?: WebRuntime['session'] }) {
             className="support-link"
             onClick={(e) => e.preventDefault()}
           >
-            Hướng dẫn sử dụng  →
+            Hướng dẫn sử dụng →
           </a>
         </div>
 
@@ -362,7 +362,7 @@ function AppLayout({ session }: { session?: WebRuntime['session'] }) {
         </main>
 
         <footer className="app-footer">
-          <span>UMC Care © 2026  ·  Bảo mật thông tin người bệnh</span>
+          <span>UMC Care © 2026 · Bảo mật thông tin người bệnh</span>
           <span>Dữ liệu minh họa</span>
         </footer>
       </div>
@@ -428,7 +428,8 @@ function CashierQueueRoute({ session }: { session?: WebRuntime['session'] }) {
   if (session && !session.capabilities.includes('CASHIER')) {
     return (
       <section role="alert" className="error-panel" style={{ margin: '24px' }}>
-        Tài khoản nhân viên không có quyền truy cập module Thu ngân & viện phí (CASHIER).
+        Tài khoản nhân viên không có quyền truy cập module Thu ngân & viện phí
+        (CASHIER).
       </section>
     );
   }
@@ -441,7 +442,8 @@ function CashierQueueRoute({ session }: { session?: WebRuntime['session'] }) {
           Thu ngân & viện phí
         </h1>
         <p className="page-subtitle">
-          Quản lý hàng chờ khoản thu, xác nhận thanh toán tại quầy và xuất biên nhận viện phí.
+          Quản lý hàng chờ khoản thu, xác nhận thanh toán tại quầy và xuất biên
+          nhận viện phí.
         </p>
       </div>
 
@@ -459,9 +461,12 @@ function CashierQueueRoute({ session }: { session?: WebRuntime['session'] }) {
         <main className="profile-detail-panel" aria-label="Chi tiết giao dịch">
           <div className="profile-detail-header">
             <div>
-              <h2 className="profile-detail-title">Xử lý thanh toán viện phí</h2>
+              <h2 className="profile-detail-title">
+                Xử lý thanh toán viện phí
+              </h2>
               <p className="profile-detail-subtitle">
-                Chọn khoản thu từ hàng chờ bên trái để kiểm tra chi tiết và thực hiện thu tiền.
+                Chọn khoản thu từ hàng chờ bên trái để kiểm tra chi tiết và thực
+                hiện thu tiền.
               </p>
             </div>
           </div>
@@ -494,7 +499,9 @@ function CatalogRoute({
         navigate(`/patient/appointments/new?doctorId=${encodeURIComponent(id)}`)
       }
       onChooseService={(id) =>
-        navigate(`/patient/appointments/new?serviceId=${encodeURIComponent(id)}`)
+        navigate(
+          `/patient/appointments/new?serviceId=${encodeURIComponent(id)}`,
+        )
       }
     />
   );

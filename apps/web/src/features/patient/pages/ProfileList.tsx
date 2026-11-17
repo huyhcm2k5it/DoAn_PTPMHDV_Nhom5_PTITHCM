@@ -58,13 +58,16 @@ export function ProfileList({
           setState({ loading: false, data });
           if (!isCreating) {
             const hasCurrentSelected =
-              Boolean(selectedId && data.items.some((p) => p.id === selectedId)) ||
+              Boolean(
+                selectedId && data.items.some((p) => p.id === selectedId),
+              ) ||
               (createdProfile && createdProfile.id === selectedId);
 
             if (!hasCurrentSelected) {
               if (data.items.length > 0) {
                 const defaultProfile =
-                  data.items.find((p) => p.relation === 'SELF') ?? data.items[0];
+                  data.items.find((p) => p.relation === 'SELF') ??
+                  data.items[0];
                 setSelectedId(defaultProfile.id);
               } else {
                 setSelectedId(null);
@@ -333,9 +336,7 @@ export function ProfileList({
             <div className="profile-detail-header">
               <div>
                 <h2 className="profile-detail-title">
-                  {isCreating
-                    ? 'Thêm hồ sơ người thân'
-                    : 'Thông tin cá nhân'}
+                  {isCreating ? 'Thêm hồ sơ người thân' : 'Thông tin cá nhân'}
                 </h2>
                 <p className="profile-detail-desc">
                   {isCreating

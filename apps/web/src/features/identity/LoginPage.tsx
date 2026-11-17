@@ -78,12 +78,22 @@ export function LoginPage() {
         navigate('/patient/profiles');
       }
     } catch (err: unknown) {
-      const errorObj = err as { status?: number; code?: string; message?: string };
+      const errorObj = err as {
+        status?: number;
+        code?: string;
+        message?: string;
+      };
       if (errorObj?.code === 'UNAUTHENTICATED' || errorObj?.status === 401) {
         setError('Số điện thoại hoặc mật khẩu không chính xác.');
-      } else if (errorObj?.code === 'RATE_LIMITED' || errorObj?.status === 429) {
+      } else if (
+        errorObj?.code === 'RATE_LIMITED' ||
+        errorObj?.status === 429
+      ) {
         setError('Bạn đã thử đăng nhập quá nhiều lần. Vui lòng thử lại sau.');
-      } else if (errorObj?.code === 'VALIDATION_ERROR' || errorObj?.status === 400) {
+      } else if (
+        errorObj?.code === 'VALIDATION_ERROR' ||
+        errorObj?.status === 400
+      ) {
         setError('Thông tin đăng nhập không hợp lệ. Vui lòng kiểm tra lại.');
       } else {
         setError(

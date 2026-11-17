@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProfileList } from '../src/features/patient/pages/ProfileList';
@@ -150,12 +156,10 @@ describe('patient profile screens', () => {
     expect(
       await screen.findByText(/Tạo hồ sơ người thân thành công/),
     ).toBeTruthy();
-    expect(
-      screen.getByRole('button', { name: 'Lưu thay đổi' }),
-    ).toBeTruthy();
-    expect(
-      (screen.getByLabelText(/Họ và tên/) as HTMLInputElement).value,
-    ).toBe('Nguyễn Bé Con');
+    expect(screen.getByRole('button', { name: 'Lưu thay đổi' })).toBeTruthy();
+    expect((screen.getByLabelText(/Họ và tên/) as HTMLInputElement).value).toBe(
+      'Nguyễn Bé Con',
+    );
   });
 });
 

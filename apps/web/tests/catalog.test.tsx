@@ -3,10 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { CatalogPage } from '../src/features/catalog/CatalogPage';
 import { createCatalogApi, ApiError } from '../src/features/catalog/api';
-import type {
-  CatalogApi,
-  MedicalService,
-} from '../src/features/catalog/types';
+import type { CatalogApi, MedicalService } from '../src/features/catalog/types';
 
 afterEach(() => {
   cleanup();

@@ -79,7 +79,9 @@ export function ProfileForm({
 
           {initial && (
             <span className="profile-badge">
-              {initial.relation === 'SELF' ? 'Hồ sơ mặc định' : 'Hồ sơ người thân'}
+              {initial.relation === 'SELF'
+                ? 'Hồ sơ mặc định'
+                : 'Hồ sơ người thân'}
             </span>
           )}
         </div>

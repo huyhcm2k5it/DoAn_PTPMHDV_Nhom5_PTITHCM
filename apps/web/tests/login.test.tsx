@@ -46,7 +46,9 @@ describe('LoginPage', () => {
       target: { value: 'short' },
     });
     fireEvent.click(screen.getByRole('button', { name: /Đăng nhập ngay/ }));
-    expect(screen.getByText('Mật khẩu phải có từ 8 đến 128 ký tự.')).toBeTruthy();
+    expect(
+      screen.getByText('Mật khẩu phải có từ 8 đến 128 ký tự.'),
+    ).toBeTruthy();
   });
 
   it('shows error message on 401 unauthenticated response', async () => {
