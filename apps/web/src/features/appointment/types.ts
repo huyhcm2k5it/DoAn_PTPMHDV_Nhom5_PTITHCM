@@ -93,6 +93,7 @@ export interface AppointmentApi {
   listAppointments(
     patientId: string,
     signal?: AbortSignal,
+    query?: { page?: string; state?: string; from?: string },
   ): Promise<{ items: AppointmentSummary[]; total: number }>;
   reschedule?(
     appointmentId: string,

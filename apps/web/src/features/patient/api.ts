@@ -94,6 +94,12 @@ export function createPatientApi(
   }
 
   return {
+    search(query, signal) {
+      return request<PatientPage>(
+        '/api/v1/patients/search?' + new URLSearchParams({ q: query }),
+        signal,
+      );
+    },
     list(page, limit, signal) {
       const query = new URLSearchParams({
         page: String(page),

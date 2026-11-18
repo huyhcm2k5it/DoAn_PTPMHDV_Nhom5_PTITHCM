@@ -1,228 +1,163 @@
-import { useState } from 'react';
+import { ContactRound, CalendarDays, Pill } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import type {
+  AppointmentApi,
+  AppointmentSummary,
+} from '../../appointment/types';
 import {
-  CalendarDays,
-  ContactRound,
-  Bell,
-  ArrowRight,
-  Clock,
-  MapPin,
-  User,
-  ShieldCheck,
-} from 'lucide-react';
+  appointmentLabels,
+  formatAppointmentTime,
+} from '../../appointment/display';
+import type { PatientApi } from '../types';
+import { ErrorPanel } from '../../../shared/ui/ErrorPanel';
 import '../patient.css';
 
-export interface PatientHomeProps {
-  hasAppointmentDefault?: boolean;
-}
-
 export function PatientHome({
-  hasAppointmentDefault = true,
-}: PatientHomeProps) {
-  // Cho phép chuyển đổi linh hoạt giữa 2 trạng thái Figma:
-  // - 25:2 (Có lịch khám sắp tới)
-  // - 25:11 (Chưa có lịch khám)
-  const [hasAppointment, setHasAppointment] = useState(hasAppointmentDefault);
-
+  patientApi,
+  appointmentApi,
+}: {
+  patientApi?: PatientApi;
+  appointmentApi?: AppointmentApi;
+}) {
+  const [upcoming, setUpcoming] = useState<
+    (AppointmentSummary & { patientName: string }) | null
+  >();
+  const [error, setError] = useState<unknown>();
+  useEffect(() => {
+    if (!patientApi || !appointmentApi) return;
+    const controller = new AbortController();
+    const { signal } = controller;
+    setUpcoming(undefined);
+    setError(undefined);
+    async function load() {
+      const { items: profiles } = await patientApi!.list(1, 100, signal);
+      const from = new Intl.DateTimeFormat('sv-SE', {
+        dateStyle: 'short',
+        timeZone: 'Asia/Ho_Chi_Minh',
+      }).format(Date.now());
+      const pages = await Promise.all(
+        profiles
+          .filter((profile) => profile.active !== false)
+          .map(async (profile) => {
+            const results = await Promise.all(
+              ['CONFIRMED', 'PENDING_PAYMENT'].map((state) =>
+                appointmentApi!.listAppointments(profile.id, signal, {
+                  from,
+                  state,
+                }),
+              ),
+            );
+            return results
+              .flatMap((page) => page.items)
+              .map((item) => ({
+                ...item,
+                patientName: profile.fullName,
+              }));
+          }),
+      );
+      const start = (item: AppointmentSummary) =>
+        Date.parse(String(item.appointment?.startAt ?? ''));
+      const next = pages
+        .flat()
+        .filter(
+          (item) =>
+            ['CONFIRMED', 'PENDING_PAYMENT'].includes(item.state) &&
+            start(item) >= Date.now(),
+        )
+        .sort((a, b) => start(a) - start(b))[0];
+      if (!signal.aborted) setUpcoming(next ?? null);
+    }
+    void load().catch((caught) => {
+      if (!signal.aborted) setError(caught);
+    });
+    return () => controller.abort();
+  }, [patientApi, appointmentApi]);
   return (
-    <div className="home-container" aria-label="Trang chủ bệnh nhân">
-      {/* 1. Lời chào (Figma 25:7 / 25:16) */}
-      <section
-        className="home-hero-banner home-animate-hero"
-        aria-labelledby="hero-title"
-      >
-        <span className="home-eyebrow">CHĂM SÓC SỨC KHỎE</span>
-        <h1 id="hero-title" className="home-hero-title">
-          Chào bạn!
-        </h1>
-        <p className="home-hero-desc">
-          Đặt lịch khám và theo dõi lịch hẹn của bạn.
-        </p>
-
-        <Link
-          to="/patient/appointments/new"
-          className="home-btn-primary"
-          aria-label="Đặt lịch khám ngay"
-        >
-          <span>Đặt lịch khám</span>
-          <ArrowRight size={18} className="home-btn-arrow" />
+    <div className="page-content quan-workflow patient-home-design">
+      <section className="home-hero-banner">
+        <p className="eyebrow">CHĂM SÓC SỨC KHỎE</p>
+        <h1>Chào bạn!</h1>
+        <p>Đặt lịch khám và theo dõi lịch hẹn của bạn.</p>
+        <Link to="/patient/appointments/new" className="button button-primary">
+          Đặt lịch khám →
         </Link>
-
-        <p className="home-hero-note">
+        <p className="field-hint">
           Bạn sẽ chọn hồ sơ người khám trong bước đặt lịch.
         </p>
       </section>
-
-      {/* 2. Lịch khám sắp tới (Figma 25:8 / 25:17) */}
-      <section
-        className="home-section home-animate-upcoming"
-        aria-labelledby="upcoming-heading"
-      >
-        <div className="home-section-header">
-          <div className="home-title-with-toggle">
-            <h2 id="upcoming-heading" className="home-section-title">
-              Lịch khám sắp tới
-            </h2>
-            {/* Nút chuyển đổi nhanh để duyệt cả 2 kịch bản Figma 25:2 và 25:11 */}
-            <div
-              className="home-state-switch"
-              role="group"
-              aria-label="Kịch bản hiển thị lịch"
-            >
-              <button
-                type="button"
-                className={`home-switch-pill ${hasAppointment ? 'is-active' : ''}`}
-                aria-pressed={hasAppointment}
-                onClick={() => setHasAppointment(true)}
-              >
-                Có lịch hẹn (25:2)
-              </button>
-              <button
-                type="button"
-                className={`home-switch-pill ${!hasAppointment ? 'is-active' : ''}`}
-                aria-pressed={!hasAppointment}
-                onClick={() => setHasAppointment(false)}
-              >
-                Chưa có lịch (25:11)
-              </button>
-            </div>
-          </div>
-
-          {hasAppointment && (
-            <Link
-              to="/patient/appointments"
-              className="home-section-link"
-              aria-label="Xem toàn bộ lịch khám"
-            >
-              Xem lịch khám →
-            </Link>
-          )}
-        </div>
-
-        {hasAppointment ? (
-          /* Trạng thái có lịch khám (Figma 25:2 - 25:188) */
-          <article className="home-appointment-card animate-scale-in">
-            <div className="home-card-topbar">
-              <span className="home-appt-code">Mã lịch: UMC091126</span>
-              <span className="home-badge-confirmed">
-                <ShieldCheck size={14} style={{ marginRight: '4px' }} />
-                Lịch đã xác nhận · Đã thu
+      <div className="section-heading">
+        <h2>Lịch khám sắp tới</h2>
+        <Link to="/patient/appointments">Xem lịch khám →</Link>
+      </div>
+      <section className="state-card upcoming-card">
+        {!patientApi ? (
+          <Link to="/login">Đăng nhập để xem lịch khám</Link>
+        ) : error != null ? (
+          <ErrorPanel error={error} />
+        ) : upcoming === undefined ? (
+          <p role="status">Đang tải lịch khám…</p>
+        ) : upcoming ? (
+          <>
+            <div className="section-heading">
+              <p className="field-hint">Mã lịch: {upcoming.appointmentId}</p>
+              <span className="status-pill">
+                {appointmentLabels[upcoming.state]}
               </span>
             </div>
-
-            <div className="home-card-main">
-              {/* Khối Ngày & Giờ khám */}
-              <div className="home-datetime-badge">
-                <span className="home-time-text">08:30 · Thứ Hai</span>
-                <span className="home-date-text">09/11/2026</span>
+            <div className="upcoming-details">
+              <div className="upcoming-date">
+                {formatAppointmentTime(upcoming.appointment?.startAt)}
               </div>
-
-              {/* Thông tin bác sĩ & người khám */}
-              <div className="home-appt-details">
-                <p className="home-patient-name">
-                  <User size={15} className="home-inline-icon" />
-                  Người khám: <strong>Nguyễn Hoàng Nam</strong>
+              <div>
+                <p>
+                  Người khám: <strong>{upcoming.patientName}</strong>
                 </p>
-                <h3 className="home-doctor-name">TS.BS Nguyễn Minh Anh</h3>
-                <p className="home-doctor-dept">
-                  <MapPin size={14} className="home-inline-icon" />
-                  Chuyên khoa Tim mạch · Phòng 204
-                </p>
+                <Link
+                  to={
+                    '/patient/appointments/' +
+                    encodeURIComponent(upcoming.appointmentId)
+                  }
+                >
+                  Xem thông tin lịch khám →
+                </Link>
               </div>
             </div>
-
-            <div className="home-card-footer">
-              <Clock size={14} className="home-inline-icon" />
-              <span>
-                Vui lòng đến trước giờ hẹn 15 phút để làm thủ tục tiếp nhận.
-              </span>
-            </div>
-          </article>
-        ) : (
-          /* Trạng thái chưa có lịch khám (Figma 25:11 - 25:204) */
-          <div className="home-empty-card animate-scale-in">
-            <div className="home-empty-icon-box" aria-hidden="true">
-              <CalendarDays size={24} />
-            </div>
-            <h3 className="home-empty-title">Bạn chưa có lịch khám sắp tới</h3>
-            <p className="home-empty-desc">
-              Chủ động chọn bác sĩ và thời gian phù hợp cho bạn hoặc người thân.
+            <p className="field-hint">
+              Vui lòng đến trước giờ hẹn để làm thủ tục tiếp nhận.
             </p>
+          </>
+        ) : (
+          <div className="home-empty">
+            <h3>Chưa có lịch khám sắp tới</h3>
+            <p>Chọn bác sĩ và thời gian phù hợp để đặt lịch khám.</p>
             <Link
               to="/patient/appointments/new"
-              className="home-btn-primary home-btn-sm"
+              className="button button-primary"
             >
               Đặt lịch khám
             </Link>
-            <p className="home-empty-note">
-              Bạn sẽ chọn hồ sơ người khám khi đặt lịch.
-            </p>
           </div>
         )}
       </section>
-
-      {/* 3. Truy cập nhanh (Figma 25:9 / 25:18) */}
-      <section
-        className="home-section home-animate-shortcuts"
-        aria-labelledby="shortcuts-heading"
-      >
-        <h2 id="shortcuts-heading" className="home-section-title">
-          Truy cập nhanh
-        </h2>
-
-        <div className="home-shortcuts-grid">
-          {/* Lối tắt 1: Hồ sơ của tôi */}
-          <Link
-            to="/patient/profiles"
-            className="home-shortcut-card"
-            aria-label="Mở hồ sơ của tôi"
-          >
-            <div className="home-shortcut-icon" aria-hidden="true">
-              <ContactRound size={22} />
-            </div>
-            <div className="home-shortcut-body">
-              <h3 className="home-shortcut-title">Hồ sơ của tôi</h3>
-              <p className="home-shortcut-desc">
-                Quản lý hồ sơ của bạn và người thân.
-              </p>
-            </div>
-          </Link>
-
-          {/* Lối tắt 2: Lịch khám của tôi */}
-          <Link
-            to="/patient/appointments"
-            className="home-shortcut-card"
-            aria-label="Mở lịch khám của tôi"
-          >
-            <div className="home-shortcut-icon" aria-hidden="true">
-              <CalendarDays size={22} />
-            </div>
-            <div className="home-shortcut-body">
-              <h3 className="home-shortcut-title">Lịch khám của tôi</h3>
-              <p className="home-shortcut-desc">
-                Theo dõi và xem chi tiết lịch hẹn.
-              </p>
-            </div>
-          </Link>
-
-          {/* Lối tắt 3: Thông báo */}
-          <Link
-            to="/patient/appointments?tab=lab"
-            className="home-shortcut-card"
-            aria-label="Mở thông báo và kết quả mới"
-          >
-            <div className="home-shortcut-icon" aria-hidden="true">
-              <Bell size={22} />
-            </div>
-            <div className="home-shortcut-body">
-              <h3 className="home-shortcut-title">Thông báo</h3>
-              <p className="home-shortcut-desc">
-                Cập nhật thông tin chăm sóc sức khỏe.
-              </p>
-            </div>
-          </Link>
-        </div>
-      </section>
+      <h2>Truy cập nhanh</h2>
+      <nav className="quan-home-links" aria-label="Tiện ích bệnh nhân">
+        <Link to="/patient/profiles" className="state-card">
+          <ContactRound size={20} />
+          <strong>Hồ sơ của tôi</strong>
+          <span>Quản lý hồ sơ của bạn và người thân.</span>
+        </Link>
+        <Link to="/patient/appointments" className="state-card">
+          <CalendarDays size={20} />
+          <strong>Lịch khám của tôi</strong>
+          <span>Theo dõi và xem chi tiết lịch hẹn.</span>
+        </Link>
+        <Link to="/patient/medications" className="state-card">
+          <Pill size={20} />
+          <strong>Đơn thuốc</strong>
+          <span>Theo dõi trạng thái cấp phát thuốc.</span>
+        </Link>
+      </nav>
     </div>
   );
 }

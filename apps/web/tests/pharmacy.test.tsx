@@ -104,10 +104,26 @@ describe('pharmacy UI and transport', () => {
     });
     render(
       <MemoryRouter>
-        <StockPage api={client} />
+        <StockPage
+          api={client}
+          adjust
+          catalog={{
+            medicines: vi.fn().mockResolvedValue([
+              {
+                id: 'medicine',
+                code: 'MED-1',
+                name: 'Thuốc demo',
+                status: 'ACTIVE',
+                unit: 'viên',
+                price: null,
+              },
+            ]),
+          }}
+        />
       </MemoryRouter>,
     );
-    fireEvent.change(screen.getByLabelText('Mã thuốc (UUID)'), {
+    await screen.findByRole('option', { name: 'Thuốc demo · MED-1' });
+    fireEvent.change(screen.getByLabelText('Thuốc trong kết quả tìm kiếm'), {
       target: { value: 'medicine' },
     });
     fireEvent.change(screen.getByLabelText('Số lượng nhập'), {
@@ -154,7 +170,13 @@ describe('pharmacy UI and transport', () => {
       </MemoryRouter>,
     );
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Xác nhận cấp phát' }),
+      await screen.findByRole('button', {
+        name: 'Kiểm tra trước khi cấp phát',
+      }),
+    );
+    expect(client.dispense).not.toHaveBeenCalled();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Xác nhận đã bàn giao thuốc' }),
     );
     await waitFor(() =>
       expect(client.dispense).toHaveBeenCalledWith(
