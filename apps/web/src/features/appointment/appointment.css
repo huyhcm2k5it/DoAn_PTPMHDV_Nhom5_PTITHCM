@@ -1,0 +1,939 @@
+/* ==========================================================================
+   Appointment Booking Screens - Exact Figma Frame 03 (1:3502) & 04 (1:3645)
+   ========================================================================== */
+
+.booking-page-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  max-width: 1136px;
+  margin: 0 auto;
+}
+
+/* 1. Thanh tiến trình 4 bước (Stepper - Figma 1:3544) */
+.booking-stepper {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.stepper-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  transition: all 0.2s ease;
+}
+
+.stepper-step.is-active {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.stepper-step.is-completed {
+  color: var(--navy);
+  font-weight: 600;
+}
+
+.step-number {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.stepper-step.is-active .step-number {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.stepper-step.is-completed .step-number {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.stepper-divider {
+  width: 32px;
+  height: 1px;
+  background: var(--line);
+}
+
+@media (max-width: 768px) {
+  .booking-stepper {
+    height: auto;
+    flex-wrap: wrap;
+    padding: 12px;
+    gap: 12px;
+    justify-content: flex-start;
+  }
+  .stepper-divider {
+    display: none;
+  }
+}
+
+/* 2. Bố cục 2 cột chính (Figma 1:3543) */
+.booking-layout-grid {
+  display: grid;
+  grid-template-columns: 697px 419px;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1150px) {
+  .booking-layout-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* CỘT TRÁI: Bộ lọc & Danh sách bác sĩ */
+.booking-left-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Thanh lọc bác sĩ (Figma 1:3549) */
+.doctor-filter-toolbar {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.doctor-filter-select {
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 14px;
+  font-size: 13px;
+  color: var(--navy);
+  background: #ffffff;
+  outline: none;
+  min-width: 220px;
+  flex: 1;
+}
+
+.doctor-search-input {
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 14px;
+  font-size: 13px;
+  color: var(--navy);
+  background: #ffffff;
+  outline: none;
+  flex: 2;
+  min-width: 200px;
+}
+
+.doctor-filter-select:focus,
+.doctor-search-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(0, 102, 153, 0.12);
+}
+
+/* Danh sách thẻ bác sĩ (Figma 1:3556, 1:3566, 1:3576) */
+.doctor-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.doctor-booking-card {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  min-height: 137px;
+  box-sizing: border-box;
+}
+
+.doctor-booking-card:hover {
+  border-color: #b0c9db;
+  box-shadow: 0 4px 16px rgba(0, 102, 153, 0.06);
+}
+
+.doctor-booking-card.is-selected {
+  border-color: var(--primary);
+  background: #fafcfe;
+  box-shadow: 0 4px 18px rgba(0, 102, 153, 0.1);
+}
+
+.doctor-card-left {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.doctor-avatar-box {
+  width: 94px;
+  height: 104px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f1f5f9;
+  flex-shrink: 0;
+}
+
+.doctor-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.doctor-info-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.doctor-degree-title {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+  margin: 0;
+}
+
+.doctor-full-name {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--navy);
+  margin: 0;
+}
+
+.doctor-specialty-rating {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--alert); /* #087f73 in Figma */
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.doctor-exam-fee {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--primary);
+  margin: 4px 0 0;
+}
+
+.doctor-card-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.doctor-slots-badge {
+  background: #e7f6f1;
+  color: var(--alert);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.doctor-select-btn {
+  height: 44px;
+  width: 148px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.doctor-select-btn.is-active {
+  background: var(--primary);
+  color: #ffffff;
+  border: none;
+}
+
+.doctor-select-btn.is-inactive {
+  background: #ffffff;
+  color: var(--primary);
+  border: 1px solid var(--line);
+}
+
+.doctor-select-btn.is-inactive:hover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
+/* CỘT PHẢI: Ngày & giờ khám (Figma 1:3586) */
+.booking-datetime-panel {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 558px;
+  box-sizing: border-box;
+}
+
+.panel-section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--navy);
+  margin: 0;
+}
+
+/* Calendar Header */
+.calendar-month-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.calendar-quick-pickers {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.calendar-select-month,
+.calendar-select-year {
+  height: 30px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.calendar-select-month:hover,
+.calendar-select-year:hover,
+.calendar-select-month:focus,
+.calendar-select-year:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-light);
+}
+
+.calendar-today-btn {
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--primary);
+  background: var(--primary-light);
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.calendar-today-btn:hover {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.calendar-nav-arrows {
+  display: flex;
+  gap: 4px;
+}
+
+.calendar-nav-btn {
+  background: none;
+  border: none;
+  color: var(--navy);
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+
+.calendar-nav-btn:hover {
+  background: #f1f5f9;
+}
+
+/* Calendar Weekdays */
+.calendar-weekdays-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* Calendar Days */
+.calendar-days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  text-align: center;
+}
+
+.calendar-day-cell {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--navy);
+  border-radius: 7px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  transition: all 0.15s ease;
+}
+
+.calendar-day-cell:hover:not(:disabled) {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.calendar-day-cell.is-today {
+  border: 1px dashed var(--primary);
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.calendar-day-cell.is-selected {
+  background: var(--primary) !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  border: 1px solid var(--primary) !important;
+}
+
+.calendar-day-cell:disabled {
+  color: #cbd5e1;
+  cursor: not-allowed;
+}
+
+/* Time Slots Section */
+.timeslot-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--navy);
+  margin: 12px 0 0;
+}
+
+.timeslot-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.timeslot-chip {
+  height: 38px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+/* 3 States: Còn trống, Đã đặt, Đang chọn */
+.timeslot-chip.is-available {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  color: var(--primary);
+}
+
+.timeslot-chip.is-available:hover {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
+.timeslot-chip.is-booked {
+  background: #f1f5f9;
+  border: 1px solid transparent;
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.timeslot-chip.is-selected {
+  background: var(--primary) !important;
+  border: 1px solid var(--primary) !important;
+  color: #ffffff !important;
+  font-weight: 600;
+}
+
+/* Legend */
+.timeslot-legend {
+  font-size: 10px;
+  color: var(--muted);
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.legend-dot.is-available {
+  background: #ffffff;
+  border: 1px solid var(--primary);
+}
+
+.legend-dot.is-booked {
+  background: #94a3b8;
+}
+
+.legend-dot.is-selected {
+  background: var(--primary);
+}
+
+/* Continue Button */
+.btn-booking-continue {
+  height: 44px;
+  width: 100%;
+  border-radius: 8px;
+  background: var(--primary);
+  color: #ffffff;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  margin-top: auto;
+}
+
+.btn-booking-continue:hover:not(:disabled) {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 102, 153, 0.2);
+}
+
+.btn-booking-continue:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Accessible Hidden Form for Unit Test & Form Submission */
+.sr-hidden-form {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ==========================================================================
+   Frame 04 · Xác nhận & thanh toán (Figma 1:3645)
+   ========================================================================== */
+.booking-review-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  margin-top: 20px;
+}
+
+.booking-review-main {
+  width: 698px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.booking-review-sidebar {
+  width: 418px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.review-card {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.review-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.review-card-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--navy);
+  margin: 0;
+}
+
+.review-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.review-badge.is-held {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.review-badge.is-confirmed {
+  background: #e7f6f1;
+  color: #087f73;
+}
+
+.review-badge.is-expired {
+  background: #fef2f2;
+  color: var(--danger);
+}
+
+.review-badge.is-counter {
+  background: #fff7e6;
+  color: #8a5700;
+}
+
+.review-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.review-info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  border-bottom: 1px dashed #f1f5f9;
+  padding-bottom: 12px;
+}
+
+.review-info-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.review-info-label {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.review-info-value {
+  color: var(--navy);
+  font-weight: 600;
+  text-align: right;
+}
+
+/* Payment Options */
+.payment-options-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.payment-option-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: left;
+  width: 100%;
+}
+
+.payment-option-card:hover {
+  border-color: var(--primary);
+  background: #fafcfe;
+}
+
+.payment-option-card.is-selected {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.payment-radio-circle {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--muted);
+  flex-shrink: 0;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.payment-option-card.is-selected .payment-radio-circle {
+  border-color: var(--primary);
+  background: var(--primary);
+  box-shadow: inset 0 0 0 3px #ffffff;
+}
+
+.payment-option-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.payment-option-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.payment-option-desc {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.payment-note-text {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 14px;
+  font-style: italic;
+}
+
+/* Sidebar Countdown & Payment Summary */
+.payment-countdown-card {
+  background: var(--primary-light);
+  border-radius: 10px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: background 0.2s ease;
+}
+
+.payment-countdown-card.is-expired {
+  background: #fef2f2;
+}
+
+.payment-countdown-card.is-confirmed {
+  background: #e7f6f1;
+}
+
+.payment-countdown-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  letter-spacing: 0.02em;
+}
+
+.payment-countdown-card.is-expired .payment-countdown-label {
+  color: var(--danger);
+}
+
+.payment-countdown-card.is-confirmed .payment-countdown-label {
+  color: #087f73;
+}
+
+.payment-countdown-timer {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  letter-spacing: -0.02em;
+}
+
+.payment-countdown-card.is-expired .payment-countdown-timer {
+  color: var(--danger);
+}
+
+.payment-breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.payment-breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--navy);
+}
+
+.payment-breakdown-row .muted {
+  color: var(--muted);
+}
+
+.payment-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 12px 0;
+}
+
+.payment-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 20px;
+}
+
+.payment-total-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.payment-total-amount {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: -0.02em;
+}
+
+.payment-terms-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+  cursor: pointer;
+  margin-bottom: 20px;
+}
+
+.payment-terms-checkbox {
+  margin-top: 3px;
+  accent-color: var(--primary);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.btn-payment-action {
+  width: 100%;
+  height: 44px;
+  border-radius: 8px;
+  background: var(--primary);
+  color: #ffffff;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-payment-action:hover:not(:disabled) {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 102, 153, 0.2);
+}
+
+.btn-payment-action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.payment-support-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.btn-demo-expired {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 11px;
+  text-decoration: underline;
+  cursor: pointer;
+  transition: color 0.15s ease;
+  margin-top: 4px;
+}
+
+.btn-demo-expired:hover {
+  color: var(--danger);
+}
+
+@media (max-width: 992px) {
+  .booking-review-layout {
+    flex-direction: column;
+  }
+
+  .booking-review-main,
+  .booking-review-sidebar {
+    width: 100%;
+  }
+}

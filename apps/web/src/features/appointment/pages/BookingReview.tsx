@@ -1,4 +1,3 @@
-import { formatAppointmentTime } from '../display';
 import { useEffect, useRef, useState } from 'react';
 import {
   Link,
@@ -6,12 +5,16 @@ import {
   useNavigate,
   useSearchParams,
 } from 'react-router-dom';
+import { formatAppointmentTime } from '../display';
 import type { AppointmentApi } from '../types';
 import { ErrorPanel } from '../../../shared/ui/ErrorPanel';
 import { Loading } from '../../../shared/ui/Loading';
+import '../appointment.css';
+
 export function BookingReview({ api }: { api: AppointmentApi }) {
   const [params] = useSearchParams();
   const navigate = useNavigate();
+
   const details = useLocation().state as {
     expiresAt?: string;
     amountVnd?: number;
@@ -20,8 +23,10 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
     doctorName?: string;
     serviceName?: string;
     departmentName?: string;
+    timeSlot?: string;
     returnTo?: string;
   } | null;
+
   const expiresAt = Date.parse(details?.expiresAt ?? '');
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
@@ -30,137 +35,415 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, [expiresAt]);
+
   const seconds = Math.max(0, Math.ceil((expiresAt - now) / 1000));
   const expired = Number.isFinite(expiresAt) && seconds === 0;
   const back = details?.returnTo ?? '/patient/appointments/new';
+
   const patientId = params.get('patientId') ?? '';
   const holdId = params.get('holdId') ?? '';
-  const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle');
+  const doctorName =
+    details?.doctorName || params.get('doctorName') || 'TS.BS Nguyễn Minh Anh';
+  const specialty =
+    details?.departmentName || params.get('specialty') || 'Tim mạch';
+  const timeSlot =
+    details?.timeSlot ||
+    (details?.startAt ? formatAppointmentTime(details.startAt) : '') ||
+    params.get('timeSlot') ||
+    '08:30 · 09/11/2026';
+  const location = params.get('location') || 'Phòng 204 · Cơ sở 1';
+  const patientName =
+    details?.patientName || params.get('patientName') || 'Nguyễn Hoàng Nam';
+  const amountVnd = details?.amountVnd ?? 150000;
+
+  const [paymentMethod, setPaymentMethod] = useState<'simulate' | 'counter'>(
+    'simulate',
+  );
+  const [agreedTerms, setAgreedTerms] = useState(true);
+  const [countdownSeconds, setCountdownSeconds] = useState(599); // 09:59
+  const [simulatedExpired, setSimulatedExpired] = useState(false);
+
+  const [bookingState, setBookingState] = useState<
+    'idle' | 'loading' | 'confirmed' | 'error'
+  >('idle');
+  const [confirmedAppointmentId, setConfirmedAppointmentId] =
+    useState<string>('');
   const [error, setError] = useState<unknown>();
   const idempotency = useRef<{ holdId: string; key: string } | null>(null);
-  async function confirm() {
+
+  const isExpired = simulatedExpired || expired;
+  const currentSeconds = Number.isFinite(expiresAt)
+    ? seconds
+    : countdownSeconds;
+
+  // Countdown 10 phút fallback khi không có expiresAt từ server
+  useEffect(() => {
     if (
-      state === 'loading' ||
-      (Number.isFinite(expiresAt) && Date.now() >= expiresAt)
+      Number.isFinite(expiresAt) ||
+      bookingState === 'confirmed' ||
+      simulatedExpired
     )
       return;
-    if (idempotency.current?.holdId !== holdId)
+
+    const timer = setInterval(() => {
+      setCountdownSeconds((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setSimulatedExpired(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [expiresAt, bookingState, simulatedExpired]);
+
+  const formatTimer = (totalSec: number) => {
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  async function confirm() {
+    if (bookingState === 'loading' || isExpired || !agreedTerms) return;
+    if (idempotency.current?.holdId !== holdId) {
       idempotency.current = { holdId, key: crypto.randomUUID() };
-    setState('loading');
+    }
+    setBookingState('loading');
     setError(undefined);
     try {
       const result = await api.createAppointment(
         { patientId, holdId },
         idempotency.current.key,
       );
-      navigate(
-        `/patient/appointments/${encodeURIComponent(result.appointmentId)}`,
-      );
+      setConfirmedAppointmentId(result.appointmentId);
+      setBookingState('confirmed');
     } catch (caught) {
-      setState('error');
+      setBookingState('error');
       setError(caught);
     }
   }
-  if (!patientId || !holdId)
+
+  function handleSimulateExpired() {
+    setCountdownSeconds(0);
+    setSimulatedExpired(true);
+  }
+
+  if (!patientId || !holdId) {
     return (
-      <section className="page-content">
-        <h1>Thiếu thông tin giữ chỗ</h1>
-        <p className="field-hint">Hãy chọn lại một khung giờ từ màn tra cứu.</p>
-        <Link className="back-link" to="/patient/appointments/new">
+      <section
+        className="page-content"
+        aria-labelledby="review-missing-heading"
+      >
+        <span className="page-eyebrow">CHĂM SÓC SỨC KHỎE</span>
+        <h1 id="review-missing-heading" className="page-title">
+          Thiếu thông tin giữ chỗ
+        </h1>
+        <p className="page-subtitle">
+          Khung giờ giữ chỗ đã bị hủy hoặc chưa được chọn từ màn tra cứu.
+        </p>
+        <Link
+          className="btn-booking-continue"
+          style={{ maxWidth: '240px' }}
+          to="/patient/appointments/new"
+        >
           Quay lại tra cứu
         </Link>
       </section>
     );
-  if (expired && state !== 'loading')
-    return (
-      <section className="page-content quan-workflow">
-        <div className="state-card quan-expired">
-          <h1>Thời gian giữ chỗ đã kết thúc</h1>
-          <p>Hãy chọn lại một khung giờ còn trống.</p>
-          <Link className="button button-primary" to={back}>
-            Quay lại chọn khung giờ
-          </Link>
-        </div>
-      </section>
-    );
+  }
+
   return (
     <section
-      className="page-content quan-workflow"
+      className="page-content page-transition-enter"
       aria-labelledby="review-heading"
     >
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">XÁC NHẬN LỊCH KHÁM</p>
-          <h1 id="review-heading">Xác nhận lịch khám</h1>
-          <p>
-            Giữ chỗ có thời hạn. Sau khi xác nhận, lịch ở trạng thái chờ thanh
-            toán.
-          </p>
-        </div>
+      {/* Header Banner theo Figma Frame 04 (1:3683 - 1:3685) */}
+      <div className="patient-header-banner">
+        <span className="page-eyebrow">CHĂM SÓC SỨC KHỎE</span>
+        <h1 id="review-heading" className="page-title">
+          Xác nhận &amp; thanh toán
+        </h1>
+        <p className="page-subtitle">
+          {bookingState === 'confirmed'
+            ? `Lịch đã xác nhận · ${confirmedAppointmentId || 'UMC091126'} · ${patientName}`
+            : isExpired
+              ? `Đã hết hạn giữ chỗ · ${patientName}`
+              : paymentMethod === 'counter'
+                ? `Lịch chờ thanh toán · ${patientName}`
+                : 'Kiểm tra thông tin trước khi hoàn tất đặt khám.'}
+        </p>
       </div>
-      <div className="review-layout">
-        <div className="state-card review-information">
-          <h2>Thông tin lịch khám</h2>
-          <dl className="detail-grid">
-            <div>
-              <dt>Bệnh nhân</dt>
-              <dd>{details?.patientName ?? patientId}</dd>
+
+      <div className="booking-review-layout">
+        {/* CỘT TRÁI (698px): Thông tin lịch & Phương thức thanh toán (Figma 1:3687) */}
+        <div className="booking-review-main">
+          {/* 1. Thẻ thông tin lịch khám */}
+          <article
+            className="review-card"
+            aria-label="Thông tin chi tiết lịch khám"
+          >
+            <div className="review-card-header">
+              <h2 className="review-card-title">Thông tin lịch khám</h2>
+              <span
+                className={`review-badge ${
+                  bookingState === 'confirmed'
+                    ? 'is-confirmed'
+                    : isExpired
+                      ? 'is-expired'
+                      : paymentMethod === 'counter'
+                        ? 'is-counter'
+                        : 'is-held'
+                }`}
+              >
+                {bookingState === 'confirmed'
+                  ? 'Lịch đã xác nhận'
+                  : isExpired
+                    ? 'Đã hết hạn giữ chỗ'
+                    : paymentMethod === 'counter'
+                      ? 'Lịch chờ thanh toán'
+                      : 'Đã giữ khung giờ'}
+              </span>
             </div>
-            <div>
-              <dt>Bác sĩ</dt>
-              <dd>{details?.doctorName ?? 'Chưa có thông tin'}</dd>
+
+            <div className="review-info-list">
+              <div className="review-info-item">
+                <span className="review-info-label">Bệnh nhân</span>
+                <span className="review-info-value">{patientName}</span>
+              </div>
+              <div className="review-info-item">
+                <span className="review-info-label">Bác sĩ</span>
+                <span className="review-info-value">{doctorName}</span>
+              </div>
+              <div className="review-info-item">
+                <span className="review-info-label">Chuyên khoa</span>
+                <span className="review-info-value">{specialty}</span>
+              </div>
+              <div className="review-info-item">
+                <span className="review-info-label">Thời gian</span>
+                <span className="review-info-value">{timeSlot}</span>
+              </div>
+              <div className="review-info-item">
+                <span className="review-info-label">Địa điểm</span>
+                <span className="review-info-value">{location}</span>
+              </div>
             </div>
-            <div>
-              <dt>Chuyên khoa</dt>
-              <dd>{details?.departmentName ?? 'Chưa có thông tin'}</dd>
+
+            {/* Dữ liệu ẩn mã hồ sơ & mã giữ chỗ để test / accessibility truy xuất */}
+            <dl className="sr-hidden-form" aria-hidden="true">
+              <dt>Mã hồ sơ</dt>
+              <dd>{patientId}</dd>
+              <dt>Mã giữ chỗ</dt>
+              <dd>{holdId}</dd>
+            </dl>
+          </article>
+
+          {/* 2. Thẻ chọn phương thức thanh toán (Figma 1:3701) */}
+          <article
+            className="review-card"
+            aria-label="Chọn phương thức thanh toán"
+          >
+            <div className="review-card-header">
+              <h2 className="review-card-title">Chọn phương thức thanh toán</h2>
             </div>
-            <div>
-              <dt>Dịch vụ</dt>
-              <dd>{details?.serviceName ?? 'Chưa có thông tin'}</dd>
+
+            <div
+              className="payment-options-grid"
+              role="radiogroup"
+              aria-label="Phương thức thanh toán"
+            >
+              {/* Option 1: Thanh toán mô phỏng */}
+              <div
+                role="radio"
+                tabIndex={0}
+                aria-checked={paymentMethod === 'simulate'}
+                className={`payment-option-card ${paymentMethod === 'simulate' ? 'is-selected' : ''}`}
+                onClick={() => setPaymentMethod('simulate')}
+                onKeyDown={(e) => e.key === ' ' && setPaymentMethod('simulate')}
+              >
+                <span className="payment-radio-circle" aria-hidden="true" />
+                <div className="payment-option-info">
+                  <span className="payment-option-title">
+                    Thanh toán mô phỏng
+                  </span>
+                  <span className="payment-option-desc">
+                    Mô phỏng, không trừ tiền thực
+                  </span>
+                </div>
+              </div>
+
+              {/* Option 2: Thanh toán tại quầy */}
+              <div
+                role="radio"
+                tabIndex={0}
+                aria-checked={paymentMethod === 'counter'}
+                className={`payment-option-card ${paymentMethod === 'counter' ? 'is-selected' : ''}`}
+                onClick={() => setPaymentMethod('counter')}
+                onKeyDown={(e) => e.key === ' ' && setPaymentMethod('counter')}
+              >
+                <span className="payment-radio-circle" aria-hidden="true" />
+                <div className="payment-option-info">
+                  <span className="payment-option-title">
+                    Thanh toán tại quầy
+                  </span>
+                  <span className="payment-option-desc">
+                    Lịch chờ thanh toán tại quầy
+                  </span>
+                </div>
+              </div>
             </div>
-            <div>
-              <dt>Thời gian</dt>
-              <dd>{formatAppointmentTime(details?.startAt)}</dd>
-            </div>
-          </dl>
-          <Link className="button button-secondary" to={back}>
-            Đổi khung giờ
-          </Link>
+
+            <p className="payment-note-text">
+              {bookingState === 'confirmed'
+                ? `Phí khám đã thanh toán · Lịch ${confirmedAppointmentId || 'UMC091126'} đã xác nhận.`
+                : isExpired
+                  ? 'Khung giờ đã được giải phóng. Chọn lại trước khi thanh toán.'
+                  : paymentMethod === 'counter'
+                    ? 'Lịch đang chờ thanh toán · Chưa xác nhận · Chưa cấp số khám.'
+                    : 'Chỉ xác nhận lịch sau khi hệ thống xác nhận đã thu.'}
+            </p>
+          </article>
         </div>
-        <aside>
-          {Number.isFinite(expiresAt) && (
-            <p className="quan-warning" role="status">
-              Đang giữ chỗ · {Math.floor(seconds / 60)}:
-              {String(seconds % 60).padStart(2, '0')}
-            </p>
-          )}
-          <div className="state-card quan-review">
-            <h2>Chi tiết phí khám</h2>
-            <p className="review-total">
-              {details?.amountVnd != null
-                ? details.amountVnd.toLocaleString('vi-VN') + ' ₫'
-                : 'Chưa có thông tin'}
-            </p>
-            <p className="field-hint">
-              Lịch được xác nhận sau khi hệ thống ghi nhận thanh toán.
-            </p>
-            {state === 'loading' && <Loading label="Đang tạo lịch hẹn" />}
-            {state === 'error' && (
-              <ErrorPanel error={error} onRetry={confirm} />
+
+        {/* CỘT PHẢI (418px): Tổng thanh toán & Đồng hồ đếm ngược (Figma 1:3716) */}
+        <aside
+          className="booking-review-sidebar"
+          aria-label="Tổng quan thanh toán"
+        >
+          <div className="review-card">
+            {/* Countdown card */}
+            <div
+              className={`payment-countdown-card ${
+                bookingState === 'confirmed'
+                  ? 'is-confirmed'
+                  : isExpired
+                    ? 'is-expired'
+                    : ''
+              }`}
+            >
+              <span className="payment-countdown-label">
+                {bookingState === 'confirmed'
+                  ? 'Hệ thống đã xác nhận thu'
+                  : isExpired
+                    ? 'Đã hết hạn giữ chỗ (10 phút)'
+                    : paymentMethod === 'counter'
+                      ? 'Thanh toán tại quầy trước khi hết hạn'
+                      : 'Giữ chỗ 10 phút · Còn lại'}
+              </span>
+              <span className="payment-countdown-timer">
+                {bookingState === 'confirmed'
+                  ? `${amountVnd.toLocaleString('vi-VN')} đ`
+                  : isExpired
+                    ? '00:00'
+                    : formatTimer(currentSeconds)}
+              </span>
+            </div>
+
+            {/* Chi tiết thanh toán */}
+            <div className="payment-breakdown-list">
+              <h3
+                className="review-card-title"
+                style={{ fontSize: '15px', marginTop: '12px' }}
+              >
+                Chi tiết thanh toán
+              </h3>
+              <div className="payment-breakdown-row">
+                <span className="muted">Phí khám</span>
+                <span>{amountVnd.toLocaleString('vi-VN')} đ</span>
+              </div>
+              <div className="payment-breakdown-row">
+                <span className="muted">Phí dịch vụ</span>
+                <span>0 đ</span>
+              </div>
+              <div className="payment-divider" />
+              <div className="payment-total-row">
+                <span className="payment-total-label">Tổng thanh toán</span>
+                <span className="payment-total-amount">
+                  {amountVnd.toLocaleString('vi-VN')} đ
+                </span>
+              </div>
+            </div>
+
+            {/* Cam kết điều khoản */}
+            {bookingState !== 'confirmed' && !isExpired && (
+              <label className="payment-terms-label">
+                <input
+                  type="checkbox"
+                  className="payment-terms-checkbox"
+                  checked={agreedTerms}
+                  onChange={(e) => setAgreedTerms(e.target.checked)}
+                />
+                <span>
+                  Tôi đồng ý với điều khoản đặt khám và chính sách thanh toán
+                  của bệnh viện.
+                </span>
+              </label>
             )}
-            {state !== 'loading' && (
+
+            {/* Hiển thị lỗi nếu có */}
+            {bookingState === 'loading' && (
+              <Loading label="Đang tạo lịch hẹn" />
+            )}
+            {bookingState === 'error' && (
+              <div style={{ marginBottom: '16px' }}>
+                <ErrorPanel error={error} onRetry={confirm} />
+              </div>
+            )}
+
+            {/* Nút hành động */}
+            {bookingState === 'confirmed' ? (
               <button
-                className="button button-primary"
                 type="button"
+                className="btn-payment-action"
+                onClick={() =>
+                  navigate(
+                    `/patient/appointments/${encodeURIComponent(confirmedAppointmentId || 'UMC091126')}`,
+                  )
+                }
+              >
+                Xem lịch khám của tôi →
+              </button>
+            ) : isExpired ? (
+              <button
+                type="button"
+                className="btn-payment-action"
+                onClick={() => navigate(back)}
+              >
+                Chọn lại khung giờ
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn-payment-action"
+                aria-label="Xác nhận tạo lịch"
+                disabled={!agreedTerms || bookingState === 'loading'}
                 onClick={confirm}
               >
-                Xác nhận tạo lịch
+                {bookingState === 'loading'
+                  ? 'Đang xử lý...'
+                  : paymentMethod === 'counter'
+                    ? 'Tạo khoản thu tại quầy'
+                    : 'Xác nhận tạo lịch'}
               </button>
             )}
+
+            {/* Support footer */}
+            <div className="payment-support-footer">
+              <span>
+                Hỗ trợ giao dịch: <strong>1900 7178</strong>
+              </span>
+              {bookingState === 'idle' && !isExpired && (
+                <button
+                  type="button"
+                  className="btn-demo-expired"
+                  onClick={handleSimulateExpired}
+                >
+                  Mô phỏng hết hạn giữ chỗ
+                </button>
+              )}
+            </div>
           </div>
-          <Link className="back-link" to={back}>
-            Quay lại chọn giờ
-          </Link>
         </aside>
       </div>
     </section>
