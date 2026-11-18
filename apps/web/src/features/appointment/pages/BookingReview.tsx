@@ -42,33 +42,48 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
 
   const patientId = params.get('patientId') ?? '';
   const holdId = params.get('holdId') ?? '';
-  const doctorName = details?.doctorName || params.get('doctorName') || 'TS.BS Nguyễn Minh Anh';
-  const specialty = details?.departmentName || params.get('specialty') || 'Tim mạch';
+  const doctorName =
+    details?.doctorName || params.get('doctorName') || 'TS.BS Nguyễn Minh Anh';
+  const specialty =
+    details?.departmentName || params.get('specialty') || 'Tim mạch';
   const timeSlot =
     details?.timeSlot ||
     (details?.startAt ? formatAppointmentTime(details.startAt) : '') ||
     params.get('timeSlot') ||
     '08:30 · 09/11/2026';
   const location = params.get('location') || 'Phòng 204 · Cơ sở 1';
-  const patientName = details?.patientName || params.get('patientName') || 'Nguyễn Hoàng Nam';
+  const patientName =
+    details?.patientName || params.get('patientName') || 'Nguyễn Hoàng Nam';
   const amountVnd = details?.amountVnd ?? 150000;
 
-  const [paymentMethod, setPaymentMethod] = useState<'simulate' | 'counter'>('simulate');
+  const [paymentMethod, setPaymentMethod] = useState<'simulate' | 'counter'>(
+    'simulate',
+  );
   const [agreedTerms, setAgreedTerms] = useState(true);
   const [countdownSeconds, setCountdownSeconds] = useState(599); // 09:59
   const [simulatedExpired, setSimulatedExpired] = useState(false);
 
-  const [bookingState, setBookingState] = useState<'idle' | 'loading' | 'confirmed' | 'error'>('idle');
-  const [confirmedAppointmentId, setConfirmedAppointmentId] = useState<string>('');
+  const [bookingState, setBookingState] = useState<
+    'idle' | 'loading' | 'confirmed' | 'error'
+  >('idle');
+  const [confirmedAppointmentId, setConfirmedAppointmentId] =
+    useState<string>('');
   const [error, setError] = useState<unknown>();
   const idempotency = useRef<{ holdId: string; key: string } | null>(null);
 
   const isExpired = simulatedExpired || expired;
-  const currentSeconds = Number.isFinite(expiresAt) ? seconds : countdownSeconds;
+  const currentSeconds = Number.isFinite(expiresAt)
+    ? seconds
+    : countdownSeconds;
 
   // Countdown 10 phút fallback khi không có expiresAt từ server
   useEffect(() => {
-    if (Number.isFinite(expiresAt) || bookingState === 'confirmed' || simulatedExpired) return;
+    if (
+      Number.isFinite(expiresAt) ||
+      bookingState === 'confirmed' ||
+      simulatedExpired
+    )
+      return;
 
     const timer = setInterval(() => {
       setCountdownSeconds((prev) => {
@@ -117,7 +132,10 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
 
   if (!patientId || !holdId) {
     return (
-      <section className="page-content" aria-labelledby="review-missing-heading">
+      <section
+        className="page-content"
+        aria-labelledby="review-missing-heading"
+      >
         <span className="page-eyebrow">CHĂM SÓC SỨC KHỎE</span>
         <h1 id="review-missing-heading" className="page-title">
           Thiếu thông tin giữ chỗ
@@ -125,7 +143,11 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
         <p className="page-subtitle">
           Khung giờ giữ chỗ đã bị hủy hoặc chưa được chọn từ màn tra cứu.
         </p>
-        <Link className="btn-booking-continue" style={{ maxWidth: '240px' }} to="/patient/appointments/new">
+        <Link
+          className="btn-booking-continue"
+          style={{ maxWidth: '240px' }}
+          to="/patient/appointments/new"
+        >
           Quay lại tra cứu
         </Link>
       </section>
@@ -133,7 +155,10 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
   }
 
   return (
-    <section className="page-content page-transition-enter" aria-labelledby="review-heading">
+    <section
+      className="page-content page-transition-enter"
+      aria-labelledby="review-heading"
+    >
       {/* Header Banner theo Figma Frame 04 (1:3683 - 1:3685) */}
       <div className="patient-header-banner">
         <span className="page-eyebrow">CHĂM SÓC SỨC KHỎE</span>
@@ -155,7 +180,10 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
         {/* CỘT TRÁI (698px): Thông tin lịch & Phương thức thanh toán (Figma 1:3687) */}
         <div className="booking-review-main">
           {/* 1. Thẻ thông tin lịch khám */}
-          <article className="review-card" aria-label="Thông tin chi tiết lịch khám">
+          <article
+            className="review-card"
+            aria-label="Thông tin chi tiết lịch khám"
+          >
             <div className="review-card-header">
               <h2 className="review-card-title">Thông tin lịch khám</h2>
               <span
@@ -212,12 +240,19 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
           </article>
 
           {/* 2. Thẻ chọn phương thức thanh toán (Figma 1:3701) */}
-          <article className="review-card" aria-label="Chọn phương thức thanh toán">
+          <article
+            className="review-card"
+            aria-label="Chọn phương thức thanh toán"
+          >
             <div className="review-card-header">
               <h2 className="review-card-title">Chọn phương thức thanh toán</h2>
             </div>
 
-            <div className="payment-options-grid" role="radiogroup" aria-label="Phương thức thanh toán">
+            <div
+              className="payment-options-grid"
+              role="radiogroup"
+              aria-label="Phương thức thanh toán"
+            >
               {/* Option 1: Thanh toán mô phỏng */}
               <div
                 role="radio"
@@ -229,8 +264,12 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
               >
                 <span className="payment-radio-circle" aria-hidden="true" />
                 <div className="payment-option-info">
-                  <span className="payment-option-title">Thanh toán mô phỏng</span>
-                  <span className="payment-option-desc">Mô phỏng, không trừ tiền thực</span>
+                  <span className="payment-option-title">
+                    Thanh toán mô phỏng
+                  </span>
+                  <span className="payment-option-desc">
+                    Mô phỏng, không trừ tiền thực
+                  </span>
                 </div>
               </div>
 
@@ -245,8 +284,12 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
               >
                 <span className="payment-radio-circle" aria-hidden="true" />
                 <div className="payment-option-info">
-                  <span className="payment-option-title">Thanh toán tại quầy</span>
-                  <span className="payment-option-desc">Lịch chờ thanh toán tại quầy</span>
+                  <span className="payment-option-title">
+                    Thanh toán tại quầy
+                  </span>
+                  <span className="payment-option-desc">
+                    Lịch chờ thanh toán tại quầy
+                  </span>
                 </div>
               </div>
             </div>
@@ -264,12 +307,19 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
         </div>
 
         {/* CỘT PHẢI (418px): Tổng thanh toán & Đồng hồ đếm ngược (Figma 1:3716) */}
-        <aside className="booking-review-sidebar" aria-label="Tổng quan thanh toán">
+        <aside
+          className="booking-review-sidebar"
+          aria-label="Tổng quan thanh toán"
+        >
           <div className="review-card">
             {/* Countdown card */}
             <div
               className={`payment-countdown-card ${
-                bookingState === 'confirmed' ? 'is-confirmed' : isExpired ? 'is-expired' : ''
+                bookingState === 'confirmed'
+                  ? 'is-confirmed'
+                  : isExpired
+                    ? 'is-expired'
+                    : ''
               }`}
             >
               <span className="payment-countdown-label">
@@ -292,7 +342,10 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
 
             {/* Chi tiết thanh toán */}
             <div className="payment-breakdown-list">
-              <h3 className="review-card-title" style={{ fontSize: '15px', marginTop: '12px' }}>
+              <h3
+                className="review-card-title"
+                style={{ fontSize: '15px', marginTop: '12px' }}
+              >
                 Chi tiết thanh toán
               </h3>
               <div className="payment-breakdown-row">
@@ -306,7 +359,9 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
               <div className="payment-divider" />
               <div className="payment-total-row">
                 <span className="payment-total-label">Tổng thanh toán</span>
-                <span className="payment-total-amount">{amountVnd.toLocaleString('vi-VN')} đ</span>
+                <span className="payment-total-amount">
+                  {amountVnd.toLocaleString('vi-VN')} đ
+                </span>
               </div>
             </div>
 
@@ -320,13 +375,16 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
                   onChange={(e) => setAgreedTerms(e.target.checked)}
                 />
                 <span>
-                  Tôi đồng ý với điều khoản đặt khám và chính sách thanh toán của bệnh viện.
+                  Tôi đồng ý với điều khoản đặt khám và chính sách thanh toán
+                  của bệnh viện.
                 </span>
               </label>
             )}
 
             {/* Hiển thị lỗi nếu có */}
-            {bookingState === 'loading' && <Loading label="Đang tạo lịch hẹn" />}
+            {bookingState === 'loading' && (
+              <Loading label="Đang tạo lịch hẹn" />
+            )}
             {bookingState === 'error' && (
               <div style={{ marginBottom: '16px' }}>
                 <ErrorPanel error={error} onRetry={confirm} />
@@ -344,7 +402,7 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
                   )
                 }
               >
-                Xem lịch khám của tôi  →
+                Xem lịch khám của tôi →
               </button>
             ) : isExpired ? (
               <button
@@ -372,7 +430,9 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
 
             {/* Support footer */}
             <div className="payment-support-footer">
-              <span>Hỗ trợ giao dịch: <strong>1900 7178</strong></span>
+              <span>
+                Hỗ trợ giao dịch: <strong>1900 7178</strong>
+              </span>
               {bookingState === 'idle' && !isExpired && (
                 <button
                   type="button"

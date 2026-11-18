@@ -114,9 +114,7 @@ export function AvailableSlots({
   const [departmentId, setDepartmentId] = useState(
     searchParams.get('departmentId') ?? '',
   );
-  const [doctorId, setDoctorId] = useState(
-    searchParams.get('doctorId') ?? '',
-  );
+  const [doctorId, setDoctorId] = useState(searchParams.get('doctorId') ?? '');
   const [serviceId, setServiceId] = useState(
     searchParams.get('serviceId') ?? '',
   );
@@ -419,7 +417,8 @@ export function AvailableSlots({
   }, [doctors, departments, searchKeyword]);
 
   async function holdSlot(slot: AvailableSlot) {
-    const currentDoc = displayDoctors.find((d) => d.id === doctorId) || displayDoctors[0];
+    const currentDoc =
+      displayDoctors.find((d) => d.id === doctorId) || displayDoctors[0];
     const docName = currentDoc?.displayName || 'TS.BS Nguyễn Minh Anh';
     const specName = currentDoc?.specialty || 'Tim mạch';
     const slotString = `${timeInVietnam(slot.startAt)} · ${date}`;
@@ -450,8 +449,12 @@ export function AvailableSlots({
               profiles?.find((item) => item.id === targetPatientId)?.fullName ??
               'Nguyễn Hoàng Nam',
             doctorName: docName,
-            serviceName: services.find((item) => item.id === serviceId)?.name ?? 'Khám Tim mạch theo yêu cầu',
-            departmentName: departments.find((item) => item.id === departmentId)?.name ?? specName,
+            serviceName:
+              services.find((item) => item.id === serviceId)?.name ??
+              'Khám Tim mạch theo yêu cầu',
+            departmentName:
+              departments.find((item) => item.id === departmentId)?.name ??
+              specName,
             timeSlot: slotString,
             returnTo: assistedPatient
               ? '/staff/reception?tab=r02'
@@ -474,7 +477,8 @@ export function AvailableSlots({
   }
 
   async function handleContinue() {
-    const currentDoc = displayDoctors.find((d) => d.id === doctorId) || displayDoctors[0];
+    const currentDoc =
+      displayDoctors.find((d) => d.id === doctorId) || displayDoctors[0];
     const docName = currentDoc?.displayName || 'TS.BS Nguyễn Minh Anh';
     const specName = currentDoc?.specialty || 'Tim mạch';
     const slotString = `${selectedSlotTime} · ${date}`;
@@ -512,11 +516,16 @@ export function AvailableSlots({
               amountVnd: hold.priceSnapshot?.amountVnd ?? 150000,
               patientName:
                 assistedPatient?.fullName ??
-                profiles?.find((item) => item.id === targetPatientId)?.fullName ??
+                profiles?.find((item) => item.id === targetPatientId)
+                  ?.fullName ??
                 'Nguyễn Hoàng Nam',
               doctorName: docName,
-              serviceName: services.find((item) => item.id === serviceId)?.name ?? 'Khám Tim mạch theo yêu cầu',
-              departmentName: departments.find((item) => item.id === departmentId)?.name ?? specName,
+              serviceName:
+                services.find((item) => item.id === serviceId)?.name ??
+                'Khám Tim mạch theo yêu cầu',
+              departmentName:
+                departments.find((item) => item.id === departmentId)?.name ??
+                specName,
               timeSlot: slotString,
               returnTo: assistedPatient
                 ? '/staff/reception?tab=r02'
@@ -546,7 +555,11 @@ export function AvailableSlots({
       {/* Tiêu đề trang (Figma 1:3540) */}
       <div className="patient-header-banner">
         <span className="home-eyebrow">CHĂM SÓC SỨC KHỎE</span>
-        <h1 id="slots-heading" className="home-hero-title" style={{ fontSize: '26px' }}>
+        <h1
+          id="slots-heading"
+          className="home-hero-title"
+          style={{ fontSize: '26px' }}
+        >
           Đặt lịch khám
         </h1>
         <p className="home-hero-desc">
@@ -558,29 +571,32 @@ export function AvailableSlots({
       <nav className="booking-stepper" aria-label="Các bước đặt khám">
         <div className="stepper-step is-completed">
           <span className="step-number">✓</span>
-          <span>1  Chuyên khoa</span>
+          <span>1 Chuyên khoa</span>
         </div>
         <div className="stepper-divider" />
         <div className="stepper-step is-active">
           <span className="step-number">2</span>
-          <span>2  Bác sĩ &amp; giờ khám</span>
+          <span>2 Bác sĩ &amp; giờ khám</span>
         </div>
         <div className="stepper-divider" />
         <div className="stepper-step">
           <span className="step-number">3</span>
-          <span>3  Xác nhận &amp; TT</span>
+          <span>3 Xác nhận &amp; TT</span>
         </div>
         <div className="stepper-divider" />
         <div className="stepper-step">
           <span className="step-number">4</span>
-          <span>4  Hoàn tất</span>
+          <span>4 Hoàn tất</span>
         </div>
       </nav>
 
       {/* 2. Bố cục 2 cột chính: Cột trái (Bác sĩ) + Cột phải (Lịch & Giờ) */}
       <div className="booking-columns-layout">
         {/* CỘT TRÁI (697px): Tìm kiếm & Danh sách thẻ bác sĩ (Figma 1:3552) */}
-        <section className="booking-doctors-section" aria-label="Danh sách bác sĩ">
+        <section
+          className="booking-doctors-section"
+          aria-label="Danh sách bác sĩ"
+        >
           {/* Thanh tìm kiếm & lọc chuyên khoa (Figma 1:3554) */}
           <div className="doctor-filter-bar">
             <select
@@ -731,7 +747,7 @@ export function AvailableSlots({
                       <p className="doctor-degree-title">{doc.degree}</p>
                       <h3 className="doctor-full-name">{doc.displayName}</h3>
                       <p className="doctor-specialty-rating">
-                        {doc.specialty}  ·  {doc.rating}
+                        {doc.specialty} · {doc.rating}
                       </p>
                       <p className="doctor-exam-fee">{doc.fee}</p>
                     </div>
@@ -762,13 +778,24 @@ export function AvailableSlots({
         </section>
 
         {/* CỘT PHẢI (419px): Chọn ngày & giờ khám (Figma 1:3586) */}
-        <aside className="booking-datetime-panel" aria-label="Chọn ngày và giờ khám">
+        <aside
+          className="booking-datetime-panel"
+          aria-label="Chọn ngày và giờ khám"
+        >
           <h2 className="panel-section-title">Chọn ngày &amp; giờ</h2>
 
           {/* Chọn hồ sơ nếu có patientApi */}
           {patientApi && (
             <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary, #475569)', marginBottom: '4px' }}>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  color: 'var(--text-secondary, #475569)',
+                  marginBottom: '4px',
+                }}
+              >
                 Hồ sơ người khám
               </label>
               <select
@@ -872,13 +899,18 @@ export function AvailableSlots({
           </div>
 
           {/* Lưới các ngày trong tháng (Figma 1:3596 - 1:3642) */}
-          <div className="calendar-days-grid" role="grid" aria-label="Các ngày trong tháng">
+          <div
+            className="calendar-days-grid"
+            role="grid"
+            aria-label="Các ngày trong tháng"
+          >
             {Array.from({ length: daysInMonth }, (_, index) => {
               const dayNum = index + 1;
               const formatted = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
               const isSelected = date === formatted;
               const isToday = formatted === localDateToday();
-              const cellStyle = dayNum === 1 ? { gridColumnStart: firstDayCol } : undefined;
+              const cellStyle =
+                dayNum === 1 ? { gridColumnStart: firstDayCol } : undefined;
 
               return (
                 <button
@@ -897,12 +929,14 @@ export function AvailableSlots({
           </div>
 
           {/* Tiêu đề khung giờ (Figma 1:3625) */}
-          <h3 className="timeslot-section-title">
-            {selectedDateLabel}
-          </h3>
+          <h3 className="timeslot-section-title">{selectedDateLabel}</h3>
 
           {/* Lưới các khung giờ khám (Figma 1:3626 - 1:3637) */}
-          <div className="timeslot-grid" role="group" aria-label="Danh sách khung giờ">
+          <div
+            className="timeslot-grid"
+            role="group"
+            aria-label="Danh sách khung giờ"
+          >
             {DEFAULT_TIME_SLOTS.map((slot) => {
               const isSelected = selectedSlotTime === slot.time;
               const isBooked = slot.state === 'booked';
