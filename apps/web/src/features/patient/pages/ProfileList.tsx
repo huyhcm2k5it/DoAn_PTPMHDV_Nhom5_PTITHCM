@@ -198,11 +198,19 @@ export function ProfileList({
   }
 
   return (
-    <section className="page-content" aria-labelledby="profiles-heading">
-      <div className="patient-header-banner">
-        <p className="eyebrow">CHĂM SÓC SỨC KHỎE</p>
-        <h1 id="profiles-heading">Hồ sơ của tôi</h1>
-        <p>Quản lý hồ sơ sức khỏe cho bạn và những người thân yêu.</p>
+    <section
+      className="page-content quan-workflow"
+      aria-labelledby="profiles-heading"
+    >
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">CHĂM SÓC SỨC KHỎE</p>
+          <h1 id="profiles-heading">Hồ sơ của tôi</h1>
+          <p>Quản lý hồ sơ bản thân và người thân để đặt lịch khám.</p>
+        </div>
+        <Link to="/patient/profiles/new" className="button button-primary">
+          Tạo hồ sơ mới
+        </Link>
       </div>
 
       {state.loading ? (
@@ -264,7 +272,7 @@ export function ProfileList({
                           : 'Chưa cập nhật BHYT'}
                     </div>
 
-                    <div style={{ marginTop: '8px' }}>
+                    <div className="quan-actions" style={{ marginTop: '8px' }}>
                       <Link
                         className="text-link"
                         to={`/patient/profiles/${encodeURIComponent(profile.id)}`}
@@ -272,6 +280,18 @@ export function ProfileList({
                       >
                         Xem hồ sơ <span aria-hidden="true">→</span>
                       </Link>
+                      {profile.active !== false && (
+                        <Link
+                          className="text-link"
+                          to={
+                            '/patient/appointments/new?' +
+                            new URLSearchParams({ patientId: profile.id })
+                          }
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          Đặt lịch khám
+                        </Link>
+                      )}
                     </div>
                   </article>
                 );

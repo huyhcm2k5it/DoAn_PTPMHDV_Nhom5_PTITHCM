@@ -117,7 +117,17 @@ async function prescriptionDetail({
       state: 'FINAL',
       itemsSnapshot: prescription.itemsSnapshot,
     },
-    stock: stock.map((s) => ({ ...s, available: s.onHand - s.reserved })),
+    stock: stock.map((row) => {
+      const snapshot = medicine.find(
+        (item) => item.entityId === row.medicineId,
+      )?.fullSnapshot;
+      return {
+        ...row,
+        medicineCode: snapshot?.code,
+        name: snapshot?.name,
+        available: row.onHand - row.reserved,
+      };
+    }),
     holds: holds.map((h) => ({
       id: h.id,
       prescriptionId,

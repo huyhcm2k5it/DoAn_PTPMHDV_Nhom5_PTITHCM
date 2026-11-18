@@ -42,6 +42,7 @@ export interface PatientApiOptions {
 }
 
 export interface PatientApi {
+  search?(query: string, signal?: AbortSignal): Promise<PatientPage>;
   list(page: number, limit: number, signal?: AbortSignal): Promise<PatientPage>;
   getById(patientId: string, signal?: AbortSignal): Promise<PatientProfile>;
   create?(

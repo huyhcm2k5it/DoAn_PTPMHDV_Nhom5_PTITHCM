@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import type { PharmacyApi, Prescription } from '../types';
 import { ErrorPanel } from '../../../shared/ui/ErrorPanel';
 import { Loading } from '../../../shared/ui/Loading';
 import { EmptyState } from '../../../shared/ui/EmptyState';
 import '../pharmacy.css';
+import { PrescriptionDetail } from './PrescriptionDetail';
+
 export function PrescriptionQueue({ api }: { api: PharmacyApi }) {
+  const { prescriptionId } = useParams();
   const [page, setPage] = useState(1),
     [generation, setGeneration] = useState(0);
   const [items, setItems] = useState<Prescription[]>(),
@@ -29,14 +32,14 @@ export function PrescriptionQueue({ api }: { api: PharmacyApi }) {
     return () => controller.abort();
   }, [api, page, generation]);
   return (
-    <section className="page-content pharmacy">
+    <section className="page-content pharmacy quan-workflow">
       <header className="page-heading">
         <div>
           <p className="eyebrow">QUẦY DƯỢC</p>
-          <h1>Toa chờ cấp thuốc</h1>
-          <p>Chỉ hiển thị toa đã được bác sĩ chốt.</p>
+          <h1>Cấp phát thuốc</h1>
+          <p>Đối chiếu đơn thuốc và bàn giao cho người bệnh.</p>
         </div>
-        <Link className="text-link" to="/staff/pharmacy">
+        <Link className="text-link" to="/staff/pharmacy/stock">
           Kho thuốc
         </Link>
       </header>
@@ -44,27 +47,42 @@ export function PrescriptionQueue({ api }: { api: PharmacyApi }) {
         <ErrorPanel error={error} onRetry={() => setGeneration((v) => v + 1)} />
       ) : !items ? (
         <Loading label="Đang tải toa thuốc" />
-      ) : items.length === 0 ? (
+      ) : items.length === 0 && !prescriptionId ? (
         <EmptyState title="Không có toa chờ cấp" />
       ) : (
-        <div className="profile-grid">
-          {items.map((rx) => (
-            <article className="state-card" key={rx.id}>
-              <h2>Toa {rx.prescriptionId || rx.id}</h2>
-              <p>
-                Phiên bản {rx.revision} · Hồ sơ {rx.patientId}
-              </p>
-              <Link
-                className="text-link"
-                to={
-                  '/staff/pharmacy/prescriptions/' +
-                  encodeURIComponent(rx.prescriptionId || rx.id)
+        <div className="pharmacy-workspace">
+          <aside className="state-card prescription-sidebar">
+            <h2>Hàng chờ toa đã ký</h2>
+            <p className="field-hint">{total} toa thuốc</p>
+            {items.map((rx) => {
+              const id = rx.prescriptionId ?? rx.id;
+              return (
+                <Link
+                  key={id}
+                  aria-current={prescriptionId === id ? 'page' : undefined}
+                  className="prescription-option"
+                  to={'/staff/pharmacy/prescriptions/' + encodeURIComponent(id)}
+                >
+                  <strong>{id}</strong>
+                  <span>Hồ sơ {rx.patientId}</span>
+                  <small>Toa đã ký · Phiên bản {rx.revision}</small>
+                </Link>
+              );
+            })}
+          </aside>
+          <div className="state-card prescription-main">
+            {prescriptionId || items[0] ? (
+              <PrescriptionDetail
+                key={prescriptionId ?? items[0]?.id}
+                api={api}
+                prescriptionId={
+                  prescriptionId ?? items[0].prescriptionId ?? items[0].id
                 }
-              >
-                Tiếp nhận toa
-              </Link>
-            </article>
-          ))}
+              />
+            ) : (
+              <EmptyState title="Chọn toa thuốc cần đối chiếu" />
+            )}
+          </div>
         </div>
       )}
       <nav className="pagination" aria-label="Phân trang toa thuốc">
