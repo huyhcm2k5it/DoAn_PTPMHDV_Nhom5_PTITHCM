@@ -64,6 +64,7 @@ import {
 import type { WebRuntime } from './runtime';
 import { LoginPage } from '../features/identity/LoginPage';
 import './app.css';
+import './quan-workflow.css';
 import { RegisterPage } from '../features/identity/RegisterPage';
 import { VerifyOtpPage } from '../features/identity/VerifyOtpPage';
 import { ForgotPasswordPage } from '../features/identity/ForgotPasswordPage';
@@ -76,23 +77,7 @@ const noAdapter = async (): Promise<Response> => {
 };
 
 function MedicalCross() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 20 20"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        d="M10 4V16M4 10H16"
-        stroke="white"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+  return <img src="/images/hqh/imgCross.svg" alt="" width="20" height="20" />;
 }
 
 function formatCurrentDateVi() {
@@ -171,42 +156,78 @@ function AppLayout({ session }: { session?: WebRuntime['session'] }) {
                 to="/patient/home"
                 className={`sidebar-nav-item ${isHomeActive ? 'is-active' : ''}`}
               >
-                <House className="sidebar-nav-icon" />
+                <img
+                  src="/images/hqh/imgHouse.svg"
+                  className="sidebar-nav-icon"
+                  width="20"
+                  height="20"
+                  alt=""
+                />
                 <span>Trang chủ</span>
               </Link>
               <Link
                 to="/patient/appointments/new"
                 className={`sidebar-nav-item ${isBookingActive ? 'is-active' : ''}`}
               >
-                <CalendarPlus className="sidebar-nav-icon" />
+                <img
+                  src="/images/hqh/imgCalendarPlus.svg"
+                  className="sidebar-nav-icon"
+                  width="20"
+                  height="20"
+                  alt=""
+                />
                 <span>Đặt lịch khám</span>
               </Link>
               <Link
                 to="/patient/appointments"
                 className={`sidebar-nav-item ${isMyAppointmentsActive ? 'is-active' : ''}`}
               >
-                <CalendarDays className="sidebar-nav-icon" />
+                <img
+                  src="/images/hqh/imgCalendarDays.svg"
+                  className="sidebar-nav-icon"
+                  width="20"
+                  height="20"
+                  alt=""
+                />
                 <span>Lịch khám của tôi</span>
               </Link>
               <Link
                 to="/patient/profiles"
                 className={`sidebar-nav-item ${isProfileActive ? 'is-active' : ''}`}
               >
-                <ContactRound className="sidebar-nav-icon" />
+                <img
+                  src="/images/hqh/imgContactRound.svg"
+                  className="sidebar-nav-icon"
+                  width="20"
+                  height="20"
+                  alt=""
+                />
                 <span>Hồ sơ của tôi</span>
               </Link>
               <Link
                 to="/patient/appointments?tab=lab"
                 className={`sidebar-nav-item ${isLabResultsActive ? 'is-active' : ''}`}
               >
-                <FileHeart className="sidebar-nav-icon" />
+                <img
+                  src="/images/hqh/imgFileHeart.svg"
+                  className="sidebar-nav-icon"
+                  width="20"
+                  height="20"
+                  alt=""
+                />
                 <span>Kết quả xét nghiệm</span>
               </Link>
               <Link
                 to="/patient/medications"
                 className={`sidebar-nav-item ${isPrescriptionActive ? 'is-active' : ''}`}
               >
-                <Pill className="sidebar-nav-icon" />
+                <img
+                  src="/images/hqh/imgPill.svg"
+                  className="sidebar-nav-icon"
+                  width="20"
+                  height="20"
+                  alt=""
+                />
                 <span>Đơn thuốc</span>
               </Link>
             </>
@@ -233,7 +254,13 @@ function AppLayout({ session }: { session?: WebRuntime['session'] }) {
                     `sidebar-nav-item ${isActive ? 'is-active' : ''}`
                   }
                 >
-                  <ContactRound className="sidebar-nav-icon" />
+                  <img
+                    src="/images/hqh/imgContactRound.svg"
+                    className="sidebar-nav-icon"
+                    width="20"
+                    height="20"
+                    alt=""
+                  />
                   <span>Quầy tiếp nhận</span>
                 </NavLink>
               )}
@@ -255,7 +282,13 @@ function AppLayout({ session }: { session?: WebRuntime['session'] }) {
                     `sidebar-nav-item ${isActive ? 'is-active' : ''}`
                   }
                 >
-                  <Pill className="sidebar-nav-icon" />
+                  <img
+                    src="/images/hqh/imgPill.svg"
+                    className="sidebar-nav-icon"
+                    width="20"
+                    height="20"
+                    alt=""
+                  />
                   <span>Quầy dược</span>
                 </NavLink>
               )}
@@ -339,13 +372,18 @@ function AppLayout({ session }: { session?: WebRuntime['session'] }) {
               className="header-bell-btn"
               aria-label="Thông báo"
             >
-              <Bell size={20} />
+              <img
+                src="/images/hqh/imgBell.svg"
+                width="20"
+                height="20"
+                alt=""
+              />
             </button>
             <div className="header-user-profile">
               <span className="header-user-name">
                 {session?.userId
                   ? `Người dùng #${session.userId.slice(-6)}`
-                  : 'Nguyễn Hoàng Nam'}
+                  : 'Chưa đăng nhập'}
               </span>
               <span className="header-user-role">{roleCaption}</span>
             </div>
@@ -534,7 +572,17 @@ function AppRoutes({
 
       <Route element={<AppLayout session={session} />}>
         <Route path="/" element={<Navigate to="/patient/home" replace />} />
-        <Route path="/patient/home" element={<PatientHome />} />
+        <Route
+          path="/patient/home"
+          element={
+            <PatientHome
+              patientApi={
+                session?.actorType === 'PATIENT' ? patientApi : undefined
+              }
+              appointmentApi={appointmentApi}
+            />
+          }
+        />
         <Route
           path="/patient/profiles"
           element={<ProfileList api={patientApi} />}
@@ -557,7 +605,15 @@ function AppRoutes({
         />
         <Route
           path="/patient/appointments/new"
-          element={<AvailableSlots api={appointmentApi} catalog={catalogApi} />}
+          element={
+            <AvailableSlots
+              api={appointmentApi}
+              catalog={catalogApi}
+              patientApi={
+                session?.actorType === 'PATIENT' ? patientApi : undefined
+              }
+            />
+          }
         />
         <Route
           path="/patient/appointments/review"
@@ -565,11 +621,26 @@ function AppRoutes({
         />
         <Route
           path="/patient/appointments"
-          element={<MyAppointments api={appointmentApi} />}
+          element={
+            <MyAppointments api={appointmentApi} patientApi={patientApi} />
+          }
         />
         <Route
           path="/staff/reception"
-          element={<ReceptionQueue api={appointmentApi} />}
+          element={
+            session?.actorType === 'STAFF' &&
+            session.capabilities.includes('RECEPTION') ? (
+              <ReceptionQueue
+                api={appointmentApi}
+                patientApi={patientApi}
+                catalog={catalogApi}
+              />
+            ) : (
+              <section className="page-content" role="alert">
+                Cần quyền tiếp đón để mở bàn tiếp nhận.
+              </section>
+            )
+          }
         />
         <Route
           path="/staff/schedules"
@@ -586,7 +657,17 @@ function AppRoutes({
         <Route element={<PharmacyAccess session={session} />}>
           <Route
             path="/staff/pharmacy"
+            element={<PrescriptionQueue api={pharmacyApi} />}
+          />
+          <Route
+            path="/staff/pharmacy/stock"
             element={<StockPage api={pharmacyApi} />}
+          />
+          <Route
+            path="/staff/pharmacy/stock/adjust"
+            element={
+              <StockPage api={pharmacyApi} catalog={catalogApi} adjust />
+            }
           />
           <Route
             path="/staff/pharmacy/prescriptions"
@@ -594,7 +675,7 @@ function AppRoutes({
           />
           <Route
             path="/staff/pharmacy/prescriptions/:prescriptionId"
-            element={<PharmacyDetailRoute api={pharmacyApi} />}
+            element={<PrescriptionQueue api={pharmacyApi} />}
           />
         </Route>
         <Route
@@ -642,6 +723,14 @@ function AppRoutes({
         <Route
           path="/patient/appointments/:appointmentId"
           element={<AppointmentDetail api={appointmentApi} />}
+        />
+        <Route
+          path="/patient/appointments/:appointmentId/reschedule"
+          element={<AppointmentDetail api={appointmentApi} mode="reschedule" />}
+        />
+        <Route
+          path="/patient/appointments/:appointmentId/cancel"
+          element={<AppointmentDetail api={appointmentApi} mode="cancel" />}
         />
         <Route
           path="*"
@@ -692,8 +781,8 @@ export function App({ runtime: propRuntime }: { runtime?: WebRuntime } = {}) {
     [apiTransport, runtime?.session?.lease],
   );
   const appointmentApi = useMemo(
-    () => createAppointmentApi(apiTransport),
-    [apiTransport],
+    () => createAppointmentApi(apiTransport, runtime?.session?.lease),
+    [apiTransport, runtime?.session?.lease],
   );
   const catalogApi = useMemo(
     () => createCatalogApi(apiTransport),

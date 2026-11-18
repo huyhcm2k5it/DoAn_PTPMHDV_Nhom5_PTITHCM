@@ -49,7 +49,7 @@ func TestDiagnosticPublishedResultWire(t *testing.T) {
 	if _, err = db.pool.Exec(ctx, `INSERT INTO visits(id,appointment_id,patient_id,doctor_user_id,department_id,claim_id,state,version,return_round,started_at) VALUES($1,$2,$3,$4,$5,$6,'LAB_REQUEST_PENDING',1,0,$7)`, payload.VisitID, domain.NewID(), domain.NewID(), domain.NewID(), domain.NewID(), domain.NewID(), now); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.pool.Exec(ctx, `INSERT INTO lab_requests(request_id,visit_id,state,order_id,request_hash,tests) VALUES($1,$2,'CREATED',$3,$4,'[]')`, event.RequestID, payload.VisitID, payload.OrderID, domain.Hash(event.RequestID)); err != nil {
+	if _, err = db.pool.Exec(ctx, `INSERT INTO lab_requests(id,visit_id,state,order_id,request_hash,test_snapshot) VALUES($1,$2,'CREATED',$3,$4,'[]')`, event.RequestID, payload.VisitID, payload.OrderID, domain.Hash(event.RequestID)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -63,7 +63,7 @@ func TestDiagnosticPublishedResultWire(t *testing.T) {
 	}
 	var requestState, visitState, terminalState string
 	var returnEvents int
-	if err = db.pool.QueryRow(ctx, `SELECT state FROM lab_requests WHERE request_id=$1`, event.RequestID).Scan(&requestState); err != nil {
+	if err = db.pool.QueryRow(ctx, `SELECT state FROM lab_requests WHERE id=$1`, event.RequestID).Scan(&requestState); err != nil {
 		t.Fatal(err)
 	}
 	if err = db.pool.QueryRow(ctx, `SELECT state FROM visits WHERE id=$1`, payload.VisitID).Scan(&visitState); err != nil {

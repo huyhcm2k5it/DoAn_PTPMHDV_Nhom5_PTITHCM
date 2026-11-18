@@ -585,8 +585,8 @@
       "service": "diagnostic",
       "method": "POST",
       "path": "/api/v1/diagnostic-orders",
-      "actor": "SERVICE[Clinical]; handler CreateLabOrder cùng requestId/hash; DOCTOR dùng CL-005",
-      "success": "201",
+      "actor": "SERVICE[Clinical] với registry requestId/requestHash đã xác minh; DOCTOR dùng CL-005",
+      "success": "202",
       "errors": "400, 401, 403, 404, 409, 503",
       "poll": "",
       "profile": "recovery"

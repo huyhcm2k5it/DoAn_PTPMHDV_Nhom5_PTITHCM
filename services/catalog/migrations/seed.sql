@@ -13,11 +13,11 @@ INSERT INTO medicines VALUES
 ('00000000-0000-4000-8000-000000000301','MED_DEMO','Thuốc mẫu dùng trong đồ án','viên','500 mg','viên nén','ACTIVE') ON CONFLICT(id) DO NOTHING;
 INSERT INTO lab_tests VALUES
 ('00000000-0000-4000-8000-000000000401','LAB_DEMO','Xét nghiệm mẫu trong đồ án','BLOOD','đơn vị demo','Tham chiếu demo',1,'ACTIVE') ON CONFLICT(id) DO NOTHING;
-INSERT INTO price_versions(id,item_type,item_id,revision,amount_vnd,effective_from,effective_to) VALUES
-('00000000-0000-4000-8000-000000000501','EXAM','00000000-0000-4000-8000-000000000201',1,150000,date_trunc('day',now())-interval '1 day',date_trunc('day',now())+interval '2 days'),
-('00000000-0000-4000-8000-000000000502','EXAM','00000000-0000-4000-8000-000000000202',1,200000,date_trunc('day',now())-interval '1 day',date_trunc('day',now())+interval '2 days'),
-('00000000-0000-4000-8000-000000000503','MEDICINE','00000000-0000-4000-8000-000000000301',1,2000,date_trunc('day',now())-interval '1 day',date_trunc('day',now())+interval '2 days'),
-('00000000-0000-4000-8000-000000000504','LAB','00000000-0000-4000-8000-000000000401',1,100000,date_trunc('day',now())-interval '1 day',date_trunc('day',now())+interval '2 days') ON CONFLICT(id) DO NOTHING;
+INSERT INTO price_versions(id,item_type,item_id,revision,amount_vnd,effective_from,effective_to,created_by) VALUES
+('00000000-0000-4000-8000-000000000501','EXAM','00000000-0000-4000-8000-000000000201',1,150000,date_trunc('day',now())-interval '1 day',date_trunc('day',now())+interval '2 days','00000000-0000-4000-8000-000000000901'),
+('00000000-0000-4000-8000-000000000502','EXAM','00000000-0000-4000-8000-000000000202',1,200000,date_trunc('day',now())-interval '1 day',date_trunc('day',now())+interval '2 days','00000000-0000-4000-8000-000000000901'),
+('00000000-0000-4000-8000-000000000503','MEDICINE','00000000-0000-4000-8000-000000000301',1,2000,date_trunc('day',now())-interval '1 day',date_trunc('day',now())+interval '2 days','00000000-0000-4000-8000-000000000901'),
+('00000000-0000-4000-8000-000000000504','LAB','00000000-0000-4000-8000-000000000401',1,100000,date_trunc('day',now())-interval '1 day',date_trunc('day',now())+interval '2 days','00000000-0000-4000-8000-000000000901') ON CONFLICT(id) DO NOTHING;
 -- Demo projection only: these UUIDs must match the Identity seed when integrating.
 INSERT INTO user_access_projection(user_id,actor_type,capabilities,token_version,status) VALUES
 ('00000000-0000-4000-8000-000000000901','STAFF','["ADMIN"]',1,'ACTIVE'),

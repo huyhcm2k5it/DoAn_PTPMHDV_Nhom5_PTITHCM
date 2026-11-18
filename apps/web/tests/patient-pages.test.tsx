@@ -247,9 +247,7 @@ describe('available slot screen', () => {
     fireEvent.change(await screen.findByLabelText('Chuyên khoa'), {
       target: { value: 'dep-1' },
     });
-    fireEvent.change(await screen.findByLabelText('Bác sĩ'), {
-      target: { value: 'doc-1' },
-    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Chọn bác sĩ' }));
     fireEvent.change(await screen.findByLabelText('Dịch vụ khám'), {
       target: { value: 'svc-1' },
     });

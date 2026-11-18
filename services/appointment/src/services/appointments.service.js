@@ -238,7 +238,9 @@ async function getAppointment({ connection, appointmentId, principalId }) {
   const Appointment = getAppointmentModel(connection);
   const appointment = await Appointment.findOne({
     id: appointmentId,
-    ...(principalId ? { principalId } : {}),
+    ...(principalId
+      ? { $or: [{ principalId }, { recipientUserId: principalId }] }
+      : {}),
   }).lean();
   if (!appointment)
     throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy lịch hẹn.');
@@ -270,7 +272,12 @@ async function listPatientAppointments({
     parsedLimit > 100
   )
     throw new ApiError(400, 'VALIDATION_ERROR', 'page/limit invalid.');
-  const query = { patientId, ...(principalId ? { principalId } : {}) };
+  const query = {
+    patientId,
+    ...(principalId
+      ? { $or: [{ principalId }, { recipientUserId: principalId }] }
+      : {}),
+  };
   if (state) query.state = state;
   if (from || to)
     query.startAt = {

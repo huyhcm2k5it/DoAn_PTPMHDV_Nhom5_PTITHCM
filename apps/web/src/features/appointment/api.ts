@@ -12,6 +12,7 @@ import type {
 
 export function createAppointmentApi(
   transport: GatewayTransport,
+  lease?: (action: string) => Promise<string>,
 ): AppointmentApi {
   async function request<T>(url: string, init?: RequestInit): Promise<T> {
     const response = await transport(url, init);
@@ -37,6 +38,14 @@ export function createAppointmentApi(
       throw error;
     }
     return body.data as T;
+  }
+  async function mutationHeaders(action: string, key?: string) {
+    const headers = new Headers({
+      'Content-Type': 'application/json',
+    });
+    if (key) headers.set('Idempotency-Key', key);
+    if (lease) headers.set('X-Authorization-Lease', await lease(action));
+    return headers;
   }
   return {
     async listAvailable(input, signal) {
@@ -80,10 +89,7 @@ export function createAppointmentApi(
       return request<AppointmentHold>('/api/v1/appointment-holds', {
         method: 'POST',
         signal,
-        headers: {
-          'Content-Type': 'application/json',
-          'Idempotency-Key': idempotencyKey,
-        },
+        headers: await mutationHeaders('AP-008', idempotencyKey),
         body: JSON.stringify(input),
       });
     },
@@ -93,7 +99,7 @@ export function createAppointmentApi(
         {
           method: 'DELETE',
           signal,
-          headers: { 'Idempotency-Key': idempotencyKey },
+          headers: await mutationHeaders('AP-009', idempotencyKey),
         },
       );
     },
@@ -101,24 +107,40 @@ export function createAppointmentApi(
       return request<AppointmentSummary>('/api/v1/appointments', {
         method: 'POST',
         signal,
-        headers: {
-          'Content-Type': 'application/json',
-          'Idempotency-Key': idempotencyKey,
-        },
+        headers: await mutationHeaders('AP-010', idempotencyKey),
         body: JSON.stringify(input),
       });
     },
     async getAppointment(appointmentId, signal) {
-      return request<AppointmentSummary>(
+      const result = await request<AppointmentSummary>(
         `/api/v1/appointments/${encodeURIComponent(appointmentId)}`,
         { signal },
       );
+      return {
+        ...result,
+        appointmentId: result.appointmentId ?? appointmentId,
+        state: String(result.appointment?.state ?? result.state),
+      };
     },
-    async listAppointments(patientId, signal) {
-      return request<{ items: AppointmentSummary[]; total: number }>(
-        `/api/v1/patients/${encodeURIComponent(patientId)}/appointments`,
-        { signal },
+    async listAppointments(patientId, signal, query = {}) {
+      const params = new URLSearchParams(query);
+      const result = await request<{
+        items: (AppointmentSummary & { id?: string })[];
+        total: number;
+      }>(
+        `/api/v1/patients/${encodeURIComponent(patientId)}/appointments${params.size ? '?' + params : ''}`,
+        {
+          signal,
+        },
       );
+      return {
+        ...result,
+        items: result.items.map((row) => ({
+          ...row,
+          appointmentId: row.appointmentId ?? row.id ?? '',
+          appointment: row.appointment ?? row,
+        })),
+      };
     },
     async reschedule(appointmentId, input, idempotencyKey, signal) {
       return request<AppointmentSummary>(
@@ -126,10 +148,7 @@ export function createAppointmentApi(
         {
           method: 'POST',
           signal,
-          headers: {
-            'Content-Type': 'application/json',
-            'Idempotency-Key': idempotencyKey,
-          },
+          headers: await mutationHeaders('AP-013', idempotencyKey),
           body: JSON.stringify(input),
         },
       );
@@ -140,10 +159,7 @@ export function createAppointmentApi(
         {
           method: 'POST',
           signal,
-          headers: {
-            'Content-Type': 'application/json',
-            'Idempotency-Key': idempotencyKey,
-          },
+          headers: await mutationHeaders('AP-014', idempotencyKey),
           body: JSON.stringify(input),
         },
       );
@@ -159,60 +175,51 @@ export function createAppointmentApi(
         { signal },
       );
     },
-    checkIn(appointmentId, expectedVersion, idempotencyKey, signal) {
+    async checkIn(appointmentId, expectedVersion, idempotencyKey, signal) {
       return request<QueueTicket>(
         `/api/v1/appointments/${encodeURIComponent(appointmentId)}/check-in`,
         {
           method: 'POST',
           signal,
-          headers: {
-            'Content-Type': 'application/json',
-            'Idempotency-Key': idempotencyKey,
-          },
+          headers: await mutationHeaders('AP-015', idempotencyKey),
           body: JSON.stringify({ expectedVersion }),
         },
       );
     },
-    callNext(input, idempotencyKey, signal) {
+    async callNext(input, idempotencyKey, signal) {
       return request<QueueTicket>('/api/v1/queues/call-next', {
         method: 'POST',
         signal,
-        headers: {
-          'Content-Type': 'application/json',
-          'Idempotency-Key': idempotencyKey,
-        },
+        headers: await mutationHeaders('AP-017', idempotencyKey),
         body: JSON.stringify(input),
       });
     },
-    noShow(ticketId, input, idempotencyKey, signal) {
+    async noShow(ticketId, input, idempotencyKey, signal) {
       return request<QueueTicket>(
         `/api/v1/queues/${encodeURIComponent(ticketId)}/no-show`,
         {
           method: 'POST',
           signal,
-          headers: {
-            'Content-Type': 'application/json',
-            'Idempotency-Key': idempotencyKey,
-          },
+          headers: await mutationHeaders('AP-018', idempotencyKey),
           body: JSON.stringify(input),
         },
       );
     },
-    createSchedule(input: ScheduleInput, signal) {
+    async createSchedule(input: ScheduleInput, signal) {
       return request<ScheduleResult>('/api/v1/schedules', {
         method: 'POST',
         signal,
-        headers: { 'Content-Type': 'application/json' },
+        headers: await mutationHeaders('AP-002'),
         body: JSON.stringify(input),
       });
     },
-    updateSchedule(scheduleId, input, signal) {
+    async updateSchedule(scheduleId, input, signal) {
       return request<ScheduleResult['schedule']>(
         `/api/v1/schedules/${encodeURIComponent(scheduleId)}`,
         {
           method: 'PATCH',
           signal,
-          headers: { 'Content-Type': 'application/json' },
+          headers: await mutationHeaders('AP-003'),
           body: JSON.stringify(input),
         },
       );

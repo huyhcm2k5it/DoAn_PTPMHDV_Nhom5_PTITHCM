@@ -31,10 +31,10 @@ func TestTerminalBeforeOrderResolutionProducesOneReturn(t *testing.T) {
 	}
 	request, order := domain.NewID(), domain.NewID()
 	request2, order2 := domain.NewID(), domain.NewID()
-	if _, err = db.pool.Exec(ctx, `INSERT INTO lab_requests(request_id,visit_id,state,request_hash,tests) VALUES($1,$2,'PENDING',$3,'[]')`, request, visit, request); err != nil {
+	if _, err = db.pool.Exec(ctx, `INSERT INTO lab_requests(id,visit_id,state,request_hash,test_snapshot) VALUES($1,$2,'PENDING',$3,'[]')`, request, visit, request); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = db.pool.Exec(ctx, `INSERT INTO lab_requests(request_id,visit_id,state,request_hash,tests) VALUES($1,$2,'PENDING',$3,'[]')`, request2, visit, request2); err != nil {
+	if _, err = db.pool.Exec(ctx, `INSERT INTO lab_requests(id,visit_id,state,request_hash,test_snapshot) VALUES($1,$2,'PENDING',$3,'[]')`, request2, visit, request2); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = db.pool.Exec(ctx, `UPDATE visits SET state='LAB_REQUEST_PENDING' WHERE id=$1`, visit); err != nil {
@@ -78,7 +78,7 @@ func TestTerminalBeforeOrderResolutionProducesOneReturn(t *testing.T) {
 	if err = db.pool.QueryRow(ctx, `SELECT state FROM visits WHERE id=$1`, visit).Scan(&state); err != nil {
 		t.Fatal(err)
 	}
-	if err = db.pool.QueryRow(ctx, `SELECT state FROM lab_requests WHERE request_id=$1`, request).Scan(&requestState); err != nil {
+	if err = db.pool.QueryRow(ctx, `SELECT state FROM lab_requests WHERE id=$1`, request).Scan(&requestState); err != nil {
 		t.Fatal(err)
 	}
 	var revision int

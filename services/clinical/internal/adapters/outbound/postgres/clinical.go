@@ -50,11 +50,14 @@ func (p *Probe) Migrate(ctx context.Context) error {
 	if err := migrateVisitGrants(ctx, tx); err != nil {
 		return err
 	}
+	if err := migrateTreatmentNormalization(ctx, tx); err != nil {
+		return err
+	}
 	return tx.Commit(ctx)
 }
 func (p *Probe) BusinessReady(ctx context.Context) error {
 	var ok bool
-	if e := p.pool.QueryRow(ctx, `SELECT count(*)=6 FROM schema_migrations WHERE version IN ('000001_clinical','000002_treatment','000003_catalog_stream','000004_lab_terminal','000005_lab_resubmit','000006_visit_grants')`).Scan(&ok); e != nil || !ok {
+	if e := p.pool.QueryRow(ctx, `SELECT count(*)=7 FROM schema_migrations WHERE version IN ('000001_clinical','000002_treatment','000003_catalog_stream','000004_lab_terminal','000005_lab_resubmit','000006_visit_grants','000007_treatment_normalization')`).Scan(&ok); e != nil || !ok {
 		return domain.Fail("SERVICE_UNAVAILABLE", "Clinical migrations are required")
 	}
 	return nil

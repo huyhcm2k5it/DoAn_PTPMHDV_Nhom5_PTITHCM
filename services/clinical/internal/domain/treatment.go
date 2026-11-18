@@ -6,6 +6,8 @@ import (
 )
 
 type PrescriptionLine struct {
+	ID           string `json:"-"`
+	MedicineID   string `json:"-"`
 	MedicineCode string `json:"medicineCode"`
 	NameSnapshot string `json:"nameSnapshot,omitempty"`
 	DoseText     string `json:"doseText"`
@@ -40,6 +42,7 @@ type Prescription struct {
 	Revision    int                `json:"revision"`
 	Lines       []PrescriptionLine `json:"lines"`
 	FinalizedAt *time.Time         `json:"finalizedAt,omitempty"`
+	FinalizedBy string             `json:"-"`
 }
 type VersionInput struct {
 	ExpectedVersion int `json:"expectedVersion"`

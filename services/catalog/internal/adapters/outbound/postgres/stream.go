@@ -225,7 +225,7 @@ func catalogSnapshotEntities(ctx context.Context, tx pgx.Tx, at time.Time) ([]ca
 		return nil, err
 	}
 	rows.Close()
-	rows, err = tx.Query(ctx, `SELECT id::text,code,name,unit,strength,form,status FROM medicines ORDER BY id`)
+	rows, err = tx.Query(ctx, `SELECT id::text,code,name,unit,COALESCE(strength,''),COALESCE(form,''),status FROM medicines ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +243,7 @@ func catalogSnapshotEntities(ctx context.Context, tx pgx.Tx, at time.Time) ([]ca
 		return nil, err
 	}
 	rows.Close()
-	rows, err = tx.Query(ctx, `SELECT id::text,code,name,specimen_type,unit,reference_range,revision,status FROM lab_tests ORDER BY id`)
+	rows, err = tx.Query(ctx, `SELECT id::text,code,name,specimen_type,COALESCE(unit,''),COALESCE(reference_range,''),revision,status FROM lab_tests ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}

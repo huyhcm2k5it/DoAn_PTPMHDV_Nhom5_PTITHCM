@@ -1,5 +1,5 @@
-import { useEffect, useId, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import type {
   CatalogApi,
   Department,
@@ -7,6 +7,7 @@ import type {
   MedicalService,
 } from '../../catalog/types';
 import type { AppointmentApi, AvailableSlot } from '../types';
+import type { PatientApi, PatientProfile } from '../../patient/types';
 import { Loading } from '../../../shared/ui/Loading';
 import { EmptyState } from '../../../shared/ui/EmptyState';
 import { ErrorPanel } from '../../../shared/ui/ErrorPanel';
@@ -23,53 +24,59 @@ function timeInVietnam(value: string) {
     ? new Intl.DateTimeFormat('vi-VN', {
         hour: '2-digit',
         minute: '2-digit',
+        hour12: false,
         timeZone: 'Asia/Ho_Chi_Minh',
       }).format(date)
     : value;
 }
 
-// Dữ liệu mẫu Figma Frame 03 (1:3502) khi danh mục chưa nạp hoặc hiển thị mặc định
+// Dữ liệu mẫu chuẩn Figma (1:3502)
 const FIGMA_DOCTORS = [
   {
     id: 'doc-nguyen-minh-anh',
-    degree: 'Tiến sĩ · Bác sĩ',
-    displayName: 'Nguyễn Minh Anh',
+    degree: 'Tiến sĩ, Bác sĩ',
+    displayName: 'TS.BS Nguyễn Minh Anh',
     specialty: 'Tim mạch',
     rating: '★ 4.9',
     fee: '150.000 đ',
-    availableSlotsCount: 4,
+    availableSlotsCount: 6,
     avatar: '/images/doctors/doctor-1.png',
   },
   {
-    id: 'doc-le-quoc-bao',
-    degree: 'Thạc sĩ · Bác sĩ',
-    displayName: 'Lê Quốc Bảo',
-    specialty: 'Cơ xương khớp',
-    rating: '★ 4.9',
+    id: 'doc-tran-thi-mai',
+    degree: 'Bác sĩ chuyên khoa II',
+    displayName: 'BS.CKII Trần Thị Mai',
+    specialty: 'Tim mạch can thiệp',
+    rating: '★ 4.8',
     fee: '150.000 đ',
     availableSlotsCount: 4,
     avatar: '/images/doctors/doctor-2.png',
   },
   {
-    id: 'doc-tran-thu-ha',
-    degree: 'Bác sĩ chuyên khoa II',
-    displayName: 'Trần Thu Hà',
-    specialty: 'Nội tổng quát',
-    rating: '★ 4.9',
+    id: 'doc-le-hoang-nam',
+    degree: 'Thạc sĩ, Bác sĩ',
+    displayName: 'ThS.BS Lê Hoàng Nam',
+    specialty: 'Nội tim mạch',
+    rating: '★ 4.7',
     fee: '150.000 đ',
-    availableSlotsCount: 4,
+    availableSlotsCount: 5,
     avatar: '/images/doctors/doctor-3.png',
   },
 ];
 
-// Khung giờ mặc định theo Figma Frame 03 (1:3626 - 1:3637)
 const DEFAULT_TIME_SLOTS = [
   { time: '08:00', state: 'available' },
-  { time: '08:15', state: 'booked' },
-  { time: '08:30', state: 'available' },
-  { time: '08:45', state: 'available' },
+  { time: '08:30', state: 'selected' },
   { time: '09:00', state: 'available' },
-  { time: '09:15', state: 'available' },
+  { time: '09:30', state: 'booked' },
+  { time: '10:00', state: 'available' },
+  { time: '10:30', state: 'available' },
+  { time: '13:30', state: 'available' },
+  { time: '14:00', state: 'booked' },
+  { time: '14:30', state: 'available' },
+  { time: '15:00', state: 'available' },
+  { time: '15:30', state: 'available' },
+  { time: '16:00', state: 'booked' },
 ];
 
 const MONTH_NAMES = [
@@ -92,20 +99,60 @@ const YEAR_OPTIONS = [2025, 2026, 2027, 2028, 2029, 2030];
 export function AvailableSlots({
   api,
   catalog,
+  patientApi,
+  assistedPatient,
 }: {
   api: AppointmentApi;
+  patientApi?: PatientApi;
+  assistedPatient?: PatientProfile;
   catalog: Pick<CatalogApi, 'departments' | 'doctors' | 'services'>;
 }) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [departmentId, setDepartmentId] = useState('');
-  const [doctorId, setDoctorId] = useState(searchParams.get('doctorId') ?? 'doc-nguyen-minh-anh');
-  const [serviceId, setServiceId] = useState(searchParams.get('serviceId') ?? '');
-  const [date, setDate] = useState(localDateToday);
-  const [patientId, setPatientId] = useState(searchParams.get('patientId') ?? '');
+  const [departmentId, setDepartmentId] = useState(
+    searchParams.get('departmentId') ?? '',
+  );
+  const [doctorId, setDoctorId] = useState(
+    searchParams.get('doctorId') ?? '',
+  );
+  const [serviceId, setServiceId] = useState(
+    searchParams.get('serviceId') ?? '',
+  );
+  const [date, setDate] = useState(
+    () => searchParams.get('date') ?? localDateToday(),
+  );
+  const [patientId, setPatientId] = useState(
+    assistedPatient?.id ?? searchParams.get('patientId') ?? '',
+  );
   const [searchKeyword, setSearchKeyword] = useState('');
+  const [profiles, setProfiles] = useState<PatientProfile[]>();
+  const [profileError, setProfileError] = useState<unknown>();
+  const holdIntent = useRef<{ signature: string; key: string } | null>(null);
+
+  useEffect(() => {
+    if (!patientApi) return;
+    const controller = new AbortController();
+    patientApi.list(1, 100, controller.signal).then(
+      ({ items }) => {
+        if (controller.signal.aborted) return;
+        const active = items.filter((item) => item.active !== false);
+        setProfiles(active);
+        setPatientId((value) =>
+          active.some((item) => item.id === value)
+            ? value
+            : (active.find((item) => item.relation === 'SELF')?.id ??
+              active[0]?.id ??
+              ''),
+        );
+      },
+      (error) => {
+        if (!controller.signal.aborted) setProfileError(error);
+      },
+    );
+    return () => controller.abort();
+  }, [patientApi]);
 
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [services, setServices] = useState<MedicalService[]>([]);
@@ -123,6 +170,9 @@ export function AvailableSlots({
   }>({ loading: false });
   const [slotRetry, setSlotRetry] = useState(0);
   const [holdError, setHoldError] = useState<unknown>();
+  const [selectedSlot, setSelectedSlot] = useState<AvailableSlot>();
+  const [doctorPage, setDoctorPage] = useState(1);
+  const [doctorTotal, setDoctorTotal] = useState(0);
   const [holdingSlot, setHoldingSlot] = useState<string>();
 
   // Slot đang được người dùng chọn trên UI
@@ -282,19 +332,14 @@ export function AvailableSlots({
     let current = true;
     setCatalogState({ loading: true });
     Promise.all([
-      catalog.doctors(departmentId, 1, controller.signal),
+      catalog.doctors(departmentId, doctorPage, controller.signal),
       catalog.services(departmentId, controller.signal),
     ]).then(
-      ([doctorPage, serviceItems]) => {
+      ([doctorPageData, serviceItems]) => {
         if (!current) return;
-        setDoctors(doctorPage.items);
+        setDoctors(doctorPageData.items);
+        setDoctorTotal(doctorPageData.total);
         setServices(serviceItems);
-        if (doctorPage.items.length > 0 && !doctorId) {
-          setDoctorId(doctorPage.items[0].id);
-        }
-        if (serviceItems.length > 0 && !serviceId) {
-          setServiceId(serviceItems[0].id);
-        }
         setCatalogState({ loading: false });
       },
       (error) => {
@@ -307,13 +352,14 @@ export function AvailableSlots({
       current = false;
       controller.abort();
     };
-  }, [catalog, departmentId]);
+  }, [catalog, departmentId, catalogRetry, doctorPage]);
 
   // Tra cứu khung giờ thực tế từ API
   useEffect(() => {
-    if (!submitted) return;
+    if (!submitted || !doctorId || !serviceId || !date) return;
     const controller = new AbortController();
     let current = true;
+    setSelectedSlot(undefined);
     setSlotState({ loading: true });
     api.listAvailable({ doctorId, serviceId, date }, controller.signal).then(
       (items) => {
@@ -372,6 +418,61 @@ export function AvailableSlots({
     );
   }, [doctors, departments, searchKeyword]);
 
+  async function holdSlot(slot: AvailableSlot) {
+    const currentDoc = displayDoctors.find((d) => d.id === doctorId) || displayDoctors[0];
+    const docName = currentDoc?.displayName || 'TS.BS Nguyễn Minh Anh';
+    const specName = currentDoc?.specialty || 'Tim mạch';
+    const slotString = `${timeInVietnam(slot.startAt)} · ${date}`;
+
+    const targetPatientId = patientId || 'patient-default';
+    const signature = JSON.stringify([targetPatientId, slot.slotId]);
+    if (holdIntent.current?.signature !== signature) {
+      holdIntent.current = { signature, key: crypto.randomUUID() };
+    }
+
+    setHoldError(undefined);
+    setHoldingSlot(slot.slotId);
+    try {
+      const hold = await api.createHold(
+        { patientId: targetPatientId, slotId: slot.slotId },
+        holdIntent.current.key,
+      );
+      holdIntent.current = null;
+      navigate(
+        `/patient/appointments/review?patientId=${encodeURIComponent(targetPatientId)}&holdId=${encodeURIComponent(hold.holdId)}&doctorName=${encodeURIComponent(docName)}&specialty=${encodeURIComponent(specName)}&timeSlot=${encodeURIComponent(slotString)}`,
+        {
+          state: {
+            expiresAt: hold.expiresAt,
+            amountVnd: hold.priceSnapshot?.amountVnd ?? 150000,
+            startAt: slot.startAt,
+            patientName:
+              assistedPatient?.fullName ??
+              profiles?.find((item) => item.id === targetPatientId)?.fullName ??
+              'Nguyễn Hoàng Nam',
+            doctorName: docName,
+            serviceName: services.find((item) => item.id === serviceId)?.name ?? 'Khám Tim mạch theo yêu cầu',
+            departmentName: departments.find((item) => item.id === departmentId)?.name ?? specName,
+            timeSlot: slotString,
+            returnTo: assistedPatient
+              ? '/staff/reception?tab=r02'
+              : '/patient/appointments/new?' +
+                new URLSearchParams({
+                  patientId: targetPatientId,
+                  departmentId,
+                  doctorId,
+                  serviceId,
+                  date,
+                }),
+          },
+        },
+      );
+    } catch (error) {
+      setHoldError(error);
+    } finally {
+      setHoldingSlot(undefined);
+    }
+  }
+
   async function handleContinue() {
     const currentDoc = displayDoctors.find((d) => d.id === doctorId) || displayDoctors[0];
     const docName = currentDoc?.displayName || 'TS.BS Nguyễn Minh Anh';
@@ -391,44 +492,52 @@ export function AvailableSlots({
     // Nếu dùng demo mode hoặc slot chưa nạp từ API, tạo hold qua API nếu có
     setHoldError(undefined);
     try {
+      const targetPatientId = patientId || 'patient-default';
+      const slotId = `slot-${selectedSlotTime.replace(':', '')}`;
+      const signature = JSON.stringify([targetPatientId, slotId]);
+      if (holdIntent.current?.signature !== signature) {
+        holdIntent.current = { signature, key: crypto.randomUUID() };
+      }
       if (api.createHold) {
         const hold = await api.createHold(
-          { patientId: patientId || 'patient-default', slotId: `slot-${selectedSlotTime.replace(':', '')}` },
-          crypto.randomUUID(),
+          { patientId: targetPatientId, slotId },
+          holdIntent.current.key,
         );
+        holdIntent.current = null;
         navigate(
-          `/patient/appointments/review?patientId=${encodeURIComponent(patientId || 'patient-default')}&holdId=${encodeURIComponent(hold.holdId)}&doctorName=${encodeURIComponent(docName)}&specialty=${encodeURIComponent(specName)}&timeSlot=${encodeURIComponent(slotString)}`,
+          `/patient/appointments/review?patientId=${encodeURIComponent(targetPatientId)}&holdId=${encodeURIComponent(hold.holdId)}&doctorName=${encodeURIComponent(docName)}&specialty=${encodeURIComponent(specName)}&timeSlot=${encodeURIComponent(slotString)}`,
+          {
+            state: {
+              expiresAt: hold.expiresAt,
+              amountVnd: hold.priceSnapshot?.amountVnd ?? 150000,
+              patientName:
+                assistedPatient?.fullName ??
+                profiles?.find((item) => item.id === targetPatientId)?.fullName ??
+                'Nguyễn Hoàng Nam',
+              doctorName: docName,
+              serviceName: services.find((item) => item.id === serviceId)?.name ?? 'Khám Tim mạch theo yêu cầu',
+              departmentName: departments.find((item) => item.id === departmentId)?.name ?? specName,
+              timeSlot: slotString,
+              returnTo: assistedPatient
+                ? '/staff/reception?tab=r02'
+                : '/patient/appointments/new?' +
+                  new URLSearchParams({
+                    patientId: targetPatientId,
+                    departmentId,
+                    doctorId,
+                    serviceId,
+                    date,
+                  }),
+            },
+          },
         );
       } else {
         navigate(
-          `/patient/appointments/review?patientId=${encodeURIComponent(patientId || 'patient-default')}&holdId=hold-demo-1&doctorName=${encodeURIComponent(docName)}&specialty=${encodeURIComponent(specName)}&timeSlot=${encodeURIComponent(slotString)}`,
+          `/patient/appointments/review?patientId=${encodeURIComponent(targetPatientId)}&holdId=hold-demo-1&doctorName=${encodeURIComponent(docName)}&specialty=${encodeURIComponent(specName)}&timeSlot=${encodeURIComponent(slotString)}`,
         );
       }
     } catch (error) {
       setHoldError(error);
-    }
-  }
-
-  async function holdSlot(slot: AvailableSlot) {
-    const currentDoc = displayDoctors.find((d) => d.id === doctorId) || displayDoctors[0];
-    const docName = currentDoc?.displayName || 'TS.BS Nguyễn Minh Anh';
-    const specName = currentDoc?.specialty || 'Tim mạch';
-    const slotString = `${timeInVietnam(slot.startAt)} · ${date}`;
-
-    setHoldError(undefined);
-    setHoldingSlot(slot.slotId);
-    try {
-      const hold = await api.createHold(
-        { patientId: patientId || 'patient-default', slotId: slot.slotId },
-        crypto.randomUUID(),
-      );
-      navigate(
-        `/patient/appointments/review?patientId=${encodeURIComponent(patientId || 'patient-default')}&holdId=${encodeURIComponent(hold.holdId)}&doctorName=${encodeURIComponent(docName)}&specialty=${encodeURIComponent(specName)}&timeSlot=${encodeURIComponent(slotString)}`,
-      );
-    } catch (error) {
-      setHoldError(error);
-    } finally {
-      setHoldingSlot(undefined);
     }
   }
 
@@ -454,32 +563,34 @@ export function AvailableSlots({
         <div className="stepper-divider" />
         <div className="stepper-step is-active">
           <span className="step-number">2</span>
-          <span>2  Bác sĩ & giờ khám</span>
+          <span>2  Bác sĩ &amp; giờ khám</span>
         </div>
         <div className="stepper-divider" />
         <div className="stepper-step">
           <span className="step-number">3</span>
-          <span>3  Thông tin khám</span>
+          <span>3  Xác nhận &amp; TT</span>
         </div>
         <div className="stepper-divider" />
         <div className="stepper-step">
           <span className="step-number">4</span>
-          <span>4  Xác nhận</span>
+          <span>4  Hoàn tất</span>
         </div>
       </nav>
 
-      {/* 2. Bố cục 2 cột chính (Figma 1:3543) */}
-      <div className="booking-layout-grid">
-        {/* CỘT TRÁI (697px): Lọc & Danh sách bác sĩ */}
-        <section className="booking-left-col" aria-label="Danh sách bác sĩ">
-          {/* Thanh công cụ lọc bác sĩ (Figma 1:3549) */}
-          <div className="doctor-filter-toolbar">
+      {/* 2. Bố cục 2 cột chính: Cột trái (Bác sĩ) + Cột phải (Lịch & Giờ) */}
+      <div className="booking-columns-layout">
+        {/* CỘT TRÁI (697px): Tìm kiếm & Danh sách thẻ bác sĩ (Figma 1:3552) */}
+        <section className="booking-doctors-section" aria-label="Danh sách bác sĩ">
+          {/* Thanh tìm kiếm & lọc chuyên khoa (Figma 1:3554) */}
+          <div className="doctor-filter-bar">
             <select
-              className="doctor-filter-select"
+              className="doctor-dept-select"
               value={departmentId}
               aria-label="Chọn chuyên khoa lọc"
               onChange={(e) => {
                 setDepartmentId(e.target.value);
+                setDoctorId('');
+                setServiceId('');
                 setSubmitted(false);
               }}
             >
@@ -577,10 +688,8 @@ export function AvailableSlots({
             <button type="submit">Tìm lịch trống</button>
           </form>
 
-          {/* Trạng thái tải & lỗi */}
-          {catalogState.loading && departments.length === 0 && (
-            <Loading label="Đang tải danh mục" />
-          )}
+          {/* Trạng thái tải hoặc lỗi danh mục */}
+          {catalogState.loading && <Loading label="Đang tải danh mục" />}
           {catalogState.error != null && (
             <ErrorPanel
               error={catalogState.error}
@@ -635,9 +744,12 @@ export function AvailableSlots({
                     <button
                       type="button"
                       className={`doctor-select-btn ${isSelected ? 'is-active' : 'is-inactive'}`}
+                      disabled={holdingSlot != null}
                       onClick={() => {
                         setDoctorId(doc.id);
-                        searchSlots();
+                        setSubmitted(false);
+                        setSelectedSlot(undefined);
+                        setSlotState({ loading: false });
                       }}
                     >
                       {isSelected ? 'Đã chọn' : 'Chọn bác sĩ'}
@@ -651,7 +763,43 @@ export function AvailableSlots({
 
         {/* CỘT PHẢI (419px): Chọn ngày & giờ khám (Figma 1:3586) */}
         <aside className="booking-datetime-panel" aria-label="Chọn ngày và giờ khám">
-          <h2 className="panel-section-title">Chọn ngày & giờ</h2>
+          <h2 className="panel-section-title">Chọn ngày &amp; giờ</h2>
+
+          {/* Chọn hồ sơ nếu có patientApi */}
+          {patientApi && (
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary, #475569)', marginBottom: '4px' }}>
+                Hồ sơ người khám
+              </label>
+              <select
+                className="doctor-dept-select"
+                style={{ width: '100%' }}
+                disabled={holdingSlot != null}
+                value={patientId}
+                onChange={(event) => setPatientId(event.target.value)}
+              >
+                <option value="">
+                  {profiles ? 'Chọn hồ sơ' : 'Đang tải hồ sơ…'}
+                </option>
+                {profiles?.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {profile.fullName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {assistedPatient && (
+            <p style={{ fontSize: '13px', marginBottom: '12px' }}>
+              Người khám: <strong>{assistedPatient.fullName}</strong>
+            </p>
+          )}
+          {profileError != null && <ErrorPanel error={profileError} />}
+          {profiles?.length === 0 && (
+            <p style={{ fontSize: '13px', marginBottom: '12px' }}>
+              <Link to="/patient/profiles/new">Tạo hồ sơ người khám</Link>
+            </p>
+          )}
 
           {/* Lịch tháng (Figma 1:3588 kết hợp Quick Selector Tháng / Năm / Hôm nay hiện đại) */}
           <div className="calendar-month-nav">

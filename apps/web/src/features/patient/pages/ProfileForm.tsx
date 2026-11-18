@@ -58,7 +58,10 @@ export function ProfileForm({
   }
 
   return (
-    <section className="page-content" aria-labelledby="profile-form-heading">
+    <section
+      className="page-content quan-workflow"
+      aria-labelledby="profile-form-heading"
+    >
       <Link className="back-link" to="/patient/profiles">
         ← Danh sách hồ sơ
       </Link>

@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from 'react-router-dom';
+import { formatAppointmentTime } from '../display';
 import type { AppointmentApi } from '../types';
 import { ErrorPanel } from '../../../shared/ui/ErrorPanel';
 import { Loading } from '../../../shared/ui/Loading';
@@ -9,33 +15,66 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
   const [params] = useSearchParams();
   const navigate = useNavigate();
 
+  const details = useLocation().state as {
+    expiresAt?: string;
+    amountVnd?: number;
+    startAt?: string;
+    patientName?: string;
+    doctorName?: string;
+    serviceName?: string;
+    departmentName?: string;
+    timeSlot?: string;
+    returnTo?: string;
+  } | null;
+
+  const expiresAt = Date.parse(details?.expiresAt ?? '');
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    setNow(Date.now());
+    if (!Number.isFinite(expiresAt)) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [expiresAt]);
+
+  const seconds = Math.max(0, Math.ceil((expiresAt - now) / 1000));
+  const expired = Number.isFinite(expiresAt) && seconds === 0;
+  const back = details?.returnTo ?? '/patient/appointments/new';
+
   const patientId = params.get('patientId') ?? '';
   const holdId = params.get('holdId') ?? '';
-  const doctorName = params.get('doctorName') || 'TS.BS Nguyễn Minh Anh';
-  const specialty = params.get('specialty') || 'Tim mạch';
-  const timeSlot = params.get('timeSlot') || '08:30 · 09/11/2026';
+  const doctorName = details?.doctorName || params.get('doctorName') || 'TS.BS Nguyễn Minh Anh';
+  const specialty = details?.departmentName || params.get('specialty') || 'Tim mạch';
+  const timeSlot =
+    details?.timeSlot ||
+    (details?.startAt ? formatAppointmentTime(details.startAt) : '') ||
+    params.get('timeSlot') ||
+    '08:30 · 09/11/2026';
   const location = params.get('location') || 'Phòng 204 · Cơ sở 1';
-  const patientName = params.get('patientName') || 'Nguyễn Hoàng Nam';
+  const patientName = details?.patientName || params.get('patientName') || 'Nguyễn Hoàng Nam';
+  const amountVnd = details?.amountVnd ?? 150000;
 
   const [paymentMethod, setPaymentMethod] = useState<'simulate' | 'counter'>('simulate');
   const [agreedTerms, setAgreedTerms] = useState(true);
   const [countdownSeconds, setCountdownSeconds] = useState(599); // 09:59
-  const [isExpired, setIsExpired] = useState(false);
+  const [simulatedExpired, setSimulatedExpired] = useState(false);
 
   const [bookingState, setBookingState] = useState<'idle' | 'loading' | 'confirmed' | 'error'>('idle');
   const [confirmedAppointmentId, setConfirmedAppointmentId] = useState<string>('');
   const [error, setError] = useState<unknown>();
-  const idempotencyKey = useRef(crypto.randomUUID());
+  const idempotency = useRef<{ holdId: string; key: string } | null>(null);
 
-  // Countdown 10 phút
+  const isExpired = simulatedExpired || expired;
+  const currentSeconds = Number.isFinite(expiresAt) ? seconds : countdownSeconds;
+
+  // Countdown 10 phút fallback khi không có expiresAt từ server
   useEffect(() => {
-    if (bookingState === 'confirmed' || isExpired) return;
+    if (Number.isFinite(expiresAt) || bookingState === 'confirmed' || simulatedExpired) return;
 
     const timer = setInterval(() => {
       setCountdownSeconds((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          setIsExpired(true);
+          setSimulatedExpired(true);
           return 0;
         }
         return prev - 1;
@@ -43,22 +82,25 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [bookingState, isExpired]);
+  }, [expiresAt, bookingState, simulatedExpired]);
 
-  const formatTimer = (totalSeconds: number) => {
-    const m = Math.floor(totalSeconds / 60);
-    const s = totalSeconds % 60;
+  const formatTimer = (totalSec: number) => {
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
   async function confirm() {
-    if (isExpired || !agreedTerms) return;
+    if (bookingState === 'loading' || isExpired || !agreedTerms) return;
+    if (idempotency.current?.holdId !== holdId) {
+      idempotency.current = { holdId, key: crypto.randomUUID() };
+    }
     setBookingState('loading');
     setError(undefined);
     try {
       const result = await api.createAppointment(
         { patientId, holdId },
-        idempotencyKey.current,
+        idempotency.current.key,
       );
       setConfirmedAppointmentId(result.appointmentId);
       setBookingState('confirmed');
@@ -70,7 +112,7 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
 
   function handleSimulateExpired() {
     setCountdownSeconds(0);
-    setIsExpired(true);
+    setSimulatedExpired(true);
   }
 
   if (!patientId || !holdId) {
@@ -241,10 +283,10 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
               </span>
               <span className="payment-countdown-timer">
                 {bookingState === 'confirmed'
-                  ? '150.000 đ'
+                  ? `${amountVnd.toLocaleString('vi-VN')} đ`
                   : isExpired
                     ? '00:00'
-                    : formatTimer(countdownSeconds)}
+                    : formatTimer(currentSeconds)}
               </span>
             </div>
 
@@ -255,7 +297,7 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
               </h3>
               <div className="payment-breakdown-row">
                 <span className="muted">Phí khám</span>
-                <span>150.000 đ</span>
+                <span>{amountVnd.toLocaleString('vi-VN')} đ</span>
               </div>
               <div className="payment-breakdown-row">
                 <span className="muted">Phí dịch vụ</span>
@@ -264,7 +306,7 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
               <div className="payment-divider" />
               <div className="payment-total-row">
                 <span className="payment-total-label">Tổng thanh toán</span>
-                <span className="payment-total-amount">150.000 đ</span>
+                <span className="payment-total-amount">{amountVnd.toLocaleString('vi-VN')} đ</span>
               </div>
             </div>
 
@@ -284,6 +326,7 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
             )}
 
             {/* Hiển thị lỗi nếu có */}
+            {bookingState === 'loading' && <Loading label="Đang tạo lịch hẹn" />}
             {bookingState === 'error' && (
               <div style={{ marginBottom: '16px' }}>
                 <ErrorPanel error={error} onRetry={confirm} />
@@ -307,7 +350,7 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
               <button
                 type="button"
                 className="btn-payment-action"
-                onClick={() => navigate('/patient/appointments/new')}
+                onClick={() => navigate(back)}
               >
                 Chọn lại khung giờ
               </button>

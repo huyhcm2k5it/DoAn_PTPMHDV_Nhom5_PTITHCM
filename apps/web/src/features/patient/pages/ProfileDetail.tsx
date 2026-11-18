@@ -39,7 +39,10 @@ export function ProfileDetail({
   }, [api, patientId, retry]);
 
   return (
-    <section className="page-content" aria-labelledby="profile-heading">
+    <section
+      className="page-content quan-workflow"
+      aria-labelledby="profile-heading"
+    >
       <Link className="back-link" to="/patient/profiles">
         ← Danh sách hồ sơ
       </Link>
