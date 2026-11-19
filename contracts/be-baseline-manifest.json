@@ -5,23 +5,23 @@
   "sources": [
     {
       "path": "docs/HQH_Care_API_86_9_Service_v5_2 - 01_HTTP_86.csv",
-      "sha256": "8ccf1faa1ffc4c368ac3f0b58b1c36aded76adb0d23eb32db9ea0bbb5707d8ce"
+      "sha256": "3b01796bf845bbceca2283e89d59d436e55cd1f420a819e2db0caf3308d78b5e"
     },
     {
       "path": "docs/HQH_Care_API_86_9_Service_v5_2 - 02_ThamSo.csv",
-      "sha256": "3dca22647f2d545c0fbe43f1ff179694e1319ab59bcd6e536ac753ace342706c"
+      "sha256": "cbfb2d417c1352f6b1010f8ff528ebf599642031f8980337fb27678652e3d2bb"
     },
     {
       "path": "docs/HQH_Care_API_86_9_Service_v5_2 - 03_PhanHoi.csv",
-      "sha256": "1c83fe75419d3d41e1972f55026c9ad39acbe49570fa12025a4a7be2581da09d"
+      "sha256": "6b719426bc04a8b7751faf5aeee7ec120811c8a0c5bf1edb258f32f28580891c"
     },
     {
       "path": "docs/HQH_Care_API_86_9_Service_v5_2 - 04_Events_18.csv",
-      "sha256": "14a7b4126b7a2b002ed8e7679120fb231d4b83eee64b0d818d54986ea61b0417"
+      "sha256": "f8a70c3caccd5d7bacf89cf7806923a04268454fc128bbec8a8138e5fcd7fa67"
     },
     {
       "path": "docs/HQH_Care_API_86_9_Service_v5_2 - 05_Commands_5.csv",
-      "sha256": "7109d0ae503095403d92a8c99fb90ff9efc8b6d60677e1f221253b8f0309fe17"
+      "sha256": "20482ee9ba5c3aacc2c0d70ac53244eb8d0f375d988f09087b3df71254d18229"
     },
     {
       "path": "docs/HQH_Care_API_86_9_Service_v5_2 - 06_QuyUoc.csv",
@@ -1052,12 +1052,12 @@
     {
       "Event": "BillingStatusChanged",
       "Producer": "Billing",
-      "Consumer": "Notification",
-      "Payload fields (? = tùy chọn)": "chargeId, recipientUserId, paymentId?, state, version, refundId?",
+      "Consumer": "Appointment Diagnostic Pharmacy Notification",
+      "Payload fields (? = tùy chọn)": "chargeId, recipientUserId, paymentId?, state, version, sourceType?, sourceId?, refundId?, refundStatus?",
       "Exchange": "umc.events.{producer}.v1",
       "Routing key": "billing.billing-status-changed.v1",
-      "Queue nhận": "evt.notification.v1",
-      "Quy tắc nghiệp vụ": "chargeId, recipientUserId, paymentId hoặc refundId, state, version. Thông báo thu/hoàn"
+      "Queue nhận": "evt.appointment.v1, evt.diagnostic.v1, evt.pharmacy.v1, evt.notification.v1",
+      "Quy tắc nghiệp vụ": "Thông báo thu/hoàn và projection trạng thái nguồn. Hoàn LAB cần sourceType=LAB_ORDER; sourceId là orderId; refundId và refundStatus=REQUESTED/FAILED/SUCCEEDED. version tăng theo charge. Payload sự kiện dùng sourceId của nguồn thu; API tạo refund dùng sourceId là cancellationId."
     },
     {
       "Event": "MedicationHoldChanged",
@@ -1195,11 +1195,11 @@
       "Command": "RequestCharge",
       "Producer": "Appointment Diagnostic Pharmacy",
       "Owner nhận": "Billing",
-      "Payload fields (? = tùy chọn)": "requestId, sourceType, sourceId, sourceRevision, patientId, recipientUserId, linesSnapshot, amountVnd, snapshotHash",
+      "Payload fields (? = tùy chọn)": "requestId, sourceType, sourceId, sourceRevision, patientId, recipientUserId, linesSnapshot, amountVnd, snapshotHash, expiresAt?",
       "Exchange": "umc.commands.{producer}.v1",
       "Routing key": "billing.request-charge.v1",
       "Queue nhận": "cmd.billing.v1",
-      "Phản hồi / quy tắc": "requestId, sourceType, sourceId, sourceRevision, patientId, recipientUserId, linesSnapshot, amountVnd, snapshotHash → ChargePrepared"
+      "Phản hồi / quy tắc": "ChargePrepared trả kết quả CREATED/REJECTED. expiresAt tùy chọn là thời điểm hết hạn thanh toán theo RFC3339. sourceRevision và snapshotHash cố định theo phiên bản nguồn."
     },
     {
       "Command": "CreateLabOrder",

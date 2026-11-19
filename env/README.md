@@ -39,6 +39,21 @@ Các cổng ứng dụng là hợp đồng với Gateway và healthcheck; đổi
 
 Mật khẩu nằm trong URI phải được percent-encode (`@` → `%40`, `/` → `%2F`). Base64 không mã hóa private key. Không commit file thật, DSN có mật khẩu, token, khóa riêng hoặc output của `docker compose config`.
 
+## Mapping khi chạy riêng backend Huy
+
+| Tiến trình | Biến tiến trình đọc | Nguồn giá trị |
+| --- | --- | --- |
+| Catalog, Clinical, Diagnostic (API, worker, migrate) | `DATABASE_URL` | Lần lượt `CATALOG_DATABASE_URL`, `CLINICAL_DATABASE_URL`, `DIAGNOSTIC_DATABASE_URL` từ `huy.env` |
+| Catalog, Clinical, Diagnostic API | `LISTEN_ADDR` | Địa chỉ bind và cổng tương ứng từ `huy.env` (8007, 8008, 8009) |
+| Catalog, Clinical, Diagnostic API | `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_PUBLIC_KEY_FILE` | Issuer và audience khớp Identity. Khi chạy ngoài Compose, trỏ đường dẫn tuyệt đối đến `infra/certs/jwt_public.pem` |
+| Catalog API | `REDIS_URL` | `UMC_REDIS_URL` từ `quan.env` |
+| Catalog worker | `AMQP_URL` | `UMC_AMQP_URL` từ `quan.env` |
+| Clinical và Diagnostic worker | `RABBITMQ_URL` | Cùng `UMC_AMQP_URL` từ `quan.env` |
+
+Compose đã làm các mapping này với issuer và audience mặc định của nhóm. Khi chạy bằng Go trực tiếp, nạp và gán các biến tiến trình trước khi chạy từng lệnh. Catalog dùng chung JWT public key để xác minh lease theo mặc định. Ba service Huy dùng public key; private key dùng ở Identity.
+
+Trước khi bật API và worker bản mới, kiểm tra migration ledger của từng DB. Schema yêu cầu Catalog đến `000004`, Clinical đến `000007`, Diagnostic đến `000003`. Nếu migration dừng vì thiếu người tạo giá hoặc thiếu snapshot thuốc lịch sử, đối chiếu dữ liệu gốc để sửa bản ghi rồi mới chạy lại. Thêm biến môi trường không khắc phục được các lỗi dữ liệu này.
+
 ## Điều kiện để demo bằng dữ liệu online
 
 - Mỗi database online đã có schema/migration và dữ liệu demo tương ứng. Mỗi service chỉ truy cập database của mình; không tự chạy seed hoặc migration lên database chung khi chưa thống nhất với owner.

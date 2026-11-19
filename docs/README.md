@@ -6,6 +6,8 @@
 
 ## Quy định làm việc nhóm
 
+- [Hợp đồng Message Queue HQH Care](HQH_Care_HOP_DONG_MESSAGE_QUEUE.md): 20 event, 5 command, envelope, payload, exchange, routing key, queue, retry, dead-letter và nghiệm thu liên service.
+
 - [Quy định GitHub và phân quyền thư mục — Huy, Quân, Hưng](QUY_DINH_GITHUB_NHOM5_HUY_QUAN_HUNG_20261024.md): người phụ trách, nhánh cá nhân, review/merge, file dùng chung và xử lý conflict.
 
 ## Hồ sơ bàn giao nhóm

@@ -6,6 +6,10 @@
 node_modules/
 dist/
 coverage/
+gocache/
+gomodcache/
+go-temp/
+.gopath/
 
 # Keep local environment values and secrets out of Git; commit only examples.
 .env
@@ -22,6 +26,7 @@ mongo/secrets/
 
 .agents
 .workbuddy-ai
+.specify/
 
 # Chặn lộ khóa bí mật
 *private.pem

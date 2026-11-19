@@ -89,7 +89,7 @@ def validate_documents(rows, documents, parameter_rows=(), response_rows=()):
                 expanded=resolve(doc,schema);props=expanded.get('properties',{})
                 if status.startswith(('4','5')):
                     if not {'error','meta'}<=set(props):errors.append(prefix+'noncanonical error envelope '+status)
-                if status=='202':
+                if status=='202' and row.get('profile')!='recovery':
                     data=resolve(doc,props.get('data',{}))
                     if 'Location' not in resp.get('headers',{}) or 'statusUrl' not in data.get('properties',{}):errors.append(prefix+'202 requires Location/statusUrl')
             except (KeyError,ValueError): pass

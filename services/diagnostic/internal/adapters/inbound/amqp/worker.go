@@ -151,7 +151,9 @@ func Run(ctx context.Context, url string, store Store, receiver Receiver, declar
 	if e != nil {
 		return e
 	}
-	deliveries = mergeDeliveries(ctx, deliveries, commands)
+	mergeCtx, stopMerge := context.WithCancel(ctx)
+	defer stopMerge()
+	deliveries = mergeDeliveries(mergeCtx, deliveries, commands)
 	ticker := time.NewTicker(250 * time.Millisecond)
 	defer ticker.Stop()
 	nextPublish := time.Time{}
@@ -174,7 +176,7 @@ func Run(ctx context.Context, url string, store Store, receiver Receiver, declar
 			}
 			var envelope domain.Envelope
 			if json.Unmarshal(d.Body, &envelope) == nil {
-				slog.Info("Clinical delivery recorded", "messageId", envelope.MessageID, "messageType", envelope.MessageType, "correlationId", envelope.CorrelationID)
+				slog.Info("Diagnostic delivery recorded", "messageId", envelope.MessageID, "messageType", envelope.MessageType, "correlationId", envelope.CorrelationID)
 			}
 		case <-ticker.C:
 			if !time.Now().Before(nextPublish) {
@@ -185,7 +187,7 @@ func Run(ctx context.Context, url string, store Store, receiver Receiver, declar
 					cancel()
 					if errors.Is(e, ErrUnroutable) {
 						nextPublish = time.Now().Add(5 * time.Second)
-						slog.Warn("Clinical outbox waiting for target binding")
+						slog.Warn("Diagnostic outbox waiting for target binding")
 						break
 					}
 					if e != nil {
@@ -221,7 +223,7 @@ func mergeDeliveries(ctx context.Context, events, commands <-chan amqp.Delivery)
 	out := make(chan amqp.Delivery)
 	go func() {
 		defer close(out)
-		for events != nil || commands != nil {
+		for {
 			var delivery amqp.Delivery
 			var ok bool
 			select {
@@ -229,13 +231,11 @@ func mergeDeliveries(ctx context.Context, events, commands <-chan amqp.Delivery)
 				return
 			case delivery, ok = <-events:
 				if !ok {
-					events = nil
-					continue
+					return
 				}
 			case delivery, ok = <-commands:
 				if !ok {
-					commands = nil
-					continue
+					return
 				}
 			}
 			select {
