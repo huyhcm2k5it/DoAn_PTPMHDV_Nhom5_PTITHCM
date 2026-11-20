@@ -216,7 +216,8 @@ func (t clinicalTx) Notes(ctx context.Context, id string) (items []domain.VisitN
 }
 func (t clinicalTx) Worklist(ctx context.Context, actor string, q domain.WorklistQuery) (result domain.Worklist, e error) {
 	result.Items = []domain.Visit{}
-	const filter = `doctor_user_id=$1 AND ($2='' OR (started_at AT TIME ZONE 'UTC')::date=NULLIF($2,'')::date) AND ($3='' OR state=$3)`
+	const filter = `doctor_user_id=$1 AND ($2='' OR (started_at AT TIME ZONE 'UTC')::date=NULLIF($2,'')::date) AND ($3='' OR state=$3)
+		AND EXISTS(SELECT 1 FROM visit_doctor_grants g WHERE g.visit_id=visits.id AND g.active)`
 	if e = t.tx.QueryRow(ctx, `SELECT count(*) FROM visits WHERE `+filter, actor, q.Date, q.State).Scan(&result.Total); e != nil {
 		return
 	}

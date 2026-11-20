@@ -77,6 +77,12 @@ export type ClinicalSession = {
   actorType: 'DOCTOR' | 'PATIENT' | 'STAFF';
 };
 export type ClinicalApi = {
+  medicalRecords?: (
+    patientId: string,
+    page: number,
+    limit: number,
+    signal?: AbortSignal,
+  ) => Promise<{ items: MedicalRecord[]; total: number }>;
   treatment?: ClinicalTreatmentApi;
   worklist: (query: WorklistQuery, signal?: AbortSignal) => Promise<Worklist>;
   start: (input: StartInput, key: string) => Promise<StartResult>;
@@ -102,23 +108,45 @@ export type Prescription = {
   version: number;
   revision: number;
   lines: PrescriptionLine[];
+  finalizedAt?: string;
 };
 export type LabRequest = {
   requestId: string;
   state: string;
   orderId?: string;
   reasonCode?: string;
+  sourceVersion?: number;
+  tests?: { testId: string; code: string; name: string; revision: number }[];
+};
+export type MedicalRecord = {
+  visit: Visit;
+  note: VisitNote;
+  prescriptions: Prescription[];
+  publishedLabResults: {
+    orderId: string;
+    revision: number;
+    publishedAt: string;
+  }[];
+};
+export type PatientSummary = {
+  id: string;
+  fullName?: string;
+  birthDate?: string;
+  sex?: string;
+  allergies?: string;
 };
 export type TreatmentCatalogMedicine = {
   code: string;
   name: string;
   status: string;
+  unit?: string;
 };
 export type TreatmentCatalogTest = {
   id: string;
   name: string;
   revision: number;
   status: string;
+  code?: string;
 };
 export type ClinicalTreatmentApi = {
   medicines: (signal?: AbortSignal) => Promise<TreatmentCatalogMedicine[]>;
@@ -150,7 +178,11 @@ export type ClinicalTreatmentApi = {
   ) => Promise<DraftResult>;
   requestLab: (
     id: string,
-    input: { tests: { testId: string; revision: number }[] },
+    input: {
+      tests: { testId: string; revision: number }[];
+      replacesRequestId?: string;
+      expectedSourceVersion?: number;
+    },
     key: string,
   ) => Promise<{ requestId: string; state: string; statusUrl: string }>;
 };

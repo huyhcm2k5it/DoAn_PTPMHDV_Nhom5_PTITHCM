@@ -12,7 +12,7 @@ export class ApiError extends Error {
 }
 export type ClinicalApiOptions = {
   authorizationLease?: (
-    action: 'CL-009' | 'CL-010',
+    action: 'CL-009' | 'CL-010' | 'CL-011',
     resourceId: string,
   ) => Promise<string>;
 };
@@ -61,6 +61,18 @@ export function createClinicalApi(
     return body.data as T;
   }
   return {
+    medicalRecords: async (id, page, limit, signal) => {
+      const headers = new Headers();
+      if (options.authorizationLease)
+        headers.set(
+          'X-Authorization-Lease',
+          await options.authorizationLease('CL-011', id),
+        );
+      return request(
+        `patients/${encodeURIComponent(id)}/medical-records?page=${page}&limit=${limit}`,
+        { headers, signal, cache: 'no-store' },
+      );
+    },
     treatment: {
       medicines: (signal) =>
         request('catalog/medicines?status=ACTIVE', { signal }),

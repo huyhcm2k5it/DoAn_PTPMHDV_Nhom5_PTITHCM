@@ -1,12 +1,12 @@
 # Clinical integration
 
-The week 3 increment adds CL-005–010: asynchronous LAB requests, prescription drafts and visit/prescription signing. `clinical.openapi.json` describes all ten operations. `clinical-diagnostic.v1.schema.json` describes the LAB request/result and visit-signed boundary.
+The implemented boundary includes CL-001–011 for queue claims, visit details and drafts, asynchronous LAB requests, prescriptions, signing and signed medical history. `clinical.openapi.json` describes the HTTP operations. `clinical-diagnostic.v1.schema.json` describes the LAB request/result and visit-signed boundary.
 
 CL-005 and CL-010 lock the same visit in a transaction. An unresolved LAB intent or an order without a valid terminal status prevents signing. Timeout leaves a request pending. A draft prescription resolves medicine names from the local Catalog projection; client names cannot override the snapshot. Signed visits and FINAL prescriptions are immutable. Finalizing requires a signed visit, a nonempty prescription and an authorization lease for CL-009; completing requires a lease for CL-010. The lease is scoped to the authenticated subject/token version and lasts at most 30 seconds.
 
 The doctor UI signs the visit and finalizes the prescription as separate requests. It keeps mutation IDs/body stable after ambiguous errors, reloads conflicts, and polls the LAB registry for the real asynchronous result. Patients see only signed notes and FINAL prescriptions. See `diagnostic-integration.md` for payment/specimen handoff and the remaining shared runtime gate.
 
-Implemented scope: CSV v5.2 CL-001–004, SRS FR-15 and UC-06. Machine-readable HTTP contract: `clinical.openapi.json`; message schema: `../messages/clinical-queue.v1.schema.json`.
+Assigned-doctor detail and mutations require an active Clinical-owned visit grant, including successful idempotent replays. A missing grant returns 503 and an explicitly revoked grant returns 403. The worklist excludes visits without an active grant. Returning to a visit through a RETURN ticket checks the current grant before queuing a new claim. Signing keeps the per-visit grant active so the assigned doctor can finalize the prepared prescription and read that visit. Explicit revocation blocks subsequent reads, mutations and replayed responses. Patient-owner reads retain their separate ownership policy. The CL-011 history policy below additionally requires a current unsigned treatment relationship.
 
 ## Queue claim
 

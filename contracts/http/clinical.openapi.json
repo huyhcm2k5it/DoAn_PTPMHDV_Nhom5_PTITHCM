@@ -159,7 +159,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Doctor worklist includes visits with active Clinical-owned grants. Operation status is returned separately when operationId is supplied."
       }
     },
     "/api/v1/visits/start": {
@@ -311,6 +312,7 @@
             }
           }
         },
+        "description": "A new RETURN claim requires the current assigned-doctor visit grant. Poll statusUrl after the local 202 response.",
         "requestBody": {
           "required": true,
           "content": {
@@ -429,7 +431,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Assigned-doctor access requires an active Clinical-owned visit grant, including successful mutation replays. Missing grant returns 503. Explicit revocation returns 403. Signing preserves per-visit authority for prescription finalization. Patient-owner reads use their separate ownership checks."
       }
     },
     "/api/v1/visits/{visitId}/draft": {
@@ -581,6 +584,7 @@
             }
           }
         },
+        "description": "Assigned-doctor access requires an active Clinical-owned visit grant, including successful mutation replays. Missing grant returns 503. Explicit revocation returns 403. Signing preserves per-visit authority for prescription finalization. Patient-owner reads use their separate ownership checks.",
         "requestBody": {
           "required": true,
           "content": {
@@ -751,6 +755,7 @@
             }
           }
         },
+        "description": "Assigned-doctor access requires an active Clinical-owned visit grant, including successful mutation replays. Missing grant returns 503. Explicit revocation returns 403. Signing preserves per-visit authority for prescription finalization. Patient-owner reads use their separate ownership checks.",
         "requestBody": {
           "required": true,
           "content": {
@@ -912,6 +917,7 @@
             }
           }
         },
+        "description": "Assigned-doctor access requires an active Clinical-owned visit grant, including successful mutation replays. Missing grant returns 503. Explicit revocation returns 403. Signing preserves per-visit authority for prescription finalization. Patient-owner reads use their separate ownership checks.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1073,6 +1079,7 @@
             }
           }
         },
+        "description": "Assigned-doctor access requires an active Clinical-owned visit grant, including successful mutation replays. Missing grant returns 503. Explicit revocation returns 403. Signing preserves per-visit authority for prescription finalization. Patient-owner reads use their separate ownership checks.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1241,7 +1248,8 @@
               }
             }
           }
-        }
+        },
+        "description": "Assigned-doctor access requires an active Clinical-owned visit grant, including successful mutation replays. Missing grant returns 503. Explicit revocation returns 403. Signing preserves per-visit authority for prescription finalization. Patient-owner reads use their separate ownership checks."
       }
     },
     "/api/v1/prescriptions/{prescriptionId}/finalize": {
@@ -1403,6 +1411,7 @@
             }
           }
         },
+        "description": "Assigned-doctor access requires an active Clinical-owned visit grant, including successful mutation replays. Missing grant returns 503. Explicit revocation returns 403. Signing preserves per-visit authority for prescription finalization. Patient-owner reads use their separate ownership checks.",
         "x-authorization-lease": {
           "action": "CL-009",
           "maxAgeSeconds": 30,
@@ -1581,6 +1590,7 @@
             }
           }
         },
+        "description": "Assigned-doctor access requires an active Clinical-owned visit grant, including successful mutation replays. Missing grant returns 503. Explicit revocation returns 403. Signing preserves per-visit authority for prescription finalization. Patient-owner reads use their separate ownership checks.",
         "x-authorization-lease": {
           "action": "CL-010",
           "maxAgeSeconds": 30,

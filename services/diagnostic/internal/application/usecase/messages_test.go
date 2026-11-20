@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"sort"
 	"testing"
 	"time"
 	"umccare/diagnostic/internal/application/ports"
@@ -29,6 +30,33 @@ func (m *memory) Put(c context.Context, k, id string, v any) error {
 	return e
 }
 func (m *memory) Orders(context.Context) ([]domain.Order, error) { return m.orders, nil }
+func (m *memory) OrderPage(_ context.Context, q domain.Query) (domain.List, error) {
+	out := domain.List{Items: []domain.Order{}}
+	for _, order := range m.orders {
+		if q.State == "" || order.State == q.State {
+			out.Items = append(out.Items, order)
+		}
+	}
+	sort.Slice(out.Items, func(i, j int) bool {
+		if out.Items[i].CreatedAt.Equal(out.Items[j].CreatedAt) {
+			return out.Items[i].ID > out.Items[j].ID
+		}
+		return out.Items[i].CreatedAt.After(out.Items[j].CreatedAt)
+	})
+	out.Total = len(out.Items)
+	start := min((q.Page-1)*q.Limit, out.Total)
+	end := min(start+q.Limit, out.Total)
+	out.Items = out.Items[start:end]
+	return out, nil
+}
+func (m *memory) Order(_ context.Context, id string) (domain.Order, error) {
+	for _, order := range m.orders {
+		if order.ID == id {
+			return order, nil
+		}
+	}
+	return domain.Order{}, domain.Fail("NOT_FOUND", "Order not found")
+}
 func (m *memory) SaveOrder(c context.Context, o domain.Order) error {
 	for i, x := range m.orders {
 		if x.ID == o.ID {

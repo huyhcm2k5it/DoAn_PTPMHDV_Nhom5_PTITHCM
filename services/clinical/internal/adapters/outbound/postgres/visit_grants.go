@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -14,6 +15,23 @@ import (
 const grantMessage = "VisitDoctorGrantChanged"
 const grantRoute = "clinical.visit-doctor-grant-changed.v1"
 const grantStreamID = "00000000-0000-4000-8000-000000000013"
+
+// The caller locks the visit first, matching ReconcileVisitGrant's lock order.
+// Signing preserves the grant. An explicit revocation ends assigned-doctor access.
+func (t clinicalTx) CheckVisitGrant(ctx context.Context, visitID string) error {
+	var active bool
+	err := t.tx.QueryRow(ctx, "SELECT active FROM visit_doctor_grants WHERE visit_id=$1 FOR SHARE", visitID).Scan(&active)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Fail("SERVICE_UNAVAILABLE", "Current visit grant is missing")
+	}
+	if err != nil {
+		return err
+	}
+	if !active {
+		return domain.Fail("FORBIDDEN", "Visit access has been revoked")
+	}
+	return nil
+}
 
 func migrateVisitGrants(ctx context.Context, tx pgx.Tx) error {
 	const version = "000006_visit_grants"

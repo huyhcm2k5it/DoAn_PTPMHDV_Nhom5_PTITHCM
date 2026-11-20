@@ -1,0 +1,859 @@
+{
+  "metadata": {
+    "title": "HQH Care — dữ liệu GIẢ cho kiểm thử giao diện phần Huy",
+    "version": 1,
+    "synthetic": true,
+    "createdAt": "2026-11-20",
+    "purpose": "Kiểm tra giao diện, liên kết ID và trạng thái. Không tự động nạp vào DB hoặc thay phản hồi API thật.",
+    "medicalUse": "Không dùng thông tin/toa/kết quả mô phỏng này làm hướng dẫn khám chữa bệnh."
+  },
+  "actors": {
+    "doctor": {
+      "userId": "00000001-0000-4000-8000-000000000001",
+      "doctorId": "00000002-0000-4000-8000-000000000001",
+      "actorType": "DOCTOR",
+      "capabilities": []
+    },
+    "otherDoctor": {
+      "userId": "00000001-0000-4000-8000-000000000002",
+      "doctorId": "00000002-0000-4000-8000-000000000002",
+      "actorType": "DOCTOR",
+      "capabilities": []
+    },
+    "labTech": {
+      "userId": "00000001-0000-4000-8000-000000000003",
+      "actorType": "STAFF",
+      "capabilities": ["LAB_TECH"]
+    },
+    "labReviewer": {
+      "userId": "00000001-0000-4000-8000-000000000004",
+      "actorType": "STAFF",
+      "capabilities": ["LAB_REVIEW"]
+    },
+    "patientOwner": {
+      "userId": "00000001-0000-4000-8000-000000000005",
+      "actorType": "PATIENT",
+      "capabilities": []
+    }
+  },
+  "catalog": {
+    "department": {
+      "id": "00000003-0000-4000-8000-000000000001",
+      "code": "NOI",
+      "name": "Nội tổng quát",
+      "status": "ACTIVE"
+    },
+    "medicines": [
+      {
+        "id": "00000005-0000-4000-8000-000000000001",
+        "code": "PAR500",
+        "name": "Paracetamol 500 mg",
+        "status": "ACTIVE",
+        "unit": "Viên"
+      },
+      {
+        "id": "00000005-0000-4000-8000-000000000002",
+        "code": "ORS",
+        "name": "Oresol gói pha uống",
+        "status": "ACTIVE",
+        "unit": "Gói"
+      }
+    ],
+    "labTests": [
+      {
+        "id": "00000004-0000-4000-8000-000000000001",
+        "code": "GLU",
+        "name": "Glucose máu",
+        "revision": 1,
+        "status": "ACTIVE",
+        "unit": "mmol/L",
+        "referenceRange": "3.9–6.4",
+        "priceVnd": 50000
+      },
+      {
+        "id": "00000004-0000-4000-8000-000000000002",
+        "code": "WBC",
+        "name": "Bạch cầu",
+        "revision": 1,
+        "status": "ACTIVE",
+        "unit": "G/L",
+        "referenceRange": "4.0–10.0",
+        "priceVnd": 80000
+      }
+    ]
+  },
+  "cases": [
+    {
+      "key": "routine",
+      "label": "Khám thường, đang soạn bệnh án",
+      "patient": {
+        "id": "00000006-0000-4000-8000-000000000001",
+        "fullName": "Nguyễn Minh An",
+        "birthDate": "1995-06-15",
+        "sex": "MALE",
+        "relation": "SELF",
+        "ownerUserId": "00000001-0000-4000-8000-000000000005",
+        "version": 1
+      },
+      "appointment": {
+        "id": "00000007-0000-4000-8000-000000000001",
+        "patientId": "00000006-0000-4000-8000-000000000001",
+        "doctorId": "00000002-0000-4000-8000-000000000001",
+        "doctorUserId": "00000001-0000-4000-8000-000000000001",
+        "departmentId": "00000003-0000-4000-8000-000000000001",
+        "state": "CHECKED_IN",
+        "startAt": "2026-11-20T01:00:00Z"
+      },
+      "ticket": {
+        "ticketId": "00000018-0000-4000-8000-000000000001",
+        "appointmentId": "00000007-0000-4000-8000-000000000001",
+        "patientId": "00000006-0000-4000-8000-000000000001",
+        "doctorId": "00000002-0000-4000-8000-000000000001",
+        "ticketType": "FIRST",
+        "state": "CLAIMED",
+        "version": 3
+      },
+      "detail": {
+        "visit": {
+          "id": "00000008-0000-4000-8000-000000000001",
+          "appointmentId": "00000007-0000-4000-8000-000000000001",
+          "patientId": "00000006-0000-4000-8000-000000000001",
+          "doctorUserId": "00000001-0000-4000-8000-000000000001",
+          "departmentId": "00000003-0000-4000-8000-000000000001",
+          "claimId": "00000014-0000-4000-8000-000000000001",
+          "state": "IN_PROGRESS",
+          "version": 3,
+          "returnRound": 0,
+          "startedAt": "2026-11-20T01:00:00Z"
+        },
+        "notes": [
+          {
+            "id": "00000015-0000-4000-8000-000000000001",
+            "visitId": "00000008-0000-4000-8000-000000000001",
+            "revision": 1,
+            "symptoms": "Mệt, đau họng trong hai ngày. Thông tin mô phỏng để kiểm thử.",
+            "findings": "Tỉnh táo, tiếp xúc tốt. Nội dung giả lập.",
+            "assessment": "Theo dõi diễn tiến triệu chứng trong tình huống demo.",
+            "diagnosis": "Bệnh cảnh giả lập phục vụ kiểm thử",
+            "authorUserId": "00000001-0000-4000-8000-000000000001",
+            "savedAt": "2026-11-20T01:10:00Z"
+          }
+        ],
+        "prescriptions": [
+          {
+            "id": "00000016-0000-4000-8000-000000000001",
+            "visitId": "00000008-0000-4000-8000-000000000001",
+            "patientId": "00000006-0000-4000-8000-000000000001",
+            "state": "DRAFT",
+            "version": 1,
+            "revision": 1,
+            "lines": [
+              {
+                "medicineCode": "PAR500",
+                "nameSnapshot": "Paracetamol 500 mg",
+                "doseText": "Liều giả lập theo toa demo, không sử dụng điều trị",
+                "quantity": 10,
+                "instruction": "Dữ liệu kiểm thử; không dùng làm hướng dẫn y khoa"
+              }
+            ]
+          }
+        ],
+        "labRequests": []
+      }
+    },
+    {
+      "key": "waiting_lab",
+      "label": "Đã thu phí LAB, chưa lấy mẫu",
+      "patient": {
+        "id": "00000006-0000-4000-8000-000000000002",
+        "fullName": "Trần Ngọc Mai",
+        "birthDate": "1996-06-15",
+        "sex": "FEMALE",
+        "relation": "SELF",
+        "ownerUserId": "00000001-0000-4000-8000-000000000005",
+        "version": 1
+      },
+      "appointment": {
+        "id": "00000007-0000-4000-8000-000000000002",
+        "patientId": "00000006-0000-4000-8000-000000000002",
+        "doctorId": "00000002-0000-4000-8000-000000000001",
+        "doctorUserId": "00000001-0000-4000-8000-000000000001",
+        "departmentId": "00000003-0000-4000-8000-000000000001",
+        "state": "CHECKED_IN",
+        "startAt": "2026-11-20T01:00:00Z"
+      },
+      "ticket": {
+        "ticketId": "00000018-0000-4000-8000-000000000002",
+        "appointmentId": "00000007-0000-4000-8000-000000000002",
+        "patientId": "00000006-0000-4000-8000-000000000002",
+        "doctorId": "00000002-0000-4000-8000-000000000001",
+        "ticketType": "FIRST",
+        "state": "CLAIMED",
+        "version": 3
+      },
+      "detail": {
+        "visit": {
+          "id": "00000008-0000-4000-8000-000000000002",
+          "appointmentId": "00000007-0000-4000-8000-000000000002",
+          "patientId": "00000006-0000-4000-8000-000000000002",
+          "doctorUserId": "00000001-0000-4000-8000-000000000001",
+          "departmentId": "00000003-0000-4000-8000-000000000001",
+          "claimId": "00000014-0000-4000-8000-000000000002",
+          "state": "WAITING_LAB",
+          "version": 3,
+          "returnRound": 0,
+          "startedAt": "2026-11-20T01:00:00Z"
+        },
+        "notes": [
+          {
+            "id": "00000015-0000-4000-8000-000000000002",
+            "visitId": "00000008-0000-4000-8000-000000000002",
+            "revision": 1,
+            "symptoms": "Mệt, đau họng trong hai ngày. Thông tin mô phỏng để kiểm thử.",
+            "findings": "Tỉnh táo, tiếp xúc tốt. Nội dung giả lập.",
+            "assessment": "Theo dõi diễn tiến triệu chứng trong tình huống demo.",
+            "diagnosis": "Bệnh cảnh giả lập phục vụ kiểm thử",
+            "authorUserId": "00000001-0000-4000-8000-000000000001",
+            "savedAt": "2026-11-20T01:10:00Z"
+          }
+        ],
+        "prescriptions": [
+          {
+            "id": "00000016-0000-4000-8000-000000000002",
+            "visitId": "00000008-0000-4000-8000-000000000002",
+            "patientId": "00000006-0000-4000-8000-000000000002",
+            "state": "DRAFT",
+            "version": 1,
+            "revision": 1,
+            "lines": [
+              {
+                "medicineCode": "PAR500",
+                "nameSnapshot": "Paracetamol 500 mg",
+                "doseText": "Liều giả lập theo toa demo, không sử dụng điều trị",
+                "quantity": 10,
+                "instruction": "Dữ liệu kiểm thử; không dùng làm hướng dẫn y khoa"
+              }
+            ]
+          }
+        ],
+        "labRequests": [
+          {
+            "requestId": "00000010-0000-4000-8000-000000000002",
+            "state": "CREATED",
+            "orderId": "00000009-0000-4000-8000-000000000002",
+            "sourceVersion": 2,
+            "tests": [
+              {
+                "testId": "00000004-0000-4000-8000-000000000001",
+                "code": "GLU",
+                "name": "Glucose máu",
+                "revision": 1
+              },
+              {
+                "testId": "00000004-0000-4000-8000-000000000002",
+                "code": "WBC",
+                "name": "Bạch cầu",
+                "revision": 1
+              }
+            ]
+          }
+        ]
+      },
+      "diagnostic": {
+        "order": {
+          "id": "00000009-0000-4000-8000-000000000002",
+          "visitId": "00000008-0000-4000-8000-000000000002",
+          "patientId": "00000006-0000-4000-8000-000000000002",
+          "doctorId": "00000001-0000-4000-8000-000000000001",
+          "chargeId": "00000011-0000-4000-8000-000000000002",
+          "chargeState": "PAID",
+          "state": "PAID",
+          "version": 3,
+          "amountVnd": 130000,
+          "tests": [
+            {
+              "testId": "00000004-0000-4000-8000-000000000001",
+              "code": "GLU",
+              "name": "Glucose máu",
+              "revision": 1,
+              "unit": "mmol/L",
+              "referenceRange": "3.9–6.4"
+            },
+            {
+              "testId": "00000004-0000-4000-8000-000000000002",
+              "code": "WBC",
+              "name": "Bạch cầu",
+              "revision": 1,
+              "unit": "G/L",
+              "referenceRange": "4.0–10.0"
+            }
+          ],
+          "createdAt": "2026-11-20T01:15:00Z"
+        },
+        "specimens": [],
+        "results": []
+      }
+    },
+    {
+      "key": "review_lab",
+      "label": "Đã lấy mẫu, kết quả chờ duyệt",
+      "patient": {
+        "id": "00000006-0000-4000-8000-000000000003",
+        "fullName": "Lê Hoàng Nam",
+        "birthDate": "1997-06-15",
+        "sex": "MALE",
+        "relation": "SELF",
+        "ownerUserId": "00000001-0000-4000-8000-000000000005",
+        "version": 1
+      },
+      "appointment": {
+        "id": "00000007-0000-4000-8000-000000000003",
+        "patientId": "00000006-0000-4000-8000-000000000003",
+        "doctorId": "00000002-0000-4000-8000-000000000001",
+        "doctorUserId": "00000001-0000-4000-8000-000000000001",
+        "departmentId": "00000003-0000-4000-8000-000000000001",
+        "state": "CHECKED_IN",
+        "startAt": "2026-11-20T01:00:00Z"
+      },
+      "ticket": {
+        "ticketId": "00000018-0000-4000-8000-000000000003",
+        "appointmentId": "00000007-0000-4000-8000-000000000003",
+        "patientId": "00000006-0000-4000-8000-000000000003",
+        "doctorId": "00000002-0000-4000-8000-000000000001",
+        "ticketType": "FIRST",
+        "state": "CLAIMED",
+        "version": 3
+      },
+      "detail": {
+        "visit": {
+          "id": "00000008-0000-4000-8000-000000000003",
+          "appointmentId": "00000007-0000-4000-8000-000000000003",
+          "patientId": "00000006-0000-4000-8000-000000000003",
+          "doctorUserId": "00000001-0000-4000-8000-000000000001",
+          "departmentId": "00000003-0000-4000-8000-000000000001",
+          "claimId": "00000014-0000-4000-8000-000000000003",
+          "state": "WAITING_LAB",
+          "version": 3,
+          "returnRound": 0,
+          "startedAt": "2026-11-20T01:00:00Z"
+        },
+        "notes": [
+          {
+            "id": "00000015-0000-4000-8000-000000000003",
+            "visitId": "00000008-0000-4000-8000-000000000003",
+            "revision": 1,
+            "symptoms": "Mệt, đau họng trong hai ngày. Thông tin mô phỏng để kiểm thử.",
+            "findings": "Tỉnh táo, tiếp xúc tốt. Nội dung giả lập.",
+            "assessment": "Theo dõi diễn tiến triệu chứng trong tình huống demo.",
+            "diagnosis": "Bệnh cảnh giả lập phục vụ kiểm thử",
+            "authorUserId": "00000001-0000-4000-8000-000000000001",
+            "savedAt": "2026-11-20T01:10:00Z"
+          }
+        ],
+        "prescriptions": [
+          {
+            "id": "00000016-0000-4000-8000-000000000003",
+            "visitId": "00000008-0000-4000-8000-000000000003",
+            "patientId": "00000006-0000-4000-8000-000000000003",
+            "state": "DRAFT",
+            "version": 1,
+            "revision": 1,
+            "lines": [
+              {
+                "medicineCode": "PAR500",
+                "nameSnapshot": "Paracetamol 500 mg",
+                "doseText": "Liều giả lập theo toa demo, không sử dụng điều trị",
+                "quantity": 10,
+                "instruction": "Dữ liệu kiểm thử; không dùng làm hướng dẫn y khoa"
+              }
+            ]
+          }
+        ],
+        "labRequests": [
+          {
+            "requestId": "00000010-0000-4000-8000-000000000003",
+            "state": "CREATED",
+            "orderId": "00000009-0000-4000-8000-000000000003",
+            "sourceVersion": 2,
+            "tests": [
+              {
+                "testId": "00000004-0000-4000-8000-000000000001",
+                "code": "GLU",
+                "name": "Glucose máu",
+                "revision": 1
+              },
+              {
+                "testId": "00000004-0000-4000-8000-000000000002",
+                "code": "WBC",
+                "name": "Bạch cầu",
+                "revision": 1
+              }
+            ]
+          }
+        ]
+      },
+      "diagnostic": {
+        "order": {
+          "id": "00000009-0000-4000-8000-000000000003",
+          "visitId": "00000008-0000-4000-8000-000000000003",
+          "patientId": "00000006-0000-4000-8000-000000000003",
+          "doctorId": "00000001-0000-4000-8000-000000000001",
+          "chargeId": "00000011-0000-4000-8000-000000000003",
+          "chargeState": "PAID",
+          "state": "SPECIMEN_COLLECTED",
+          "version": 3,
+          "amountVnd": 130000,
+          "tests": [
+            {
+              "testId": "00000004-0000-4000-8000-000000000001",
+              "code": "GLU",
+              "name": "Glucose máu",
+              "revision": 1,
+              "unit": "mmol/L",
+              "referenceRange": "3.9–6.4"
+            },
+            {
+              "testId": "00000004-0000-4000-8000-000000000002",
+              "code": "WBC",
+              "name": "Bạch cầu",
+              "revision": 1,
+              "unit": "G/L",
+              "referenceRange": "4.0–10.0"
+            }
+          ],
+          "createdAt": "2026-11-20T01:15:00Z"
+        },
+        "specimens": [
+          {
+            "id": "00000012-0000-4000-8000-000000000003",
+            "orderId": "00000009-0000-4000-8000-000000000003",
+            "state": "COLLECTED",
+            "sequence": 1,
+            "barcode": "DEMO-XN-20261120-0003",
+            "version": 1,
+            "collectedBy": "00000001-0000-4000-8000-000000000003",
+            "collectedAt": "2026-11-20T01:30:00Z"
+          }
+        ],
+        "results": [
+          {
+            "id": "00000013-0000-4000-8000-000000000003",
+            "orderId": "00000009-0000-4000-8000-000000000003",
+            "specimenId": "00000012-0000-4000-8000-000000000003",
+            "revision": 1,
+            "state": "REVIEW",
+            "enteredBy": "00000001-0000-4000-8000-000000000003",
+            "version": 2,
+            "submittedAt": "2026-11-20T02:00:00Z",
+            "items": [
+              {
+                "id": "00000017-0000-4000-8000-000000000030",
+                "testCode": "GLU",
+                "valueText": "5.2",
+                "unit": "mmol/L",
+                "referenceRange": "3.9–6.4",
+                "flag": "NORMAL"
+              },
+              {
+                "id": "00000017-0000-4000-8000-000000000031",
+                "testCode": "WBC",
+                "valueText": "7.5",
+                "unit": "G/L",
+                "referenceRange": "4.0–10.0",
+                "flag": "NORMAL"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "key": "returned",
+      "label": "Đã nhận vé khám lại, xem LAB đã công bố",
+      "patient": {
+        "id": "00000006-0000-4000-8000-000000000004",
+        "fullName": "Phạm Thu Hà",
+        "birthDate": "1998-06-15",
+        "sex": "FEMALE",
+        "relation": "SELF",
+        "ownerUserId": "00000001-0000-4000-8000-000000000005",
+        "version": 1
+      },
+      "appointment": {
+        "id": "00000007-0000-4000-8000-000000000004",
+        "patientId": "00000006-0000-4000-8000-000000000004",
+        "doctorId": "00000002-0000-4000-8000-000000000001",
+        "doctorUserId": "00000001-0000-4000-8000-000000000001",
+        "departmentId": "00000003-0000-4000-8000-000000000001",
+        "state": "CHECKED_IN",
+        "startAt": "2026-11-20T01:00:00Z"
+      },
+      "ticket": {
+        "ticketId": "00000018-0000-4000-8000-000000000004",
+        "appointmentId": "00000007-0000-4000-8000-000000000004",
+        "patientId": "00000006-0000-4000-8000-000000000004",
+        "doctorId": "00000002-0000-4000-8000-000000000001",
+        "ticketType": "RETURN",
+        "state": "CLAIMED",
+        "version": 3
+      },
+      "detail": {
+        "visit": {
+          "id": "00000008-0000-4000-8000-000000000004",
+          "appointmentId": "00000007-0000-4000-8000-000000000004",
+          "patientId": "00000006-0000-4000-8000-000000000004",
+          "doctorUserId": "00000001-0000-4000-8000-000000000001",
+          "departmentId": "00000003-0000-4000-8000-000000000001",
+          "claimId": "00000014-0000-4000-8000-000000000004",
+          "state": "IN_PROGRESS",
+          "version": 8,
+          "returnRound": 1,
+          "startedAt": "2026-11-20T01:00:00Z"
+        },
+        "notes": [
+          {
+            "id": "00000015-0000-4000-8000-000000000004",
+            "visitId": "00000008-0000-4000-8000-000000000004",
+            "revision": 1,
+            "symptoms": "Mệt, đau họng trong hai ngày. Thông tin mô phỏng để kiểm thử.",
+            "findings": "Tỉnh táo, tiếp xúc tốt. Nội dung giả lập.",
+            "assessment": "Theo dõi diễn tiến triệu chứng trong tình huống demo.",
+            "diagnosis": "Bệnh cảnh giả lập phục vụ kiểm thử",
+            "authorUserId": "00000001-0000-4000-8000-000000000001",
+            "savedAt": "2026-11-20T01:10:00Z"
+          }
+        ],
+        "prescriptions": [
+          {
+            "id": "00000016-0000-4000-8000-000000000004",
+            "visitId": "00000008-0000-4000-8000-000000000004",
+            "patientId": "00000006-0000-4000-8000-000000000004",
+            "state": "DRAFT",
+            "version": 1,
+            "revision": 1,
+            "lines": [
+              {
+                "medicineCode": "PAR500",
+                "nameSnapshot": "Paracetamol 500 mg",
+                "doseText": "Liều giả lập theo toa demo, không sử dụng điều trị",
+                "quantity": 10,
+                "instruction": "Dữ liệu kiểm thử; không dùng làm hướng dẫn y khoa"
+              }
+            ]
+          }
+        ],
+        "labRequests": [
+          {
+            "requestId": "00000010-0000-4000-8000-000000000004",
+            "state": "PUBLISHED",
+            "orderId": "00000009-0000-4000-8000-000000000004",
+            "sourceVersion": 3,
+            "tests": [
+              {
+                "testId": "00000004-0000-4000-8000-000000000001",
+                "code": "GLU",
+                "name": "Glucose máu",
+                "revision": 1
+              },
+              {
+                "testId": "00000004-0000-4000-8000-000000000002",
+                "code": "WBC",
+                "name": "Bạch cầu",
+                "revision": 1
+              }
+            ]
+          }
+        ]
+      },
+      "diagnostic": {
+        "order": {
+          "id": "00000009-0000-4000-8000-000000000004",
+          "visitId": "00000008-0000-4000-8000-000000000004",
+          "patientId": "00000006-0000-4000-8000-000000000004",
+          "doctorId": "00000001-0000-4000-8000-000000000001",
+          "chargeId": "00000011-0000-4000-8000-000000000004",
+          "chargeState": "PAID",
+          "state": "PUBLISHED",
+          "version": 5,
+          "amountVnd": 130000,
+          "tests": [
+            {
+              "testId": "00000004-0000-4000-8000-000000000001",
+              "code": "GLU",
+              "name": "Glucose máu",
+              "revision": 1,
+              "unit": "mmol/L",
+              "referenceRange": "3.9–6.4"
+            },
+            {
+              "testId": "00000004-0000-4000-8000-000000000002",
+              "code": "WBC",
+              "name": "Bạch cầu",
+              "revision": 1,
+              "unit": "G/L",
+              "referenceRange": "4.0–10.0"
+            }
+          ],
+          "createdAt": "2026-11-20T01:15:00Z"
+        },
+        "specimens": [
+          {
+            "id": "00000012-0000-4000-8000-000000000004",
+            "orderId": "00000009-0000-4000-8000-000000000004",
+            "state": "COLLECTED",
+            "sequence": 1,
+            "barcode": "DEMO-XN-20261120-0004",
+            "version": 1,
+            "collectedBy": "00000001-0000-4000-8000-000000000003",
+            "collectedAt": "2026-11-20T01:30:00Z"
+          }
+        ],
+        "results": [
+          {
+            "id": "00000013-0000-4000-8000-000000000004",
+            "orderId": "00000009-0000-4000-8000-000000000004",
+            "specimenId": "00000012-0000-4000-8000-000000000004",
+            "revision": 1,
+            "state": "PUBLISHED",
+            "enteredBy": "00000001-0000-4000-8000-000000000003",
+            "version": 3,
+            "submittedAt": "2026-11-20T02:00:00Z",
+            "publishedAt": "2026-11-20T02:20:00Z",
+            "items": [
+              {
+                "id": "00000017-0000-4000-8000-000000000040",
+                "testCode": "GLU",
+                "valueText": "5.2",
+                "unit": "mmol/L",
+                "referenceRange": "3.9–6.4",
+                "flag": "NORMAL"
+              },
+              {
+                "id": "00000017-0000-4000-8000-000000000041",
+                "testCode": "WBC",
+                "valueText": "7.5",
+                "unit": "G/L",
+                "referenceRange": "4.0–10.0",
+                "flag": "NORMAL"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "key": "signed",
+      "label": "Đã ký bệnh án và toa, chỉ đọc",
+      "patient": {
+        "id": "00000006-0000-4000-8000-000000000005",
+        "fullName": "Võ Gia Bảo",
+        "birthDate": "1999-06-15",
+        "sex": "MALE",
+        "relation": "SELF",
+        "ownerUserId": "00000001-0000-4000-8000-000000000005",
+        "version": 1
+      },
+      "appointment": {
+        "id": "00000007-0000-4000-8000-000000000005",
+        "patientId": "00000006-0000-4000-8000-000000000005",
+        "doctorId": "00000002-0000-4000-8000-000000000001",
+        "doctorUserId": "00000001-0000-4000-8000-000000000001",
+        "departmentId": "00000003-0000-4000-8000-000000000001",
+        "state": "COMPLETED",
+        "startAt": "2026-11-20T01:00:00Z"
+      },
+      "ticket": {
+        "ticketId": "00000018-0000-4000-8000-000000000005",
+        "appointmentId": "00000007-0000-4000-8000-000000000005",
+        "patientId": "00000006-0000-4000-8000-000000000005",
+        "doctorId": "00000002-0000-4000-8000-000000000001",
+        "ticketType": "FIRST",
+        "state": "CLAIMED",
+        "version": 3
+      },
+      "detail": {
+        "visit": {
+          "id": "00000008-0000-4000-8000-000000000005",
+          "appointmentId": "00000007-0000-4000-8000-000000000005",
+          "patientId": "00000006-0000-4000-8000-000000000005",
+          "doctorUserId": "00000001-0000-4000-8000-000000000001",
+          "departmentId": "00000003-0000-4000-8000-000000000001",
+          "claimId": "00000014-0000-4000-8000-000000000005",
+          "state": "SIGNED",
+          "version": 5,
+          "returnRound": 0,
+          "startedAt": "2026-11-20T01:00:00Z",
+          "signedAt": "2026-11-20T03:00:00Z"
+        },
+        "notes": [
+          {
+            "id": "00000015-0000-4000-8000-000000000005",
+            "visitId": "00000008-0000-4000-8000-000000000005",
+            "revision": 1,
+            "symptoms": "Mệt, đau họng trong hai ngày. Thông tin mô phỏng để kiểm thử.",
+            "findings": "Tỉnh táo, tiếp xúc tốt. Nội dung giả lập.",
+            "assessment": "Theo dõi diễn tiến triệu chứng trong tình huống demo.",
+            "diagnosis": "Bệnh cảnh giả lập phục vụ kiểm thử",
+            "authorUserId": "00000001-0000-4000-8000-000000000001",
+            "savedAt": "2026-11-20T01:10:00Z"
+          }
+        ],
+        "prescriptions": [
+          {
+            "id": "00000016-0000-4000-8000-000000000005",
+            "visitId": "00000008-0000-4000-8000-000000000005",
+            "patientId": "00000006-0000-4000-8000-000000000005",
+            "state": "FINAL",
+            "version": 2,
+            "revision": 1,
+            "lines": [
+              {
+                "medicineCode": "PAR500",
+                "nameSnapshot": "Paracetamol 500 mg",
+                "doseText": "Liều giả lập theo toa demo, không sử dụng điều trị",
+                "quantity": 10,
+                "instruction": "Dữ liệu kiểm thử; không dùng làm hướng dẫn y khoa"
+              }
+            ],
+            "finalizedAt": "2026-11-20T03:02:00Z"
+          }
+        ],
+        "labRequests": []
+      }
+    },
+    {
+      "key": "cancelled_lab",
+      "label": "Hủy LAB trước lấy mẫu, đang chờ hoàn tiền",
+      "patient": {
+        "id": "00000006-0000-4000-8000-000000000006",
+        "fullName": "Đặng Thanh Vy",
+        "birthDate": "2000-06-15",
+        "sex": "FEMALE",
+        "relation": "SELF",
+        "ownerUserId": "00000001-0000-4000-8000-000000000005",
+        "version": 1
+      },
+      "appointment": {
+        "id": "00000007-0000-4000-8000-000000000006",
+        "patientId": "00000006-0000-4000-8000-000000000006",
+        "doctorId": "00000002-0000-4000-8000-000000000001",
+        "doctorUserId": "00000001-0000-4000-8000-000000000001",
+        "departmentId": "00000003-0000-4000-8000-000000000001",
+        "state": "CHECKED_IN",
+        "startAt": "2026-11-20T01:00:00Z"
+      },
+      "ticket": {
+        "ticketId": "00000018-0000-4000-8000-000000000006",
+        "appointmentId": "00000007-0000-4000-8000-000000000006",
+        "patientId": "00000006-0000-4000-8000-000000000006",
+        "doctorId": "00000002-0000-4000-8000-000000000001",
+        "ticketType": "FIRST",
+        "state": "CLAIMED",
+        "version": 3
+      },
+      "detail": {
+        "visit": {
+          "id": "00000008-0000-4000-8000-000000000006",
+          "appointmentId": "00000007-0000-4000-8000-000000000006",
+          "patientId": "00000006-0000-4000-8000-000000000006",
+          "doctorUserId": "00000001-0000-4000-8000-000000000001",
+          "departmentId": "00000003-0000-4000-8000-000000000001",
+          "claimId": "00000014-0000-4000-8000-000000000006",
+          "state": "IN_PROGRESS",
+          "version": 3,
+          "returnRound": 0,
+          "startedAt": "2026-11-20T01:00:00Z"
+        },
+        "notes": [
+          {
+            "id": "00000015-0000-4000-8000-000000000006",
+            "visitId": "00000008-0000-4000-8000-000000000006",
+            "revision": 1,
+            "symptoms": "Mệt, đau họng trong hai ngày. Thông tin mô phỏng để kiểm thử.",
+            "findings": "Tỉnh táo, tiếp xúc tốt. Nội dung giả lập.",
+            "assessment": "Theo dõi diễn tiến triệu chứng trong tình huống demo.",
+            "diagnosis": "Bệnh cảnh giả lập phục vụ kiểm thử",
+            "authorUserId": "00000001-0000-4000-8000-000000000001",
+            "savedAt": "2026-11-20T01:10:00Z"
+          }
+        ],
+        "prescriptions": [
+          {
+            "id": "00000016-0000-4000-8000-000000000006",
+            "visitId": "00000008-0000-4000-8000-000000000006",
+            "patientId": "00000006-0000-4000-8000-000000000006",
+            "state": "DRAFT",
+            "version": 1,
+            "revision": 1,
+            "lines": [
+              {
+                "medicineCode": "PAR500",
+                "nameSnapshot": "Paracetamol 500 mg",
+                "doseText": "Liều giả lập theo toa demo, không sử dụng điều trị",
+                "quantity": 10,
+                "instruction": "Dữ liệu kiểm thử; không dùng làm hướng dẫn y khoa"
+              }
+            ]
+          }
+        ],
+        "labRequests": [
+          {
+            "requestId": "00000010-0000-4000-8000-000000000006",
+            "state": "CANCELLED",
+            "orderId": "00000009-0000-4000-8000-000000000006",
+            "sourceVersion": 2,
+            "tests": [
+              {
+                "testId": "00000004-0000-4000-8000-000000000001",
+                "code": "GLU",
+                "name": "Glucose máu",
+                "revision": 1
+              },
+              {
+                "testId": "00000004-0000-4000-8000-000000000002",
+                "code": "WBC",
+                "name": "Bạch cầu",
+                "revision": 1
+              }
+            ]
+          }
+        ]
+      },
+      "diagnostic": {
+        "order": {
+          "id": "00000009-0000-4000-8000-000000000006",
+          "visitId": "00000008-0000-4000-8000-000000000006",
+          "patientId": "00000006-0000-4000-8000-000000000006",
+          "doctorId": "00000001-0000-4000-8000-000000000001",
+          "chargeId": "00000011-0000-4000-8000-000000000006",
+          "chargeState": "PAID",
+          "state": "CANCELLED",
+          "version": 4,
+          "amountVnd": 130000,
+          "tests": [
+            {
+              "testId": "00000004-0000-4000-8000-000000000001",
+              "code": "GLU",
+              "name": "Glucose máu",
+              "revision": 1,
+              "unit": "mmol/L",
+              "referenceRange": "3.9–6.4"
+            },
+            {
+              "testId": "00000004-0000-4000-8000-000000000002",
+              "code": "WBC",
+              "name": "Bạch cầu",
+              "revision": 1,
+              "unit": "G/L",
+              "referenceRange": "4.0–10.0"
+            }
+          ],
+          "createdAt": "2026-11-20T01:15:00Z",
+          "refundStatus": "REQUESTED"
+        },
+        "specimens": [],
+        "results": []
+      }
+    }
+  ]
+}
