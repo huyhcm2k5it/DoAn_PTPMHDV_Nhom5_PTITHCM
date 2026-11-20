@@ -223,6 +223,15 @@ jobs:
           node-version: '24.14.0'
           cache: npm
           cache-dependency-path: tools/clinical-preview/package-lock.json
+      - name: Install shared web dependencies
+        working-directory: apps/web
+        run: npm ci
+      - name: Verify shared web and Huy workspaces
+        working-directory: apps/web
+        run: |
+          npm run typecheck
+          npm test
+          npm run build
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
