@@ -1,245 +1,359 @@
-.clinical-feature {
-  --clinical-ink: #203441;
-  --clinical-accent: #126b73;
-  --clinical-line: #d9e4e8;
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 32px;
-  color: var(--clinical-ink);
-  font-family: system-ui, sans-serif;
-  line-height: 1.5;
-  background: #f5f8f9;
-  min-height: 100vh;
-  box-sizing: border-box;
-}
-.clinical-feature * {
-  box-sizing: border-box;
-}
-.clinical-feature h1 {
-  font-size: 2rem;
-  margin: 0.1em 0;
-}
-.clinical-feature h2 {
-  font-size: 1.15rem;
-  margin: 0 0 0.7rem;
-}
-.clinical-feature p {
-  margin: 0.4rem 0 1rem;
-}
-.clinical-feature button {
-  cursor: pointer;
-  border: 1px solid var(--clinical-accent);
-  background: var(--clinical-accent);
-  color: white;
-  border-radius: 7px;
-  padding: 10px 16px;
-  font: inherit;
-  font-weight: 600;
-}
-.clinical-feature button:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-.clinical-feature button:focus-visible,
-.clinical-feature input:focus-visible,
-.clinical-feature select:focus-visible,
-.clinical-feature textarea:focus-visible {
-  outline: 3px solid #ebbb52;
-  outline-offset: 3px;
-}
-.clinical-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 20px;
-  margin-bottom: 24px;
-}
-.clinical-eyebrow {
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--clinical-accent);
-}
-.clinical-start {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 20px;
-  border: 1px solid var(--clinical-line);
-  background: white;
-  border-radius: 10px;
-  margin-bottom: 20px;
-}
-.clinical-start p {
-  margin-bottom: 0;
-}
-.clinical-filters {
-  display: flex;
-  gap: 16px;
-  margin: 24px 0;
-}
-.clinical-feature label {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  font-weight: 600;
-  margin-bottom: 16px;
-}
-.clinical-feature input,
-.clinical-feature select,
-.clinical-feature textarea {
-  font: inherit;
-  line-height: 1.5;
-  color: var(--clinical-ink);
-  padding: 10px 12px;
-  border: 1px solid #b2c7cf;
-  border-radius: 6px;
-  background: white;
-  width: 100%;
-}
-.clinical-feature textarea {
-  resize: vertical;
-}
-.clinical-columns {
+@import './workspace.css';
+.huy-doctor-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.6fr);
-  gap: 24px;
+  grid-template-columns: minmax(260px, 0.85fr) minmax(0, 2fr);
+  gap: 20px;
   align-items: start;
 }
-.clinical-list,
-.clinical-detail {
-  background: white;
-  border: 1px solid var(--clinical-line);
-  border-radius: 10px;
-  padding: 22px;
+.huy-visit-workspace {
   min-width: 0;
 }
-.clinical-list ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.clinical-list li {
+.huy-patient-summary {
   display: flex;
-  flex-direction: column;
-  gap: 7px;
-  padding: 18px 0;
-  border-top: 1px solid var(--clinical-line);
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.huy-patient-summary h2 {
+  font-size: 20px;
+  text-transform: uppercase;
+  margin: 0 0 6px;
+}
+.huy-patient-summary p {
+  color: var(--huy-muted);
+  font-size: 12px;
+  margin: 0;
   overflow-wrap: anywhere;
 }
-.clinical-list li button {
-  align-self: flex-start;
+.huy-visit-facts {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.huy-visit-facts > div {
+  padding: 15px;
+  background: var(--huy-soft);
+  border-radius: 8px;
+  min-width: 0;
+}
+.huy-visit-facts small {
+  display: block;
+  font-size: 11px;
+  color: var(--huy-muted);
+  margin-bottom: 7px;
+}
+.huy-visit-facts strong {
+  font-size: 15px;
+  font-weight: 650;
+}
+.huy-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 22px;
+  overflow: auto;
+}
+.huy-tabs button {
+  font-size: 13px;
+  padding: 10px 0;
+  margin-right: 12px;
+  white-space: nowrap;
+}
+.huy-note-fields {
+  display: grid;
+  gap: 20px;
+}
+.huy-note-fields textarea {
+  font-size: 14px;
+}
+.huy-exam-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 25px;
+}
+.huy-exam-actions small {
+  color: var(--huy-muted);
+  font-size: 11px;
+}
+.huy-exam-actions > div {
+  display: flex;
+  gap: 12px;
+}
+.huy-treatment {
+  display: grid;
+  grid-template-columns: minmax(270px, 1fr) minmax(0, 1.8fr);
+  gap: 20px;
+  align-items: stretch;
+}
+.huy-treatment-feedback {
+  grid-column: 1/-1;
+}
+.huy-treatment-feedback:empty {
+  display: none;
+}
+.huy-lab-prescribe {
+  display: flex;
+  flex-direction: column;
+}
+.huy-lab-options {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 330px;
+  overflow: auto;
+}
+.huy-test-choice {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-start;
+  gap: 10px !important;
+  background: var(--huy-soft);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 13px 11px;
+  color: var(--huy-ink) !important;
+  cursor: pointer;
+}
+.huy-test-choice:has(input:checked) {
+  background: #eaf4fa;
+  border-color: #a8cee2;
+}
+.huy-workspace .huy-test-choice input {
+  width: 16px;
+  flex: 0 0 16px;
+  padding: 0;
+  min-height: 16px;
+  height: 16px;
+  margin: 3px 0;
+  accent-color: var(--huy-primary);
+}
+.huy-workspace .huy-test-choice > span {
+  flex: 1;
+  min-width: 0;
+}
+.huy-test-choice strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+}
+.huy-test-choice small {
+  display: block;
+  font-size: 11px;
+  color: var(--huy-muted);
   margin-top: 5px;
 }
-.clinical-state {
-  color: #126b73;
-  font-size: 0.8rem;
-  font-weight: 700;
+.huy-lab-prescribe > label {
+  margin-bottom: 18px;
 }
-.clinical-list time {
-  font-size: 0.85rem;
-  color: #4b626e;
+.huy-lab-bottom {
+  padding-top: 24px;
+  margin-top: auto;
 }
-.clinical-pagination {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  margin-top: 18px;
-}
-.clinical-pagination button {
-  font-size: 0.82rem;
-  padding: 7px 9px;
-}
-.clinical-feature [role='alert'] {
-  color: #8b2633;
-  background: #fff4f4;
-  border-left: 3px solid #a83947;
-  padding: 12px;
-  margin: 12px 0;
-}
-.clinical-feature [role='alert'] button {
-  display: block;
-  margin-top: 12px;
-}
-.clinical-feature [role='status'] {
-  color: #185d55;
-  padding: 8px 0;
-}
-.clinical-feature small {
-  font-weight: 400;
-}
-.clinical-detail form > button {
+.huy-lab-bottom .huy-button {
   width: 100%;
 }
-@media (max-width: 800px) {
-  .clinical-columns {
+.huy-lab-registry {
+  border-top: 1px solid var(--huy-line);
+  margin-top: 22px;
+  padding-top: 18px;
+}
+.huy-lab-request {
+  padding: 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #eff3f8;
+}
+.huy-lab-request > small {
+  color: var(--huy-muted);
+  font-size: 10px;
+}
+.huy-lab-request > p {
+  width: 100%;
+  font-size: 12px;
+  margin: 0;
+}
+.huy-lab-request .huy-link {
+  font-size: 11px;
+}
+.huy-prescription > .huy-section-title h2 {
+  margin-bottom: 12px;
+}
+.huy-prescription > .huy-muted {
+  font-size: 12px;
+}
+.huy-prescription > .huy-notice {
+  margin-top: 18px;
+  margin-bottom: 22px;
+}
+.huy-medicine-picker {
+  position: relative;
+  margin-bottom: 14px;
+}
+.huy-medicine-options {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow: auto;
+  background: white;
+  border: 1px solid var(--huy-line);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px #142d4d12;
+  z-index: 5;
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 4px;
+}
+.huy-medicine-options li > button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  background: white;
+  border: 0;
+  border-radius: 5px;
+  padding: 10px;
+  color: var(--huy-ink);
+}
+.huy-medicine-options li > button:hover {
+  background: var(--huy-selected);
+}
+.huy-medicine-options small {
+  display: block;
+  font-size: 11px;
+  color: var(--huy-muted);
+}
+.huy-prescription-table {
+  table-layout: fixed;
+}
+.huy-prescription-table th:first-child {
+  width: 43%;
+}
+.huy-prescription-table th:nth-child(2) {
+  width: 34%;
+}
+.huy-prescription-table th:nth-child(3) {
+  width: 70px;
+}
+.huy-prescription-table th:last-child:not(:nth-child(3)) {
+  width: 40px;
+}
+.huy-prescription-table td {
+  padding: 12px 8px;
+}
+.huy-prescription-table td input {
+  font-size: 12px;
+}
+.huy-line-instruction {
+  margin-top: 12px;
+  gap: 4px !important;
+}
+.huy-line-instruction > span {
+  font-size: 10px;
+  color: var(--huy-muted);
+}
+.huy-prescription-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 22px;
+  flex-wrap: wrap;
+}
+.huy-prescription-actions .huy-button {
+  flex: 1;
+  white-space: normal;
+  font-size: 12px;
+  min-width: 130px;
+}
+@media (min-width: 1100px) {
+  .huy-exam-panel {
+    min-height: 650px;
+  }
+  .huy-queue {
+    min-height: 650px;
+  }
+}
+@media (max-width: 1000px) {
+  .huy-doctor-grid {
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 16px;
+  }
+  .huy-treatment {
     grid-template-columns: 1fr;
   }
-  .clinical-heading {
-    align-items: flex-start;
+  .huy-lab-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
-  .clinical-feature {
-    padding: 20px;
+  .huy-exam-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .huy-exam-actions > div {
+    justify-content: flex-end;
+  }
+  .huy-visit-facts {
+    grid-template-columns: 1fr 1fr;
+  }
+  .huy-visit-facts > div:first-child {
+    grid-column: 1/-1;
+  }
+}
+@media (max-width: 760px) {
+  .huy-doctor-grid > .huy-queue {
+    min-height: 0;
+  }
+  .huy-doctor-grid {
+    grid-template-columns: 1fr;
+  }
+  .huy-queue-list {
+    max-height: 330px;
+    overflow: auto;
+  }
+  .huy-visit-facts {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+  .huy-visit-facts > div:first-child {
+    grid-column: auto;
+  }
+  .huy-patient-summary {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .huy-lab-options {
+    grid-template-columns: 1fr;
   }
 }
 @media (max-width: 480px) {
-  .clinical-feature {
-    padding: 14px;
+  .huy-visit-facts {
+    grid-template-columns: 1fr;
   }
-  .clinical-heading,
-  .clinical-start,
-  .clinical-filters {
+  .huy-visit-facts > div {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .huy-visit-facts small {
+    margin: 0;
+  }
+  .huy-exam-actions > div {
     flex-direction: column;
-    align-items: stretch;
   }
-  .clinical-heading button,
-  .clinical-start button {
+  .huy-prescription-actions {
+    flex-direction: column;
+  }
+  .huy-prescription-actions .huy-button {
     width: 100%;
   }
-  .clinical-list,
-  .clinical-detail {
-    padding: 16px;
-  }
-}
-.clinical-treatment {
-  margin-top: 2rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid #dce5ec;
-}
-.clinical-treatment fieldset {
-  border: 1px solid #dce5ec;
-  border-radius: 8px;
-  margin: 0.7rem 0;
-  padding: 1rem;
-}
-.clinical-treatment input,
-.clinical-treatment select {
-  padding: 0.65rem;
-  border: 1px solid #a9b9c6;
-  border-radius: 6px;
-  max-width: 100%;
-}
-.clinical-actions {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin: 0.8rem 0;
-}
-.clinical-check {
-  display: flex !important;
-  align-items: center;
-  gap: 0.6rem;
-}
-.clinical-prescriptions {
-  list-style: none;
-  padding: 0;
-}
-.clinical-prescriptions > li {
-  background: #f4f8fb;
-  border-radius: 8px;
-  padding: 1rem;
-  margin: 0.8rem 0;
 }

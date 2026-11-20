@@ -24,9 +24,24 @@ export function withAuthRedirect(
 ): GatewayTransport {
   return async (url, init) => {
     const response = await transport(url, init);
-    if (response.status === 401) onUnauthorized();
+    if (
+      response.status === 401 &&
+      !(await isExpiredAuthorizationLease(response))
+    )
+      onUnauthorized();
     return response;
   };
+}
+
+async function isExpiredAuthorizationLease(
+  response: Response,
+): Promise<boolean> {
+  if (response.status !== 401) return false;
+  const body = await response
+    .clone()
+    .json()
+    .catch(() => null);
+  return body?.error?.code === 'AUTHZ_LEASE_EXPIRED';
 }
 
 declare global {
@@ -334,7 +349,12 @@ export async function defaultTransport(
     url.includes('/api/v1/auth/otp') ||
     url.includes('/api/v1/auth/password');
 
-  if (response.status === 401 && !isAuthForm && currentRefreshToken) {
+  if (
+    response.status === 401 &&
+    !isAuthForm &&
+    currentRefreshToken &&
+    !(await isExpiredAuthorizationLease(response))
+  ) {
     if (
       currentSession?.userId !== initialUserId ||
       authGeneration !== initialGeneration

@@ -24,7 +24,10 @@ function Preview() {
     () => createClinicalApi(transport, { authorizationLease: async () => currentLease.current }),
     [transport],
   );
-  const diagnostic = useMemo(() => createDiagnosticApi(transport), [transport]);
+  const diagnostic = useMemo(
+    () => createDiagnosticApi(transport, { authorizationLease: async () => currentLease.current }),
+    [transport],
+  );
   return (
     <>
       <details style={{ padding: 16, fontFamily: 'system-ui', background: '#e9eff2' }}>
@@ -43,11 +46,11 @@ function Preview() {
           <select value={screen} onChange={(event) => setScreen(event.target.value)}>
             <option value="doctor">Bác sĩ</option>
             <option value="tech">LAB_TECH</option>
-            <option value="review">LAB_REVIEW (chỉ đọc)</option>
+            <option value="review">LAB_REVIEW (duyệt độc lập)</option>
           </select>
         </label>
         <label>
-          Authorization lease cho thao tác ký
+          Authorization lease cho thao tác được bảo vệ
           <input
             type="password"
             autoComplete="off"
@@ -67,6 +70,7 @@ function Preview() {
       {screen === 'doctor' ? (
         <ClinicalFeature
           api={api}
+          diagnosticApi={diagnostic}
           session={{ userId, actorType: 'DOCTOR' }}
           selectedTicket={{
             ticketId: '55555555-0000-0000-0000-000000000001',

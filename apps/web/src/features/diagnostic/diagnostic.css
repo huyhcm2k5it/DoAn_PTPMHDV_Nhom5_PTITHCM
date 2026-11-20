@@ -1,84 +1,190 @@
-.diagnostic-feature {
-  max-width: 1280px;
-  margin: auto;
-  padding: 1.5rem;
-  color: #19384a;
-  font:
-    15px/1.5 system-ui,
-    sans-serif;
-}
-.diagnostic-feature header,
-.diagnostic-feature nav {
+@import '../clinical/workspace.css';
+.huy-lab-toolbar {
   display: flex;
-  justify-content: space-between;
-  gap: 1rem;
   align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 20px;
+  padding: 12px 18px;
 }
-.diagnostic-columns {
+.huy-lab-toolbar label {
+  max-width: 230px;
+  flex: 1;
+  font-size: 11px;
+}
+.huy-lab-toolbar label select {
+  border: 0;
+  padding: 4px 0;
+  min-height: 30px;
+  color: var(--huy-primary);
+  font-weight: 600;
+  font-size: 13px;
+}
+.huy-lab-toolbar > p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--huy-muted);
+}
+.huy-lab-toolbar > p span {
+  padding: 0 8px;
+  color: #a1aec0;
+}
+.huy-diagnostic-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr);
-  gap: 1.5rem;
-  margin-top: 1.5rem;
+  grid-template-columns: minmax(280px, 1fr) minmax(0, 1.65fr);
+  gap: 20px;
+  align-items: start;
 }
-.diagnostic-feature label {
+.huy-diagnostic-grid > .huy-queue > label {
+  margin-bottom: 18px;
+}
+.huy-diagnostic-grid .huy-queue-list > li > button {
+  min-height: 104px;
+}
+.huy-diagnostic-grid .huy-queue-list small.huy-order-code {
+  color: var(--huy-primary);
+  font-weight: 650;
+  margin: 0 0 5px;
+  font-size: 11px;
+}
+.huy-diagnostic-detail {
+  min-height: 590px;
+}
+.huy-diagnostic-detail .huy-section-title h2 {
+  font-size: 18px;
+  margin: 0 0 8px;
+}
+.huy-await-payment {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  margin: 0.8rem 0;
+  align-items: center;
+  justify-content: center;
+  min-height: 350px;
+  text-align: center;
+  color: var(--huy-muted);
+  padding: 30px;
 }
-.diagnostic-feature input,
-.diagnostic-feature select,
-.diagnostic-feature button {
-  font: inherit;
-  padding: 0.65rem;
-  border: 1px solid #a9bdca;
-  border-radius: 7px;
+.huy-await-payment > svg {
+  color: #7aa8bc;
+  margin-bottom: 20px;
 }
-.diagnostic-feature button {
-  background: #e8f3f7;
-  color: #174e68;
-  cursor: pointer;
+.huy-await-payment h3 {
+  font-size: 17px;
 }
-.diagnostic-feature button:disabled {
-  opacity: 0.5;
-  cursor: default;
+.huy-await-payment p {
+  font-size: 13px;
+  max-width: 35ch;
 }
-.diagnostic-feature ul {
-  list-style: none;
-  padding: 0;
-}
-.diagnostic-feature li {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  padding: 1rem;
-  margin: 0.7rem 0;
-  border: 1px solid #dbe5ec;
+.huy-sample-form {
+  background: var(--huy-soft);
+  padding: 20px;
   border-radius: 9px;
+  margin: 24px 0;
 }
-.diagnostic-order {
-  padding: 1rem;
-  background: #f5f9fb;
-  border-radius: 12px;
-  overflow-wrap: anywhere;
+.huy-sample-form label {
+  margin-bottom: 15px;
 }
-.diagnostic-feature [role='alert'] {
-  padding: 0.8rem;
-  background: #fff1ed;
-  color: #843120;
-  border-radius: 7px;
+.huy-specimen-history {
+  border: 1px solid var(--huy-line);
+  border-radius: 8px;
+  margin: 20px 0;
+  padding: 12px 14px;
 }
-.diagnostic-feature [role='status'] {
-  padding: 0.6rem;
-  background: #eaf5fa;
-  border-radius: 6px;
+.huy-specimen-history summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--huy-muted);
 }
-@media (max-width: 750px) {
-  .diagnostic-columns {
+.huy-specimen {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--huy-line);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+.huy-specimen strong {
+  font-size: 13px;
+}
+.huy-specimen p {
+  font-size: 11px;
+  color: var(--huy-muted);
+  margin: 4px 0;
+}
+.huy-result-editor {
+  margin-top: 25px;
+}
+.huy-result-editor .huy-table td,
+.huy-result-editor .huy-table th {
+  padding: 12px 8px;
+}
+.huy-result-table {
+  font-size: 12px;
+}
+.huy-result-table th:first-child {
+  min-width: 105px;
+}
+.huy-result-table td input {
+  min-width: 95px;
+}
+.huy-result-table td select {
+  min-width: 98px;
+  font-size: 11px;
+}
+.huy-result-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+.huy-result-actions > p {
+  font-size: 11px;
+  margin: 0;
+}
+.huy-result-actions > div {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.huy-result-actions .huy-button {
+  font-size: 12px;
+}
+@media (max-width: 1100px) {
+  .huy-diagnostic-grid {
+    grid-template-columns: 280px minmax(0, 1fr);
+    gap: 16px;
+  }
+  .huy-lab-toolbar > p {
+    display: none;
+  }
+}
+@media (max-width: 800px) {
+  .huy-diagnostic-grid > .huy-queue {
+    min-height: 0;
+  }
+  .huy-diagnostic-grid {
     grid-template-columns: 1fr;
   }
-  .diagnostic-feature header {
-    align-items: flex-start;
+  .huy-diagnostic-grid .huy-queue-list {
+    max-height: 350px;
+    overflow: auto;
+  }
+  .huy-diagnostic-detail {
+    min-height: 450px;
+  }
+}
+@media (max-width: 480px) {
+  .huy-lab-toolbar {
+    flex-wrap: wrap;
+  }
+  .huy-result-actions,
+  .huy-result-actions > div {
+    width: 100%;
     flex-direction: column;
+    align-items: stretch;
   }
 }

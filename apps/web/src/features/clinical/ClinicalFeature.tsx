@@ -11,11 +11,34 @@ import type {
 } from './types';
 import './clinical.css';
 import { TreatmentPanel } from './TreatmentPanel';
+import {
+  ArrowRight,
+  ClipboardList,
+  RefreshCw,
+  Stethoscope,
+} from 'lucide-react';
+import {
+  Empty,
+  Loading,
+  Notice,
+  shortId,
+  timeLabel,
+  ConfirmDialog,
+} from './ClinicalUI';
+import { DraftEditor } from './DraftEditor';
+import { MedicalHistory } from './MedicalHistory';
+import { PublishedLabResults } from '../diagnostic/PublishedLabResults';
+import type { DiagnosticApi } from '../diagnostic/types';
+import type { PatientSummary } from './types';
 
 export type ClinicalFeatureProps = {
   api: ClinicalApi;
   session?: ClinicalSession;
   selectedTicket?: StartInput;
+  initialView?: 'exam' | 'treatment';
+  initialVisitId?: string;
+  diagnosticApi?: DiagnosticApi;
+  patients?: Record<string, PatientSummary>;
 };
 const labels: Record<string, string> = {
   IN_PROGRESS: 'Đang khám',
@@ -30,6 +53,10 @@ export function ClinicalFeature({
   api,
   session,
   selectedTicket,
+  initialView,
+  initialVisitId,
+  diagnosticApi,
+  patients,
 }: ClinicalFeatureProps) {
   if (!session || session.actorType !== 'DOCTOR')
     return (
@@ -39,16 +66,30 @@ export function ClinicalFeature({
       </section>
     );
   return (
-    <Workbench key={session.userId} api={api} selectedTicket={selectedTicket} />
+    <Workbench
+      key={session.userId}
+      api={api}
+      selectedTicket={selectedTicket}
+      initialView={initialView}
+      initialVisitId={initialVisitId}
+      diagnosticApi={diagnosticApi}
+      patients={patients}
+    />
   );
 }
 function Workbench({
   api,
   selectedTicket,
-}: {
-  api: ClinicalApi;
-  selectedTicket?: StartInput;
-}) {
+  initialView = 'exam',
+  initialVisitId = '',
+  diagnosticApi,
+  patients,
+}: Omit<ClinicalFeatureProps, 'session'>) {
+  const [view, setView] = useState(initialView);
+  const [tab, setTab] = useState<'exam' | 'history' | 'results'>('exam');
+  const [dirty, setDirty] = useState(false);
+  const [draftPending, setDraftPending] = useState(false);
+  const [nextVisit, setNextVisit] = useState('');
   const apiRef = useRef(api);
   apiRef.current = api;
   const [date, setDate] = useState('');
@@ -62,7 +103,7 @@ function Workbench({
   });
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState<unknown>();
-  const [selected, setSelected] = useState('');
+  const [selected, setSelected] = useState(initialVisitId);
   const [detail, setDetail] = useState<VisitDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<unknown>();
@@ -87,7 +128,15 @@ function Workbench({
     apiRef.current
       .worklist({ date, state, page, limit: 20 }, controller.signal)
       .then((data) => {
-        if (active) setList(data);
+        if (active) {
+          setList(data);
+          setSelected(
+            (current) =>
+              current ||
+              (initialView === 'exam' ? data.items[0]?.id : '') ||
+              '',
+          );
+        }
       })
       .catch((error) => {
         if (active) setListError(error);
@@ -107,7 +156,7 @@ function Workbench({
     }
     const controller = new AbortController();
     let active = true;
-    setDetail(null);
+    setDetail((current) => (current?.visit.id === selected ? current : null));
     setDetailLoading(true);
     setDetailError(undefined);
     apiRef.current
@@ -127,7 +176,9 @@ function Workbench({
     };
   }, [selected, detailReload]);
   const hasPendingLab =
-    detail?.labRequests.some((request) => request.state === 'PENDING') ?? false;
+    detail?.labRequests.some((request) =>
+      ['PENDING', 'CREATED'].includes(request.state),
+    ) ?? false;
   useEffect(() => {
     if (!selected || !hasPendingLab || detailLoading) return;
     const controller = new AbortController();
@@ -189,6 +240,7 @@ function Workbench({
         intent.current = null;
         if (result.state === 'ACCEPTED' && result.visitId) {
           setSelected(result.visitId);
+          setDetailReload((n) => n + 1);
           setReload((n) => n + 1);
         }
       } catch (error) {
@@ -241,284 +293,423 @@ function Workbench({
       if (alive.current) setStarting(false);
     }
   }
+  const patient = detail ? patients?.[detail.visit.patientId] : undefined;
+  const choose = (id: string) => {
+    if (dirty && id !== selected) setNextVisit(id);
+    else setSelected(id);
+  };
   return (
-    <section className="clinical-feature">
-      <header className="clinical-heading">
+    <section className="clinical-feature huy-workspace">
+      <header className="huy-page-heading">
         <div>
-          <p className="clinical-eyebrow">Không gian bác sĩ</p>
-          <h1>Bàn khám</h1>
-          <p>Theo dõi lượt khám và lưu bệnh án nháp.</p>
-        </div>
-        <button type="button" onClick={() => setReload((n) => n + 1)}>
-          Làm mới danh sách
-        </button>
-      </header>
-      <div className="clinical-start">
-        <div>
-          <h2>Nhận bệnh nhân</h2>
+          <p className="huy-eyebrow">KHÔNG GIAN LÀM VIỆC</p>
+          <h1>
+            {view === 'exam' ? 'Bàn khám bác sĩ' : 'Chỉ định & kê đơn thuốc'}
+          </h1>
           <p>
-            {selectedTicket
-              ? 'Vé hàng chờ đã được chọn. Xác nhận để bắt đầu nhận lượt.'
-              : 'Chọn một vé từ hàng chờ để nhận lượt khám.'}
+            {view === 'exam'
+              ? 'Theo dõi lượt khám và thông tin điều trị.'
+              : 'Hoàn thiện chỉ định, đơn thuốc và kết luận điều trị.'}
           </p>
         </div>
         <button
+          className="huy-button secondary"
           type="button"
-          disabled={
-            starting ||
-            operation?.state === 'PENDING' ||
-            (!selectedTicket && !intent.current)
-          }
-          onClick={() => void start()}
+          onClick={() => setReload((n) => n + 1)}
         >
-          {starting
-            ? 'Đang gửi…'
-            : intent.current && startError && !operation
-              ? 'Thử lại yêu cầu nhận lượt'
-              : 'Nhận lượt khám'}
+          <RefreshCw size={16} aria-hidden="true" />
+          Làm mới
+        </button>
+      </header>
+      <div className="huy-view-switch" aria-label="Không gian bác sĩ">
+        <button
+          type="button"
+          aria-pressed={view === 'exam'}
+          disabled={view !== 'exam' && dirty}
+          onClick={() => setView('exam')}
+        >
+          <Stethoscope size={17} aria-hidden="true" />
+          Bàn khám bác sĩ
+        </button>
+        <button
+          type="button"
+          aria-pressed={view === 'treatment'}
+          disabled={!detail || dirty}
+          onClick={() => setView('treatment')}
+        >
+          <ClipboardList size={17} aria-hidden="true" />
+          Chỉ định & kê đơn
         </button>
       </div>
-      {operation?.state === 'PENDING' && (
-        <p role="status">
-          Đang chờ xác nhận vé. Lượt khám sẽ mở khi hàng chờ xác nhận thành
-          công.
-        </p>
-      )}
-      {operation?.state === 'REJECTED' && (
-        <p role="alert">
-          Không nhận được lượt: {operation.reasonCode ?? 'CLAIM_REJECTED'}. Hãy
-          kiểm tra lại vé hàng chờ.
-        </p>
-      )}
       {startError !== undefined && (
-        <div role="alert">
+        <Notice tone="error">
           {errorMessage(startError)}
           {operation?.state === 'PENDING' && (
             <button type="button" onClick={() => setPollReload((n) => n + 1)}>
               Kiểm tra lại trạng thái
             </button>
           )}
-        </div>
+        </Notice>
       )}
-      <div className="clinical-filters">
-        <label>
-          Ngày khám (UTC)
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => {
-              setDate(e.target.value);
-              setPage(1);
-            }}
-          />
-        </label>
-        <label>
-          Trạng thái
-          <select
-            value={state}
-            onChange={(e) => {
-              setState(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="">Tất cả trạng thái</option>
-            {Object.entries(labels).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-      <div className="clinical-columns">
-        <section className="clinical-list" aria-label="Danh sách lượt khám">
-          <h2>
-            Lượt khám của tôi <small>({list.total})</small>
-          </h2>
-          {loading ? (
-            <p role="status">Đang tải danh sách…</p>
-          ) : listError ? (
-            <p role="alert">{errorMessage(listError)}</p>
-          ) : list.items.length === 0 ? (
-            <p>Chưa có lượt khám phù hợp.</p>
-          ) : (
-            <ul>
-              {list.items.map((v) => (
-                <li key={v.id}>
-                  <span className="clinical-state">
-                    {labels[v.state] ?? v.state}
-                  </span>
-                  <strong>Lượt {v.id.slice(0, 8)}</strong>
-                  <span>Hồ sơ {v.patientId}</span>
-                  <time dateTime={v.startedAt}>
-                    {new Date(v.startedAt).toLocaleString('vi-VN')}
-                  </time>
-                  <button type="button" onClick={() => setSelected(v.id)}>
-                    Mở lượt {v.id.slice(0, 8)}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <nav className="clinical-pagination" aria-label="Phân trang">
-            <button
-              type="button"
-              disabled={page <= 1 || loading}
-              onClick={() => setPage((p) => p - 1)}
-            >
-              Trang trước
-            </button>
-            <span>Trang {page}</span>
-            <button
-              type="button"
-              disabled={page * 20 >= list.total || loading}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Trang sau
-            </button>
-          </nav>
-        </section>
-        <section className="clinical-detail" aria-label="Bệnh án nháp">
-          {detailLoading ? (
-            <p role="status">Đang tải lượt khám…</p>
-          ) : detailError ? (
-            <p role="alert">{errorMessage(detailError)}</p>
+      {operation?.state === 'PENDING' && (
+        <Notice>
+          Đang tiếp nhận lượt khám. Chờ hàng chờ xác nhận trước khi mở bệnh án.
+        </Notice>
+      )}
+      {operation?.state === 'REJECTED' && (
+        <Notice tone="error">
+          Không nhận được lượt.{' '}
+          {operation.reasonCode ?? 'Vui lòng chọn lại vé.'}
+        </Notice>
+      )}
+      {detailError !== undefined && detail !== null && (
+        <Notice tone="error">
+          {errorMessage(detailError)} Đang giữ bản xác nhận gần nhất và nội dung
+          chưa lưu.
+          <button type="button" onClick={() => setDetailReload((n) => n + 1)}>
+            Tải lại lượt khám
+          </button>
+        </Notice>
+      )}
+      <div
+        className={
+          view === 'exam' || !selected
+            ? 'huy-doctor-grid'
+            : 'huy-treatment-workspace'
+        }
+      >
+        {(view === 'exam' || !selected) && (
+          <aside className="huy-paper huy-queue">
+            <div className="huy-section-title">
+              <h2>Hàng chờ hôm nay</h2>
+              <span className="huy-count">{list.total}</span>
+            </div>
+            <div className="huy-filter-pair">
+              <label>
+                Ngày khám (UTC)
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => {
+                    setDate(e.target.value);
+                    setPage(1);
+                  }}
+                />
+              </label>
+              <label>
+                Trạng thái
+                <select
+                  value={state}
+                  onChange={(e) => {
+                    setState(e.target.value);
+                    setPage(1);
+                  }}
+                >
+                  <option value="">Tất cả</option>
+                  {Object.entries(labels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            {loading ? (
+              <Loading />
+            ) : listError ? (
+              <Notice tone="error">{errorMessage(listError)}</Notice>
+            ) : !list.items.length ? (
+              <Empty>
+                Chưa có lượt khám phù hợp. Chọn vé đã tiếp nhận để bắt đầu.
+              </Empty>
+            ) : (
+              <ul className="huy-queue-list">
+                {list.items.map((v, i) => (
+                  <li key={v.id}>
+                    <button
+                      type="button"
+                      className={selected === v.id ? 'selected' : ''}
+                      aria-pressed={selected === v.id}
+                      disabled={draftPending}
+                      aria-label={
+                        'Mở lượt ' + (patients?.[v.patientId]?.fullName || v.id)
+                      }
+                      onClick={() => choose(v.id)}
+                    >
+                      <span className="huy-queue-number">
+                        {String((page - 1) * 20 + i + 1).padStart(2, '0')}
+                      </span>
+                      <span>
+                        <strong>
+                          {patients?.[v.patientId]?.fullName ||
+                            'Hồ sơ ' + shortId(v.patientId)}
+                        </strong>
+                        <small>
+                          {v.returnRound
+                            ? 'Quay lại sau xét nghiệm'
+                            : 'Khám lần đầu'}
+                        </small>
+                        <span
+                          className={
+                            'huy-badge ' +
+                            (v.state === 'SIGNED' ? 'success' : 'info')
+                          }
+                        >
+                          {labels[v.state]}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <nav className="huy-pagination" aria-label="Phân trang">
+              <button
+                type="button"
+                disabled={loading || page <= 1}
+                onClick={() => setPage((p) => p - 1)}
+              >
+                Trước
+              </button>
+              <span>Trang {page}</span>
+              <button
+                type="button"
+                disabled={loading || page * 20 >= list.total}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Sau
+              </button>
+            </nav>
+            <div className="huy-queue-bottom">
+              <p>
+                {selectedTicket
+                  ? 'Vé đã được chọn từ tiếp nhận.'
+                  : 'Chọn vé từ màn tiếp nhận để nhận bệnh nhân.'}
+              </p>
+              <button
+                className="huy-button"
+                type="button"
+                disabled={
+                  starting ||
+                  operation?.state === 'PENDING' ||
+                  (!selectedTicket && !intent.current)
+                }
+                onClick={() => void start()}
+              >
+                {starting
+                  ? 'Đang gửi…'
+                  : intent.current && startError && !operation
+                    ? 'Thử lại yêu cầu nhận lượt'
+                    : 'Nhận lượt khám'}
+                <ArrowRight size={16} aria-hidden="true" />
+              </button>
+            </div>
+          </aside>
+        )}
+        <div className="huy-visit-workspace">
+          {detailLoading && !detail ? (
+            <div className="huy-paper">
+              <Loading>Đang tải lượt khám…</Loading>
+            </div>
+          ) : detailError && !detail ? (
+            <Notice tone="error">
+              {errorMessage(detailError)}
+              <button
+                type="button"
+                onClick={() => setDetailReload((n) => n + 1)}
+              >
+                Tải lại lượt khám
+              </button>
+            </Notice>
           ) : detail ? (
             <>
-              <DraftEditor
-                key={`${detail.visit.id}:${detailReload}`}
-                api={api}
-                detail={detail}
-                onReload={() => setDetailReload((n) => n + 1)}
-                onSaved={() => {
-                  setReload((n) => n + 1);
-                  setDetailReload((n) => n + 1);
-                }}
-              />
-              {api.treatment && (
+              <section
+                className={
+                  'huy-paper huy-patient-summary ' +
+                  (view === 'exam' ? 'exam' : '')
+                }
+              >
+                <div>
+                  <h2>
+                    {patient?.fullName ||
+                      'Hồ sơ ' + shortId(detail.visit.patientId)}
+                  </h2>
+                  <p>
+                    {patient?.sex && (
+                      <>
+                        {patient.sex === 'MALE'
+                          ? 'Nam'
+                          : patient.sex === 'FEMALE'
+                            ? 'Nữ'
+                            : patient.sex}{' '}
+                        ·{' '}
+                      </>
+                    )}
+                    {patient?.birthDate && (
+                      <>
+                        {new Date(patient.birthDate).toLocaleDateString(
+                          'vi-VN',
+                        )}{' '}
+                        ·{' '}
+                      </>
+                    )}
+                    Lượt {shortId(detail.visit.id)} ·{' '}
+                    {detail.visit.returnRound
+                      ? 'Quay lại sau xét nghiệm'
+                      : 'Khám lần đầu'}
+                  </p>
+                </div>
+                <span
+                  className={
+                    'huy-badge ' +
+                    (detail.visit.state === 'SIGNED' ? 'success' : 'info')
+                  }
+                >
+                  {labels[detail.visit.state]}
+                </span>
+                {patient?.allergies && (
+                  <span className="huy-badge danger">
+                    Dị ứng {patient.allergies}
+                  </span>
+                )}
+              </section>
+              {view === 'exam' ? (
+                <section className="huy-paper huy-exam-panel">
+                  <div className="huy-visit-facts">
+                    <div>
+                      <small>Bắt đầu khám</small>
+                      <strong>{timeLabel(detail.visit.startedAt)}</strong>
+                    </div>
+                    <div>
+                      <small>Lượt khám</small>
+                      <strong>
+                        {detail.visit.returnRound ? 'Quay lại' : 'Lần đầu'}
+                      </strong>
+                    </div>
+                    <div>
+                      <small>Bệnh án</small>
+                      <strong>
+                        {detail.visit.state === 'SIGNED'
+                          ? 'Đã ký'
+                          : 'Đang cập nhật'}
+                      </strong>
+                    </div>
+                  </div>
+                  <div
+                    className="huy-tabs"
+                    role="tablist"
+                    aria-label="Thông tin khám"
+                  >
+                    {(
+                      [
+                        ['exam', 'Khám lâm sàng'],
+                        ['history', 'Lịch sử khám'],
+                        ['results', 'Kết quả xét nghiệm'],
+                      ] as const
+                    ).map(([id, label]) => (
+                      <button
+                        type="button"
+                        key={id}
+                        role="tab"
+                        id={'tab-' + id}
+                        aria-selected={tab === id}
+                        aria-controls={'panel-' + id}
+                        onClick={() => setTab(id)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <div
+                    id="panel-exam"
+                    role="tabpanel"
+                    aria-labelledby="tab-exam"
+                    hidden={tab !== 'exam'}
+                  >
+                    <DraftEditor
+                      key={detail.visit.id}
+                      api={api}
+                      detail={detail}
+                      onDirty={setDirty}
+                      onPending={setDraftPending}
+                      onContinue={() => setView('treatment')}
+                      onReload={() => setDetailReload((n) => n + 1)}
+                      onSaved={() => {
+                        setReload((n) => n + 1);
+                        setDetailReload((n) => n + 1);
+                      }}
+                    />
+                  </div>
+                  {tab === 'history' && (
+                    <div
+                      id="panel-history"
+                      role="tabpanel"
+                      aria-labelledby="tab-history"
+                    >
+                      <MedicalHistory
+                        api={api}
+                        patientId={detail.visit.patientId}
+                      />
+                    </div>
+                  )}
+                  {tab === 'results' && (
+                    <div
+                      id="panel-results"
+                      role="tabpanel"
+                      aria-labelledby="tab-results"
+                    >
+                      {diagnosticApi ? (
+                        <PublishedLabResults
+                          api={diagnosticApi}
+                          patientId={detail.visit.patientId}
+                        />
+                      ) : (
+                        <Empty>
+                          Kết nối kết quả xét nghiệm chưa được cung cấp.
+                        </Empty>
+                      )}
+                    </div>
+                  )}
+                </section>
+              ) : api.treatment ? (
                 <TreatmentPanel
-                  key={`treatment:${detail.visit.id}:${detailReload}`}
+                  key={detail.visit.id}
                   api={api.treatment}
+                  diagnosticApi={diagnosticApi}
                   detail={detail}
+                  onDirty={setDirty}
                   onChanged={() => {
                     setDetailReload((n) => n + 1);
                     setReload((n) => n + 1);
                   }}
                 />
+              ) : (
+                <Empty>Kết nối chỉ định và kê đơn chưa sẵn sàng.</Empty>
               )}
             </>
           ) : (
-            <p>Chọn một lượt khám để xem và ghi nháp.</p>
-          )}
-        </section>
-      </div>
-    </section>
-  );
-}
-
-function DraftEditor({
-  api,
-  detail,
-  onReload,
-  onSaved,
-}: {
-  api: ClinicalApi;
-  detail: VisitDetail;
-  onReload: () => void;
-  onSaved: () => void;
-}) {
-  const last = detail.notes.at(-1);
-  const [fields, setFields] = useState({
-    symptoms: last?.symptoms ?? '',
-    findings: last?.findings ?? '',
-    assessment: last?.assessment ?? '',
-    diagnosis: last?.diagnosis ?? '',
-  });
-  const [version, setVersion] = useState(detail.visit.version);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<unknown>();
-  const [saved, setSaved] = useState(false);
-  const attempt = useRef<{ fingerprint: string; key: string } | null>(null);
-  const alive = useRef(true);
-  useEffect(() => {
-    alive.current = true;
-    return () => {
-      alive.current = false;
-    };
-  }, []);
-  async function save(event: React.FormEvent) {
-    event.preventDefault();
-    if (saving || detail.visit.state === 'SIGNED') return;
-    const input: DraftInput = { ...fields, expectedVersion: version };
-    const fingerprint = JSON.stringify({ visitId: detail.visit.id, input });
-    if (attempt.current?.fingerprint !== fingerprint)
-      attempt.current = { fingerprint, key: crypto.randomUUID() };
-    const key = attempt.current.key;
-    setSaving(true);
-    setError(undefined);
-    setSaved(false);
-    try {
-      const result = await api.saveDraft(detail.visit.id, input, key);
-      if (alive.current) {
-        setVersion(result.version);
-        setSaved(true);
-        attempt.current = null;
-        onSaved();
-      }
-    } catch (err) {
-      if (alive.current) setError(err);
-    } finally {
-      if (alive.current) setSaving(false);
-    }
-  }
-  const locked = detail.visit.state === 'SIGNED';
-  return (
-    <form onSubmit={(event) => void save(event)}>
-      <header>
-        <h2>Bệnh án nháp</h2>
-        <p>
-          {labels[detail.visit.state]} · Phiên bản {version}
-        </p>
-      </header>
-      {locked && <p>Lượt khám đã ký. Nội dung được giữ nguyên.</p>}
-      {(
-        [
-          ['symptoms', 'Triệu chứng'],
-          ['findings', 'Dấu hiệu khám'],
-          ['assessment', 'Nhận định'],
-          ['diagnosis', 'Chẩn đoán'],
-        ] as const
-      ).map(([key, label]) => (
-        <label key={key}>
-          {label}
-          <textarea
-            value={fields[key]}
-            maxLength={10000}
-            rows={key === 'symptoms' ? 4 : 3}
-            disabled={saving || locked}
-            onChange={(event) => {
-              setFields({ ...fields, [key]: event.target.value });
-              setSaved(false);
-            }}
-          />
-        </label>
-      ))}
-      {error !== undefined && (
-        <div role="alert">
-          {errorMessage(error)}
-          {error instanceof ApiError && error.status === 409 && (
-            <button type="button" onClick={onReload}>
-              Tải bản mới (bỏ thay đổi chưa lưu)
-            </button>
+            <section className="huy-paper">
+              <Empty>Chọn một lượt khám để xem bệnh án.</Empty>
+            </section>
           )}
         </div>
+      </div>
+      {nextVisit && (
+        <ConfirmDialog
+          title="Chuyển lượt khám?"
+          onClose={() => setNextVisit('')}
+          onConfirm={() => {
+            setDirty(false);
+            setSelected(nextVisit);
+            setNextVisit('');
+          }}
+        >
+          <p>
+            Nội dung khám chưa lưu sẽ được bỏ. Bạn có thể quay lại để lưu trước
+            khi chuyển.
+          </p>
+        </ConfirmDialog>
       )}
-      {saved && <p role="status">Đã lưu bản nháp thành công.</p>}
-      {!locked && (
-        <button type="submit" disabled={saving}>
-          {saving ? 'Đang lưu…' : 'Lưu bản nháp'}
-        </button>
-      )}
-    </form>
+    </section>
   );
 }

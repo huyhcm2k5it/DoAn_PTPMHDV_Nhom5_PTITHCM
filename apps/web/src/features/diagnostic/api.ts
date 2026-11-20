@@ -14,12 +14,27 @@ export class DiagnosticError extends Error {
   }
 }
 export function diagnosticMessage(error: unknown): string {
-  if (error instanceof DiagnosticError)
-    return `${error.message}${error.correlationId ? ` (Mã tra cứu: ${error.correlationId})` : ''}`;
+  if (error instanceof DiagnosticError) {
+    const messages: Record<string, string> = {
+      FORBIDDEN:
+        'Bạn không có quyền thực hiện thao tác này. Người đã tham gia nhập kết quả không được duyệt kết quả đó.',
+      STATE_CONFLICT:
+        'Trạng thái hoặc phiên bản đã thay đổi. Tải lại dữ liệu trước khi thao tác tiếp.',
+      AUTHZ_LEASE_EXPIRED:
+        'Phiên quyền đã hết hạn. Thử lại cùng yêu cầu để lấy quyền mới.',
+      SERVICE_UNAVAILABLE:
+        'Dữ liệu hoặc dịch vụ liên quan chưa sẵn sàng. Vui lòng thử lại.',
+      VALIDATION_ERROR:
+        'Thông tin chưa hợp lệ. Kiểm tra các trường nhập và danh sách chỉ số xét nghiệm.',
+      NOT_FOUND: 'Không tìm thấy dữ liệu được phép xem.',
+    };
+    return `${messages[error.code] ?? error.message}${error.correlationId ? ` (Mã tra cứu: ${error.correlationId})` : ''}`;
+  }
   return 'Không kết nối được máy chủ. Giữ nguyên yêu cầu để thử lại.';
 }
 export function createDiagnosticApi(
   transport: DiagnosticTransport,
+  options: { authorizationLease?: (action: string) => Promise<string> } = {},
 ): DiagnosticApi {
   async function request<T>(
     path: string,
@@ -48,7 +63,63 @@ export function createDiagnosticApi(
     headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key },
     body: JSON.stringify(body),
   });
+  async function protectedWrite(
+    action: string,
+    body: unknown,
+    key: string,
+    method = 'POST',
+  ) {
+    const init = { ...post(body, key), method };
+    if (options.authorizationLease) {
+      const headers = new Headers(init.headers);
+      headers.set(
+        'X-Authorization-Lease',
+        await options.authorizationLease(action),
+      );
+      init.headers = headers;
+    }
+    return init;
+  }
   return {
+    createResult: (id, input, key) =>
+      request(
+        `diagnostic-orders/${encodeURIComponent(id)}/results`,
+        post(input, key),
+        201,
+      ),
+    updateResult: async (id, input, key) =>
+      request(
+        `results/${encodeURIComponent(id)}`,
+        await protectedWrite('DI-008', input, key, 'PUT'),
+      ),
+    transitionResult: async (id, action, input, key) =>
+      request(
+        `results/${encodeURIComponent(id)}/${action}`,
+        action === 'return-rework'
+          ? post(input, key)
+          : await protectedWrite(
+              action === 'submit-review' ? 'DI-009' : 'DI-011',
+              input,
+              key,
+            ),
+      ),
+    cancel: async (id, input, key) =>
+      request(
+        `diagnostic-orders/${encodeURIComponent(id)}/cancel`,
+        await protectedWrite('DI-012', input, key),
+      ),
+    publishedResults: async (id, page, limit, signal) => {
+      const headers = new Headers();
+      if (options.authorizationLease)
+        headers.set(
+          'X-Authorization-Lease',
+          await options.authorizationLease('DI-013'),
+        );
+      return request(
+        `patients/${encodeURIComponent(id)}/published-results?page=${page}&limit=${limit}`,
+        { headers, signal, cache: 'no-store' },
+      );
+    },
     list: (q, signal) => {
       const params = new URLSearchParams({
         page: String(q.page),

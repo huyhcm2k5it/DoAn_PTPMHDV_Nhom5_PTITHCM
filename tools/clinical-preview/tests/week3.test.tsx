@@ -1,15 +1,39 @@
 import React from 'react';
-import { afterEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { TreatmentPanel } from '../../../apps/web/src/features/clinical/TreatmentPanel';
 import { DiagnosticFeature } from '../../../apps/web/src/features/diagnostic/DiagnosticFeature';
 import { createClinicalApi, ApiError } from '../../../apps/web/src/features/clinical/api';
 import { ClinicalFeature } from '../../../apps/web/src/features/clinical/ClinicalFeature';
 import { act } from '@testing-library/react';
+beforeEach(() => {
+  Object.defineProperty(HTMLDialogElement.prototype, 'showModal', {
+    configurable: true,
+    value: function () {
+      this.setAttribute('open', '');
+    },
+  });
+  Object.defineProperty(HTMLDialogElement.prototype, 'close', {
+    configurable: true,
+    value: function () {
+      this.removeAttribute('open');
+    },
+  });
+});
 afterEach(cleanup);
+async function addMedicine() {
+  fireEvent.change(screen.getByPlaceholderText('Nhập tên hoặc mã thuốc để thêm vào đơn…'), {
+    target: { value: 'Para' },
+  });
+  fireEvent.click(await screen.findByRole('button', { name: /Paracetamol/ }));
+}
+function confirmSigning() {
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Xác nhận ký' }));
+}
+
 const detail: any = {
-  visit: { id: 'visit', state: 'IN_PROGRESS', version: 2 },
-  notes: [],
+  visit: { id: 'visit', patientId: 'patient', state: 'IN_PROGRESS', version: 2 },
+  notes: [{ id: 'note', diagnosis: 'Viêm họng', symptoms: '', findings: '', assessment: '' }],
   prescriptions: [],
   labRequests: [],
 };
@@ -34,11 +58,11 @@ function treatment() {
 it('keeps LAB pending as pending and submits only Catalog IDs/revisions', async () => {
   const api = treatment();
   render(<TreatmentPanel api={api} detail={detail} onChanged={() => {}} />);
-  fireEvent.click(await screen.findByLabelText('Huyết học'));
+  fireEvent.click(await screen.findByRole('checkbox', { name: /Huyết học/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Gửi chỉ định xét nghiệm' }));
   await waitFor(() => expect(api.requestLab).toHaveBeenCalledTimes(1));
   expect(api.requestLab.mock.calls[0][1]).toEqual({ tests: [{ testId: 'test', revision: 1 }] });
-  expect(await screen.findByText(/Đã nhận chỉ định, đang chờ tạo order/)).toBeTruthy();
+  expect(await screen.findByText(/Đã tiếp nhận yêu cầu chỉ định/)).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Ký kết luận khám' }).hasAttribute('disabled')).toBe(
     true,
   );
@@ -47,14 +71,13 @@ it('preserves mutation body and key during an ambiguous retry', async () => {
   const api = treatment();
   api.createPrescription.mockRejectedValue(new Error('network'));
   render(<TreatmentPanel api={api} detail={detail} onChanged={() => {}} />);
-  await screen.findByLabelText('Thuốc dòng 1');
-  fireEvent.change(screen.getByLabelText('Thuốc dòng 1'), { target: { value: 'PAR' } });
-  fireEvent.change(screen.getByLabelText('Liều dùng dòng 1'), { target: { value: '1 viên' } });
+  await addMedicine();
+  fireEvent.change(screen.getByLabelText('Liều dùng Paracetamol'), { target: { value: '1 viên' } });
   fireEvent.click(screen.getByRole('button', { name: 'Lưu toa nháp' }));
   await screen.findByRole('alert');
   const first = api.createPrescription.mock.calls[0];
-  expect(screen.getByLabelText('Liều dùng dòng 1').hasAttribute('disabled')).toBe(true);
-  fireEvent.click(screen.getByRole('button', { name: 'Thử lại thao tác' }));
+  expect(screen.getByLabelText('Liều dùng Paracetamol').hasAttribute('disabled')).toBe(true);
+  fireEvent.click(screen.getByRole('button', { name: 'Thử lại cùng yêu cầu' }));
   await waitFor(() => expect(api.createPrescription).toHaveBeenCalledTimes(2));
   expect(api.createPrescription.mock.calls[1]).toEqual(first);
 });
@@ -62,23 +85,36 @@ it('signing visit does not silently finalize a prescription', async () => {
   const api = treatment();
   render(<TreatmentPanel api={api} detail={detail} onChanged={() => {}} />);
   fireEvent.click(screen.getByRole('button', { name: 'Ký kết luận khám' }));
+  confirmSigning();
   await waitFor(() => expect(api.complete).toHaveBeenCalledTimes(1));
   expect(api.finalizePrescription).not.toHaveBeenCalled();
 });
 function lab() {
   return {
-    list: vi
-      .fn()
-      .mockResolvedValue({
-        items: [{ id: 'order', state: 'WAITING_SAMPLE', chargeState: 'PAID', version: 1 }],
-        total: 1,
-      }),
-    detail: vi
-      .fn()
-      .mockResolvedValue({
-        order: { id: 'order', state: 'WAITING_SAMPLE', chargeState: 'PENDING', version: 1 },
-        specimens: [],
-      }),
+    list: vi.fn().mockResolvedValue({
+      items: [
+        {
+          id: 'order',
+          patientId: 'patient',
+          tests: [],
+          state: 'PAID',
+          chargeState: 'PAID',
+          version: 1,
+        },
+      ],
+      total: 1,
+    }),
+    detail: vi.fn().mockResolvedValue({
+      order: {
+        id: 'order',
+        patientId: 'patient',
+        tests: [],
+        state: 'PAID',
+        chargeState: 'PENDING',
+        version: 1,
+      },
+      specimens: [],
+    }),
     collect: vi.fn(),
     reject: vi.fn(),
     recollect: vi.fn(),
@@ -93,7 +129,7 @@ it('denies lab mutations to review-only staff and does not claim payment sync', 
     />,
   );
   fireEvent.click(await screen.findByRole('button', { name: 'Mở order order' }));
-  await screen.findByText(/Chờ đồng bộ thanh toán/);
+  await screen.findByText(/Đang chờ xác nhận thanh toán/);
   expect(screen.queryByRole('button', { name: 'Lấy mẫu' })).toBeNull();
   expect(api.collect).not.toHaveBeenCalled();
 });
@@ -108,14 +144,12 @@ it('does not load LAB data for patient', () => {
   expect(api.list).not.toHaveBeenCalled();
 });
 it('refreshes the signing lease while retaining the mutation key and body', async () => {
-  const transport = vi
-    .fn()
-    .mockImplementation(
-      async () =>
-        new Response(JSON.stringify({ data: { visitId: 'v', state: 'SIGNED', version: 3 } }), {
-          status: 200,
-        }),
-    );
+  const transport = vi.fn().mockImplementation(
+    async () =>
+      new Response(JSON.stringify({ data: { visitId: 'v', state: 'SIGNED', version: 3 } }), {
+        status: 200,
+      }),
+  );
   const lease = vi.fn().mockResolvedValueOnce('lease-one').mockResolvedValueOnce('lease-two');
   const api = createClinicalApi(transport, { authorizationLease: lease });
   await api.treatment!.complete('v', { expectedVersion: 2 }, 'intent');
@@ -135,13 +169,23 @@ it('preserves the signing intent when the authorization lease expires', async ()
     .mockResolvedValueOnce({ visitId: 'visit', state: 'SIGNED', version: 3 });
   render(<TreatmentPanel api={api} detail={detail} onChanged={() => {}} />);
   fireEvent.click(screen.getByRole('button', { name: 'Ký kết luận khám' }));
-  fireEvent.click(await screen.findByRole('button', { name: 'Thử lại thao tác' }));
+  confirmSigning();
+  fireEvent.click(await screen.findByRole('button', { name: 'Thử lại cùng yêu cầu' }));
   await waitFor(() => expect(api.complete).toHaveBeenCalledTimes(2));
   expect(api.complete.mock.calls[1]).toEqual(api.complete.mock.calls[0]);
 });
 it('edits and deletes a draft with the observed version, and finalizes only after signing', async () => {
   const api = treatment();
-  api.updatePrescription.mockResolvedValue({});
+  api.updatePrescription.mockResolvedValue({
+    prescription: {
+      id: 'rx123456',
+      state: 'DRAFT',
+      version: 5,
+      lines: [
+        { medicineCode: 'PAR', nameSnapshot: 'Paracetamol', doseText: '2 viên', quantity: 2 },
+      ],
+    },
+  });
   api.deletePrescription.mockResolvedValue({});
   api.finalizePrescription.mockResolvedValue({});
   const rx = {
@@ -151,23 +195,23 @@ it('edits and deletes a draft with the observed version, and finalizes only afte
     state: 'DRAFT',
     version: 4,
     revision: 1,
-    lines: [{ medicineCode: 'PAR', doseText: '1 viên', quantity: 2 }],
+    lines: [{ medicineCode: 'PAR', nameSnapshot: 'Paracetamol', doseText: '1 viên', quantity: 2 }],
   };
   const view = render(
     <TreatmentPanel api={api} detail={{ ...detail, prescriptions: [rx] }} onChanged={() => {}} />,
   );
-  await screen.findByRole('option', { name: 'Paracetamol (PAR)' });
-  fireEvent.click(screen.getByRole('button', { name: 'Sửa toa rx123456' }));
-  fireEvent.change(screen.getByLabelText('Liều dùng dòng 1'), { target: { value: '2 viên' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Lưu thay đổi toa' }));
+  await screen.findByLabelText('Liều dùng Paracetamol');
+  fireEvent.change(screen.getByLabelText('Liều dùng Paracetamol'), { target: { value: '2 viên' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Lưu toa nháp' }));
   await waitFor(() => expect(api.updatePrescription).toHaveBeenCalledTimes(1));
   expect(api.updatePrescription.mock.calls[0][1]).toMatchObject({
     expectedVersion: 4,
-    lines: [{ medicineCode: 'PAR', doseText: '2 viên', quantity: 2 }],
+    lines: [{ medicineCode: 'PAR', nameSnapshot: 'Paracetamol', doseText: '2 viên', quantity: 2 }],
   });
-  fireEvent.click(screen.getByRole('button', { name: 'Xóa toa rx123456' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Xóa toa nháp này' }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Xóa toa nháp' }));
   await waitFor(() => expect(api.deletePrescription).toHaveBeenCalledTimes(1));
-  expect(api.deletePrescription.mock.calls[0].slice(0, 2)).toEqual(['rx123456', 4]);
+  expect(api.deletePrescription.mock.calls[0].slice(0, 2)).toEqual(['rx123456', 5]);
   view.unmount();
   render(
     <TreatmentPanel
@@ -176,7 +220,8 @@ it('edits and deletes a draft with the observed version, and finalizes only afte
       onChanged={() => {}}
     />,
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Ký toa rx123456' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Ký toa thuốc' }));
+  confirmSigning();
   await waitFor(() => expect(api.finalizePrescription).toHaveBeenCalledTimes(1));
   expect(api.finalizePrescription.mock.calls[0][1]).toEqual({ expectedVersion: 4 });
 });
@@ -193,12 +238,26 @@ it('rejects with a reason and version then recollects the same order', async () 
     collectedAt: '2026-11-04T00:00:00Z',
   };
   api.detail.mockResolvedValueOnce({
-    order: { id: 'order', state: 'SPECIMEN_COLLECTED', chargeState: 'PAID', version: 1 },
+    order: {
+      id: 'order',
+      patientId: 'patient',
+      tests: [],
+      state: 'SPECIMEN_COLLECTED',
+      chargeState: 'PAID',
+      version: 1,
+    },
     specimens: [specimen],
   });
   api.reject.mockResolvedValue({ specimen: { ...specimen, state: 'REJECTED' } });
   api.detail.mockResolvedValue({
-    order: { id: 'order', state: 'SPECIMEN_REJECTED', chargeState: 'PAID', version: 2 },
+    order: {
+      id: 'order',
+      patientId: 'patient',
+      tests: [],
+      state: 'SPECIMEN_REJECTED',
+      chargeState: 'PAID',
+      version: 2,
+    },
     specimens: [{ ...specimen, state: 'REJECTED', version: 8, reasonCode: 'HEMOLYSIS' }],
   });
   api.recollect.mockResolvedValue({ specimen: { ...specimen, id: 'sample2', sequence: 2 } });
@@ -209,10 +268,12 @@ it('rejects with a reason and version then recollects the same order', async () 
     />,
   );
   fireEvent.click(await screen.findByRole('button', { name: 'Mở order order' }));
-  fireEvent.change(await screen.findByLabelText('Lý do từ chối mẫu 1'), {
+  fireEvent.click(await screen.findByText('Lịch sử mẫu bệnh phẩm (1)'));
+  fireEvent.click(screen.getByRole('button', { name: 'Từ chối mẫu' }));
+  fireEvent.change(await screen.findByLabelText('Lý do từ chối mẫu'), {
     target: { value: 'HEMOLYSIS' },
   });
-  fireEvent.click(screen.getByRole('button', { name: 'Từ chối mẫu 1' }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Từ chối mẫu' }));
   await waitFor(() => expect(api.reject).toHaveBeenCalledTimes(1));
   expect(api.reject.mock.calls[0].slice(0, 2)).toEqual([
     'sample',
@@ -226,6 +287,7 @@ it('rejects with a reason and version then recollects the same order', async () 
 it('polls pending LAB without discarding draft text', async () => {
   const visit = {
     id: 'visit',
+    patientId: 'patient',
     state: 'LAB_REQUEST_PENDING',
     version: 2,
     startedAt: '2026-11-04T00:00:00Z',
@@ -251,32 +313,33 @@ it('polls pending LAB without discarding draft text', async () => {
   };
   render(<ClinicalFeature api={client} session={{ userId: 'doctor', actorType: 'DOCTOR' }} />);
   fireEvent.click(await screen.findByRole('button', { name: 'Mở lượt visit' }));
-  fireEvent.change(await screen.findByLabelText('Triệu chứng'), {
+  fireEvent.change(await screen.findByLabelText('Lý do khám & bệnh sử'), {
     target: { value: 'Giữ nguyên nội dung đang viết' },
   });
   await waitFor(() => expect(client.detail).toHaveBeenCalledTimes(2), { timeout: 4000 });
-  expect((screen.getByLabelText('Triệu chứng') as HTMLTextAreaElement).value).toBe(
+  expect((screen.getByLabelText('Lý do khám & bệnh sử') as HTMLTextAreaElement).value).toBe(
     'Giữ nguyên nội dung đang viết',
   );
-  expect(await screen.findByText(/CREATED.*Order order/)).toBeTruthy();
+  expect((await screen.findAllByText('Chờ xét nghiệm')).length).toBeGreaterThan(0);
 });
 it('preserves prescription text after a conflict until an explicit reload', async () => {
   const api = treatment(),
     changed = vi.fn();
   api.createPrescription.mockRejectedValue(new ApiError(409, 'STATE_CONFLICT', 'Reload required'));
   render(<TreatmentPanel api={api} detail={detail} onChanged={changed} />);
-  await screen.findByRole('option', { name: 'Paracetamol (PAR)' });
-  fireEvent.change(screen.getByLabelText('Thuốc dòng 1'), { target: { value: 'PAR' } });
-  fireEvent.change(screen.getByLabelText('Liều dùng dòng 1'), {
+  await addMedicine();
+  fireEvent.change(screen.getByLabelText('Liều dùng Paracetamol'), {
     target: { value: 'Nội dung chưa lưu' },
   });
   fireEvent.click(screen.getByRole('button', { name: 'Lưu toa nháp' }));
   await screen.findByRole('alert');
-  expect((screen.getByLabelText('Liều dùng dòng 1') as HTMLInputElement).value).toBe(
+  expect((screen.getByLabelText('Liều dùng Paracetamol') as HTMLInputElement).value).toBe(
     'Nội dung chưa lưu',
   );
   expect(changed).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('button', { name: 'Tải bản mới (bỏ thay đổi chưa lưu)' }));
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Tải lại phiên bản mới, giữ nội dung đang soạn' }),
+  );
   expect(changed).toHaveBeenCalledTimes(1);
 });
 it('ignores an old LAB detail response after the session changes', async () => {

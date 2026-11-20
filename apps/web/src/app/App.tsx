@@ -20,6 +20,7 @@ import {
   Pill,
   Bell,
   Stethoscope,
+  ClipboardList,
   FlaskConical,
   Receipt,
   CalendarClock,
@@ -44,7 +45,8 @@ import { createCatalogApi } from '../features/catalog/api';
 import { CatalogPage } from '../features/catalog/CatalogPage';
 import type { CatalogApi } from '../features/catalog/types';
 import { createClinicalApi } from '../features/clinical/api';
-import { ClinicalFeature } from '../features/clinical/ClinicalFeature';
+import { ClinicalRoute } from '../features/clinical/ClinicalRoute';
+import { PatientRecordsRoute } from '../features/clinical/PatientRecordsRoute';
 import type { ClinicalApi } from '../features/clinical/types';
 import { createDiagnosticApi } from '../features/diagnostic/api';
 import { DiagnosticFeature } from '../features/diagnostic/DiagnosticFeature';
@@ -144,7 +146,7 @@ function AppLayout({ session }: { session?: WebRuntime['session'] }) {
           <div className="brand-logo-icon" aria-hidden="true">
             <MedicalCross />
           </div>
-          <span className="brand-title">UMC CARE</span>
+          <span className="brand-title">HQH CARE</span>
         </Link>
 
         <p className="sidebar-caption">{sidebarCategory}</p>
@@ -205,7 +207,7 @@ function AppLayout({ session }: { session?: WebRuntime['session'] }) {
                 <span>Hồ sơ của tôi</span>
               </Link>
               <Link
-                to="/patient/appointments?tab=lab"
+                to="/patient/lab-results"
                 className={`sidebar-nav-item ${isLabResultsActive ? 'is-active' : ''}`}
               >
                 <img
@@ -245,6 +247,17 @@ function AppLayout({ session }: { session?: WebRuntime['session'] }) {
             </NavLink>
           )}
 
+          {session?.actorType === 'DOCTOR' && (
+            <NavLink
+              to="/doctor/treatment"
+              className={({ isActive }) =>
+                `sidebar-nav-item ${isActive ? 'is-active' : ''}`
+              }
+            >
+              <ClipboardList className="sidebar-nav-icon" aria-hidden="true" />
+              <span>Chỉ định & kê đơn</span>
+            </NavLink>
+          )}
           {session?.actorType === 'STAFF' && (
             <>
               {session.capabilities.includes('RECEPTION') && (
@@ -400,8 +413,7 @@ function AppLayout({ session }: { session?: WebRuntime['session'] }) {
         </main>
 
         <footer className="app-footer">
-          <span>UMC Care © 2026 · Bảo mật thông tin người bệnh</span>
-          <span>Dữ liệu minh họa</span>
+          <span>HQH Care © 2026 · Bảo mật thông tin người bệnh</span>
         </footer>
       </div>
     </div>
@@ -691,10 +703,52 @@ function AppRoutes({
           }
         />
         <Route
+          path="/doctor/treatment"
+          element={
+            <ClinicalRoute
+              api={clinicalApi}
+              diagnosticApi={diagnosticApi}
+              session={session}
+              view="treatment"
+            />
+          }
+        />
+        <Route
+          path="/patient/lab-results"
+          element={
+            session?.actorType === 'PATIENT' ? (
+              <PatientRecordsRoute
+                patientApi={patientApi}
+                clinicalApi={clinicalApi}
+                diagnosticApi={diagnosticApi}
+                kind="results"
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/patient/medical-records"
+          element={
+            session?.actorType === 'PATIENT' ? (
+              <PatientRecordsRoute
+                patientApi={patientApi}
+                clinicalApi={clinicalApi}
+                diagnosticApi={diagnosticApi}
+                kind="records"
+              />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
           path="/doctor/clinical"
           element={
-            <ClinicalFeature
+            <ClinicalRoute
               api={clinicalApi}
+              diagnosticApi={diagnosticApi}
               session={
                 session
                   ? { userId: session.userId, actorType: session.actorType }
@@ -798,8 +852,11 @@ export function App({ runtime: propRuntime }: { runtime?: WebRuntime } = {}) {
     [apiTransport, runtime?.session?.lease],
   );
   const diagnosticApi = useMemo(
-    () => createDiagnosticApi(apiTransport),
-    [apiTransport],
+    () =>
+      createDiagnosticApi(apiTransport, {
+        authorizationLease: runtime?.session?.lease,
+      }),
+    [apiTransport, runtime?.session?.lease],
   );
   const pharmacyApi = useMemo(
     () =>

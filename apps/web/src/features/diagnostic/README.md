@@ -1,17 +1,41 @@
-# LAB workspace
+# Không gian xét nghiệm — Huy
 
-Huy owns this feature. It exports `DiagnosticFeature`, `createDiagnosticApi` and types without changing the group's router or shared session.
+Route `/staff/diagnostic` triển khai nhóm 10 của Web UI. DiagnosticFeature nhận API, phiên Identity và tùy chọn bản đồ nhân khẩu patients có nguồn hợp lệ. Chỉ STAFF có LAB_TECH/LAB_REVIEW tải hàng chờ; backend quyết định quyền từng request.
+
+## Luồng và API
+
+| Thao tác           | Điều kiện trên màn                               | API                                       |
+| ------------------ | ------------------------------------------------ | ----------------------------------------- |
+| Danh sách/chi tiết | Phiên xét nghiệm                                 | DI-002/003, lọc trạng thái đơn/phân trang |
+| Lấy mẫu            | LAB_TECH, order PAID, chargeState PAID           | DI-003                                    |
+| Từ chối mẫu        | COLLECTED mới nhất, chưa có result, có lý do     | DI-005, expectedVersion của mẫu           |
+| Lấy lại mẫu        | SPECIMEN_REJECTED, đã trả tiền                   | DI-006, cùng order, không thu phí mới     |
+| Nhập/sửa kết quả   | LAB_TECH, DRAFT/REWORK, mẫu hợp lệ               | DI-007/008                                |
+| Gửi duyệt          | Đã lưu đủ chỉ số, không còn thay đổi chưa lưu    | DI-009                                    |
+| Yêu cầu làm lại    | LAB_REVIEW, REVIEW, lý do bắt buộc               | DI-010                                    |
+| Công bố            | LAB_REVIEW, REVIEW, người duyệt độc lập          | DI-011                                    |
+| Hủy                | Bác sĩ được phép, đã thu tiền, chưa từng lấy mẫu | DI-012 trong CancelLabDialog              |
+| Xem kết quả        | Bác sĩ/bệnh nhân được backend cấp quyền          | DI-013, chỉ PUBLISHED                     |
+
+REVIEW/REWORK là trạng thái result tại chi tiết, không gửi làm bộ lọc order DI-002. Thanh toán lấy từ Diagnostic projection của Billing; không tự đánh dấu đã thu để mở lấy mẫu. Làm mới tải hàng chờ; chi tiết cập nhật định kỳ, tạm dừng khi có nội dung chưa lưu hoặc write chưa xác định kết quả.
+
+DI-007/008 gửi testCode/valueText/flag theo snapshot chỉ định. Đơn vị/tham chiếu hiển thị từ snapshot; server xác minh và gắn vào kết quả. Không tự tạo chỉ số, kết quả hay khoảng tham chiếu. Gửi duyệt chưa công bố; chỉ DI-011 trả PUBLISHED mới hiển thị đã công bố.
+
+Màn chặn userId bằng enteredBy tự duyệt. Backend còn kiểm tra toàn bộ contributors (người sửa/gửi duyệt); API hiện chưa trả toàn bộ danh sách này. Quyền cuối cùng do server quyết định; 403 phải hiển thị lỗi và giữ dữ liệu.
+
+CANCELLED chỉ đọc. refundStatus từ DI-002: PENDING_SYNC/REQUESTED/FAILED/SUCCEEDED. Chỉ SUCCEEDED hiển thị đã hoàn tiền; không tự thay trạng thái hoặc dựng kết quả để đóng luồng.
+
+## Adapter và phiên
 
 ```tsx
-const api = createDiagnosticApi(runtime.transport);
-<DiagnosticFeature
-  api={api}
-  session={{ userId, actorType: 'STAFF', capabilities }}
-/>;
+const api = createDiagnosticApi(runtime.transport, {
+  authorizationLease: runtime.session?.lease,
+});
+<DiagnosticFeature api={api} session={runtime.session} />;
 ```
 
-The host passes the authenticated Identity subject and current capabilities. LAB_TECH can collect, reject with a reason and expectedVersion, and recollect on the same order. LAB_REVIEW can read this increment. Patients and other actors do not load the queue. Backend authorization remains authoritative.
+DI-008/009/011/012/013 dùng lease đúng action. DI-007/010 không bị adapter áp đặt lease ngoài hợp đồng hiện tại. Mỗi write có Idempotency-Key; retry giữ key/body, chỉ làm mới lease. 409 cần xử lý phiên bản; bản poll cũ không thay kết quả mới vừa lưu. Write chưa rõ kết quả khóa sửa và chuyển chỉ định.
 
-The queue supports state filters and pagination. Detail shows the locally confirmed charge state, specimen history and actor/time audit. Collection stays disabled while payment is pending. Recollection uses DI-006 and never requests another charge. Each write preserves its UUID/body after an ambiguous network failure; the form stays locked until that intent resolves. Conflict messages offer a reload without silently discarding the reason/barcode. Requests abort or ignore stale responses when the order/session changes, and a subject change unmounts the previous patient's detail.
+PublishedLabResults bàn giao khối 05.06; ResultTable dùng chung bảng. Bệnh nhân chỉ thấy PUBLISHED với giá trị, đơn vị, tham chiếu và in. JWT do transport chung của Hưng cung cấp; không có bí mật backend hoặc kết nối trực tiếp DB/RabbitMQ/Redis trong feature.
 
-Routes suggested for Quân's shell: `/staff/lab/*`. Hưng supplies the authenticated Gateway transport. `tools/clinical-preview` provides an isolated runner using real Diagnostic on8083; it does not manufacture payment or specimen success.
+DI-002/003 chưa có tên bệnh nhân, dị ứng, sinh hiệu. Khi host chưa cung cấp dữ liệu có quyền, màn hiện mã hồ sơ; không dựng thông tin theo PDF. Kiểm thử ở `apps/web/tests/huy-workspaces.test.tsx` và `tools/clinical-preview/tests/week3.test.tsx`. Chạy online cần tài khoản, grant/projection và dữ liệu thật; fixture UI không thay thế nghiệm thu tích hợp.
