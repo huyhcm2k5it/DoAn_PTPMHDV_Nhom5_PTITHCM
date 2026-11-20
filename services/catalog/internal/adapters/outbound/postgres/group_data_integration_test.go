@@ -137,7 +137,41 @@ func TestGroupCatalogDataAndLegacyUpgrade(t *testing.T) {
 		t.Fatal(err)
 	}
 	snapshot, err := db.ExportCatalogSnapshot(ctx)
-	if err != nil || len(snapshot.Entities) != 46 || snapshot.Watermark != 46 {
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Assert the identities imported from the shared fixture, not a historical
+	// row count: the group's medicine catalog can grow independently of this test.
+	expected := map[string]bool{}
+	for kind, table := range map[string]string{
+		"DEPARTMENT": "departments", "DOCTOR": "doctors", "SERVICE": "medical_services",
+		"MEDICINE": "medicines", "LAB_TEST": "lab_tests", "PRICE_VERSION": "price_versions",
+	} {
+		var rows []struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal(data[table], &rows); err != nil || len(rows) == 0 {
+			t.Fatalf("invalid or empty %s fixture: %v", table, err)
+		}
+		for _, row := range rows {
+			key := kind + ":" + row.ID
+			if !domain.ValidID(row.ID) || expected[key] {
+				t.Fatalf("invalid or duplicate fixture identity %s", key)
+			}
+			expected[key] = true
+		}
+	}
+	if len(snapshot.Entities) != len(expected) || snapshot.Watermark != int64(len(expected)) {
 		t.Fatalf("group catalog snapshot: entities=%d watermark=%d err=%v", len(snapshot.Entities), snapshot.Watermark, err)
+	}
+	for _, entity := range snapshot.Entities {
+		key := entity.EntityType + ":" + entity.EntityID
+		if !expected[key] {
+			t.Fatalf("unexpected or duplicate snapshot identity %s", key)
+		}
+		delete(expected, key)
+	}
+	if len(expected) != 0 {
+		t.Fatalf("snapshot omitted %d fixture identities", len(expected))
 	}
 }

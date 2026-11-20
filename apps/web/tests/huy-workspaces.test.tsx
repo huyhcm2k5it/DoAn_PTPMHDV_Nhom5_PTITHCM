@@ -101,13 +101,11 @@ it('reloads the same visit after Appointment accepts its return ticket', async (
     visitId: detail.visit.id,
   };
   const api: ClinicalApi = {
-    worklist: vi
-      .fn()
-      .mockImplementation(async (q) => ({
-        items: [detail.visit],
-        total: 1,
-        startRequest: q.operationId ? operation : null,
-      })),
+    worklist: vi.fn().mockImplementation(async (q) => ({
+      items: [detail.visit],
+      total: 1,
+      startRequest: q.operationId ? operation : null,
+    })),
     start: vi.fn().mockResolvedValue({ ...operation, state: 'PENDING' }),
     detail: vi
       .fn()

@@ -23,13 +23,11 @@ it('still redirects on an unauthenticated response', async () => {
   const { withAuthRedirect } = await import('../src/app/runtime');
   const logout = vi.fn();
   await withAuthRedirect(
-    vi
-      .fn()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ error: { code: 'UNAUTHENTICATED' } }), {
-          status: 401,
-        }),
-      ),
+    vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: { code: 'UNAUTHENTICATED' } }), {
+        status: 401,
+      }),
+    ),
     logout,
   )('/api/v1/clinical/worklist');
   expect(logout).toHaveBeenCalledTimes(1);
@@ -46,13 +44,11 @@ it('does not refresh JWT or replay an expired lease with the same stale header',
       capabilities: [],
     }),
   );
-  const fetchMock = vi
-    .fn()
-    .mockResolvedValue(
-      new Response(JSON.stringify({ error: { code: 'AUTHZ_LEASE_EXPIRED' } }), {
-        status: 401,
-      }),
-    );
+  const fetchMock = vi.fn().mockResolvedValue(
+    new Response(JSON.stringify({ error: { code: 'AUTHZ_LEASE_EXPIRED' } }), {
+      status: 401,
+    }),
+  );
   vi.stubGlobal('fetch', fetchMock);
   const { defaultTransport } = await import('../src/app/runtime');
   const result = await defaultTransport('/api/v1/visits/v/complete', {
