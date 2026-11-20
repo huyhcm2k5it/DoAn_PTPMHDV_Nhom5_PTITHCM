@@ -1,7 +1,7 @@
 {
   "metadata": {
     "title": "Dữ liệu minh họa hành trình bệnh nhân HQH Care",
-    "version": "2.0",
+    "version": "2.1",
     "purpose": "Dữ liệu giả minh họa ERD 3NF và hành trình đã hoàn thành, không phải seed hoặc bằng chứng hệ thống đã chạy.",
     "time_zone": "UTC",
     "business_date": "2026-11-10",
@@ -13,7 +13,8 @@
     ],
     "identity_note": "Tài khoản, email miền example.invalid và số bắt đầu 000 là giả. Tài khoản chỉ thể hiện trạng thái minh họa, không thể dùng đăng nhập hoặc nhận OTP.",
     "review_note": "Người nhập và người duyệt xét nghiệm là hai tài khoản STAFF khác nhau.",
-    "references_note": "Các UUID cũ được giữ nguyên; UUID mới được tạo cố định cho ví dụ, không khớp seed hiện có."
+    "references_note": "Các UUID cũ được giữ nguyên; UUID mới được tạo cố định cho ví dụ, không khớp seed hiện có.",
+    "catalog_note": "Danh mục gồm đủ 10 khoa theo bộ dữ liệu giao diện hiện có của dự án. Mỗi khoa có 3 bác sĩ ACTIVE, mỗi bác sĩ liên kết với một tài khoản Identity DOCTOR ACTIVE. Tên và thông tin liên hệ được tạo cho dữ liệu minh họa."
   },
   "services": {
     "identity": {
@@ -105,6 +106,314 @@
           "version": 1,
           "token_version": 1,
           "access_version": 1
+        },
+        {
+          "id": "25ba242b-8d5f-54d0-a9a8-22aa4c9c1002",
+          "phone": "0000000100",
+          "email": "bs.noi.3@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "b542e608-6343-5a36-bc06-74a93fcb0e39",
+          "phone": "0000000101",
+          "email": "bs.ngoai.1@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "b82f7906-10f1-5a76-9c18-dadc18b08da9",
+          "phone": "0000000102",
+          "email": "bs.ngoai.2@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "c437c58d-cc72-5ecd-bd72-2232361ba376",
+          "phone": "0000000103",
+          "email": "bs.ngoai.3@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "7f4b58fb-02a7-5a0f-aec4-3a5cd0d136de",
+          "phone": "0000000104",
+          "email": "bs.nhi.1@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "5f8b6104-6bc5-519e-a962-c2b41cee481e",
+          "phone": "0000000105",
+          "email": "bs.nhi.2@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "b8a5c980-ad77-505e-b1e5-6d7d9787c019",
+          "phone": "0000000106",
+          "email": "bs.nhi.3@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "4b9dd85b-a4a6-5f9c-b1ab-b57bd8de3d5f",
+          "phone": "0000000107",
+          "email": "bs.tmh.1@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "69bd5cef-563e-5b67-a2be-13f0839e35ac",
+          "phone": "0000000108",
+          "email": "bs.tmh.2@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "48806f16-5d12-583a-83a3-c4d9cb023935",
+          "phone": "0000000109",
+          "email": "bs.tmh.3@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "4895e134-10b8-573b-9cdb-e896a1b3c0b4",
+          "phone": "0000000110",
+          "email": "bs.mat.1@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "5a88812e-e9d2-5e33-954a-e7e06dc670a5",
+          "phone": "0000000111",
+          "email": "bs.mat.2@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "16a00dcc-c7b8-5175-aa1a-a99670e91226",
+          "phone": "0000000112",
+          "email": "bs.mat.3@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "0a571e80-b61d-5c04-b124-5195c2d89e41",
+          "phone": "0000000113",
+          "email": "bs.dalieu.1@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "85cb2cf2-88cc-57dc-b238-df251f2e2896",
+          "phone": "0000000114",
+          "email": "bs.dalieu.2@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "2a465420-f006-500d-98e6-18bf9a97a4ea",
+          "phone": "0000000115",
+          "email": "bs.dalieu.3@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "7911cdb4-39b4-5a8a-9594-38c372e20a0b",
+          "phone": "0000000116",
+          "email": "bs.tim.1@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "3285a142-084a-5ca7-a810-d30f38dddc5c",
+          "phone": "0000000117",
+          "email": "bs.tim.2@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "de3d68bd-2711-569b-a09f-3b43ff3741b1",
+          "phone": "0000000118",
+          "email": "bs.tim.3@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "4d308516-e9f1-54ba-82fb-4757400633e5",
+          "phone": "0000000119",
+          "email": "bs.tieuhoa.1@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "8d880cf9-94da-514a-a448-ef0dff8a288c",
+          "phone": "0000000120",
+          "email": "bs.tieuhoa.2@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "870afc94-3b4f-5345-87e7-782ee9052f03",
+          "phone": "0000000121",
+          "email": "bs.tieuhoa.3@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "9fc0a0b8-c610-56a5-8726-b9904c6d85d1",
+          "phone": "0000000122",
+          "email": "bs.cxk.1@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "a4b8f21e-b953-52b5-9b89-76b2637371e3",
+          "phone": "0000000123",
+          "email": "bs.cxk.2@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "0d927664-6553-59ba-9654-3a31b843ad73",
+          "phone": "0000000124",
+          "email": "bs.cxk.3@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "f7f1e307-5928-5cc9-9f3f-e03151ca8803",
+          "phone": "0000000125",
+          "email": "bs.hohap.1@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "98950892-9717-5553-8c5d-9bee2cafe4bc",
+          "phone": "0000000126",
+          "email": "bs.hohap.2@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
+        },
+        {
+          "id": "a7c2cca3-df72-57b4-8d9d-255226a7e48e",
+          "phone": "0000000127",
+          "email": "bs.hohap.3@example.invalid",
+          "actor_type": "DOCTOR",
+          "status": "ACTIVE",
+          "phone_verified_at": null,
+          "version": 1,
+          "token_version": 1,
+          "access_version": 1
         }
       ],
       "staff_capabilities": [
@@ -161,7 +470,7 @@
           "id": "1cb1d7ec-2620-5e26-9f12-02bf4150f774",
           "ownerUserId": "9367c90c-9e4f-5d6b-b2a8-c55c2c85a610",
           "relation": "SELF",
-          "fullName": "Nguyễn Demo An",
+          "fullName": "Nguyễn An",
           "birthDate": "1995-03-12",
           "sex": "FEMALE",
           "contactPhone": "0000000001",
@@ -175,7 +484,7 @@
           "id": "c3d50eac-48d1-5df4-941b-e3eaf28fde92",
           "ownerUserId": "db78960c-720f-5965-9b04-9f091980ceba",
           "relation": "SELF",
-          "fullName": "Trần Demo Bình",
+          "fullName": "Trần Bình",
           "birthDate": "1990-05-18",
           "sex": "MALE",
           "contactPhone": "0000000002",
@@ -191,8 +500,62 @@
       "departments": [
         {
           "id": "c4f4129b-face-57e4-a659-a311f0d8cd0b",
-          "code": "DEMO-NOI",
-          "name": "Nội tổng quát mẫu",
+          "code": "NOI",
+          "name": "Nội tổng quát",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "652bc74f-ccf0-539b-bf56-ae00cbbfde94",
+          "code": "NGOAI",
+          "name": "Ngoại tổng quát",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "1b6cdc6b-b12d-51eb-89c9-abb700ca0206",
+          "code": "NHI",
+          "name": "Nhi",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "afadf1d5-bdd9-5434-8050-56fd4b310d76",
+          "code": "TMH",
+          "name": "Tai Mũi Họng",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "98513b28-14bd-5f7d-92cb-663868291642",
+          "code": "MAT",
+          "name": "Mắt",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "9a9c9eee-032c-5bfe-a19a-945d4d0cdd1a",
+          "code": "DALIEU",
+          "name": "Da liễu",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "1afe6e04-ccd5-5ba1-928c-90e6ed3a11cd",
+          "code": "TIM",
+          "name": "Tim mạch",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "3153a933-154a-5e77-a669-d3a9fd8893ce",
+          "code": "TIEUHOA",
+          "name": "Tiêu hóa",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "087bb102-61c4-5d1b-9c8f-211aeb7905bb",
+          "code": "CXK",
+          "name": "Cơ xương khớp",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "e46861a6-0358-5581-aeb5-823b9cc4d2b1",
+          "code": "HOHAP",
+          "name": "Hô hấp",
           "status": "ACTIVE"
         }
       ],
@@ -201,14 +564,210 @@
           "id": "543e4e87-7dcb-5612-b685-ce84b3d721f5",
           "identity_user_id": "ffd26cd4-cbc2-5473-a5c0-7a9c4e64f480",
           "department_id": "c4f4129b-face-57e4-a659-a311f0d8cd0b",
-          "display_name": "BS. Demo Minh",
+          "display_name": "BS. Minh",
           "status": "ACTIVE"
         },
         {
           "id": "ea19a2f7-b99b-5bd0-ac4c-184d58477e47",
           "identity_user_id": "bfc87b3a-8de9-5836-9495-8b79af505254",
           "department_id": "c4f4129b-face-57e4-a659-a311f0d8cd0b",
-          "display_name": "BS. Demo Lan",
+          "display_name": "BS. Lan",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "d9038aaa-d22c-5724-8d86-c611edc48c90",
+          "identity_user_id": "25ba242b-8d5f-54d0-a9a8-22aa4c9c1002",
+          "department_id": "c4f4129b-face-57e4-a659-a311f0d8cd0b",
+          "display_name": "BS. Lê Hoàng Nam",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "a1ca45be-50b2-522b-a782-46aeaa64a0f9",
+          "identity_user_id": "b542e608-6343-5a36-bc06-74a93fcb0e39",
+          "department_id": "652bc74f-ccf0-539b-bf56-ae00cbbfde94",
+          "display_name": "BS. Phạm Quốc Huy",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "4708ec66-8186-5fb9-aa76-55e625daf47b",
+          "identity_user_id": "b82f7906-10f1-5a76-9c18-dadc18b08da9",
+          "department_id": "652bc74f-ccf0-539b-bf56-ae00cbbfde94",
+          "display_name": "BS. Võ Thanh Tùng",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "5fe87476-cd4a-5e37-a40b-91ca27e46af3",
+          "identity_user_id": "c437c58d-cc72-5ecd-bd72-2232361ba376",
+          "department_id": "652bc74f-ccf0-539b-bf56-ae00cbbfde94",
+          "display_name": "BS. Nguyễn Hải Đăng",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "4651ec1a-b366-5345-8377-634ce80f2eed",
+          "identity_user_id": "7f4b58fb-02a7-5a0f-aec4-3a5cd0d136de",
+          "department_id": "1b6cdc6b-b12d-51eb-89c9-abb700ca0206",
+          "display_name": "BS. Trần Thị Mai",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "296cfcb9-13f0-5a99-99b5-daf87ecbedd0",
+          "identity_user_id": "5f8b6104-6bc5-519e-a962-c2b41cee481e",
+          "department_id": "1b6cdc6b-b12d-51eb-89c9-abb700ca0206",
+          "display_name": "BS. Lê Ngọc Hân",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "43e4578b-9de7-5d41-a8c7-272126c37164",
+          "identity_user_id": "b8a5c980-ad77-505e-b1e5-6d7d9787c019",
+          "department_id": "1b6cdc6b-b12d-51eb-89c9-abb700ca0206",
+          "display_name": "BS. Phan Minh Khang",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "d35b1685-e878-5857-a5d1-486445df4d8e",
+          "identity_user_id": "4b9dd85b-a4a6-5f9c-b1ab-b57bd8de3d5f",
+          "department_id": "afadf1d5-bdd9-5434-8050-56fd4b310d76",
+          "display_name": "BS. Nguyễn Hoài Phúc",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "bfa29cbb-deda-574f-9a69-79677c7ee629",
+          "identity_user_id": "69bd5cef-563e-5b67-a2be-13f0839e35ac",
+          "department_id": "afadf1d5-bdd9-5434-8050-56fd4b310d76",
+          "display_name": "BS. Đặng Thu Hà",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "cb61a88b-ca40-5c7d-ae0a-fab7e808cd43",
+          "identity_user_id": "48806f16-5d12-583a-83a3-c4d9cb023935",
+          "department_id": "afadf1d5-bdd9-5434-8050-56fd4b310d76",
+          "display_name": "BS. Bùi Quang Vinh",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "b9383aee-6a55-5b8b-a91e-bad262678b44",
+          "identity_user_id": "4895e134-10b8-573b-9cdb-e896a1b3c0b4",
+          "department_id": "98513b28-14bd-5f7d-92cb-663868291642",
+          "display_name": "BS. Lê Thanh Trúc",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "d9a1d326-c774-53c7-86bf-9917054f313b",
+          "identity_user_id": "5a88812e-e9d2-5e33-954a-e7e06dc670a5",
+          "department_id": "98513b28-14bd-5f7d-92cb-663868291642",
+          "display_name": "BS. Vũ Anh Tuấn",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "549b1ec2-42c3-5589-bac0-ed0b11f38518",
+          "identity_user_id": "16a00dcc-c7b8-5175-aa1a-a99670e91226",
+          "department_id": "98513b28-14bd-5f7d-92cb-663868291642",
+          "display_name": "BS. Trần Bảo Ngọc",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "feb08105-644b-565f-a3b7-504b6c89397c",
+          "identity_user_id": "0a571e80-b61d-5c04-b124-5195c2d89e41",
+          "department_id": "9a9c9eee-032c-5bfe-a19a-945d4d0cdd1a",
+          "display_name": "BS. Phạm Khánh Linh",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "ca5f3d36-1c12-5a83-86d8-87876a6da351",
+          "identity_user_id": "85cb2cf2-88cc-57dc-b238-df251f2e2896",
+          "department_id": "9a9c9eee-032c-5bfe-a19a-945d4d0cdd1a",
+          "display_name": "BS. Ngô Thị Thảo",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "31941d73-beb3-52cc-a3b4-949af9a4b31d",
+          "identity_user_id": "2a465420-f006-500d-98e6-18bf9a97a4ea",
+          "department_id": "9a9c9eee-032c-5bfe-a19a-945d4d0cdd1a",
+          "display_name": "BS. Hoàng Minh Đức",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "99d3c708-f348-5997-bef9-4f666eb84efb",
+          "identity_user_id": "7911cdb4-39b4-5a8a-9594-38c372e20a0b",
+          "department_id": "1afe6e04-ccd5-5ba1-928c-90e6ed3a11cd",
+          "display_name": "BS. Nguyễn Minh Anh",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "fa1fd8d9-242e-5c1e-b8db-2bb1ea7b9e87",
+          "identity_user_id": "3285a142-084a-5ca7-a810-d30f38dddc5c",
+          "department_id": "1afe6e04-ccd5-5ba1-928c-90e6ed3a11cd",
+          "display_name": "BS. Trần Thanh Bình",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "7571d10c-f554-567d-af00-de95ccbaf17c",
+          "identity_user_id": "de3d68bd-2711-569b-a09f-3b43ff3741b1",
+          "department_id": "1afe6e04-ccd5-5ba1-928c-90e6ed3a11cd",
+          "display_name": "BS. Đỗ Quốc Bảo",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "41570959-dd55-5f78-b6b6-ddbd04f47f1e",
+          "identity_user_id": "4d308516-e9f1-54ba-82fb-4757400633e5",
+          "department_id": "3153a933-154a-5e77-a669-d3a9fd8893ce",
+          "display_name": "BS. Huỳnh Gia Hưng",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "5a340271-5af1-5925-9bc6-647dac5a7c1a",
+          "identity_user_id": "8d880cf9-94da-514a-a448-ef0dff8a288c",
+          "department_id": "3153a933-154a-5e77-a669-d3a9fd8893ce",
+          "display_name": "BS. Lê Thị Ngân",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "33493349-2550-5374-a7c1-b262279fe601",
+          "identity_user_id": "870afc94-3b4f-5345-87e7-782ee9052f03",
+          "department_id": "3153a933-154a-5e77-a669-d3a9fd8893ce",
+          "display_name": "BS. Nguyễn Thành Đạt",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "fc4e581a-2eba-54dd-935c-06f282590f55",
+          "identity_user_id": "9fc0a0b8-c610-56a5-8726-b9904c6d85d1",
+          "department_id": "087bb102-61c4-5d1b-9c8f-211aeb7905bb",
+          "display_name": "BS. Võ Hoàng Long",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "382369f7-f444-5222-bd80-768316404208",
+          "identity_user_id": "a4b8f21e-b953-52b5-9b89-76b2637371e3",
+          "department_id": "087bb102-61c4-5d1b-9c8f-211aeb7905bb",
+          "display_name": "BS. Dương Thanh Sơn",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "255df75c-c8af-5894-8a83-1d01f5b748a5",
+          "identity_user_id": "0d927664-6553-59ba-9654-3a31b843ad73",
+          "department_id": "087bb102-61c4-5d1b-9c8f-211aeb7905bb",
+          "display_name": "BS. Phạm Tuệ Anh",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "840ee3c4-50ef-5e79-8e85-d0cb3c6870f1",
+          "identity_user_id": "f7f1e307-5928-5cc9-9f3f-e03151ca8803",
+          "department_id": "e46861a6-0358-5581-aeb5-823b9cc4d2b1",
+          "display_name": "BS. Bùi Minh Châu",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "b9dddaf9-55b2-5a28-8e48-2376a0f3097a",
+          "identity_user_id": "98950892-9717-5553-8c5d-9bee2cafe4bc",
+          "department_id": "e46861a6-0358-5581-aeb5-823b9cc4d2b1",
+          "display_name": "BS. Hồ Ngọc Uyên",
+          "status": "ACTIVE"
+        },
+        {
+          "id": "4b1dc1f5-3ee8-5a47-be74-ffc85eea7df6",
+          "identity_user_id": "a7c2cca3-df72-57b4-8d9d-255226a7e48e",
+          "department_id": "e46861a6-0358-5581-aeb5-823b9cc4d2b1",
+          "display_name": "BS. Trần Quốc Khánh",
           "status": "ACTIVE"
         }
       ],
@@ -216,7 +775,7 @@
         {
           "id": "65316ab7-2d21-5178-b3dd-a51702bbbcb6",
           "department_id": "c4f4129b-face-57e4-a659-a311f0d8cd0b",
-          "code": "DEMO-KHAM",
+          "code": "KHAM",
           "name": "Khám tổng quát mẫu",
           "status": "ACTIVE"
         }
@@ -224,7 +783,7 @@
       "medicines": [
         {
           "id": "b3c064cd-acd4-5cc2-9ba9-bc9d0c6a486f",
-          "code": "DEMO-MED-01",
+          "code": "MED-01",
           "name": "Thuốc mẫu A",
           "unit": "viên",
           "strength": "500 mg",
@@ -235,7 +794,7 @@
       "lab_tests": [
         {
           "id": "d6c115e9-3634-5be8-867a-ae4d6218ac79",
-          "code": "DEMO-LAB-01",
+          "code": "LAB-01",
           "name": "Xét nghiệm mẫu",
           "specimen_type": "BLOOD",
           "unit": "đơn vị",
@@ -285,7 +844,7 @@
           "doctorUserId": "ffd26cd4-cbc2-5473-a5c0-7a9c4e64f480",
           "departmentId": "c4f4129b-face-57e4-a659-a311f0d8cd0b",
           "serviceId": "65316ab7-2d21-5178-b3dd-a51702bbbcb6",
-          "room": "P-DEMO-01",
+          "room": "P-01",
           "startAt": "2026-11-10T02:00:00Z",
           "endAt": "2026-11-10T05:00:00Z",
           "capacityPerSlot": 1,
@@ -441,7 +1000,7 @@
             {
               "testId": "d6c115e9-3634-5be8-867a-ae4d6218ac79",
               "revision": 1,
-              "code": "DEMO-LAB-01",
+              "code": "LAB-01",
               "name": "Xét nghiệm mẫu",
               "unit": "đơn vị",
               "referenceRange": "khoảng tham chiếu mẫu"
@@ -468,7 +1027,7 @@
           "id": "07003b0f-3bea-5497-99b3-330f2610fc39",
           "prescription_id": "2a3e6767-445f-5b0c-837e-a3e530995f19",
           "medicine_id": "b3c064cd-acd4-5cc2-9ba9-bc9d0c6a486f",
-          "medicine_code_snapshot": "DEMO-MED-01",
+          "medicine_code_snapshot": "MED-01",
           "name_snapshot": "Thuốc mẫu A",
           "dose_text": "1 viên mỗi lần",
           "quantity": 10,
@@ -490,7 +1049,7 @@
             {
               "testId": "d6c115e9-3634-5be8-867a-ae4d6218ac79",
               "revision": 1,
-              "code": "DEMO-LAB-01",
+              "code": "LAB-01",
               "name": "Xét nghiệm mẫu",
               "unit": "đơn vị",
               "referenceRange": "khoảng tham chiếu mẫu"
@@ -499,7 +1058,7 @@
           "price_snapshot": [
             {
               "itemId": "d6c115e9-3634-5be8-867a-ae4d6218ac79",
-              "code": "DEMO-LAB-01",
+              "code": "LAB-01",
               "name": "Xét nghiệm mẫu",
               "quantity": 1,
               "unitPriceVnd": 100000,
@@ -518,7 +1077,7 @@
           "order_id": "7ff6d0c1-5655-55b4-9b9f-a611b0c6c9e0",
           "sequence": 1,
           "state": "COLLECTED",
-          "barcode": "DEMO-BARCODE-001",
+          "barcode": "BARCODE-001",
           "collected_at": "2026-11-10T02:20:00Z",
           "collected_by": "bbfcfdc6-595d-5ff9-aee2-c53f62dbbff7",
           "version": 1
@@ -541,7 +1100,7 @@
         {
           "id": "9f496d39-b907-56ea-8f64-0f286cf2a113",
           "result_id": "9f28496b-fff0-5c58-9002-c90d60e78fca",
-          "test_code": "DEMO-LAB-01",
+          "test_code": "LAB-01",
           "value_text": "Giá trị mẫu",
           "flag": "NORMAL"
         }
@@ -573,7 +1132,7 @@
         {
           "id": "fdc20ccb-c7e5-53b7-9da7-219df705db8b",
           "medicineId": "b3c064cd-acd4-5cc2-9ba9-bc9d0c6a486f",
-          "medicineCode": "DEMO-MED-01",
+          "medicineCode": "MED-01",
           "onHand": 90,
           "reserved": 0,
           "version": 3,
@@ -589,7 +1148,7 @@
           "patientId": "1cb1d7ec-2620-5e26-9f12-02bf4150f774",
           "linesSnapshot": [
             {
-              "medicineCode": "DEMO-MED-01",
+              "medicineCode": "MED-01",
               "nameSnapshot": "Thuốc mẫu A",
               "doseText": "1 viên mỗi lần",
               "quantity": 10,
@@ -600,7 +1159,7 @@
           "state": "FINAL",
           "itemsSnapshot": [
             {
-              "medicineCode": "DEMO-MED-01",
+              "medicineCode": "MED-01",
               "nameSnapshot": "Thuốc mẫu A",
               "doseText": "1 viên mỗi lần",
               "quantity": 10,
@@ -619,7 +1178,7 @@
           "itemsSnapshot": [
             {
               "medicineId": "b3c064cd-acd4-5cc2-9ba9-bc9d0c6a486f",
-              "medicineCode": "DEMO-MED-01",
+              "medicineCode": "MED-01",
               "nameSnapshot": "Thuốc mẫu A",
               "quantity": 10,
               "priceVersionId": "d0ed1ec0-aec9-5abf-a2ca-1629528c62a6",
@@ -655,7 +1214,7 @@
           "itemsSnapshot": [
             {
               "medicineId": "b3c064cd-acd4-5cc2-9ba9-bc9d0c6a486f",
-              "medicineCode": "DEMO-MED-01",
+              "medicineCode": "MED-01",
               "nameSnapshot": "Thuốc mẫu A",
               "quantity": 10,
               "priceVersionId": "d0ed1ec0-aec9-5abf-a2ca-1629528c62a6",
@@ -678,7 +1237,7 @@
             {
               "medicineId": "b3c064cd-acd4-5cc2-9ba9-bc9d0c6a486f",
               "quantity": 100,
-              "batchRef": "DEMO-BATCH-01"
+              "batchRef": "BATCH-01"
             }
           ],
           "receivedAt": "2026-11-10T01:00:00Z"
@@ -767,37 +1326,37 @@
           "id": "b4a31193-b09b-5fcf-9ad2-68e6d8a482cd",
           "charge_id": "f49461f3-ec23-5d35-847b-13130bad8fe1",
           "saga_id": "659d1f0c-b064-5765-9e3b-1c0292136f61",
-          "transaction_id": "DEMO-TXN-1",
+          "transaction_id": "TXN-1",
           "state": "SUCCEEDED",
           "method": "SIMULATION",
           "attempted_at": "2026-11-10T01:13:00Z",
           "paid_at": "2026-11-10T01:13:00Z",
           "fence": 1,
-          "idempotency_key": "DEMO-DEMO-TXN-1"
+          "idempotency_key": "TXN-1"
         },
         {
           "id": "2f151272-75d1-5620-b327-929fc7a7549d",
           "charge_id": "48536d14-1ff6-52f6-8c8b-3d7dbda4ad11",
           "saga_id": "210f8913-a2f9-5065-8e91-6b3c36bc3957",
-          "transaction_id": "DEMO-TXN-2",
+          "transaction_id": "TXN-2",
           "state": "SUCCEEDED",
           "method": "SIMULATION",
           "attempted_at": "2026-11-10T02:10:00Z",
           "paid_at": "2026-11-10T02:10:00Z",
           "fence": 1,
-          "idempotency_key": "DEMO-DEMO-TXN-2"
+          "idempotency_key": "TXN-2"
         },
         {
           "id": "4a959117-2c76-53b1-8f5d-d04a1b14c00b",
           "charge_id": "eed9245f-27e8-563a-b4c4-d55f831f1692",
           "saga_id": "c04145ba-8f8d-5015-a769-f6deeb8b8f3c",
-          "transaction_id": "DEMO-TXN-3",
+          "transaction_id": "TXN-3",
           "state": "SUCCEEDED",
           "method": "SIMULATION",
           "attempted_at": "2026-11-10T03:05:00Z",
           "paid_at": "2026-11-10T03:05:00Z",
           "fence": 1,
-          "idempotency_key": "DEMO-DEMO-TXN-3"
+          "idempotency_key": "TXN-3"
         }
       ],
       "receipts": [
@@ -805,7 +1364,7 @@
           "id": "e23d7075-d819-5f62-bec1-807863f2731f",
           "payment_id": "b4a31193-b09b-5fcf-9ad2-68e6d8a482cd",
           "charge_id": "f49461f3-ec23-5d35-847b-13130bad8fe1",
-          "receipt_no": "DEMO-RCPT-1",
+          "receipt_no": "RCPT-1",
           "amount_vnd": 150000,
           "issued_at": "2026-11-10T01:13:00Z"
         },
@@ -813,7 +1372,7 @@
           "id": "976e9b1a-0fcf-5b43-bec8-faf0e3729ac2",
           "payment_id": "2f151272-75d1-5620-b327-929fc7a7549d",
           "charge_id": "48536d14-1ff6-52f6-8c8b-3d7dbda4ad11",
-          "receipt_no": "DEMO-RCPT-2",
+          "receipt_no": "RCPT-2",
           "amount_vnd": 100000,
           "issued_at": "2026-11-10T02:10:00Z"
         },
@@ -821,7 +1380,7 @@
           "id": "92a7db1d-5407-535d-915e-05872b6f1ec3",
           "payment_id": "4a959117-2c76-53b1-8f5d-d04a1b14c00b",
           "charge_id": "eed9245f-27e8-563a-b4c4-d55f831f1692",
-          "receipt_no": "DEMO-RCPT-3",
+          "receipt_no": "RCPT-3",
           "amount_vnd": 20000,
           "issued_at": "2026-11-10T03:05:00Z"
         }
