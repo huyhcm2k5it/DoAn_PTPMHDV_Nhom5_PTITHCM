@@ -18,6 +18,7 @@ type ClinicalTx interface {
 	UpdateStart(context.Context, domain.StartRequest) error
 	AppendCommand(context.Context, domain.Envelope) error
 	Visit(context.Context, string) (domain.Visit, error)
+	CheckVisitGrant(context.Context, string) error
 	VisitByAppointment(context.Context, string) (domain.Visit, bool, error)
 	InsertVisit(context.Context, domain.Visit) error
 	UpdateVisit(context.Context, domain.Visit) error

@@ -11,6 +11,8 @@ type Tx interface {
 	Get(context.Context, string, string) (json.RawMessage, error)
 	Put(context.Context, string, string, any) error
 	Orders(context.Context) ([]domain.Order, error)
+	Order(context.Context, string) (domain.Order, error)
+	OrderPage(context.Context, domain.Query) (domain.List, error)
 	SaveOrder(context.Context, domain.Order) error
 	Outbox(context.Context, domain.Envelope, string, string) error
 	SeenMessage(context.Context, string, string, string) (bool, error)

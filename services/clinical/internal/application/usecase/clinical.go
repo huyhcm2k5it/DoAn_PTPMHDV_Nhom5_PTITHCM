@@ -106,6 +106,11 @@ func (s *Service) Start(ctx context.Context, p domain.Principal, key string, inp
 		if ticket.DoctorID != input.DoctorID || ticket.DoctorUserID != p.UserID {
 			return domain.Fail("FORBIDDEN", "Ticket is not assigned to this doctor")
 		}
+		if ticket.TicketType == "RETURN" {
+			if _, e = doctorVisit(ctx, tx, p, ticket.VisitID); e != nil {
+				return e
+			}
+		}
 		if ticket.Version != input.ExpectedTicketVersion {
 			return domain.Fail("TICKET_VERSION_CONFLICT", "Ticket changed; reload its current version")
 		}
@@ -147,6 +152,11 @@ func (s *Service) Detail(ctx context.Context, p domain.Principal, id string) (re
 		}
 		if p.ActorType == "DOCTOR" && visit.DoctorUserID != domain.ID(p.UserID) {
 			return domain.Fail("FORBIDDEN", "Visit belongs to another doctor")
+		}
+		if p.ActorType == "DOCTOR" {
+			if e = tx.CheckVisitGrant(ctx, visit.ID); e != nil {
+				return e
+			}
 		}
 		if p.ActorType == "PATIENT" {
 			if visit.State != "SIGNED" {
@@ -210,6 +220,10 @@ func (s *Service) SaveDraft(ctx context.Context, p domain.Principal, id, key str
 		if e := authorize(ctx, tx, p, "DOCTOR"); e != nil {
 			return e
 		}
+		visit, e := doctorVisit(ctx, tx, p, id)
+		if e != nil {
+			return e
+		}
 		raw, h, found, e := tx.Replay(ctx, p.UserID, "CL-004", key)
 		if e != nil {
 			return e
@@ -219,10 +233,6 @@ func (s *Service) SaveDraft(ctx context.Context, p domain.Principal, id, key str
 				return domain.Fail("IDEMPOTENCY_CONFLICT", "Key already belongs to another draft")
 			}
 			return json.Unmarshal(raw, &result)
-		}
-		visit, e := tx.Visit(ctx, id)
-		if e != nil {
-			return e
 		}
 		if e = visit.CanDraft(p.UserID, input.ExpectedVersion); e != nil {
 			return e

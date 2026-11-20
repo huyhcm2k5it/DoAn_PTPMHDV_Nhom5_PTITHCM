@@ -45,8 +45,8 @@ func TestLabBillingEvidenceStillRequiresOwnedOrder(t *testing.T) {
 
 type unavailableBillingOrders struct{ *memory }
 
-func (unavailableBillingOrders) Orders(context.Context) ([]domain.Order, error) {
-	return nil, errors.New("storage unavailable")
+func (unavailableBillingOrders) Order(context.Context, string) (domain.Order, error) {
+	return domain.Order{}, errors.New("storage unavailable")
 }
 
 func TestSharedSettlementDoesNotAcknowledgeStorageFailure(t *testing.T) {

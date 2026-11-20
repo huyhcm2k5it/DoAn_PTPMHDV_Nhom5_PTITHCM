@@ -12,6 +12,8 @@ Owner: Huy. Go/Echo/pgx, with domain and application ports independent from driv
 
 An ACCEPTED QueueTicketClaimed event creates one FIRST visit per appointment; RETURN resumes the same eligible visit once. REJECTED creates no visit. Both message ID and business result are deduplicated; conflicting terminal results are quarantined. A stale draft returns 409 and SIGNED visits cannot be edited.
 
+Assigned-doctor detail, mutations and their successful replays require an active visit grant. Missing evidence returns 503 and explicit revocation returns 403. The worklist lists active grants only. Signing preserves the grant so finalizing the prepared prescription remains possible. Use the owner reconciliation command for verified legacy visits before connecting the doctor UI.
+
 ## Run with online services
 
 From the repository root, load `CLINICAL_DATABASE_URL` from Huy's private env as the process `DATABASE_URL`. It must select `clinical_db` on Neon with `sslmode=require`. Configure the RSA public key supplied by Hưng. This service never reads another service's database. The placeholders below are examples, not usable credentials.

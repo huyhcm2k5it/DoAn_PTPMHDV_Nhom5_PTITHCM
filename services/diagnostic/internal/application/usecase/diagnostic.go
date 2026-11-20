@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"encoding/json"
-	"sort"
 	"strings"
 	"time"
 	"umccare/diagnostic/internal/application/ports"
@@ -43,16 +42,7 @@ func authorize(ctx context.Context, t ports.Tx, p domain.Principal, read bool) e
 	return domain.Fail("FORBIDDEN", "LAB capability required")
 }
 func orders(ctx context.Context, t ports.Tx, id string) (domain.Order, error) {
-	xs, e := t.Orders(ctx)
-	if e != nil {
-		return domain.Order{}, e
-	}
-	for _, o := range xs {
-		if o.ID == domain.ID(id) {
-			return o, nil
-		}
-	}
-	return domain.Order{}, domain.Fail("NOT_FOUND", "Order not found")
+	return t.Order(ctx, domain.ID(id))
 }
 func (s *Service) List(ctx context.Context, p domain.Principal, q domain.Query) (out domain.List, e error) {
 	out.Items = []domain.Order{}
@@ -62,34 +52,15 @@ func (s *Service) List(ctx context.Context, p domain.Principal, q domain.Query) 
 	if q.State != "" && !domain.Has([]string{"PENDING_PAYMENT", "SETTLEMENT_LOCKED", "PAID", "SPECIMEN_COLLECTED", "SPECIMEN_REJECTED", "CANCELLED", "PUBLISHED"}, q.State) {
 		return out, domain.Fail("VALIDATION_ERROR", "Invalid order state")
 	}
-	e = s.store.Within(ctx, "diagnostic:business", func(t ports.Tx) error {
+	e = s.store.Within(ctx, "", func(t ports.Tx) error {
 		if p.ActorType != "STAFF" {
 			return domain.Fail("FORBIDDEN", "Staff queue only")
 		}
 		if e := authorize(ctx, t, p, true); e != nil {
 			return e
 		}
-		xs, e := t.Orders(ctx)
-		if e != nil {
-			return e
-		}
-		for _, o := range xs {
-			if q.State == "" || o.State == q.State {
-				out.Items = append(out.Items, o)
-			}
-		}
-		sort.Slice(out.Items, func(i, j int) bool { return out.Items[i].CreatedAt.After(out.Items[j].CreatedAt) })
-		out.Total = len(out.Items)
-		start := (q.Page - 1) * q.Limit
-		if start > out.Total {
-			start = out.Total
-		}
-		end := start + q.Limit
-		if end > out.Total {
-			end = out.Total
-		}
-		out.Items = out.Items[start:end]
-		return nil
+		out, e = t.OrderPage(ctx, q)
+		return e
 	})
 	return
 }
@@ -97,7 +68,7 @@ func (s *Service) Detail(ctx context.Context, p domain.Principal, id string) (ou
 	if !domain.ValidID(id) {
 		return out, domain.Fail("VALIDATION_ERROR", "UUID required")
 	}
-	e = s.store.Within(ctx, "diagnostic:business", func(t ports.Tx) error {
+	e = s.store.Within(ctx, "", func(t ports.Tx) error {
 		if e := authorize(ctx, t, p, true); e != nil {
 			return e
 		}

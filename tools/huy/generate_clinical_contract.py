@@ -52,6 +52,12 @@ def operation(id,response,status=200,parameters=None,body=None,errors=None):
     sensitive = oid in {'CL-009', 'CL-010', 'CL-011', 'DI-008', 'DI-009', 'DI-011', 'DI-012', 'DI-013'}
     sec = {'bearerAuth': [], **({'authorizationLease': []} if sensitive else {})}
     result={'operationId':id,'security':[sec],'parameters':[correlation]+(parameters or []),'responses':{str(status):{'description':'Committed locally; poll statusUrl for the claim result' if status==202 else 'Success','content':{'application/json':{'schema':ref(response)}}}}}
+    if oid == 'CL-001':
+        result['description'] = 'Doctor worklist includes visits with active Clinical-owned grants. Operation status is returned separately when operationId is supplied.'
+    elif oid == 'CL-002':
+        result['description'] = 'A new RETURN claim requires the current assigned-doctor visit grant. Poll statusUrl after the local 202 response.'
+    elif oid in {'CL-003','CL-004','CL-005','CL-006','CL-007','CL-008','CL-009','CL-010'}:
+        result['description'] = 'Assigned-doctor access requires an active Clinical-owned visit grant, including successful mutation replays. Missing grant returns 503. Explicit revocation returns 403. Signing preserves per-visit authority for prescription finalization. Patient-owner reads use their separate ownership checks.'
     if sensitive:
         result['x-authorization-lease']={'action':oid,'maxAgeSeconds':30,'expiryLeewaySeconds':0,'expiredStatus':401,'expiredCode':'AUTHZ_LEASE_EXPIRED'}
     for code in errors or [400,401,403,404,503]:

@@ -233,6 +233,50 @@ func (t diagnosticTx) putResult(ctx context.Context, id string, raw []byte) erro
 	return nil
 }
 func (t diagnosticTx) Orders(ctx context.Context) ([]domain.Order, error) {
+	return t.queryOrders(ctx, "ORDER BY orders.id FOR UPDATE OF orders")
+}
+
+func (t diagnosticTx) Order(ctx context.Context, id string) (domain.Order, error) {
+	items, err := t.queryOrders(ctx, "WHERE orders.id=$1 FOR UPDATE OF orders", id)
+	if err != nil {
+		return domain.Order{}, err
+	}
+	if len(items) == 0 {
+		return domain.Order{}, domain.Fail("NOT_FOUND", "Order not found")
+	}
+	return items[0], nil
+}
+
+// Count and page use the same statement snapshot, including pages beyond the end.
+// Queue reads do not lock order rows or load every specimen in the database.
+func (t diagnosticTx) OrderPage(ctx context.Context, q domain.Query) (domain.List, error) {
+	out := domain.List{Items: []domain.Order{}}
+	var raw []byte
+	err := t.tx.QueryRow(ctx, `WITH filtered AS MATERIALIZED (
+		SELECT o.*,subject.patient_id FROM lab_orders o
+		JOIN diagnostic_visit_subjects subject ON subject.visit_id=o.visit_id
+		WHERE $1::text='' OR o.state=$1
+	), page AS (
+		SELECT * FROM filtered ORDER BY created_at DESC,id DESC LIMIT $2 OFFSET $3
+	)
+	SELECT jsonb_build_object('total',(SELECT count(*) FROM filtered),'items',COALESCE(
+		(SELECT jsonb_agg(jsonb_build_object(
+			'id',id,'requestId',clinical_request_id,'visitId',visit_id,
+			'patientId',patient_id,'doctorId',COALESCE(doctor_id::text,''),
+			'state',state,'version',version,'sourceRevision',source_revision,
+			'chargeId',COALESCE(charge_id::text,''),'chargeState',charge_state,
+			'amountVnd',amount_vnd,'snapshotHash',amount_hash,'linesSnapshot',price_snapshot,
+			'tests',test_snapshot,'refundStatus',refund_status,'createdAt',created_at
+		) ORDER BY created_at DESC,id DESC) FROM page),'[]'::jsonb))`,
+		q.State, q.Limit, (q.Page-1)*q.Limit).Scan(&raw)
+	if err != nil {
+		return out, err
+	}
+	err = json.Unmarshal(raw, &out)
+	return out, err
+}
+
+func (t diagnosticTx) queryOrders(ctx context.Context, clause string, args ...any) ([]domain.Order, error) {
 	rows, e := t.tx.Query(ctx, `SELECT orders.id::text,orders.clinical_request_id::text,orders.request_hash,
 		orders.visit_id::text,subject.patient_id::text,COALESCE(orders.doctor_id::text,''),orders.state,orders.version,
 		orders.source_revision,COALESCE(orders.charge_id::text,''),orders.charge_state,COALESCE(orders.charge_request_id::text,''),
@@ -240,7 +284,7 @@ func (t diagnosticTx) Orders(ctx context.Context) ([]domain.Order, error) {
 		orders.settlement_state,orders.settlement_version,orders.attempt_version,orders.last_query_at,orders.refund_status,orders.created_at
 		FROM lab_orders AS orders
 		JOIN diagnostic_visit_subjects AS subject ON subject.visit_id=orders.visit_id
-		ORDER BY orders.id FOR UPDATE OF orders`)
+		`+clause, args...)
 	if e != nil {
 		return nil, e
 	}

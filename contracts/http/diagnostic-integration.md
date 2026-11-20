@@ -1,6 +1,6 @@
 # Diagnostic: order and specimen integration
 
-Implemented boundary: DI-002–011 and the PATIENT-owner path of DI-013 in `diagnostic.openapi.json`. DI-012 is registered but fails closed until the Appointment-owned current doctor/visit grant projection is supplied. DOCTOR access to DI-013 is likewise unavailable until a current grant projection exists. DI-001 recovery creation remains disabled and absent from the public contract.
+Implemented boundary: DI-002–013 in `diagnostic.openapi.json`. Doctor detail, cancellation and published-result reads use the Clinical-owned VisitDoctorGrantChanged projection and a current, gap-free checkpoint. Missing or stale evidence returns 503. A revoked or unrelated grant denies the resource. DI-001 recovery creation remains private and disabled by default.
 
 The doctor submits CL-005 to Clinical. Its transaction commits the pending registry and `CreateLabOrder` outbox together. Diagnostic consumes that command from `umc.commands.clinical.v1`, routing `diagnostic.create-lab-order.v1`; it does not accept patient identity, prices or paid status from the browser. The immutable test definitions are verified against its local Catalog projection. Price versions and patient ownership must already be projected locally.
 

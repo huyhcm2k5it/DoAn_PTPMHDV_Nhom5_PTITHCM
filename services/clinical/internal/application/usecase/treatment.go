@@ -39,7 +39,7 @@ func doctorVisit(ctx context.Context, tx ports.ClinicalTx, p domain.Principal, i
 	if v.DoctorUserID != domain.ID(p.UserID) {
 		return v, domain.Fail("FORBIDDEN", "Visit belongs to another doctor")
 	}
-	return v, nil
+	return v, tx.CheckVisitGrant(ctx, v.ID)
 }
 func (s *Service) event(v domain.Visit, typ, kind string, payload any, meta domain.Meta) domain.Envelope {
 	if meta.CorrelationID == "" {
@@ -73,11 +73,11 @@ func (s *Service) RequestLab(ctx context.Context, p domain.Principal, id, key st
 		if e != nil {
 			return e
 		}
-		if found, e := replay(ctx, tx, p, "CL-005", key, hash, &out); e != nil || found {
-			return e
-		}
 		v, e := doctorVisit(ctx, tx, p, id)
 		if e != nil {
+			return e
+		}
+		if found, e := replay(ctx, tx, p, "CL-005", key, hash, &out); e != nil || found {
 			return e
 		}
 		if v.State != "IN_PROGRESS" && v.State != "LAB_REQUEST_PENDING" && v.State != "WAITING_LAB" {
@@ -199,11 +199,11 @@ func (s *Service) CreatePrescription(ctx context.Context, p domain.Principal, id
 		if e != nil {
 			return e
 		}
-		if found, e := replay(ctx, tx, p, "CL-006", key, hash, &out); e != nil || found {
-			return e
-		}
 		v, e := doctorVisit(ctx, tx, p, id)
 		if e != nil {
+			return e
+		}
+		if found, e := replay(ctx, tx, p, "CL-006", key, hash, &out); e != nil || found {
 			return e
 		}
 		if v.State == "SIGNED" {
@@ -244,9 +244,6 @@ func (s *Service) mutatePrescription(ctx context.Context, p domain.Principal, id
 		if e != nil {
 			return e
 		}
-		if found, e := replay(ctx, tx, p, op, key, hash, &out); e != nil || found {
-			return e
-		}
 		rx, e := tx.Prescription(ctx, domain.ID(id))
 		if e != nil {
 			return e
@@ -255,6 +252,9 @@ func (s *Service) mutatePrescription(ctx context.Context, p domain.Principal, id
 		if e != nil {
 			return e
 		} // Lock visit before mutation; every prescription writer uses same visit row.
+		if found, e := replay(ctx, tx, p, op, key, hash, &out); e != nil || found {
+			return e
+		}
 		rx, e = tx.Prescription(ctx, domain.ID(id))
 		if e != nil {
 			return e
@@ -357,11 +357,11 @@ func (s *Service) Complete(ctx context.Context, p domain.Principal, id, key stri
 		if e != nil {
 			return e
 		}
-		if found, e := replay(ctx, tx, p, "CL-010", key, hash, &out); e != nil || found {
-			return e
-		}
 		v, e := doctorVisit(ctx, tx, p, id)
 		if e != nil {
+			return e
+		}
+		if found, e := replay(ctx, tx, p, "CL-010", key, hash, &out); e != nil || found {
 			return e
 		}
 		if e = v.CanDraft(domain.ID(p.UserID), input.ExpectedVersion); e != nil {
