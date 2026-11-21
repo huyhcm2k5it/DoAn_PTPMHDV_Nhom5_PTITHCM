@@ -170,6 +170,17 @@ const appointmentStorage = [
       },
     ],
   },
+  {
+    name: 'settlement_decisions',
+    indexes: [
+      {
+        name: 'uq_settlement_decision_version',
+        key: { settlementId: 1, decisionVersion: 1 },
+        unique: true,
+      },
+    ],
+  },
+  { name: 'schedule_write_locks', indexes: [] },
   ...technicalStorage,
 ];
 

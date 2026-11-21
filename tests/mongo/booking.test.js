@@ -74,7 +74,9 @@ async function setup(t) {
     await mongod.stop();
   });
   await ensureAppointmentStorage(connection);
-  await connection.collection('patient_access_projection').insertOne({ patientId: patientA, ownerUserId: ownerA, active: true, policyVersion: 1 });
+  await connection
+    .collection('patient_access_projection')
+    .insertOne({ patientId: patientA, ownerUserId: ownerA, active: true, policyVersion: 1 });
   const Schedule = getScheduleModel(connection);
   const Slot = getSlotModel(connection);
   await Schedule.create({
@@ -104,7 +106,17 @@ async function setup(t) {
     createAppointmentApp({
       connection,
       verifyBearerToken,
-      verifyAuthorizationLease: async (token, options) => token === 'test-identity-lease' ? ({ tokenType: 'LEASE', action: options.action, sub: options.subject, tokenVersion: options.tokenVersion, iat: 1793404800, exp: 1793404830 }) : null,
+      verifyAuthorizationLease: async (token, options) =>
+        token === 'test-identity-lease'
+          ? {
+              tokenType: 'LEASE',
+              action: options.action,
+              sub: options.subject,
+              tokenVersion: options.tokenVersion,
+              iat: 1793404800,
+              exp: 1793404830,
+            }
+          : null,
       authorizePatientAccess,
       now: () => new Date('2026-10-31T00:00:00Z'),
       resolvePriceSnapshot: async () => ({
@@ -248,6 +260,9 @@ test('AP-010 consumes a hold into PENDING_PAYMENT and AP-011/AP-012 read it', as
   assert.equal(appointment.status, 202);
   const accepted = await appointment.json();
   assert.equal(accepted.data.state, 'PENDING_PAYMENT');
+  const savedHold = await connection.collection('holds').findOne({ id: created.holdId });
+  assert.equal(savedHold.status, 'CONSUMED');
+  assert.ok(savedHold.consumedAt instanceof Date);
   const appointmentReplay = await fetch(base + '/api/v1/appointments', {
     method: 'POST',
     headers: {
@@ -887,16 +902,43 @@ test('reception booking sends the patient owner as charge recipient', async (t) 
   const { connection, Slot } = await setup(t);
   const staff = '00000000-0000-4000-8000-000000000901';
   const now = new Date('2026-10-31T00:00:00Z');
-  await Slot.updateOne({id: 'slot-1'}, {$set: {startAt: new Date('2026-10-31T04:00:00Z'), endAt: new Date('2026-10-31T04:30:00Z')}});
-  const hold = await createHold({ connection, patientId: patientA, slotId: 'slot-1', principalId: staff,
-    idempotencyKey: 'reception-hold', now, resolvePriceSnapshot: async () => ({ amountVnd: 100000, snapshotHash: 'a'.repeat(64) }) });
-  const created = await createAppointment({ connection, principalId: staff, patientId: patientA, holdId: hold.holdId,
-    idempotencyKey: 'reception-book', now });
-  const event = await connection.collection('outbox').findOne({message_type:'RequestCharge'});
+  await Slot.updateOne(
+    { id: 'slot-1' },
+    {
+      $set: { startAt: new Date('2026-10-31T04:00:00Z'), endAt: new Date('2026-10-31T04:30:00Z') },
+    },
+  );
+  const hold = await createHold({
+    connection,
+    patientId: patientA,
+    slotId: 'slot-1',
+    principalId: staff,
+    idempotencyKey: 'reception-hold',
+    now,
+    resolvePriceSnapshot: async () => ({ amountVnd: 100000, snapshotHash: 'a'.repeat(64) }),
+  });
+  const created = await createAppointment({
+    connection,
+    principalId: staff,
+    patientId: patientA,
+    holdId: hold.holdId,
+    idempotencyKey: 'reception-book',
+    now,
+  });
+  const event = await connection.collection('outbox').findOne({ message_type: 'RequestCharge' });
   assert.equal(event.payload.recipientUserId, ownerA);
-  await cancelAppointment({connection, appointmentId: created.appointmentId, principalId: staff,
-    patientId: patientA, reasonCode: 'PATIENT_REQUEST', expectedVersion: 1,
-    idempotencyKey: 'reception-cancel', now});
-  const changed = await connection.collection('outbox').findOne({message_type: 'AppointmentChanged'});
+  await cancelAppointment({
+    connection,
+    appointmentId: created.appointmentId,
+    principalId: staff,
+    patientId: patientA,
+    reasonCode: 'PATIENT_REQUEST',
+    expectedVersion: 1,
+    idempotencyKey: 'reception-cancel',
+    now,
+  });
+  const changed = await connection
+    .collection('outbox')
+    .findOne({ message_type: 'AppointmentChanged' });
   assert.equal(changed.payload.recipientUserId, ownerA);
 });

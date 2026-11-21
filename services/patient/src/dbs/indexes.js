@@ -15,9 +15,15 @@ const patientStorage = [
       ownerUserId: { bsonType: 'string', minLength: 1 },
     }),
   },
-  entity('profile_audit', [
-    { name: 'ix_profile_audit_patient_at', key: { patientId: 1, at: -1 } },
-  ]),
+  {
+    ...entity('profile_audit', [
+      { name: 'ix_profile_audit_patient_at', key: { patientId: 1, at: -1 } },
+    ]),
+    // Older audit records may lack changedFields and cannot be reconstructed.
+    validator: requiredFields(['id'], {
+      changedFields: { bsonType: 'array', items: { bsonType: 'string' } },
+    }),
+  },
   {
     name: 'user_access_projection',
     indexes: [

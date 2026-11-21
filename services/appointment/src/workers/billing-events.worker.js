@@ -139,6 +139,8 @@ async function handleReserveSettlementCommand({
             $set: {
               state: 'SETTLEMENT_LOCKED',
               settlementId: p.settlementId,
+              settlementState: 'PENDING',
+              settlementVersion: 0,
               fence,
               fenceCounter: fence,
               reserveAttemptVersion: p.attemptVersion,
@@ -220,21 +222,30 @@ async function handleBillingMessage({
   const Appointment = getAppointmentModel(connection);
   const Inbox = getInboxModel(connection);
   const Decision = getSettlementDecisionModel(connection);
-  if (
-    await Inbox.findOne({
-      message_id: message.messageId,
-      consumer_name: consumerName,
-    }).lean()
-  )
-    return { duplicate: true };
-  try {
-    return await withMongoTransaction(connection, async (session) => {
+  const identity = {
+    message_id: message.messageId,
+    consumer_name: consumerName,
+  };
+  const fingerprint = payloadHash(message.payload);
+  async function alreadyProcessed() {
+    const delivery = await Inbox.findOne(identity).lean();
+    if (delivery?.payload_hash && delivery.payload_hash !== fingerprint)
+      throw new ApiError(
+        409,
+        'MESSAGE_CONFLICT',
+        'MessageId was reused with another payload.',
+      );
+    return Boolean(delivery);
+  }
+
+  if (await alreadyProcessed()) return { duplicate: true };
+  const processMessage = () =>
+    withMongoTransaction(connection, async (session) => {
       await Inbox.create(
         [
           {
-            message_id: message.messageId,
-            consumer_name: consumerName,
-            payload_hash: payloadHash(message.payload),
+            ...identity,
+            payload_hash: fingerprint,
             received_at: now,
           },
         ],
@@ -328,6 +339,8 @@ async function handleBillingMessage({
               $set: {
                 state: 'SETTLEMENT_LOCKED',
                 settlementId: payload.settlementId,
+                settlementState: 'PENDING',
+                settlementVersion: 0,
                 fence: payload.fence,
                 updatedAt: now,
               },
@@ -350,55 +363,107 @@ async function handleBillingMessage({
           ...payload,
           sourceType: payload.sourceType || 'APPOINTMENT',
         });
-        await Decision.updateOne(
-          {
-            settlementId: payload.settlementId,
-            decisionVersion: payload.decisionVersion,
-          },
-          {
-            $setOnInsert: {
-              id: message.messageId,
-              settlementId: payload.settlementId,
-              sourceId: payload.sourceId,
-              sourceRevision: payload.sourceRevision,
-              decisionVersion: payload.decisionVersion,
-              state: payload.state,
-              fence: payload.fence,
-              paymentId: payload.paymentId,
-              createdAt: now,
-            },
-          },
-          { upsert: true, session },
-        );
         if (
-          payload.state === 'FAILED' &&
-          appointment.state === 'SETTLEMENT_LOCKED' &&
-          appointment.fence === payload.fence
+          typeof payload.settlementId !== 'string' ||
+          !payload.settlementId ||
+          !Number.isSafeInteger(payload.decisionVersion) ||
+          payload.decisionVersion < 1 ||
+          !['SUCCEEDED', 'FAILED', 'UNKNOWN'].includes(payload.state) ||
+          (payload.fence != null &&
+            (!Number.isSafeInteger(payload.fence) || payload.fence < 1))
         )
+          throw new ApiError(
+            400,
+            'INVALID_MESSAGE',
+            'Invalid settlement decision.',
+          );
+
+        const decisionKey = {
+          settlementId: payload.settlementId,
+          decisionVersion: payload.decisionVersion,
+        };
+        const decision = await Decision.findOne(decisionKey)
+          .session(session)
+          .lean();
+        if (
+          decision &&
+          ['sourceId', 'sourceRevision', 'state', 'fence', 'paymentId'].some(
+            (field) => (decision[field] ?? null) !== (payload[field] ?? null),
+          )
+        )
+          throw new ApiError(
+            409,
+            'MESSAGE_CONFLICT',
+            'Settlement decision changed.',
+          );
+        if (!decision)
+          await Decision.create(
+            [
+              {
+                ...decisionKey,
+                id: message.messageId,
+                sourceId: payload.sourceId,
+                sourceRevision: payload.sourceRevision,
+                state: payload.state,
+                fence: payload.fence,
+                paymentId: payload.paymentId,
+                createdAt: now,
+              },
+            ],
+            { session },
+          );
+
+        const activeSettlement =
+          appointment.settlementId === payload.settlementId &&
+          ((Number.isSafeInteger(appointment.fence) &&
+            appointment.fence > 0 &&
+            appointment.fence === payload.fence) ||
+            (payload.state === 'UNKNOWN' && payload.fence == null));
+        const newerDecision =
+          payload.decisionVersion > (appointment.settlementVersion ?? -1);
+        const locked = appointment.state === 'SETTLEMENT_LOCKED';
+        const confirmed = appointment.state === 'CONFIRMED';
+        const compatibleDecision =
+          appointment.settlementState !== 'SUCCEEDED' ||
+          payload.state === 'SUCCEEDED';
+        if (
+          activeSettlement &&
+          newerDecision &&
+          compatibleDecision &&
+          (locked || (confirmed && payload.state === 'SUCCEEDED'))
+        ) {
+          const failed = payload.state === 'FAILED';
           await Appointment.updateOne(
-            {
-              id: appointment.id,
-              state: 'SETTLEMENT_LOCKED',
-              fence: payload.fence,
-            },
+            { id: appointment.id, version: appointment.version },
             {
               $set: {
-                state: 'PENDING_PAYMENT',
-                settlementId: null,
-                fence: null,
+                settlementState: payload.state,
+                settlementVersion: payload.decisionVersion,
                 updatedAt: now,
+                ...(failed
+                  ? {
+                      state: 'PENDING_PAYMENT',
+                      settlementId: null,
+                      fence: null,
+                    }
+                  : {}),
               },
-              $push: {
-                stateHistory: {
-                  state: 'PENDING_PAYMENT',
-                  at: now,
-                  reasonCode: 'SETTLEMENT_FAILED',
-                },
-              },
+              ...(failed
+                ? {
+                    $push: {
+                      stateHistory: {
+                        state: 'PENDING_PAYMENT',
+                        at: now,
+                        reasonCode: 'SETTLEMENT_FAILED',
+                      },
+                    },
+                  }
+                : {}),
               $inc: { version: 1 },
             },
             { session },
           );
+        }
       } else if (message.messageType === 'ChargePaid') {
         const appointment = await Appointment.findOne({ id: payload.sourceId })
           .session(session)
@@ -438,7 +503,12 @@ async function handleBillingMessage({
             fence: payload.fence,
           },
           {
-            $set: { state: 'CONFIRMED', chargeStatus: 'PAID', updatedAt: now },
+            $set: {
+              state: 'CONFIRMED',
+              chargeStatus: 'PAID',
+              settlementState: 'SUCCEEDED',
+              updatedAt: now,
+            },
             $push: {
               stateHistory: { state: 'CONFIRMED', at: now, by: 'Billing' },
             },
@@ -450,7 +520,7 @@ async function handleBillingMessage({
         const Slot = getSlotModel(connection);
         const slotChanged = await Slot.updateOne(
           { id: appointment.slotId, heldCount: { $gt: 0 } },
-          { $inc: { heldCount: -1, confirmedCount: 1 } },
+          { $inc: { heldCount: -1, confirmedCount: 1, version: 1 } },
           { session },
         );
         if (!slotChanged.modifiedCount)
@@ -467,28 +537,21 @@ async function handleBillingMessage({
         );
       return { duplicate: false };
     });
+  try {
+    return await processMessage();
   } catch (error) {
-    if (error?.code === 11000) {
-      const raced = await Inbox.findOne({
-        message_id: message.messageId,
-        consumer_name: consumerName,
-      }).lean();
-      if (raced) {
-        if (
-          raced.payload_hash &&
-          raced.payload_hash !== payloadHash(message.payload)
-        )
-          throw new ApiError(
-            409,
-            'MESSAGE_CONFLICT',
-            'MessageId was reused with another payload.',
-          );
-        return { duplicate: true };
-      }
-    }
+    if (error?.code !== 11000) throw error;
+    if (await alreadyProcessed()) return { duplicate: true };
+    if (
+      message.messageType === 'SettlementDecision' &&
+      error.keyPattern?.settlementId &&
+      error.keyPattern?.decisionVersion
+    )
+      return processMessage();
     throw error;
   }
 }
+
 module.exports = {
   handleBillingMessage,
   handleReserveSettlementCommand,

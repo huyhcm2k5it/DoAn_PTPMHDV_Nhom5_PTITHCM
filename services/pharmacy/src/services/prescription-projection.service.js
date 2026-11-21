@@ -1,3 +1,4 @@
+const { randomUUID } = require('node:crypto');
 const { consume, uuid, integer, failure, hash } = require('./common');
 async function applyPrescriptionFinalized({
   connection,
@@ -54,8 +55,12 @@ async function applyPrescriptionFinalized({
       if (!current)
         await coll.insertOne(
           {
-            id: p.prescriptionId + ':' + p.revision,
-            ...p,
+            id: randomUUID(),
+            prescriptionId: p.prescriptionId,
+            revision: p.revision,
+            visitId: p.visitId,
+            patientId: p.patientId,
+            finalizedAt: p.finalizedAt,
             state: 'FINAL',
             linesSnapshot: p.itemsSnapshot,
             payloadHash: hash(p),
@@ -68,4 +73,15 @@ async function applyPrescriptionFinalized({
     },
   );
 }
-module.exports = { applyPrescriptionFinalized };
+function prescriptionLines(row) {
+  const lines = row.linesSnapshot ?? row.itemsSnapshot;
+  if (!Array.isArray(lines) || !lines.length)
+    throw failure(
+      503,
+      'SERVICE_UNAVAILABLE',
+      'Prescription snapshot is unavailable.',
+    );
+  return lines;
+}
+
+module.exports = { applyPrescriptionFinalized, prescriptionLines };
