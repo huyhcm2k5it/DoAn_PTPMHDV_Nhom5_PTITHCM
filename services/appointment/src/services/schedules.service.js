@@ -5,8 +5,11 @@ const {
   getSlotModel,
   getHoldModel,
   getAppointmentModel,
+  getIdempotencyModel,
 } = require('../models/appointment.model.js');
 const { ApiError } = require('../core/errors.js');
+const { requestHash } = require('./holds.service.js');
+const { getSlotCache } = require('./slot-cache.service.js');
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -21,6 +24,7 @@ function parseSchedule(body, { partial = false } = {}) {
   const required = [
     'doctorId',
     'serviceId',
+    'room',
     'startAt',
     'endAt',
     'capacityPerSlot',
@@ -30,7 +34,7 @@ function parseSchedule(body, { partial = false } = {}) {
     throw new ApiError(
       400,
       'VALIDATION_ERROR',
-      'doctorId, serviceId, startAt, endAt, capacityPerSlot and slotMinutes are required.',
+      'doctorId, serviceId, room, startAt, endAt, capacityPerSlot and slotMinutes are required.',
     );
   if (value.doctorId != null && !UUID.test(value.doctorId))
     throw new ApiError(400, 'VALIDATION_ERROR', 'doctorId must be a UUID.');
@@ -40,6 +44,15 @@ function parseSchedule(body, { partial = false } = {}) {
     throw new ApiError(400, 'VALIDATION_ERROR', 'doctorUserId must be a UUID.');
   if (value.departmentId != null && !UUID.test(value.departmentId))
     throw new ApiError(400, 'VALIDATION_ERROR', 'departmentId must be a UUID.');
+  if (
+    Object.hasOwn(value, 'room') &&
+    (typeof value.room !== 'string' || !value.room.trim())
+  )
+    throw new ApiError(
+      400,
+      'VALIDATION_ERROR',
+      'room must be a nonempty string.',
+    );
   const startAt = value.startAt == null ? undefined : new Date(value.startAt);
   const endAt = value.endAt == null ? undefined : new Date(value.endAt);
   if (startAt && !Number.isFinite(startAt.getTime()))
@@ -149,6 +162,48 @@ async function withScheduleWrite(connection, work) {
     await locks.updateOne(identity, { $inc: { revision: 1 } }, { session });
     return work(session);
   });
+}
+
+async function mutateSchedule(
+  connection,
+  authContext,
+  key,
+  route,
+  body,
+  now,
+  work,
+) {
+  assertAdmin(authContext);
+  if (typeof key !== 'string' || !UUID.test(key))
+    throw new ApiError(
+      400,
+      'VALIDATION_ERROR',
+      'Idempotency-Key must be a UUID.',
+    );
+  const identity = { principal_id: authContext.userId, route, key };
+  const hash = requestHash(body || {});
+  const Idempotency = getIdempotencyModel(connection);
+
+  const result = await withScheduleWrite(connection, async (session) => {
+    const prior = await Idempotency.findOne(identity).session(session).lean();
+    if (prior) {
+      if (prior.request_hash !== hash)
+        throw new ApiError(
+          409,
+          'IDEMPOTENCY_KEY_REUSED',
+          'Idempotency-Key was already used with a different payload.',
+        );
+      return { changed: false, response: prior.response };
+    }
+    const response = await work(session);
+    await Idempotency.create(
+      [{ ...identity, request_hash: hash, response, created_at: now }],
+      { session },
+    );
+    return { changed: true, response };
+  });
+  if (result.changed) await getSlotCache().invalidate();
+  return result.response;
 }
 
 async function assertNoOverlap(Schedule, data, scheduleId, session) {
@@ -277,29 +332,37 @@ async function createSchedule({
   connection,
   authContext,
   body,
+  idempotencyKey,
   createId = randomUUID,
   now = new Date(),
 }) {
-  assertAdmin(authContext);
-  const data = parseSchedule(body);
-  validateWindow(data, now);
   const Schedule = getScheduleModel(connection);
   const Slot = getSlotModel(connection);
-  return withScheduleWrite(connection, async (session) => {
-    const schedule = {
-      id: createId(),
-      ...data,
-      status: data.status || 'OPEN',
-      version: 1,
-    };
-    await assertNoOverlap(Schedule, schedule, null, session);
-    const slots = slotWindows(schedule).map((window) =>
-      newSlot(schedule, window, createId),
-    );
-    await Schedule.create([schedule], { session });
-    await Slot.insertMany(slots, { session });
-    return { schedule, slots };
-  });
+  return mutateSchedule(
+    connection,
+    authContext,
+    idempotencyKey,
+    'POST /api/v1/schedules',
+    body,
+    now,
+    async (session) => {
+      const data = parseSchedule(body);
+      validateWindow(data, now);
+      const schedule = {
+        id: createId(),
+        ...data,
+        status: data.status || 'OPEN',
+        version: 1,
+      };
+      await assertNoOverlap(Schedule, schedule, null, session);
+      const slots = slotWindows(schedule).map((window) =>
+        newSlot(schedule, window, createId),
+      );
+      await Schedule.create([schedule], { session });
+      await Slot.insertMany(slots, { session });
+      return { schedule, slots };
+    },
+  );
 }
 
 async function updateSchedule({
@@ -307,48 +370,79 @@ async function updateSchedule({
   authContext,
   scheduleId,
   body,
+  idempotencyKey,
   createId = randomUUID,
   now = new Date(),
 }) {
   assertAdmin(authContext);
-  if (!scheduleId)
-    throw new ApiError(400, 'VALIDATION_ERROR', 'scheduleId is required.');
-  const expectedVersion = Number(body?.expectedVersion);
-  if (!Number.isInteger(expectedVersion) || expectedVersion < 1)
-    throw new ApiError(
-      400,
-      'VALIDATION_ERROR',
-      'expectedVersion must be a positive integer.',
-    );
-  const data = parseSchedule(body, { partial: true });
+  if (typeof scheduleId !== 'string' || !UUID.test(scheduleId))
+    throw new ApiError(400, 'VALIDATION_ERROR', 'scheduleId must be a UUID.');
   const Schedule = getScheduleModel(connection);
   const Slot = getSlotModel(connection);
-  return withScheduleWrite(connection, async (session) => {
-    const current = await Schedule.findOne({ id: scheduleId })
-      .session(session)
-      .lean();
-    if (!current) throw new ApiError(404, 'NOT_FOUND', 'Schedule not found.');
-    if (current.version !== expectedVersion)
-      throw new ApiError(409, 'SCHEDULE_VERSION_CONFLICT', 'Schedule changed.');
-    if (current.startAt <= now)
-      throw new ApiError(
-        409,
-        'SCHEDULE_IMMUTABLE',
-        'Past schedule cannot be changed.',
+  return mutateSchedule(
+    connection,
+    authContext,
+    idempotencyKey,
+    'PATCH /api/v1/schedules/' + scheduleId,
+    body,
+    now,
+    async (session) => {
+      const expectedVersion = Number(body?.expectedVersion);
+      if (!Number.isInteger(expectedVersion) || expectedVersion < 1)
+        throw new ApiError(
+          400,
+          'VALIDATION_ERROR',
+          'expectedVersion must be a positive integer.',
+        );
+      const data = parseSchedule(body, { partial: true });
+      const current = await Schedule.findOne({ id: scheduleId })
+        .session(session)
+        .lean();
+      if (!current) throw new ApiError(404, 'NOT_FOUND', 'Schedule not found.');
+      if (current.version !== expectedVersion)
+        throw new ApiError(
+          409,
+          'SCHEDULE_VERSION_CONFLICT',
+          'Schedule changed.',
+        );
+      if (current.startAt <= now)
+        throw new ApiError(
+          409,
+          'SCHEDULE_IMMUTABLE',
+          'Past schedule cannot be changed.',
+        );
+      const { _id, ...schedule } = current;
+      const next = { ...schedule, ...data };
+      if (!next.room?.trim())
+        throw new ApiError(
+          400,
+          'VALIDATION_ERROR',
+          'room is required for this schedule.',
+        );
+      validateWindow(next, now);
+      await assertNoOverlap(Schedule, next, scheduleId, session);
+      await syncScheduleSlots(
+        connection,
+        Slot,
+        current,
+        next,
+        createId,
+        session,
       );
-    const next = { ...current, ...data };
-    validateWindow(next, now);
-    await assertNoOverlap(Schedule, next, scheduleId, session);
-    await syncScheduleSlots(connection, Slot, current, next, createId, session);
-    const changed = await Schedule.updateOne(
-      { id: scheduleId, version: expectedVersion },
-      { $set: { ...data }, $inc: { version: 1 } },
-      { session },
-    );
-    if (!changed.modifiedCount)
-      throw new ApiError(409, 'SCHEDULE_VERSION_CONFLICT', 'Schedule changed.');
-    return { ...next, version: expectedVersion + 1 };
-  });
+      const changed = await Schedule.updateOne(
+        { id: scheduleId, version: expectedVersion },
+        { $set: { ...data }, $inc: { version: 1 } },
+        { session },
+      );
+      if (!changed.modifiedCount)
+        throw new ApiError(
+          409,
+          'SCHEDULE_VERSION_CONFLICT',
+          'Schedule changed.',
+        );
+      return { ...next, version: expectedVersion + 1 };
+    },
+  );
 }
 
 async function listSchedules({

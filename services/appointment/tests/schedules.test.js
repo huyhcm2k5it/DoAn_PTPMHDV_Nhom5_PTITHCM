@@ -11,6 +11,7 @@ test('schedule parser rejects invalid ranges and normalizes admin input', () => 
       parseSchedule({
         doctorId,
         serviceId,
+        room: 'A-101',
         startAt: 'bad',
         endAt: '2026-11-20T10:00:00Z',
         capacityPerSlot: 1,
@@ -23,6 +24,7 @@ test('schedule parser rejects invalid ranges and normalizes admin input', () => 
       parseSchedule({
         doctorId,
         serviceId,
+        room: 'A-101',
         startAt: '2026-11-20T10:00:00Z',
         endAt: '2026-11-20T09:00:00Z',
         capacityPerSlot: 1,

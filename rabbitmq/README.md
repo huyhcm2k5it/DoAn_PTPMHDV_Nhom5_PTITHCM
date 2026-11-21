@@ -2,6 +2,8 @@
 
 Quân quản lý một broker CloudAMQP online, một vhost và `UMC_AMQP_URL` dùng chung cho 9 service. URL dùng `amqps://` với TLS; host, cổng và vhost lấy từ CloudAMQP. [definitions.json](definitions.json) chứa exchange, quorum queue và binding. Owner broker đối chiếu định nghĩa với vhost online, import topology và cấp ACL publisher/consumer trước khi chạy worker.
 
+RabbitMQ local trong Compose chỉ báo healthy sau khi cổng kết nối sẵn sàng và đã nạp `definitions.json`. Vì vậy các hàng đợi giữ được sự kiện Catalog phát từ lúc khởi động, ngay cả khi consumer chưa chạy. CloudAMQP vẫn cần import topology trên vhost online trước khi bật worker.
+
 Hưng còn đọc `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_VHOST`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD`; các biến này phải chỉ cùng broker/vhost với `UMC_AMQP_URL`. Giá trị thật nằm trong `env/quan.env` và không được commit. Compose hiện vẫn dựng RabbitMQ container; xem [giới hạn triển khai online](../infra/compose/README.md).
 
 - `umc.commands.appointment.v1` / `billing.request-charge.v1` -> `cmd.billing.v1`.

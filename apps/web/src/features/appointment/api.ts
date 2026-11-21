@@ -205,24 +205,25 @@ export function createAppointmentApi(
         },
       );
     },
-    async createSchedule(input: ScheduleInput, signal) {
+    async createSchedule(input: ScheduleInput, idempotencyKey, signal) {
       return request<ScheduleResult>('/api/v1/schedules', {
         method: 'POST',
         signal,
-        headers: await mutationHeaders('AP-002'),
+        headers: await mutationHeaders('AP-002', idempotencyKey),
         body: JSON.stringify(input),
       });
     },
-    async updateSchedule(scheduleId, input, signal) {
-      return request<ScheduleResult['schedule']>(
+    async updateSchedule(scheduleId, input, idempotencyKey, signal) {
+      const data = await request<ScheduleResult>(
         `/api/v1/schedules/${encodeURIComponent(scheduleId)}`,
         {
           method: 'PATCH',
           signal,
-          headers: await mutationHeaders('AP-003'),
+          headers: await mutationHeaders('AP-003', idempotencyKey),
           body: JSON.stringify(input),
         },
       );
+      return data.schedule;
     },
     getAdminSummary(date, signal) {
       return request<AdminSummary>(

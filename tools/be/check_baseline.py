@@ -31,6 +31,11 @@ def sheet(suffix):
     return source, list(csv.DictReader(io.StringIO("".join(text[4:]))))
 
 
+def source_checksum(path):
+    # Git stores the source CSVs with LF; allow a Windows CRLF checkout.
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+
 def build():
     sources = []
     tables = {}
@@ -38,7 +43,7 @@ def build():
         source, rows = sheet(name)
         tables[name] = rows
         sources.append({"path": source.relative_to(ROOT).as_posix(),
-                        "sha256": hashlib.sha256(source.read_bytes()).hexdigest()})
+                        "sha256": source_checksum(source)})
     return {
         "version": "v5.2-be-20261108",
         "ownerApproval": "PENDING_REVIEW",

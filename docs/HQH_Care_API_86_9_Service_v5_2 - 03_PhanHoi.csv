@@ -121,14 +121,14 @@ AP-005,201,Thành công,,Hoàn tất thao tác tạo ca/phòng/capacity. Kết q
 AP-005,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
 AP-005,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
 AP-005,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
-AP-005,409,Lỗi,SCHEDULE_OVERLAP,SCHEDULE_OVERLAP: Ca bác sĩ/phòng trùng khoảng giờ.,ErrorResponse
+AP-005,409,Lỗi,"SCHEDULE_OVERLAP, IDEMPOTENCY_KEY_REUSED","SCHEDULE_OVERLAP: Ca bác sĩ/phòng trùng khoảng giờ.; IDEMPOTENCY_KEY_REUSED: Cùng khóa nhưng payload khác.",ErrorResponse
 AP-005,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
 AP-006,200,Thành công,,Hoàn tất thao tác sửa ca tương lai. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,schedule: Schedule
 AP-006,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
 AP-006,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
 AP-006,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse
 AP-006,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
-AP-006,409,Lỗi,"SCHEDULE_VERSION_CONFLICT, BOOKED_CAPACITY_CONFLICT",SCHEDULE_VERSION_CONFLICT: Ca làm việc đã đổi kể từ khi client đọc.; BOOKED_CAPACITY_CONFLICT: Sửa ca làm việc làm mất chỗ của lịch đã giữ hoặc đặt.,ErrorResponse
+AP-006,409,Lỗi,"SCHEDULE_VERSION_CONFLICT, BOOKED_CAPACITY_CONFLICT, SCHEDULE_OVERLAP, IDEMPOTENCY_KEY_REUSED","SCHEDULE_VERSION_CONFLICT: Ca đã đổi.; BOOKED_CAPACITY_CONFLICT: Sửa ca làm mất chỗ đã giữ hoặc đặt.; SCHEDULE_OVERLAP: Ca bác sĩ/phòng trùng giờ.; IDEMPOTENCY_KEY_REUSED: Cùng khóa nhưng payload khác.",ErrorResponse
 AP-006,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
 CA-004,201,Thành công,,Hoàn tất thao tác tạo phiên bản giá tương lai cho khám/lab/thuốc. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"priceVersionId: string:uuid, revision: integer, effectiveFrom: string:date-time"
 CA-004,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse

@@ -50,12 +50,6 @@ export type ScheduleInput = {
 };
 export type ScheduleResult = {
   schedule: ScheduleInput & { id: string; version: number };
-  slots: Array<{
-    id: string;
-    startAt: string;
-    endAt: string;
-    capacity: number;
-  }>;
 };
 export type AdminSummary = {
   date: string;
@@ -130,11 +124,13 @@ export interface AppointmentApi {
   ): Promise<QueueTicket>;
   createSchedule?(
     input: ScheduleInput,
+    idempotencyKey: string,
     signal?: AbortSignal,
   ): Promise<ScheduleResult>;
   updateSchedule?(
     scheduleId: string,
     input: Partial<ScheduleInput> & { expectedVersion: number },
+    idempotencyKey: string,
     signal?: AbortSignal,
   ): Promise<ScheduleResult['schedule']>;
   getAdminSummary?(date: string, signal?: AbortSignal): Promise<AdminSummary>;
