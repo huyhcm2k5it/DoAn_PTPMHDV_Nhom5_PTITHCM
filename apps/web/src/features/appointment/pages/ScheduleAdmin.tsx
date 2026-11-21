@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AppointmentApi, ScheduleInput } from '../types';
 import { ErrorPanel } from '../../../shared/ui/ErrorPanel';
 
@@ -13,15 +13,26 @@ const initial: ScheduleInput = {
   status: 'OPEN',
 };
 
+function localDateTime(value: string) {
+  if (!value) return '';
+  const date = new Date(value);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+    .toISOString()
+    .slice(0, 16);
+}
+
 export function ScheduleAdmin({ api }: { api: AppointmentApi }) {
   const [form, setForm] = useState<ScheduleInput>(initial);
   const [result, setResult] = useState<unknown>();
   const [error, setError] = useState<unknown>();
   const [saving, setSaving] = useState(false);
+  const intent = useRef<{ signature: string; key: string } | undefined>(
+    undefined,
+  );
   const [schedules, setSchedules] = useState<
     Array<ScheduleInput & { id: string; version: number }>
   >([]);
-  const [selected, setSelected] = useState<string>();
+  const [selected, setSelected] = useState<{ id: string; version: number }>();
   useEffect(() => {
     const controller = new AbortController();
     api.listSchedules?.({}, controller.signal).then(
@@ -35,21 +46,32 @@ export function ScheduleAdmin({ api }: { api: AppointmentApi }) {
   }
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (saving) return;
     setSaving(true);
     setError(undefined);
     setResult(undefined);
     try {
-      if (selected)
-        setResult(
-          await api.updateSchedule?.(selected, {
-            room: form.room,
-            status: form.status,
-            expectedVersion: Number(
-              schedules.find((item) => item.id === selected)?.version || 1,
-            ),
-          }),
-        );
-      else setResult(await api.createSchedule?.(form));
+      const patch = selected && {
+        room: form.room,
+        startAt: form.startAt,
+        endAt: form.endAt,
+        capacityPerSlot: form.capacityPerSlot,
+        expectedVersion: selected.version,
+      };
+      const signature = JSON.stringify([selected?.id, patch || form]);
+      if (intent.current?.signature !== signature)
+        intent.current = { signature, key: crypto.randomUUID() };
+      const key = intent.current.key;
+      if (selected && patch) {
+        const updated = await api.updateSchedule?.(selected.id, patch, key);
+        if (updated) {
+          setSelected({ id: updated.id, version: updated.version });
+          setResult(updated);
+        }
+      } else if (!selected) {
+        setResult(await api.createSchedule?.(form, key));
+      }
+      intent.current = undefined;
     } catch (caught) {
       setError(caught);
     } finally {
@@ -61,12 +83,19 @@ export function ScheduleAdmin({ api }: { api: AppointmentApi }) {
       <p className="eyebrow">QUẢN TRỊ LỊCH KHÁM</p>
       <h1 id="schedule-heading">{selected ? 'Sửa ca khám' : 'Tạo ca khám'}</h1>
       {error != null && <ErrorPanel error={error} />}
-      {result != null && <p role="status">Đã tạo ca và sinh các slot.</p>}
+      {result != null && (
+        <p role="status">
+          {selected
+            ? 'Đã cập nhật ca và khung giờ.'
+            : 'Đã tạo ca và sinh các slot.'}
+        </p>
+      )}
       <form className="search-panel" onSubmit={(event) => void submit(event)}>
         <label>
           Bác sĩ
           <input
             required
+            disabled={selected != null}
             value={form.doctorId}
             onChange={(event) => set('doctorId', event.target.value)}
           />
@@ -75,6 +104,7 @@ export function ScheduleAdmin({ api }: { api: AppointmentApi }) {
           Dịch vụ
           <input
             required
+            disabled={selected != null}
             value={form.serviceId}
             onChange={(event) => set('serviceId', event.target.value)}
           />
@@ -82,6 +112,7 @@ export function ScheduleAdmin({ api }: { api: AppointmentApi }) {
         <label>
           Phòng
           <input
+            required
             value={form.room ?? ''}
             onChange={(event) => set('room', event.target.value)}
           />
@@ -91,9 +122,14 @@ export function ScheduleAdmin({ api }: { api: AppointmentApi }) {
           <input
             required
             type="datetime-local"
-            value={form.startAt}
+            value={localDateTime(form.startAt)}
             onChange={(event) =>
-              set('startAt', new Date(event.target.value).toISOString())
+              set(
+                'startAt',
+                event.target.value
+                  ? new Date(event.target.value).toISOString()
+                  : '',
+              )
             }
           />
         </label>
@@ -102,9 +138,14 @@ export function ScheduleAdmin({ api }: { api: AppointmentApi }) {
           <input
             required
             type="datetime-local"
-            value={form.endAt}
+            value={localDateTime(form.endAt)}
             onChange={(event) =>
-              set('endAt', new Date(event.target.value).toISOString())
+              set(
+                'endAt',
+                event.target.value
+                  ? new Date(event.target.value).toISOString()
+                  : '',
+              )
             }
           />
         </label>
@@ -126,6 +167,7 @@ export function ScheduleAdmin({ api }: { api: AppointmentApi }) {
             required
             type="number"
             min={5}
+            disabled={selected != null}
             value={form.slotMinutes}
             onChange={(event) => set('slotMinutes', Number(event.target.value))}
           />
@@ -161,7 +203,7 @@ export function ScheduleAdmin({ api }: { api: AppointmentApi }) {
               className="button button-secondary"
               type="button"
               onClick={() => {
-                setSelected(schedule.id);
+                setSelected({ id: schedule.id, version: schedule.version });
                 setForm(schedule);
               }}
             >

@@ -66,19 +66,17 @@ services:
     - ../../env/quan.env
     volumes:
     - rabbitmq_data:/var/lib/rabbitmq
+    - ../../rabbitmq/definitions.json:/etc/umc-rabbitmq/definitions.json:ro
+    - ../../rabbitmq/ready-with-topology.sh:/etc/umc-rabbitmq/ready-with-topology.sh:ro
     networks:
     - private
     - default
     healthcheck:
-      test:
-      - CMD
-      - rabbitmq-diagnostics
-      - -q
-      - ping
+      test: [CMD, sh, /etc/umc-rabbitmq/ready-with-topology.sh]
       interval: 5s
-      timeout: 5s
+      timeout: 15s
       retries: 20
-      start_period: 15s
+      start_period: 20s
     restart: unless-stopped
   postgres:
     image: postgres:18

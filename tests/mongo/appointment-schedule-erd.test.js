@@ -11,7 +11,7 @@ const {
 const { createHold } = require('../../services/appointment/src/services/holds.service');
 
 const h = mongoHarness(ensureAppointmentStorage, 'appointment_db');
-const authContext = { actorType: 'STAFF', capabilities: ['ADMIN'] };
+const authContext = { userId: randomUUID(), actorType: 'STAFF', capabilities: ['ADMIN'] };
 const now = new Date('2026-11-21T01:00:00Z');
 const doctorId = randomUUID();
 const serviceId = randomUUID();
@@ -20,6 +20,7 @@ function create(fields = {}) {
   return createSchedule({
     connection: h.connection,
     authContext,
+    idempotencyKey: randomUUID(),
     now,
     body: {
       doctorId,
@@ -38,6 +39,7 @@ function update(schedule, fields) {
   return updateSchedule({
     connection: h.connection,
     authContext,
+    idempotencyKey: randomUUID(),
     now,
     scheduleId: schedule.id,
     body: { expectedVersion: schedule.version, ...fields },
@@ -258,4 +260,89 @@ test('two overlapping slots for the same patient allow only one concurrent hold'
   const rejected = results.find((item) => item.status === 'rejected');
   assert.equal(rejected.reason.code, 'PATIENT_TIME_CONFLICT');
   assert.equal(await h.connection.collection('holds').countDocuments({ patientId }), 1);
+});
+
+test('schedule HTTP writes validate the schema and replay the original intent', async (t) => {
+  const { createApp } = require('../../services/appointment/src/app');
+  const Ajv = require('ajv/dist/2020');
+  const addFormats = require('ajv-formats');
+  const contract = require('../../contracts/http/appointment.openapi.json');
+  const ajv = new Ajv({ strict: false });
+  addFormats(ajv);
+  const validate = ajv.compile({
+    ...contract,
+    $ref: '#/components/schemas/ScheduleResponse',
+  });
+  const app = createApp({
+    connection: h.connection,
+    now: () => now,
+    verifyBearerToken: async () => ({
+      sub: authContext.userId,
+      actorType: 'STAFF',
+      capabilities: ['ADMIN'],
+      tokenVersion: 1,
+    }),
+    verifyAuthorizationLease: async (_, options) => ({
+      tokenType: 'LEASE',
+      sub: options.subject,
+      action: options.action,
+      tokenVersion: options.tokenVersion,
+      iat: +now / 1000,
+      exp: +now / 1000 + 30,
+    }),
+  });
+  const server = app.listen(0, '127.0.0.1');
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  await new Promise((resolve) => server.once('listening', resolve));
+  const base = 'http://127.0.0.1:' + server.address().port + '/api/v1/schedules';
+  async function call(method, body, key, scheduleId) {
+    const res = await fetch(scheduleId ? base + '/' + scheduleId : base, {
+      method,
+      headers: {
+        authorization: 'Bearer test',
+        'x-authorization-lease': 'test',
+        'content-type': 'application/json',
+        ...(key ? { 'idempotency-key': key } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+    return { status: res.status, body: await res.json() };
+  }
+  const input = {
+    doctorId,
+    serviceId,
+    room: 'Box 1',
+    startAt: '2026-11-22T01:00:00Z',
+    endAt: '2026-11-22T02:00:00Z',
+    slotMinutes: 15,
+    capacityPerSlot: 3,
+  };
+  const key = randomUUID();
+  assert.equal((await call('POST', input)).status, 400);
+  assert.equal((await call('POST', { ...input, room: ' ' }, key)).status, 400);
+  const results = await Promise.all([call('POST', input, key), call('POST', input, key)]);
+  for (const created of results) {
+    assert.equal(created.status, 201);
+    assert.equal(validate(created.body), true, JSON.stringify(validate.errors));
+  }
+  assert.deepEqual(results[0].body.data, results[1].body.data);
+  const id = results[0].body.data.schedule.id;
+  assert.equal(await h.connection.collection('schedules').countDocuments(), 1);
+  assert.equal(await h.connection.collection('slots').countDocuments(), 4);
+  const reused = await call('POST', { ...input, room: 'Box 2' }, key);
+  assert.equal(reused.status, 409);
+  assert.equal(reused.body.error.code, 'IDEMPOTENCY_KEY_REUSED');
+
+  const patch = { expectedVersion: 1, capacityPerSlot: 2 };
+  assert.equal((await call('PATCH', patch, undefined, id)).status, 400);
+  const patchKey = randomUUID();
+  const modified = await call('PATCH', patch, patchKey, id);
+  assert.equal(modified.status, 200);
+  assert.equal(validate(modified.body), true, JSON.stringify(validate.errors));
+  assert.equal(modified.body.data.schedule.version, 2);
+  assert.deepEqual((await call('PATCH', patch, patchKey, id)).body.data, modified.body.data);
+  const changed = await call('PATCH', { ...patch, capacityPerSlot: 1 }, patchKey, id);
+  assert.equal(changed.status, 409);
+  assert.equal(changed.body.error.code, 'IDEMPOTENCY_KEY_REUSED');
+  assert.equal((await h.connection.collection('schedules').findOne({ id })).version, 2);
 });
