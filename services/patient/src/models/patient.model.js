@@ -1,3 +1,5 @@
+const PATIENT_SEX = ['MALE', 'FEMALE', 'OTHER', 'UNKNOWN'];
+
 function getPatientModel(connection) {
   if (connection.models.Patient) return connection.models.Patient;
   const schema = new connection.base.Schema(
@@ -7,7 +9,7 @@ function getPatientModel(connection) {
       relation: { type: String, required: true, enum: ['SELF', 'OTHER'] },
       fullName: { type: String, required: true },
       birthDate: { type: String, required: true },
-      sex: String,
+      sex: { type: String, enum: PATIENT_SEX },
       bhytSelfDeclared: String,
       contactPhone: String,
       address: String,
@@ -22,4 +24,4 @@ function getPatientModel(connection) {
   schema.index({ ownerUserId: 1 }, { name: 'ix_patients_owner' });
   return connection.model('Patient', schema);
 }
-module.exports = { getPatientModel };
+module.exports = { getPatientModel, PATIENT_SEX };

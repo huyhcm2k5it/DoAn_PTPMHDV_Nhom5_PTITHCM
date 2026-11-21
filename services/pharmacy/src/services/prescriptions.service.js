@@ -1,4 +1,6 @@
 const { uuid, integer, staffAccess, failure } = require('./common');
+const { prescriptionLines } = require('./prescription-projection.service');
+
 async function listPrescriptions({ connection, page = 1, limit = 20 }) {
   integer(page, 'page');
   integer(limit, 'limit', 100);
@@ -17,7 +19,12 @@ async function listPrescriptions({ connection, page = 1, limit = 20 }) {
     },
     { $match: { dispenses: { $size: 0 } } },
     { $project: { _id: 0, dispenses: 0, payloadHash: 0 } },
-    { $set: { id: '$prescriptionId' } },
+    {
+      $set: {
+        id: '$prescriptionId',
+        itemsSnapshot: { $ifNull: ['$linesSnapshot', '$itemsSnapshot'] },
+      },
+    },
     { $sort: { finalizedAt: 1, prescriptionId: 1 } },
     {
       $facet: {
@@ -90,7 +97,8 @@ async function prescriptionDetail({
     undefined,
     authContext.tokenVersion,
   );
-  const codes = prescription.itemsSnapshot.map((item) => item.medicineCode);
+  const lines = prescriptionLines(prescription);
+  const codes = lines.map((item) => item.medicineCode);
   const medicine = await connection
     .collection('catalog_projection')
     .find({
@@ -115,7 +123,7 @@ async function prescriptionDetail({
       patientId: prescription.patientId,
       visitId: prescription.visitId,
       state: 'FINAL',
-      itemsSnapshot: prescription.itemsSnapshot,
+      itemsSnapshot: lines,
     },
     stock: stock.map((row) => {
       const snapshot = medicine.find(

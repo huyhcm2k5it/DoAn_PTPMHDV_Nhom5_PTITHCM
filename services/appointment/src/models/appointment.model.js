@@ -34,6 +34,7 @@ function getSlotModel(connection) {
       capacity: { type: Number, required: true },
       heldCount: { type: Number, required: true },
       confirmedCount: { type: Number, required: true },
+      version: { type: Number, default: 1 },
     },
     { collection: 'slots', versionKey: false, strict: 'throw' },
   );
@@ -67,6 +68,7 @@ function getHoldModel(connection) {
       expiresAt: { type: Date, required: true },
       createdAt: { type: Date, required: true },
       releasedAt: Date,
+      consumedAt: Date,
       priceSnapshot: {
         type: connection.base.Schema.Types.Mixed,
         default: null,
@@ -137,7 +139,11 @@ function getAppointmentModel(connection) {
       fence: Number,
       fenceCounter: Number,
       reserveAttemptVersion: Number,
-      settlementState: String,
+      settlementState: {
+        type: String,
+        enum: ['NONE', 'PENDING', 'UNKNOWN', 'FAILED', 'SUCCEEDED'],
+      },
+      settlementVersion: Number,
       paidEvidence: connection.base.Schema.Types.Mixed,
       refundVersion: Number,
       refundAsOf: Date,
@@ -182,6 +188,7 @@ function getQueueTicketModel(connection) {
       calledAt: Date,
       calledBy: String,
       claimedAt: Date,
+      claimedBy: String,
       inServiceAt: Date,
       completedAt: Date,
       noShowReason: String,

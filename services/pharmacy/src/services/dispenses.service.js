@@ -48,6 +48,7 @@ async function dispenseMedication(args) {
               reserved: -item.quantity,
               version: 1,
             },
+            $set: { updatedAt: now },
           },
           { session },
         );

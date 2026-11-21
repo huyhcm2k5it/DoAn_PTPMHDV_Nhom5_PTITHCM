@@ -167,3 +167,32 @@ test('Clinical ticket snapshots never coerce array IDs into trusted UUIDs', () =
   row.doctorUserId = [row.doctorUserId];
   assert.equal(clinicalTicketSnapshot(row), null);
 });
+
+test('FIRST and RETURN claims persist the assigned Identity user instead of the Catalog ID', async () => {
+  const {
+    handleClaimQueueTicketCommand,
+  } = require('../../services/appointment/src/workers/clinical-events.worker');
+  const rows = [ticket(), ticket('RETURN')];
+  const tickets = h.connection.collection('queue_tickets');
+  await tickets.insertMany(rows);
+  for (const row of rows) {
+    const message = {
+      messageId: randomUUID(),
+      messageKind: 'COMMAND',
+      messageType: 'ClaimQueueTicket',
+      payload: {
+        requestId: randomUUID(),
+        ticketId: row.id,
+        doctorId: row.doctorId,
+        patientId: row.patientId,
+        expectedTicketVersion: row.version,
+      },
+    };
+    await handleClaimQueueTicketCommand({ connection: h.connection, message });
+    await handleClaimQueueTicketCommand({ connection: h.connection, message });
+    const saved = await tickets.findOne({ id: row.id });
+    assert.equal(saved.claimedBy, row.doctorUserId);
+    assert.equal(saved.stateHistory.at(-1).by, row.doctorUserId);
+    assert.equal(saved.stateHistory.length, 1);
+  }
+});

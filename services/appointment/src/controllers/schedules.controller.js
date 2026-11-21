@@ -46,6 +46,7 @@ function createSchedulesController(dependencies) {
           authContext: req.authContext,
           scheduleId: req.params.scheduleId,
           body: req.body,
+          createId: dependencies.createId,
           now: dependencies.now?.() || new Date(),
         });
         res

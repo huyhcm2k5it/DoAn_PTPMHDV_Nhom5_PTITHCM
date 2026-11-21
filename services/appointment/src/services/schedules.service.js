@@ -3,6 +3,8 @@ const { withMongoTransaction } = require('../../../../mongo/transaction.js');
 const {
   getScheduleModel,
   getSlotModel,
+  getHoldModel,
+  getAppointmentModel,
 } = require('../models/appointment.model.js');
 const { ApiError } = require('../core/errors.js');
 
@@ -90,22 +92,185 @@ function parseSchedule(body, { partial = false } = {}) {
   };
 }
 
+function validateWindow(schedule, now) {
+  if (schedule.startAt <= now)
+    throw new ApiError(
+      400,
+      'VALIDATION_ERROR',
+      'Schedule must be in the future.',
+    );
+  if (!(schedule.endAt > schedule.startAt))
+    throw new ApiError(400, 'VALIDATION_ERROR', 'endAt must be after startAt.');
+}
+
+function slotWindows(schedule) {
+  const start = schedule.startAt.getTime();
+  const end = schedule.endAt.getTime();
+  const step = schedule.slotMinutes * 60_000;
+  const count = Math.ceil((end - start) / step);
+  if (!Number.isSafeInteger(count) || count < 1 || count > 10_000)
+    throw new ApiError(400, 'VALIDATION_ERROR', 'Invalid number of slots.');
+  return Array.from({ length: count }, (_, index) => {
+    const startAt = start + index * step;
+    return {
+      startAt: new Date(startAt),
+      endAt: new Date(Math.min(startAt + step, end)),
+    };
+  });
+}
+
+function newSlot(schedule, window, createId) {
+  return {
+    id: createId(),
+    scheduleId: schedule.id,
+    ...window,
+    capacity: schedule.capacityPerSlot,
+    heldCount: 0,
+    confirmedCount: 0,
+    version: 1,
+  };
+}
+
+async function withScheduleWrite(connection, work) {
+  // A shared write serializes overlap checks across different schedule documents.
+  // Initialize outside the transaction so retries always have a row to lock.
+  const locks = connection.collection('schedule_write_locks');
+  const identity = { _id: 'schedules' };
+  try {
+    await locks.updateOne(
+      identity,
+      { $setOnInsert: { revision: 0 } },
+      { upsert: true, writeConcern: { w: 'majority' } },
+    );
+  } catch (error) {
+    if (error.code !== 11000) throw error;
+  }
+  return withMongoTransaction(connection, async (session) => {
+    await locks.updateOne(identity, { $inc: { revision: 1 } }, { session });
+    return work(session);
+  });
+}
+
 async function assertNoOverlap(Schedule, data, scheduleId, session) {
-  const overlap = await Schedule.findOne({
+  if (data.status !== 'OPEN') return;
+  const resources = [{ doctorId: data.doctorId }];
+  if (data.room) resources.push({ room: data.room });
+  const query = Schedule.findOne({
     id: { $ne: scheduleId },
     status: 'OPEN',
-    doctorId: data.doctorId,
+    $or: resources,
     startAt: { $lt: data.endAt },
     endAt: { $gt: data.startAt },
-  })
-    .session(session)
-    .lean();
-  if (overlap)
+  }).session(session);
+  if (data.room) query.collation({ locale: 'en', strength: 2 });
+  if (await query.lean())
     throw new ApiError(
       409,
       'SCHEDULE_OVERLAP',
-      'Doctor already has an overlapping schedule.',
+      'Doctor or room already has an overlapping schedule.',
     );
+}
+
+async function assertSlotsCanChange(connection, ids, session) {
+  if (!ids.length) return;
+  const references = { $in: ids };
+  const hold = await getHoldModel(connection)
+    .exists({ slotId: references })
+    .session(session);
+  const appointment = await getAppointmentModel(connection)
+    .exists({
+      $or: [
+        { slotId: references },
+        { 'slotHistory.fromSlotId': references },
+        { 'slotHistory.toSlotId': references },
+      ],
+    })
+    .session(session);
+  if (hold || appointment)
+    throw new ApiError(
+      409,
+      'BOOKED_CAPACITY_CONFLICT',
+      'A slot referenced by booking history cannot be moved or removed.',
+    );
+}
+
+async function syncScheduleSlots(
+  connection,
+  Slot,
+  current,
+  next,
+  createId,
+  session,
+) {
+  const gridChanged =
+    Number(current.startAt) !== Number(next.startAt) ||
+    Number(current.endAt) !== Number(next.endAt) ||
+    current.slotMinutes !== next.slotMinutes;
+  const bookingFieldsChanged = [
+    'doctorId',
+    'doctorUserId',
+    'departmentId',
+    'serviceId',
+  ].some((field) => current[field] !== next[field]);
+  if (
+    !gridChanged &&
+    !bookingFieldsChanged &&
+    current.capacityPerSlot === next.capacityPerSlot &&
+    current.status === next.status
+  )
+    return;
+
+  const slots = await Slot.find({ scheduleId: next.id })
+    .session(session)
+    .lean();
+  const desired = gridChanged ? slotWindows(next) : slots;
+  const starts = new Map(desired.map((item) => [Number(item.startAt), item]));
+  const changedSlots = slots.filter((slot) => {
+    const window = starts.get(Number(slot.startAt));
+    return !window || Number(window.endAt) !== Number(slot.endAt);
+  });
+  const changedIds = new Set(changedSlots.map((slot) => slot.id));
+
+  for (const slot of slots) {
+    const occupied = slot.heldCount + slot.confirmedCount;
+    if (occupied > 0 && (bookingFieldsChanged || changedIds.has(slot.id)))
+      throw new ApiError(
+        409,
+        'BOOKED_CAPACITY_CONFLICT',
+        'An occupied slot cannot be moved, removed or assigned to a different service or doctor.',
+      );
+    if (occupied > next.capacityPerSlot)
+      throw new ApiError(
+        409,
+        'BOOKED_CAPACITY_CONFLICT',
+        'Capacity cannot be below the number of bookings in a slot.',
+      );
+  }
+  await assertSlotsCanChange(connection, [...changedIds], session);
+
+  for (const slot of slots) {
+    const start = Number(slot.startAt);
+    const window = starts.get(start);
+    const filter = { id: slot.id, scheduleId: next.id };
+    if (!window) {
+      await Slot.deleteOne(filter, { session });
+      continue;
+    }
+    starts.delete(start);
+    // Every retained slot is written so a concurrent hold cannot commit from
+    // a snapshot with the old capacity, schedule status or doctor mapping.
+    const update = changedIds.has(slot.id)
+      ? { $set: newSlot(next, window, createId) }
+      : {
+          $set: { capacity: next.capacityPerSlot },
+          $inc: { version: 1 },
+        };
+    await Slot.updateOne(filter, update, { session });
+  }
+  const added = [...starts.values()].map((window) =>
+    newSlot(next, window, createId),
+  );
+  if (added.length) await Slot.insertMany(added, { session });
 }
 
 async function createSchedule({
@@ -117,48 +282,22 @@ async function createSchedule({
 }) {
   assertAdmin(authContext);
   const data = parseSchedule(body);
-  if (data.startAt <= now)
-    throw new ApiError(
-      400,
-      'VALIDATION_ERROR',
-      'Schedule must be in the future.',
-    );
+  validateWindow(data, now);
   const Schedule = getScheduleModel(connection);
   const Slot = getSlotModel(connection);
-  return withMongoTransaction(connection, async (session) => {
-    await assertNoOverlap(Schedule, data, null, session);
+  return withScheduleWrite(connection, async (session) => {
     const schedule = {
       id: createId(),
       ...data,
       status: data.status || 'OPEN',
       version: 1,
     };
-    await Schedule.create([schedule], { session });
-    const slotCount = Math.ceil(
-      (schedule.endAt.getTime() - schedule.startAt.getTime()) /
-        (schedule.slotMinutes * 60 * 1000),
+    await assertNoOverlap(Schedule, schedule, null, session);
+    const slots = slotWindows(schedule).map((window) =>
+      newSlot(schedule, window, createId),
     );
-    const slots = Array.from({ length: slotCount }, (_, index) => {
-      const startAt = new Date(
-        schedule.startAt.getTime() + index * schedule.slotMinutes * 60 * 1000,
-      );
-      const endAt = new Date(
-        Math.min(
-          startAt.getTime() + schedule.slotMinutes * 60 * 1000,
-          schedule.endAt.getTime(),
-        ),
-      );
-      return {
-        id: createId(),
-        scheduleId: schedule.id,
-        startAt,
-        endAt,
-        capacity: schedule.capacityPerSlot,
-        heldCount: 0,
-        confirmedCount: 0,
-      };
-    });
-    if (slots.length) await Slot.insertMany(slots, { session });
+    await Schedule.create([schedule], { session });
+    await Slot.insertMany(slots, { session });
     return { schedule, slots };
   });
 }
@@ -168,6 +307,7 @@ async function updateSchedule({
   authContext,
   scheduleId,
   body,
+  createId = randomUUID,
   now = new Date(),
 }) {
   assertAdmin(authContext);
@@ -180,49 +320,33 @@ async function updateSchedule({
       'VALIDATION_ERROR',
       'expectedVersion must be a positive integer.',
     );
+  const data = parseSchedule(body, { partial: true });
   const Schedule = getScheduleModel(connection);
   const Slot = getSlotModel(connection);
-  return withMongoTransaction(connection, async (session) => {
+  return withScheduleWrite(connection, async (session) => {
     const current = await Schedule.findOne({ id: scheduleId })
       .session(session)
       .lean();
     if (!current) throw new ApiError(404, 'NOT_FOUND', 'Schedule not found.');
     if (current.version !== expectedVersion)
-      throw new ApiError(409, 'VERSION_CONFLICT', 'Schedule changed.');
+      throw new ApiError(409, 'SCHEDULE_VERSION_CONFLICT', 'Schedule changed.');
     if (current.startAt <= now)
       throw new ApiError(
         409,
         'SCHEDULE_IMMUTABLE',
         'Past schedule cannot be changed.',
       );
-    const data = parseSchedule(body, { partial: true });
     const next = { ...current, ...data };
+    validateWindow(next, now);
     await assertNoOverlap(Schedule, next, scheduleId, session);
-    const occupied = await Slot.aggregate([
-      { $match: { scheduleId } },
-      {
-        $group: {
-          _id: null,
-          held: { $sum: '$heldCount' },
-          confirmed: { $sum: '$confirmedCount' },
-        },
-      },
-    ]).session(session);
-    const occupiedCount =
-      (occupied[0]?.held || 0) + (occupied[0]?.confirmed || 0);
-    if (data.capacityPerSlot != null && data.capacityPerSlot < occupiedCount)
-      throw new ApiError(
-        409,
-        'CAPACITY_BELOW_OCCUPIED',
-        'capacityPerSlot cannot be below occupied slots.',
-      );
+    await syncScheduleSlots(connection, Slot, current, next, createId, session);
     const changed = await Schedule.updateOne(
       { id: scheduleId, version: expectedVersion },
       { $set: { ...data }, $inc: { version: 1 } },
       { session },
     );
     if (!changed.modifiedCount)
-      throw new ApiError(409, 'VERSION_CONFLICT', 'Schedule changed.');
+      throw new ApiError(409, 'SCHEDULE_VERSION_CONFLICT', 'Schedule changed.');
     return { ...next, version: expectedVersion + 1 };
   });
 }
