@@ -51,3 +51,7 @@ MedicalHistory, SignedPrescription và PublishedLabResults có thể ghép vào 
 Chạy `npm ci`, `npm run typecheck`, `npm test`, `npm run build` trong `apps/web`. Kiểm thử Huy tại `tests/huy-workspaces.test.tsx`, `tests/huy-clinical-regression.test.tsx` và `tests/huy-treatment-regression.test.tsx`. Các màn và bài kiểm tra dùng chung React và dependencies của web.
 
 Fixture chỉ dành cho kiểm thử. Nghiệm thu online cần tài khoản thật, grant/projection, migration và dữ liệu nhóm. Build và fixture UI không chứng minh RabbitMQ/DB online đã thông suốt.
+
+## Điều hướng và lượt khám đang chọn
+
+`ClinicalRoute` đồng bộ chuyển Bàn khám/Chỉ định với router; `visitId` được giữ trên URL khi đã chọn lượt. Menu bên trái, vị trí ở thanh trên và tiêu đề trang phải cùng màn. Khi mở Chỉ định mà chưa chọn lượt, giao diện hiển thị hướng dẫn và nút về Bàn khám; không tự chọn người bệnh hoặc tạo lượt mới. Danh sách bên trái là lượt đã được phân công, không phải danh sách vé chờ do Appointment quản lý.

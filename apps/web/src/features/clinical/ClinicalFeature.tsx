@@ -39,6 +39,7 @@ export type ClinicalFeatureProps = {
   initialVisitId?: string;
   diagnosticApi?: DiagnosticApi;
   patients?: Record<string, PatientSummary>;
+  onNavigate?: (view: 'exam' | 'treatment', visitId: string) => void;
 };
 const labels: Record<string, string> = {
   IN_PROGRESS: 'Đang khám',
@@ -61,6 +62,7 @@ export function ClinicalFeature({
   initialVisitId,
   diagnosticApi,
   patients,
+  onNavigate,
 }: ClinicalFeatureProps) {
   if (!session || session.actorType !== 'DOCTOR')
     return (
@@ -78,6 +80,7 @@ export function ClinicalFeature({
       initialVisitId={initialVisitId}
       diagnosticApi={diagnosticApi}
       patients={patients}
+      onNavigate={onNavigate}
     />
   );
 }
@@ -88,6 +91,7 @@ function Workbench({
   initialVisitId = '',
   diagnosticApi,
   patients,
+  onNavigate,
 }: Omit<ClinicalFeatureProps, 'session'>) {
   const [view, setView] = useState(initialView);
   const [tab, setTab] = useState<'exam' | 'history' | 'results'>('exam');
@@ -304,9 +308,16 @@ function Workbench({
     }
   }
   const patient = detail ? patients?.[detail.visit.patientId] : undefined;
+  function changeView(next: 'exam' | 'treatment') {
+    if (onNavigate) onNavigate(next, selected);
+    else setView(next);
+  }
   const choose = (id: string) => {
     if (dirty && id !== selected) setNextVisit(id);
-    else setSelected(id);
+    else {
+      setSelected(id);
+      onNavigate?.(view, id);
+    }
   };
   return (
     <section className="clinical-feature huy-workspace">
@@ -336,7 +347,7 @@ function Workbench({
           type="button"
           aria-pressed={view === 'exam'}
           disabled={view !== 'exam' && dirty}
-          onClick={() => setView('exam')}
+          onClick={() => changeView('exam')}
         >
           <Stethoscope size={17} aria-hidden="true" />
           Bàn khám bác sĩ
@@ -345,7 +356,7 @@ function Workbench({
           type="button"
           aria-pressed={view === 'treatment'}
           disabled={!detail || dirty}
-          onClick={() => setView('treatment')}
+          onClick={() => changeView('treatment')}
         >
           <ClipboardList size={17} aria-hidden="true" />
           Chỉ định & kê đơn
@@ -389,9 +400,13 @@ function Workbench({
         }
       >
         {(view === 'exam' || !selected) && (
-          <aside className="huy-paper huy-queue">
+          <aside
+            className={
+              'huy-paper huy-queue' + (!list.items.length ? ' is-empty' : '')
+            }
+          >
             <div className="huy-section-title">
-              <h2>Hàng chờ hôm nay</h2>
+              <h2>Lượt khám được phân công</h2>
               <span className="huy-count">{list.total}</span>
             </div>
             <div className="huy-filter-pair">
@@ -430,7 +445,8 @@ function Workbench({
               <Notice tone="error">{errorMessage(listError)}</Notice>
             ) : !list.items.length ? (
               <Empty>
-                Chưa có lượt khám phù hợp. Chọn vé đã tiếp nhận để bắt đầu.
+                Chưa có lượt khám được phân công phù hợp với bộ lọc. Lượt khám
+                sẽ xuất hiện sau khi nhận vé do tiếp nhận chuyển sang.
               </Empty>
             ) : (
               <ul className="huy-queue-list">
@@ -494,7 +510,7 @@ function Workbench({
               <p>
                 {selectedTicket
                   ? 'Vé đã được chọn từ tiếp nhận.'
-                  : 'Chọn vé từ màn tiếp nhận để nhận bệnh nhân.'}
+                  : 'Chưa có vé được chuyển sang. Nhân viên tiếp nhận cần gửi đúng vé khám cho bác sĩ.'}
               </p>
               <button
                 className="huy-button"
@@ -642,7 +658,7 @@ function Workbench({
                       detail={detail}
                       onDirty={setDirty}
                       onPending={setDraftPending}
-                      onContinue={() => setView('treatment')}
+                      onContinue={() => changeView('treatment')}
                       onReload={() => setDetailReload((n) => n + 1)}
                       onSaved={() => {
                         setReload((n) => n + 1);
@@ -698,8 +714,32 @@ function Workbench({
               )}
             </>
           ) : (
-            <section className="huy-paper">
-              <Empty>Chọn một lượt khám để xem bệnh án.</Empty>
+            <section className="huy-paper huy-route-empty">
+              <h2>
+                {view === 'treatment'
+                  ? 'Chọn lượt khám để chỉ định và kê đơn'
+                  : 'Bắt đầu từ lượt khám được phân công'}
+              </h2>
+              <p>
+                Chọn một lượt khám trong danh sách bên trái để xem thông tin
+                đúng người bệnh.
+              </p>
+              <ol>
+                <li>Nhận vé khám do nhân viên tiếp nhận chuyển sang.</li>
+                <li>Mở lượt khám, ghi nhận triệu chứng và lưu bệnh án.</li>
+                <li>
+                  Chuyển sang chỉ định xét nghiệm hoặc kê đơn cho lượt đang mở.
+                </li>
+              </ol>
+              {view === 'treatment' && (
+                <button
+                  type="button"
+                  className="huy-button secondary"
+                  onClick={() => changeView('exam')}
+                >
+                  Về bàn khám để chọn lượt
+                </button>
+              )}
             </section>
           )}
         </div>
@@ -711,6 +751,7 @@ function Workbench({
           onConfirm={() => {
             setDirty(false);
             setSelected(nextVisit);
+            onNavigate?.(view, nextVisit);
             setNextVisit('');
           }}
         >

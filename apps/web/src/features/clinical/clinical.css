@@ -357,3 +357,23 @@
     width: 100%;
   }
 }
+
+.huy-queue.is-empty {
+  min-height: 0;
+}
+.huy-route-empty {
+  padding: 28px;
+}
+.huy-route-empty h2 {
+  margin: 0 0 12px;
+  font-size: 20px;
+}
+.huy-route-empty p,
+.huy-route-empty li {
+  color: var(--huy-muted);
+  line-height: 1.7;
+}
+.huy-route-empty ol {
+  padding-left: 22px;
+  margin: 18px 0 24px;
+}

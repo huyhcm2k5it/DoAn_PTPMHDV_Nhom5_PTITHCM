@@ -1,4 +1,7 @@
+import { homeForSession } from '../src/app/App';
 import React from 'react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { ClinicalRoute } from '../src/features/clinical/ClinicalRoute';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   cleanup,
@@ -94,7 +97,11 @@ it('requires an explicit visit selection when opening the treatment route withou
   );
   await screen.findByRole('button', { name: 'Mở lượt visit' });
   expect(api.detail).not.toHaveBeenCalled();
-  expect(screen.getByText('Chọn một lượt khám để xem bệnh án.')).toBeTruthy();
+  expect(
+    screen.getByRole('heading', {
+      name: 'Chọn lượt khám để chỉ định và kê đơn',
+    }),
+  ).toBeTruthy();
 });
 it('reloads the same visit after Appointment accepts its return ticket', async () => {
   const operation = {
@@ -612,4 +619,82 @@ it('attaches the right lease for each protected Diagnostic action without changi
       'X-Authorization-Lease',
     ),
   ).toBe(false);
+});
+
+it('keeps the doctor route and workspace in sync when returning from an empty treatment screen', async () => {
+  const api = {
+    worklist: vi
+      .fn()
+      .mockResolvedValue({ items: [], total: 0, startRequest: null }),
+    detail: vi.fn(),
+    start: vi.fn(),
+    saveDraft: vi.fn(),
+  } as ClinicalApi;
+  function Location() {
+    return (
+      <output data-testid="doctor-location">{useLocation().pathname}</output>
+    );
+  }
+  const props = {
+    api,
+    diagnosticApi: {} as DiagnosticApi,
+    session: { userId: 'doctor', actorType: 'DOCTOR' as const },
+  };
+  render(
+    <MemoryRouter initialEntries={['/doctor/treatment']}>
+      <Location />
+      <Routes>
+        <Route
+          path="/doctor/treatment"
+          element={<ClinicalRoute {...props} view="treatment" />}
+        />
+        <Route
+          path="/doctor/clinical"
+          element={<ClinicalRoute {...props} view="exam" />}
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
+  await screen.findByRole('heading', {
+    name: 'Chọn lượt khám để chỉ định và kê đơn',
+  });
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Về bàn khám để chọn lượt' }),
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId('doctor-location').textContent).toBe(
+      '/doctor/clinical',
+    ),
+  );
+  expect(
+    screen.getByRole('heading', { name: 'Bàn khám bác sĩ', level: 1 }),
+  ).toBeTruthy();
+  expect(api.start).not.toHaveBeenCalled();
+});
+
+it('returns each actor to their own workspace instead of the patient portal', () => {
+  expect(
+    homeForSession({ userId: 'doctor', actorType: 'DOCTOR', capabilities: [] }),
+  ).toBe('/doctor/clinical');
+  expect(
+    homeForSession({
+      userId: 'patient',
+      actorType: 'PATIENT',
+      capabilities: [],
+    }),
+  ).toBe('/patient/home');
+  expect(
+    homeForSession({
+      userId: 'lab',
+      actorType: 'STAFF',
+      capabilities: ['LAB_TECH'],
+    }),
+  ).toBe('/staff/diagnostic');
+  expect(
+    homeForSession({
+      userId: 'admin',
+      actorType: 'STAFF',
+      capabilities: ['ADMIN', 'LAB_TECH'],
+    }),
+  ).toBe('/staff/summary');
 });
