@@ -10,6 +10,8 @@ const {
   hash,
   failure,
 } = require('./common');
+const { prescriptionLines } = require('./prescription-projection.service');
+
 async function createMedicationHold(args) {
   const {
     connection,
@@ -74,7 +76,7 @@ async function createMedicationHold(args) {
         );
       const items = [];
       let amountVnd = 0;
-      for (const line of latest.itemsSnapshot) {
+      for (const line of prescriptionLines(latest)) {
         const medicine = await connection
           .collection('catalog_projection')
           .findOne(
@@ -108,7 +110,10 @@ async function createMedicationHold(args) {
               $gte: [{ $subtract: ['$onHand', '$reserved'] }, line.quantity],
             },
           },
-          { $inc: { reserved: line.quantity, version: 1 } },
+          {
+            $inc: { reserved: line.quantity, version: 1 },
+            $set: { updatedAt: now },
+          },
           { session },
         );
         if (!changed.modifiedCount)
@@ -165,6 +170,7 @@ async function createMedicationHold(args) {
         chargeId: null,
         settlementId: null,
         settlementState: 'NONE',
+        settlementVersion: 0,
         fence: null,
         fenceCounter: old?.fenceCounter || 0,
         attemptHistory: old
@@ -225,7 +231,10 @@ async function returnReservation({ connection, session, hold, state, now }) {
         medicineId: item.medicineId,
         reserved: { $gte: item.quantity },
       },
-      { $inc: { reserved: -item.quantity, version: 1 } },
+      {
+        $inc: { reserved: -item.quantity, version: 1 },
+        $set: { updatedAt: now },
+      },
       { session },
     );
     if (!changed.modifiedCount)

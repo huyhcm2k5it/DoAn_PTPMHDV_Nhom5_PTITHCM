@@ -176,7 +176,7 @@ async function createHold({
             $lt: [{ $add: ['$heldCount', '$confirmedCount'] }, '$capacity'],
           },
         },
-        { $inc: { heldCount: 1 } },
+        { $inc: { heldCount: 1, version: 1 } },
         { session },
       );
       if (!reserved.modifiedCount)
@@ -305,7 +305,7 @@ async function releaseHold({
         throw new ApiError(409, 'VERSION_CONFLICT', 'Hold đã thay đổi.');
       const restored = await Slot.updateOne(
         { id: hold.slotId, heldCount: { $gt: 0 } },
-        { $inc: { heldCount: -1 } },
+        { $inc: { heldCount: -1, version: 1 } },
         { session },
       );
       if (!restored.modifiedCount)
@@ -370,7 +370,7 @@ async function expireHolds({ connection, now = new Date(), batchSize = 100 }) {
         if (!changed.modifiedCount) return;
         const restored = await Slot.updateOne(
           { id: candidate.slotId, heldCount: { $gt: 0 } },
-          { $inc: { heldCount: -1 } },
+          { $inc: { heldCount: -1, version: 1 } },
           { session },
         );
         if (!restored.modifiedCount)

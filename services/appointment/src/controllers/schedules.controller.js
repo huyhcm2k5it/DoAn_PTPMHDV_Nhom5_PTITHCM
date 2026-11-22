@@ -29,28 +29,33 @@ function createSchedulesController(dependencies) {
           connection: dependencies.connection,
           authContext: req.authContext,
           body: req.body,
+          idempotencyKey: req.get('idempotency-key'),
           createId: dependencies.createId,
           now: dependencies.now?.() || new Date(),
         });
-        res
-          .status(201)
-          .json({ data, meta: { correlationId: req.correlationId } });
+        res.status(201).json({
+          data: { schedule: data.schedule },
+          meta: { correlationId: req.correlationId },
+        });
       } catch (error) {
         next(error);
       }
     },
     async update(req, res, next) {
       try {
-        const data = await updateSchedule({
+        const schedule = await updateSchedule({
           connection: dependencies.connection,
           authContext: req.authContext,
           scheduleId: req.params.scheduleId,
           body: req.body,
+          idempotencyKey: req.get('idempotency-key'),
+          createId: dependencies.createId,
           now: dependencies.now?.() || new Date(),
         });
-        res
-          .status(200)
-          .json({ data, meta: { correlationId: req.correlationId } });
+        res.status(200).json({
+          data: { schedule },
+          meta: { correlationId: req.correlationId },
+        });
       } catch (error) {
         next(error);
       }

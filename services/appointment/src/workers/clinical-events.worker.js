@@ -201,10 +201,15 @@ async function handleClaimQueueTicketCommand({
               claimId,
               ...(visitId ? { visitId } : {}),
               claimedAt: now,
+              claimedBy: ticket.doctorUserId || null,
               updatedAt: now,
             },
             $push: {
-              stateHistory: { state: 'CLAIMED', at: now, by: payload.doctorId },
+              stateHistory: {
+                state: 'CLAIMED',
+                at: now,
+                by: ticket.doctorUserId || null,
+              },
             },
             $inc: { version: 1 },
           },
@@ -387,13 +392,14 @@ async function handleClinicalMessage({
             claimId: payload.claimId,
             visitId: payload.visitId || undefined,
             claimedAt: now,
+            claimedBy: ticket.doctorUserId || null,
             updatedAt: now,
           },
           $push: {
             stateHistory: {
               state: 'CLAIMED',
               at: now,
-              by: payload.doctorUserId || null,
+              by: ticket.doctorUserId || null,
             },
           },
           $inc: { version: 1 },

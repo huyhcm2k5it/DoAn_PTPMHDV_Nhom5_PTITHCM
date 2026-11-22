@@ -86,7 +86,12 @@ async function billing(type, holdId, extra = {}) {
         fence: r.fence,
         amountVnd: r.amountVnd,
         amountHash: r.snapshotHash,
-        attemptVersion: type === 'ReserveSettlement' ? (extra.settlementId && extra.settlementId !== r.settlementId ? (r.reserveAttemptVersion || 0) + 1 : (r.reserveAttemptVersion || 1)) : r.version,
+        attemptVersion:
+          type === 'ReserveSettlement'
+            ? extra.settlementId && extra.settlementId !== r.settlementId
+              ? (r.reserveAttemptVersion || 0) + 1
+              : r.reserveAttemptVersion || 1
+            : r.version,
         ...extra,
       },
     },
@@ -286,6 +291,12 @@ test('FAILED cannot discard verified payment or unlock reserved stock', async ()
 
 test('FINAL projection replays, rejects same revision changed content and rejects untrusted producer', async () => {
   const m = await project();
+  const stored = await h.connection
+    .collection('prescription_projection')
+    .findOne({ prescriptionId: rx });
+  assert.match(stored.id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.deepEqual(stored.linesSnapshot, m.payload.itemsSnapshot);
+  assert.equal(stored.itemsSnapshot, undefined);
   assert.equal(
     (await applyPrescriptionFinalized({ connection: h.connection, message: m, now })).duplicate,
     true,
@@ -335,6 +346,11 @@ test('hold reserves full FINAL prescription and RequestCharge together and repla
   assert.equal(outbox.payload.amountVnd, 1000);
   assert.equal(outbox.payload.recipientUserId, owner);
   assert.equal(new Date((await row(first.holdId)).expiresAt) - now, 900000);
+  assert.equal((await row(first.holdId)).settlementVersion, 0);
+  assert.deepEqual(
+    (await h.connection.collection('inventory').findOne({ medicineId: medicine })).updatedAt,
+    now,
+  );
 });
 test('twenty concurrent full prescriptions cannot oversell the last unit', async () => {
   await h.connection
@@ -433,6 +449,7 @@ test('PAID evidence commits locally and two dispensers issue exactly once withou
     holdId: first.holdId,
     expectedVersion: committed.version,
     idempotencyKey: key(),
+    now: new Date(now.getTime() + 1_000),
   };
   const results = await Promise.allSettled([
     dispenseMedication(input),
@@ -442,6 +459,7 @@ test('PAID evidence commits locally and two dispensers issue exactly once withou
   const stock = await h.connection.collection('inventory').findOne({ medicineId: medicine });
   assert.equal(stock.onHand, 4);
   assert.equal(stock.reserved, 0);
+  assert.deepEqual(stock.updatedAt, input.now);
   assert.equal(await h.connection.collection('dispenses').countDocuments(), 1);
   const event = await h.connection
     .collection('outbox')

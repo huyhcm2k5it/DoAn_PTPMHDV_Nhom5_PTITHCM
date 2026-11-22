@@ -46,7 +46,7 @@ async function expirePendingAppointments({
       const Slot = getSlotModel(connection);
       const released = await Slot.updateOne(
         { id: candidate.slotId, heldCount: { $gt: 0 } },
-        { $inc: { heldCount: -1 } },
+        { $inc: { heldCount: -1, version: 1 } },
         { session },
       );
       if (!released.modifiedCount) throw new Error('CAPACITY_INVARIANT_BROKEN');

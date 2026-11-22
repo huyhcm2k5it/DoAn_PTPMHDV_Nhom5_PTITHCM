@@ -1,11 +1,20 @@
 
 
-/** Bootstrap collections; incompatible existing options require an explicit migration. */
+/**
+ * Create missing collections and ensure indexes on both new and legacy storage.
+ * Validator changes on existing collections are separate, explicit migrations.
+ */
 async function installStorage(connection, collections) {
   for (const collection of collections) {
-    await connection.createCollection(collection.name, {
-      ...(collection.validator ? { validator: collection.validator, validationLevel: 'strict', validationAction: 'error' } : {}),
-    });
+    try {
+      await connection.createCollection(collection.name, {
+        ...(collection.validator ? { validator: collection.validator, validationLevel: 'strict', validationAction: 'error' } : {}),
+      });
+    } catch (error) {
+      // Atlas returns NamespaceExists when the existing collection has different
+      // options, including when only its validator is older.
+      if (error.code !== 48 && error.codeName !== 'NamespaceExists') throw error;
+    }
     if (collection.indexes.length) await connection.collection(collection.name).createIndexes(collection.indexes);
   }
 }

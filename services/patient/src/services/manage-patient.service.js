@@ -1,6 +1,7 @@
 const { createHash, randomUUID } = require('node:crypto');
 const { withMongoTransaction } = require('../../../../mongo/transaction.js');
 const { ApiError } = require('../core/errors.js');
+const { PATIENT_SEX } = require('../models/patient.model.js');
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -27,7 +28,21 @@ function cleanPatient(patient) {
   return data;
 }
 
-function validateProfile(body) {
+function isCalendarDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value))
+    return false;
+  const date = new Date(value + 'T00:00:00.000Z');
+  return (
+    Number.isFinite(date.getTime()) &&
+    date.toISOString().slice(0, 10) === value &&
+    !value.startsWith('0000')
+  );
+}
+
+function validateProfile(
+  body,
+  { validateBirthDate = true, validateSex = true } = {},
+) {
   const value = body || {};
   if (
     !value.fullName ||
@@ -35,11 +50,11 @@ function validateProfile(body) {
     value.fullName.trim().length < 2
   )
     throw new ApiError(400, 'VALIDATION_ERROR', 'fullName is required.');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value.birthDate || ''))
+  if (validateBirthDate && !isCalendarDate(value.birthDate))
     throw new ApiError(
       400,
       'VALIDATION_ERROR',
-      'birthDate must be YYYY-MM-DD.',
+      'birthDate must be a valid calendar date (YYYY-MM-DD).',
     );
   if (!['SELF', 'OTHER'].includes(value.relation))
     throw new ApiError(
@@ -47,11 +62,18 @@ function validateProfile(body) {
       'VALIDATION_ERROR',
       'relation must be SELF or OTHER.',
     );
+  const sex = value.sex == null || value.sex === '' ? undefined : value.sex;
+  if (validateSex && sex !== undefined && !PATIENT_SEX.includes(sex))
+    throw new ApiError(
+      400,
+      'VALIDATION_ERROR',
+      'sex must be MALE, FEMALE, OTHER or UNKNOWN.',
+    );
   return {
     fullName: value.fullName.trim(),
     birthDate: value.birthDate,
     relation: value.relation,
-    sex: value.sex || undefined,
+    sex,
     bhytSelfDeclared: value.bhytSelfDeclared || undefined,
     contactPhone: value.contactPhone || undefined,
     address: value.address || undefined,
@@ -217,6 +239,13 @@ async function createPatient({
           patientId: patient.id,
           actorUserId: authContext.userId,
           action: 'CREATED',
+          changedFields: [
+            'ownerUserId',
+            'active',
+            ...Object.keys(profile).filter(
+              (field) => profile[field] !== undefined,
+            ),
+          ],
           version: 1,
           at: now,
         },
@@ -284,23 +313,45 @@ async function updatePatient({
         throw new ApiError(403, 'FORBIDDEN', 'Actor is not the patient owner.');
       if (current.version !== Number(expectedVersion))
         throw new ApiError(409, 'VERSION_CONFLICT', 'Patient changed.');
-      const updates = {
-        ...validateProfile({ ...current, ...body }),
-        updatedAt: now,
-      };
+      const profile = validateProfile(
+        { ...current, ...body },
+        {
+          validateBirthDate: Object.hasOwn(body || {}, 'birthDate'),
+          validateSex: Object.hasOwn(body || {}, 'sex'),
+        },
+      );
+      const changedFields = Object.keys(profile).filter(
+        (field) =>
+          Object.hasOwn(body || {}, field) && profile[field] !== current[field],
+      );
+      if (!changedFields.length) return cleanPatient(current);
+
+      const next = { ...current };
+      const $set = { updatedAt: now };
+      const $unset = {};
+      for (const field of changedFields) {
+        if (profile[field] === undefined) {
+          $unset[field] = '';
+          delete next[field];
+        } else {
+          $set[field] = profile[field];
+          next[field] = profile[field];
+        }
+      }
       const changed = await Patient.updateOne(
         { id: patientId, version: current.version, active: { $ne: false } },
-        { $set: updates, $inc: { version: 1, policyVersion: 1 } },
+        {
+          $set,
+          ...(Object.keys($unset).length ? { $unset } : {}),
+          $inc: { version: 1, policyVersion: 1 },
+        },
         { session },
       );
       if (!changed.modifiedCount)
         throw new ApiError(409, 'VERSION_CONFLICT', 'Patient changed.');
-      const next = {
-        ...current,
-        ...updates,
-        version: current.version + 1,
-        policyVersion: current.policyVersion + 1,
-      };
+      next.updatedAt = now;
+      next.version += 1;
+      next.policyVersion += 1;
       await connection.collection('outbox').insertOne(
         {
           message_id: randomUUID(),
@@ -329,6 +380,7 @@ async function updatePatient({
           patientId,
           actorUserId: authContext.userId,
           action: 'UPDATED',
+          changedFields,
           version: next.version,
           at: now,
         },

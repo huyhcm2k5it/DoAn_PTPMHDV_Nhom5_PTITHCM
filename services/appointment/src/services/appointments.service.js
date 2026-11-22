@@ -129,7 +129,7 @@ async function createAppointment({
           version: hold.version,
           expiresAt: { $gt: now },
         },
-        { $set: { status: 'CONSUMED' }, $inc: { version: 1 } },
+        { $set: { status: 'CONSUMED', consumedAt: now }, $inc: { version: 1 } },
         { session },
       );
       if (!changed.modifiedCount)
@@ -167,6 +167,8 @@ async function createAppointment({
         state: 'PENDING_PAYMENT',
         stateHistory: [{ state: 'PENDING_PAYMENT', at: now }],
         chargeSync: 'PENDING',
+        settlementState: 'NONE',
+        settlementVersion: 0,
         priceSnapshot: hold.priceSnapshot || null,
         paymentDueAt: new Date(now.getTime() + 10 * 60 * 1000),
         version: 1,
@@ -483,7 +485,7 @@ async function rescheduleAppointment({
             $lt: [{ $add: ['$heldCount', '$confirmedCount'] }, '$capacity'],
           },
         },
-        { $inc: { confirmedCount: 1 } },
+        { $inc: { confirmedCount: 1, version: 1 } },
         { session },
       );
       if (!reserved.modifiedCount)
@@ -518,7 +520,7 @@ async function rescheduleAppointment({
         throw new ApiError(409, 'VERSION_CONFLICT', 'Appointment changed.');
       const released = await Slot.updateOne(
         { id: appointment.slotId, confirmedCount: { $gt: 0 } },
-        { $inc: { confirmedCount: -1 } },
+        { $inc: { confirmedCount: -1, version: 1 } },
         { session },
       );
       if (!released.modifiedCount)
@@ -679,6 +681,7 @@ async function cancelAppointment({
             [appointment.state === 'CONFIRMED'
               ? 'confirmedCount'
               : 'heldCount']: -1,
+            version: 1,
           },
         },
         { session },
