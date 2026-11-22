@@ -12,7 +12,7 @@ Checkout hiện tại, nhánh `huy_task`. Báo cáo này phân biệt kết qu�
 | RabbitMQ 4.3.6 thật | Clinical/Diagnostic PASS publisher confirm, mandatory return và retry qua consumer restart với NotBefore/token/body giữ nguyên. Vhost test riêng được xóa sau suite. |
 | Redis 7.4 thật | Cả ba service PASS đọc/ghi bằng account riêng và ACL từ chối namespace ngoài owner. Clinical/Diagnostic kiểm TTL; Catalog kiểm đổi generation. |
 | HTTP/OpenAPI | Response HTTP thực dùng PostgreSQL/RSA của cả ba service khớp schema OpenAPI; kiểm input lỗi và error envelope PASS. |
-| Web | 14 file / 84 test PASS; production build PASS. Test Catalog/Clinical đã chuyển vào runner web chung. |
+| Web | 14 file / 86 test PASS; production build PASS. Test Catalog/Clinical đã chuyển vào runner web chung. |
 | Cấu hình local | 23 test Python PASS cho topology, env cách ly, port, DB, Redis namespace, khóa JWT và thứ tự seed/start. |
 
 Log và fixture sinh ra nằm trong `.runtime/`, ngoài Git. Container test middleware dùng `--rm`; volume cache/vhost tạm tự dọn. Không dùng credential online để chạy các suite trên.
@@ -37,7 +37,8 @@ Log và fixture sinh ra nằm trong `.runtime/`, ngoài Git. Container test midd
 - Diagnostic còn backlog lịch sử cần xử lý. Sau khi giới hạn handler retry chạy tuần tự và thu hẹp reconcile, lượt theo dõi mới thấy worker nhận CatalogChanged/VisitDoctorGrantChanged liên tục, không còn timeout trong đoạn log cuối hơn hai phút. Cần tiếp tục theo dõi đến khi backlog đồng bộ xong.
 - Clinical medical-records và Diagnostic published-results qua web với JWT + lease thật đều đã trả 200 sau bản sửa worker. Hồ sơ Clinical được thử chưa có bản ghi; chưa được đánh dấu nghiệm thu trọn ca LAB.
 - Chưa nghiệm thu trọn hành trình đặt lịch → thanh toán → LAB → cấp thuốc. Health và login thành công không thay cho kết quả đó.
-- Chưa commit/push trong lượt này.
+- Đã đồng bộ `develop` tại `c345c99` vào `huy_task` rồi đẩy lên GitHub. Sau merge: unit test và go vet ba service PASS; 23 test Python, 86 test web, typecheck/production build, kiểm kiến trúc và ba OpenAPI PASS. Kết quả chạy thật ở trên thuộc lượt kiểm trước merge; chưa chạy lại toàn hành trình nhóm sau merge.
+- Compose chỉ chạy 9 API, 9 worker, Gateway và web. Cả 9 DB, RabbitMQ, Redis lấy host online từ ba env nhóm; thiếu cấu hình RabbitMQ online thì dừng, không fallback local.
 
 ## Chạy đúng project nhóm
 
