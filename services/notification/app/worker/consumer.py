@@ -8,7 +8,7 @@ import uuid
 from datetime import timedelta
 from django.db import connections, transaction, OperationalError
 from django.utils import timezone
-from app.application.messages import digest, receive
+from app.application.messages import REQUIRED, digest, receive, validate_envelope
 from app.application.presentation import MESSAGES
 from app.domain.models import (
     DeadLetter, LegacyNotification, Notification, NotificationDeliveryKey, RetryJob,
@@ -22,13 +22,11 @@ ROUTES = {
     "diagnostic.lab-result-published.v1": ("LabResultPublished", "diagnostic", "DIAGNOSTIC"),
     "pharmacy.medication-dispensed.v1": ("MedicationDispensed", "pharmacy", "PHARMACY"),
 }
-REQUIRED = {"messageId", "messageKind", "messageType", "schemaVersion", "producer",
-            "aggregateId", "aggregateVersion", "correlationId", "causationId",
-            "requestId", "occurredAt", "payload"}
 
 
 @transaction.atomic
 def route_event(routing_key, envelope):
+    validate_envelope(envelope)
     if routing_key == "identity.identity-access-changed.v1":
         from app.application.identity_projection import apply_identity_access
         return apply_identity_access(envelope)

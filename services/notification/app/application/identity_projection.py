@@ -2,7 +2,7 @@
 import uuid
 from django.db import transaction
 from django.utils.dateparse import parse_datetime
-from app.application.messages import digest, receive
+from app.application.messages import digest, receive, validate_envelope
 from app.domain.models import IdentityAccessProjection
 
 PAYLOAD_FIELDS = {'userId', 'status', 'actorType', 'capabilities', 'tokenVersion', 'phoneVerified', 'version'}
@@ -19,9 +19,7 @@ def wire_uuid(value):
 
 
 def validate(envelope):
-    from app.worker.consumer import REQUIRED
-    if not isinstance(envelope, dict) or set(envelope) != REQUIRED:
-        raise ValueError('Invalid identity envelope')
+    validate_envelope(envelope)
     if (envelope['messageKind'] != 'EVENT' or envelope['messageType'] != 'IdentityAccessChanged'
             or envelope['producer'] != 'identity' or type(envelope['schemaVersion']) is not int
             or envelope['schemaVersion'] != 1 or not positive_int(envelope['aggregateVersion'])):
