@@ -9,7 +9,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"umccare/clinical/internal/application/ports"
 	"umccare/clinical/internal/domain"
-	"umccare/clinical/migrations"
 )
 
 const grantMessage = "VisitDoctorGrantChanged"
@@ -31,23 +30,6 @@ func (t clinicalTx) CheckVisitGrant(ctx context.Context, visitID string) error {
 		return domain.Fail("FORBIDDEN", "Visit access has been revoked")
 	}
 	return nil
-}
-
-func migrateVisitGrants(ctx context.Context, tx pgx.Tx) error {
-	const version = "000006_visit_grants"
-	var applied bool
-	if err := tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM schema_migrations WHERE version=$1)", version).Scan(&applied); err != nil || applied {
-		return err
-	}
-	sql, err := migrations.Files.ReadFile(version + ".up.sql")
-	if err != nil {
-		return err
-	}
-	if _, err = tx.Exec(ctx, string(sql)); err != nil {
-		return err
-	}
-	_, err = tx.Exec(ctx, "INSERT INTO schema_migrations(version) VALUES ($1)", version)
-	return err
 }
 
 func (t clinicalTx) appendGrantEvent(ctx context.Context, aggregate string, body map[string]any, now time.Time, meta domain.Meta) error {

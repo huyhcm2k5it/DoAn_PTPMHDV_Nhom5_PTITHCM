@@ -4,83 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	"time"
 	"umccare/clinical/internal/domain"
-	"umccare/clinical/migrations"
 )
-
-func migrateTreatment(ctx context.Context, tx pgx.Tx) error {
-	var exists bool
-	if e := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version='000002_treatment')`).Scan(&exists); e != nil {
-		return e
-	}
-	if exists {
-		return nil
-	}
-	raw, e := treatmentMigration()
-	if e != nil {
-		return e
-	}
-	if _, e = tx.Exec(ctx, string(raw)); e != nil {
-		return e
-	}
-	_, e = tx.Exec(ctx, `INSERT INTO schema_migrations(version)VALUES('000002_treatment')`)
-	return e
-}
-
-func migrateCatalogStream(ctx context.Context, tx pgx.Tx) error {
-	var exists bool
-	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version='000003_catalog_stream')`).Scan(&exists); err != nil {
-		return err
-	}
-	if exists {
-		return nil
-	}
-	raw, err := migrations.Files.ReadFile("000003_catalog_stream.up.sql")
-	if err != nil {
-		return err
-	}
-	if _, err = tx.Exec(ctx, string(raw)); err != nil {
-		return err
-	}
-	_, err = tx.Exec(ctx, `INSERT INTO schema_migrations(version)VALUES('000003_catalog_stream')`)
-	return err
-}
-
-func migrateLabTerminal(ctx context.Context, tx pgx.Tx) error {
-	var exists bool
-	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version='000004_lab_terminal')`).Scan(&exists); err != nil || exists {
-		return err
-	}
-	raw, err := migrations.Files.ReadFile("000004_lab_terminal.up.sql")
-	if err != nil {
-		return err
-	}
-	if _, err = tx.Exec(ctx, string(raw)); err != nil {
-		return err
-	}
-	_, err = tx.Exec(ctx, `INSERT INTO schema_migrations(version) VALUES('000004_lab_terminal')`)
-	return err
-}
-
-func migrateTreatmentNormalization(ctx context.Context, tx pgx.Tx) error {
-	const version = "000007_treatment_normalization"
-	var exists bool
-	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=$1)`, version).Scan(&exists); err != nil || exists {
-		return err
-	}
-	raw, err := migrations.Files.ReadFile(version + ".up.sql")
-	if err != nil {
-		return err
-	}
-	if _, err = tx.Exec(ctx, string(raw)); err != nil {
-		return err
-	}
-	_, err = tx.Exec(ctx, `INSERT INTO schema_migrations(version) VALUES($1)`, version)
-	return err
-}
 
 func (t clinicalTx) LabTerminal(ctx context.Context, request string) (v domain.LabTerminal, found bool, err error) {
 	var revision *int
@@ -307,8 +236,4 @@ func (t clinicalTx) AppendMessage(ctx context.Context, m domain.Envelope, exchan
 	}
 	_, e = t.tx.Exec(ctx, `INSERT INTO outbox(message_id,aggregate_id,destination,routing_key,envelope)VALUES($1,$2,$3,$4,$5)`, m.MessageID, m.AggregateID, exchange, route, raw)
 	return e
-}
-
-func treatmentMigration() ([]byte, error) {
-	return migrations.Files.ReadFile("000002_treatment.up.sql")
 }

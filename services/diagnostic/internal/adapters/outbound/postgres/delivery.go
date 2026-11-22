@@ -44,28 +44,42 @@ func incomingHash(d ports.Incoming) string {
 	}
 	return domain.Hash(d.Body)
 }
+
+// ScheduleRetry commits an outbox handoff before the original delivery is ACKed.
+// Only the current token may advance an attempt; duplicate broker deliveries are harmless.
 func (p *Probe) ScheduleRetry(ctx context.Context, d ports.Incoming, next int, delay time.Duration) error {
-	if !domain.ValidID(d.MessageID) || next < 1 || next > 3 {
-		return domain.Fail("INVALID_MESSAGE", "Invalid retry identity or attempt")
+	if !domain.ValidID(d.MessageID) || next != d.Attempt+1 || next < 1 || next > 3 || delay < 0 || delay > 61*time.Second {
+		return domain.Fail("INVALID_MESSAGE", "Invalid broker retry")
 	}
 	hash := incomingHash(d)
-	return p.Within(ctx, "message:"+d.MessageID, func(raw ports.Tx) error {
-		t := raw.(diagnosticTx)
-		seen, e := t.SeenMessage(ctx, d.MessageID, hash, d.LeaseID)
-		if e != nil || seen {
-			return e
+	return p.Within(ctx, "message:"+d.MessageID, func(base ports.Tx) error {
+		t := base.(diagnosticTx)
+		seen, err := t.SeenMessage(ctx, d.MessageID, hash, d.RetryToken)
+		if err != nil || seen {
+			return err
 		}
-		_, e = t.tx.Exec(ctx, `INSERT INTO inbox(message_id,payload_hash,status)VALUES($1,$2,'RETRY_SCHEDULED') ON CONFLICT(message_id)DO NOTHING`, d.MessageID, hash)
-		if e != nil {
-			return e
+		token := domain.NewID()
+		d.Attempt, d.RetryToken = next, token
+		body, err := json.Marshal(ports.BrokerRetry{SchemaVersion: 1, Service: "diagnostic", Input: d, NotBefore: time.Now().UTC().Add(delay)})
+		if err != nil {
+			return err
 		}
-		_, e = t.tx.Exec(ctx, `INSERT INTO retry_jobs(message_id,exchange_name,routing_key,body,payload_hash,attempt,due_at)VALUES($1,$2,$3,$4,$5,$6,now()+$7::double precision*interval '1 second') ON CONFLICT(message_id)DO UPDATE SET attempt=EXCLUDED.attempt,due_at=EXCLUDED.due_at,lease_id=NULL,lease_until=NULL WHERE retry_jobs.payload_hash=EXCLUDED.payload_hash AND retry_jobs.status='PENDING' AND retry_jobs.attempt<EXCLUDED.attempt`, d.MessageID, d.Exchange, d.RoutingKey, d.Body, hash, next, delay.Seconds())
-		return e
+		_, err = t.tx.Exec(ctx, `INSERT INTO inbox(message_id,payload_hash,status,retry_token,delivery_attempt)
+            VALUES($1,$2,'RETRY_SCHEDULED',$3,$4) ON CONFLICT(message_id) DO UPDATE
+            SET status='RETRY_SCHEDULED',retry_token=EXCLUDED.retry_token,delivery_attempt=EXCLUDED.delivery_attempt`, d.MessageID, hash, token, next)
+		if err != nil {
+			return err
+		}
+		_, err = t.tx.Exec(ctx, `INSERT INTO outbox(message_id,aggregate_id,destination,routing_key,envelope)
+            VALUES($1,$2,'umc.retry.diagnostic.v1','retry',$3)`, token, d.MessageID, body)
+		return err
 	})
 }
+
+// Quarantine uses the existing outbox to hand off the complete failure to RabbitMQ DLQ.
+// No separate PostgreSQL copy of the DLQ is required.
 func (p *Probe) Quarantine(ctx context.Context, d ports.Incoming, reason string) error {
 	rawHash := domain.Hash(d.Body)
-	canonicalHash := incomingHash(d)
 	id := d.MessageID
 	if len(id) > 128 {
 		id = id[:128]
@@ -73,74 +87,30 @@ func (p *Probe) Quarantine(ctx context.Context, d ports.Incoming, reason string)
 	if id == "" {
 		id = rawHash
 	}
-	return p.Within(ctx, "dead:"+id+":"+rawHash, func(raw ports.Tx) error {
-		t := raw.(diagnosticTx)
-		deadID := domain.NewID()
-		body := d.Body
-		if len(body) > 1<<20 {
-			body = body[:1<<20]
+	body := d.Body
+	truncated := len(body) > 1<<20
+	if truncated {
+		body = body[:1<<20]
+	}
+	record, err := json.Marshal(map[string]any{"originalMessageId": id, "exchange": d.Exchange, "routingKey": d.RoutingKey,
+		"reasonCode": reason, "payloadHash": rawHash, "body": body, "attempt": d.Attempt, "bodyTruncated": truncated})
+	if err != nil {
+		return err
+	}
+	return p.Within(ctx, "dead:"+id+":"+rawHash, func(base ports.Tx) error {
+		t := base.(diagnosticTx)
+		_, err := t.tx.Exec(ctx, `INSERT INTO outbox(message_id,aggregate_id,destination,routing_key,envelope)
+            VALUES(md5($1)::uuid,md5($1)::uuid,'umc.deadletters.diagnostic.v1','diagnostic.quarantine.v1',$2)
+            ON CONFLICT(message_id) DO NOTHING`, "diagnostic:dead:"+id+":"+rawHash+":"+reason, record)
+		if err != nil {
+			return err
 		}
-		tag, e := t.tx.Exec(ctx, `INSERT INTO dead_letters(id,message_id,exchange_name,routing_key,body,payload_hash,reason_code)VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(message_id,payload_hash)DO NOTHING`, deadID, id, d.Exchange, d.RoutingKey, body, rawHash, reason)
-		if e != nil {
-			return e
+		if domain.ValidID(d.MessageID) {
+			_, err = t.tx.Exec(ctx, `INSERT INTO inbox(message_id,payload_hash,status) VALUES($1,$2,'DEAD')
+                ON CONFLICT(message_id) DO UPDATE SET status='DEAD',retry_token=NULL
+                WHERE inbox.payload_hash=EXCLUDED.payload_hash AND inbox.status='RETRY_SCHEDULED'
+                  AND (inbox.retry_token IS NULL OR inbox.retry_token=NULLIF($3,'')::uuid)`, d.MessageID, incomingHash(d), d.RetryToken)
 		}
-		if tag.RowsAffected() > 0 {
-			payload, e := json.Marshal(map[string]any{"deadLetterId": deadID, "originalMessageId": id, "exchange": d.Exchange, "routingKey": d.RoutingKey, "reasonCode": reason, "payloadHash": rawHash, "body": body})
-			if e != nil {
-				return e
-			}
-			if _, e = t.tx.Exec(ctx, `INSERT INTO outbox(message_id,aggregate_id,destination,routing_key,envelope)VALUES($1,$2,'umc.deadletters.diagnostic.v1','diagnostic.quarantine.v1',$3)`, domain.NewID(), deadID, payload); e != nil {
-				return e
-			}
-		}
-		if domain.ValidID(id) {
-			if _, e = t.tx.Exec(ctx, `UPDATE retry_jobs SET status='DEAD',lease_id=NULL,lease_until=NULL WHERE message_id=$1 AND payload_hash=$2;`, id, canonicalHash); e != nil {
-				return e
-			}
-			_, e = t.tx.Exec(ctx, `UPDATE inbox SET status='DEAD' WHERE message_id=$1 AND payload_hash=$2 AND status='RETRY_SCHEDULED'`, id, canonicalHash)
-		}
-		return e
+		return err
 	})
-}
-func (p *Probe) DueRetries(ctx context.Context, limit int) ([]ports.Incoming, error) {
-	if limit < 1 || limit > 20 {
-		limit = 10
-	}
-	tx, e := p.pool.Begin(ctx)
-	if e != nil {
-		return nil, e
-	}
-	defer tx.Rollback(ctx)
-	rows, e := tx.Query(ctx, `SELECT message_id::text,exchange_name,routing_key,body,attempt FROM retry_jobs WHERE status='PENDING' AND due_at<=now() AND (lease_until IS NULL OR lease_until<now()) ORDER BY due_at LIMIT $1 FOR UPDATE SKIP LOCKED`, limit)
-	if e != nil {
-		return nil, e
-	}
-	jobs := []ports.Incoming{}
-	for rows.Next() {
-		var d ports.Incoming
-		if e = rows.Scan(&d.MessageID, &d.Exchange, &d.RoutingKey, &d.Body, &d.Attempt); e != nil {
-			rows.Close()
-			return nil, e
-		}
-		d.LeaseID = domain.NewID()
-		jobs = append(jobs, d)
-	}
-	e = rows.Err()
-	rows.Close()
-	if e != nil {
-		return nil, e
-	}
-	for _, d := range jobs {
-		if _, e = tx.Exec(ctx, `UPDATE retry_jobs SET lease_id=$2,lease_until=now()+interval '60 seconds' WHERE message_id=$1`, d.MessageID, d.LeaseID); e != nil {
-			return nil, e
-		}
-	}
-	if e = tx.Commit(ctx); e != nil {
-		return nil, e
-	}
-	return jobs, nil
-}
-func (p *Probe) CompleteRetry(ctx context.Context, d ports.Incoming) error {
-	_, e := p.pool.Exec(ctx, `UPDATE retry_jobs SET status='PROCESSED',lease_id=NULL,lease_until=NULL WHERE message_id=$1 AND lease_id=$2`, d.MessageID, d.LeaseID)
-	return e
 }

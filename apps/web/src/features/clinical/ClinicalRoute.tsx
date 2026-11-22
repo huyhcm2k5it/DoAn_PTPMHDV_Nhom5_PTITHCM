@@ -1,4 +1,4 @@
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ClinicalFeature } from './ClinicalFeature';
 import type { ClinicalApi, ClinicalSession, StartInput } from './types';
 import type { DiagnosticApi } from '../diagnostic/types';
@@ -16,6 +16,7 @@ export function ClinicalRoute({
   view?: 'exam' | 'treatment';
 }) {
   const [params] = useSearchParams();
+  const navigate = useNavigate();
   const ticketId = params.get('ticketId'),
     doctorId = params.get('doctorId');
   const version =
@@ -53,12 +54,23 @@ export function ClinicalRoute({
     );
   return (
     <ClinicalFeature
+      key={[view, visitId, ticketId ?? '', version ?? ''].join(':')}
       api={api}
       diagnosticApi={diagnosticApi}
       session={session}
       selectedTicket={ticket}
       initialView={view}
       initialVisitId={visitId}
+      onNavigate={(next, selectedVisit) => {
+        const route =
+          next === 'exam' ? '/doctor/clinical' : '/doctor/treatment';
+        navigate(
+          route +
+            (selectedVisit
+              ? '?' + new URLSearchParams({ visitId: selectedVisit }).toString()
+              : ''),
+        );
+      }}
     />
   );
 }

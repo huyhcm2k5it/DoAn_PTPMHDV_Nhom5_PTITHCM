@@ -12,9 +12,10 @@ import (
 type Service struct {
 	store ports.Store
 	now   func() time.Time
+	cache ports.ReadCache
 }
 
-func New(s ports.Store, now func() time.Time) *Service { return &Service{s, now} }
+func New(s ports.Store, now func() time.Time) *Service { return &Service{store: s, now: now} }
 func load(ctx context.Context, t ports.Tx, kind, key string, v any) error {
 	b, e := t.Get(ctx, kind, key)
 	if e != nil {
@@ -243,4 +244,10 @@ func (s *Service) emit(ctx context.Context, t ports.Tx, in domain.Envelope, kind
 		exchange = "umc.commands.diagnostic.v1"
 	}
 	return t.Outbox(ctx, m, exchange, route)
+}
+
+func NewCached(store ports.Store, now func() time.Time, cache ports.ReadCache) *Service {
+	s := New(store, now)
+	s.cache = cache
+	return s
 }

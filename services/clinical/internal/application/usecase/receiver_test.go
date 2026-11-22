@@ -87,7 +87,7 @@ func TestReceiveCommitsRetryBeforeAcknowledgement(t *testing.T) {
 		t.Fatal("would ack without durable retry")
 	}
 	delivery.Attempt = 3
-	delivery.LeaseID = domain.NewID()
+	delivery.RetryToken = domain.NewID()
 	store.err = nil
 	if e := r.Receive(context.Background(), delivery); e != nil || store.dead != 1 {
 		t.Fatal(store, e)

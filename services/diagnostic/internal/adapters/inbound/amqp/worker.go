@@ -73,8 +73,7 @@ func (p *Publisher) Publish(ctx context.Context, m ports.Outgoing) error {
 
 type Store interface {
 	PublishPending(context.Context, func(context.Context, ports.Outgoing) error) (bool, error)
-	DueRetries(context.Context, int) ([]ports.Incoming, error)
-	CompleteRetry(context.Context, ports.Incoming) error
+	Quarantine(context.Context, ports.Incoming, string) error
 }
 type Receiver interface {
 	Receive(context.Context, ports.Incoming) error
@@ -143,17 +142,23 @@ func Run(ctx context.Context, url string, store Store, receiver Receiver, declar
 	if e = inCh.Qos(10, 0, false); e != nil {
 		return e
 	}
-	deliveries, e := inCh.ConsumeWithContext(ctx, "evt.diagnostic.v1", "", false, false, false, false, nil)
+	deliveries, e := inCh.Consume("evt.diagnostic.v1", "", false, false, false, false, nil)
 	if e != nil {
 		return e
 	}
-	commands, e := inCh.ConsumeWithContext(ctx, "cmd.diagnostic.v1", "", false, false, false, false, nil)
+	commands, e := inCh.Consume("cmd.diagnostic.v1", "", false, false, false, false, nil)
 	if e != nil {
 		return e
 	}
 	mergeCtx, stopMerge := context.WithCancel(ctx)
 	defer stopMerge()
 	deliveries = mergeDeliveries(mergeCtx, deliveries, commands)
+	retryErrors, stopRetries, err := startBrokerRetries(ctx, conn, receiver.Receive, store.Quarantine)
+	if err != nil {
+		return err
+	}
+	defer stopRetries()
+
 	ticker := time.NewTicker(250 * time.Millisecond)
 	defer ticker.Stop()
 	nextPublish := time.Time{}
@@ -161,6 +166,9 @@ func Run(ctx context.Context, url string, store Store, receiver Receiver, declar
 		select {
 		case <-ctx.Done():
 			return nil
+		case retryErr := <-retryErrors:
+			return retryErr
+
 		case d, open := <-deliveries:
 			if !open {
 				return errors.New("consumer channel closed")
@@ -196,23 +204,6 @@ func Run(ctx context.Context, url string, store Store, receiver Receiver, declar
 					if !sent {
 						break
 					}
-				}
-			}
-			call, cancel := context.WithTimeout(ctx, 5*time.Second)
-			jobs, err := store.DueRetries(call, 5)
-			cancel()
-			if err != nil {
-				return err
-			}
-			for _, job := range jobs {
-				call, cancel := context.WithTimeout(ctx, 10*time.Second)
-				err = receiver.Receive(call, job)
-				if err == nil {
-					err = store.CompleteRetry(call, job)
-				}
-				cancel()
-				if err != nil {
-					return err
 				}
 			}
 		}

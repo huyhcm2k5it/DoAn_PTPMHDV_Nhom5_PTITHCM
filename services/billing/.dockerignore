@@ -1,0 +1,14 @@
+.git/
+.runtime/
+node_modules/
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
+.env
+.env.*
+*.pem
+*.log
+*.sqlite3
+coverage/
+dist/

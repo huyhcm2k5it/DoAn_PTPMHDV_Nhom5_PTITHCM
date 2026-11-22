@@ -11,6 +11,7 @@ import (
 type Service struct {
 	store ports.ClinicalStore
 	now   func() time.Time
+	cache ports.ReadCache
 }
 
 func New(store ports.ClinicalStore, now func() time.Time) *Service {
@@ -268,7 +269,7 @@ func (s *Service) HandleClaim(ctx context.Context, exchange string, event domain
 	messageHash := domain.Hash(event)
 	claimHash := domain.Hash(claim)
 	return s.store.Within(ctx, "claim:"+claim.RequestID, func(tx ports.ClinicalTx) error {
-		seen, e := tx.SeenMessage(ctx, domain.ID(event.MessageID), messageHash, retryLease(ctx))
+		seen, e := tx.SeenMessage(ctx, domain.ID(event.MessageID), messageHash, retryToken(ctx))
 		if e != nil || seen {
 			return e
 		}
@@ -329,4 +330,10 @@ func (s *Service) HandleClaim(ctx context.Context, exchange string, event domain
 		}
 		return tx.MarkMessage(ctx, domain.ID(event.MessageID), messageHash)
 	})
+}
+
+func NewCached(store ports.ClinicalStore, now func() time.Time, cache ports.ReadCache) *Service {
+	s := New(store, now)
+	s.cache = cache
+	return s
 }

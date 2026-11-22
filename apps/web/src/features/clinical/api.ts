@@ -120,14 +120,7 @@ export function createClinicalApi(
     start: async (input, key) => {
       const result = await request<StartResult>(
         'visits/start',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Idempotency-Key': key,
-          },
-          body: JSON.stringify(input),
-        },
+        write('POST', input, key),
         202,
       );
       if (
@@ -145,11 +138,10 @@ export function createClinicalApi(
     detail: (id, signal) =>
       request(`visits/${encodeURIComponent(id)}`, { signal }),
     saveDraft: (id, input, key) =>
-      request(`visits/${encodeURIComponent(id)}/draft`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key },
-        body: JSON.stringify(input),
-      }),
+      request(
+        `visits/${encodeURIComponent(id)}/draft`,
+        write('PUT', input, key),
+      ),
   };
 }
 function write(method: string, input: unknown, key: string): RequestInit {

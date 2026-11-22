@@ -1,11 +1,11 @@
 FROM node:24-alpine
 ENV NODE_ENV=production PORT=8002
 WORKDIR /app/services/appointment
-COPY services/appointment/package*.json ./
+COPY package*.json ./
 RUN npm ci --omit=dev --ignore-scripts
-COPY services/appointment/src ./src
-COPY services/appointment/scripts ./scripts
-COPY mongo /app/mongo
+COPY src ./src
+COPY scripts ./scripts
+COPY --from=mongo_shared . /app/mongo
 USER node
 EXPOSE 8002
 CMD ["node", "src/main.js"]

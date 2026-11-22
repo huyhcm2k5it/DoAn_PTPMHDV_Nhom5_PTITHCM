@@ -265,10 +265,20 @@ export async function loginUser(
     if (sessionRes.ok) {
       const sJson = await sessionRes.json();
       const sData = sJson?.data;
-      const rawCaps = sData?.capabilities ?? [];
+      if (
+        typeof sData?.userId !== 'string' ||
+        !sData.userId ||
+        !['PATIENT', 'DOCTOR', 'STAFF'].includes(sData.actorType) ||
+        !Array.isArray(sData.capabilities)
+      ) {
+        throw new Error('Dữ liệu phiên đăng nhập không hợp lệ.');
+      }
+      const rawCaps = sData.capabilities;
       const capabilities: string[] = rawCaps
         .filter((c: any) =>
-          typeof c === 'string' ? true : c.enabled !== false,
+          typeof c === 'string'
+            ? c.length > 0
+            : c && typeof c.capability === 'string' && c.enabled !== false,
         )
         .map((c: any) => (typeof c === 'string' ? c : c.capability));
 
@@ -280,20 +290,12 @@ export async function loginUser(
         lease: fetchAuthorizationLease,
       };
     } else {
-      session = {
-        userId: '',
-        actorType: loginData.actorType,
-        capabilities: [],
-        lease: fetchAuthorizationLease,
-      };
+      throw new Error('Không tải được phiên đăng nhập. Vui lòng thử lại.');
     }
-  } catch {
-    session = {
-      userId: '',
-      actorType: loginData.actorType,
-      capabilities: [],
-      lease: fetchAuthorizationLease,
-    };
+  } catch (error) {
+    clearAuthSession();
+    notifyListeners();
+    throw error;
   }
 
   currentSession = session;

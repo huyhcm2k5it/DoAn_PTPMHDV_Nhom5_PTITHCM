@@ -22,4 +22,4 @@ Giữ `api`/`session` ổn định bằng useMemo/provider. Shared transport th�
 - Form chặn double submit. Cùng nội dung thử lại dùng cùng Idempotency-Key; sửa nội dung là ý định mới. Không tự gửi lại khi mạng lỗi.
 - Callback chỉ chuyển ID danh mục cho Appointment; không tự tạo lịch.
 
-Tests nằm trong preview riêng do shell chưa có package.json. Chạy lệnh tại `tools/catalog-preview/README.md`; khi ghép shell chuyển bộ test này vào runner chung. Scope CSS `.umc-catalog`, responsive 700px và giảm chuyển động theo thiết lập hệ điều hành.
+Kiểm thử nằm trong `apps/web/tests/huy-catalog-api.test.ts`, `huy-catalog-regression.test.tsx` và `catalog.test.tsx`. Chạy bằng runner chung của `apps/web`. Scope CSS `.umc-catalog`, responsive 700px và giảm chuyển động theo thiết lập hệ điều hành.

@@ -54,7 +54,8 @@ func TestMedicalRecordsOwnerLeaseAndSignedOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	app := usecase.New(db, time.Now)
+	cache := &recordsTestCache{values: map[string][]byte{}}
+	app := usecase.NewCached(db, time.Now, cache)
 	p := domain.Principal{UserID: owner, ActorType: "PATIENT", TokenVersion: 1, LeaseAction: "CL-011", LeaseExpiresAt: now.Add(time.Minute)}
 	result, err := app.Records(ctx, p, patient, 1, 20)
 	if err != nil || result.Total != 1 || len(result.Items) != 1 || result.Items[0].Visit.ID != signed || result.Items[0].Note.Diagnosis != "SIGNED_NOTE" || len(result.Items[0].Prescriptions) != 1 || result.Items[0].Prescriptions[0].State != "FINAL" {
@@ -62,6 +63,9 @@ func TestMedicalRecordsOwnerLeaseAndSignedOnly(t *testing.T) {
 	}
 	if len(result.Items[0].PublishedLabResults) != 1 || result.Items[0].PublishedLabResults[0].OrderID != order || result.Items[0].PublishedLabResults[0].Revision != 3 {
 		t.Fatalf("invalid published references: %+v", result.Items[0].PublishedLabResults)
+	}
+	if len(cache.values) == 0 {
+		t.Fatal("Clinical history did not populate cache")
 	}
 	p.UserID = other
 	if _, err = app.Records(ctx, p, patient, 1, 20); domain.Code(err) != "NOT_FOUND" {
@@ -97,4 +101,15 @@ func TestMedicalRecordsOwnerLeaseAndSignedOnly(t *testing.T) {
 	if _, err = app.Records(ctx, p, patient, 1, 20); domain.Code(err) != "AUTHZ_LEASE_EXPIRED" {
 		t.Fatal("expired lease accepted", err)
 	}
+}
+
+type recordsTestCache struct{ values map[string][]byte }
+
+func (c *recordsTestCache) Get(_ context.Context, key string) ([]byte, bool, error) {
+	raw, ok := c.values[key]
+	return raw, ok, nil
+}
+func (c *recordsTestCache) Set(_ context.Context, key string, raw []byte, _ time.Duration) error {
+	c.values[key] = append([]byte(nil), raw...)
+	return nil
 }

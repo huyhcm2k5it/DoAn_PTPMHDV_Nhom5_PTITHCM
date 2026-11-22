@@ -51,7 +51,7 @@ Response `{data,meta:{correlationId}}`; lỗi `{error:{code,message},meta:{corre
 
 `domain` chứa kiểu/quy tắc; `application/ports` chứa inbound/output port trung lập; `application/usecase` điều phối; `adapters/inbound/http` là Echo/JWT; `adapters/outbound/postgres` là pgx/transaction; `cmd` ghép dependency. Không import driver/framework vào lõi, không đọc DB service khác.
 
-Migration hiện có hai version (`000001_catalog`, `000002_catalog_stream`) với ledger, transaction và advisory lock; đây là runner nhỏ theo dự án, không phải framework migration đầy đủ. Khi thêm version tiếp theo phải kiểm upgrade từ version 2, không sửa file đã áp dụng.
+Migration hiện có năm version (`000001_catalog` đến `000005_broker_delivery`) với ledger, transaction và advisory lock; đây là runner nhỏ theo dự án, không phải framework migration đầy đủ. Khi thêm version tiếp theo phải kiểm upgrade từ version 2, không sửa file đã áp dụng.
 
 ## Kiểm thử
 
@@ -71,7 +71,7 @@ python tools/huy/check_architecture.py
 
 Linux/CI có PostgreSQL riêng: set `TEST_DATABASE_URL` vào DB bắt đầu `umc_huy_test`, chạy `go test -tags=integration -count=1 -v ./internal/adapters/outbound/postgres`. Test không tự skip nếu thiếu DB. Unit test thường không được tính thay integration. Bộ DB test chứng minh seed lặp, nullable giá, concurrent key/overlap, rollback khi outbox lỗi, quyền bị thu hồi và cả 6 route qua RSA JWT thật trong fixture test. File response test thật dùng cho JSON Schema validation.
 
-Web feature và preview: `apps/web/src/features/catalog/README.md`, `tools/catalog-preview/README.md`. CI definition trong `.github/workflows/huy-go.yml`; xem kết quả của commit trên GitHub để biết job đã chạy hay chưa.
+Web feature và kiểm thử dùng runner chung tại `apps/web`. Xem `apps/web/src/features/catalog/README.md` và CI trong `.github/workflows/huy-go.yml` để đối chiếu lệnh chạy.
 
 ## Repair a verified doctor mapping
 
@@ -84,3 +84,7 @@ go run ./cmd/rebind-doctor -doctor-id CATALOG_DOCTOR_UUID -expected-user-id CURR
 ```
 
 The command checks the expected old mapping, rejects inactive/non-doctor target accounts, and commits the new revision, audit and CatalogChanged outbox together. Repeating the same successful repair returns the same event/sequence. Snapshot export retains the new doctor revision. A worker must publish the outbox; Appointment must separately repair its own legacy schedule/ticket mappings from verified owner data. This tool never writes another service's DB or manufactures a Clinical claim.
+
+## Local Docker
+
+Use `python tools/be/run.py` from the repository root to run the entire group with the three existing owner env files. Catalog, Clinical and Diagnostic share the online Redis with separate namespaces. The API migrates before readiness when `MIGRATE_ON_START=1`; `/api healthcheck` is the container health check. Manual `/migrate` is a one-shot operation using the API image, not a separate service. Quarantine now uses outbox to deliver failures to RabbitMQ DLQ; migration 000005 preserves historical quarantine metadata before dropping that table.

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 	httpadapter "umccare/catalog/internal/adapters/inbound/http"
@@ -27,6 +28,12 @@ func key(path string) (*rsa.PublicKey, error) {
 	return jwt.ParseRSAPublicKeyFromPEM(raw)
 }
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "healthcheck" {
+		if !healthy() {
+			os.Exit(1)
+		}
+		return
+	}
 	if err := run(); err != nil {
 		slog.Error("catalog startup failed; verify configuration and dependencies")
 		os.Exit(1)
@@ -42,6 +49,15 @@ func run() error {
 		return err
 	}
 	defer db.Close()
+	if os.Getenv("MIGRATE_ON_START") == "1" {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		err := db.Migrate(ctx)
+		cancel()
+		if err != nil {
+			return err
+		}
+	}
+
 	var auth httpadapter.Authenticator
 	if cfg.JWTKeyFile != "" {
 		access, e := key(cfg.JWTKeyFile)
@@ -90,4 +106,25 @@ func run() error {
 		defer cancel()
 		return server.Shutdown(shutdown)
 	}
+}
+
+// Reuse the application binary for container readiness; no shell or curl image is needed.
+func healthy() bool {
+	address := os.Getenv("LISTEN_ADDR")
+	if address == "" {
+		address = "127.0.0.1:8007"
+	}
+	if strings.HasPrefix(address, ":") {
+		address = "127.0.0.1" + address
+	}
+	if strings.HasPrefix(address, "0.0.0.0:") {
+		address = "127.0.0.1:" + strings.TrimPrefix(address, "0.0.0.0:")
+	}
+	client := http.Client{Timeout: 2 * time.Second}
+	response, err := client.Get("http://" + address + "/health/ready")
+	if err != nil {
+		return false
+	}
+	defer response.Body.Close()
+	return response.StatusCode == http.StatusOK
 }

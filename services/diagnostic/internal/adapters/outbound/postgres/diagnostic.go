@@ -4,54 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/jackc/pgx/v5"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"umccare/diagnostic/internal/application/ports"
 	"umccare/diagnostic/internal/application/projection"
 	"umccare/diagnostic/internal/domain"
-	"umccare/diagnostic/migrations"
 )
 
 type diagnosticTx struct{ tx pgx.Tx }
 
-func (p *Probe) Migrate(ctx context.Context) error {
-	tx, e := p.pool.Begin(ctx)
-	if e != nil {
-		return e
-	}
-	defer tx.Rollback(ctx)
-	if _, e = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('diagnostic:migrate',0));CREATE TABLE IF NOT EXISTS schema_migrations(version text PRIMARY KEY)`); e != nil {
-		return e
-	}
-	for _, version := range []string{"000001_diagnostic", "000002_visit_subjects", "000003_diagnostic_erd_alignment"} {
-		var exists bool
-		if e = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=$1)`, version).Scan(&exists); e != nil {
-			return e
-		}
-		if exists {
-			continue
-		}
-		b, readErr := migrations.Files.ReadFile(version + ".up.sql")
-		if readErr != nil {
-			return readErr
-		}
-		if _, e = tx.Exec(ctx, string(b)); e != nil {
-			return e
-		}
-		if _, e = tx.Exec(ctx, `INSERT INTO schema_migrations VALUES($1)`, version); e != nil {
-			return e
-		}
-	}
-	return tx.Commit(ctx)
-}
-func (p *Probe) BusinessReady(ctx context.Context) error {
-	var b bool
-	e := p.pool.QueryRow(ctx, `SELECT count(*)=3 FROM schema_migrations WHERE version IN ('000001_diagnostic','000002_visit_subjects','000003_diagnostic_erd_alignment')`).Scan(&b)
-	if e != nil || !b {
-		return domain.Fail("SERVICE_UNAVAILABLE", "Diagnostic migrations required")
-	}
-	return nil
-}
 func (p *Probe) Within(ctx context.Context, lock string, fn func(ports.Tx) error) error {
 	tx, e := p.pool.Begin(ctx)
 	if e != nil {
@@ -69,6 +32,9 @@ func (p *Probe) Within(ctx context.Context, lock string, fn func(ports.Tx) error
 	return tx.Commit(ctx)
 }
 func (t diagnosticTx) Get(ctx context.Context, kind, key string) (json.RawMessage, error) {
+	if kind == "replay" {
+		return t.getReplay(ctx, key)
+	}
 	if kind == "result" {
 		return t.getResult(ctx, key)
 	}
@@ -94,6 +60,9 @@ func (t diagnosticTx) Put(ctx context.Context, kind, key string, v any) error {
 	b, e := json.Marshal(v)
 	if e != nil {
 		return e
+	}
+	if kind == "replay" {
+		return t.putReplay(ctx, key, b)
 	}
 	if kind == "result" {
 		return t.putResult(ctx, key, b)
@@ -234,6 +203,11 @@ func (t diagnosticTx) putResult(ctx context.Context, id string, raw []byte) erro
 }
 func (t diagnosticTx) Orders(ctx context.Context) ([]domain.Order, error) {
 	return t.queryOrders(ctx, "ORDER BY orders.id FOR UPDATE OF orders")
+}
+
+func (t diagnosticTx) SettlementOrdersDue(ctx context.Context, before time.Time) ([]domain.Order, error) {
+	return t.queryOrders(ctx, `WHERE orders.state='SETTLEMENT_LOCKED' AND orders.last_query_at<=$1
+        ORDER BY orders.last_query_at,orders.id LIMIT 20 FOR UPDATE OF orders SKIP LOCKED`, before)
 }
 
 func (t diagnosticTx) Order(ctx context.Context, id string) (domain.Order, error) {
@@ -483,19 +457,16 @@ func (t diagnosticTx) SaveOrder(ctx context.Context, o domain.Order) error {
 			WHERE specimens.order_id=EXCLUDED.order_id AND specimens.sequence=EXCLUDED.sequence AND specimens.barcode=EXCLUDED.barcode`,
 			s.ID, o.ID, s.Sequence, s.State, s.Barcode, s.CollectedAt, s.CollectedBy, s.ReasonCode, s.Version)
 		if e != nil {
+			var constraint *pgconn.PgError
+			if errors.As(e, &constraint) && constraint.Code == "23505" && constraint.ConstraintName == "specimens_barcode_key" {
+				return domain.Fail("STATE_CONFLICT", "Barcode already in use")
+			}
 			return e
 		}
 		if tag.RowsAffected() != 1 {
 			return domain.Fail("STATE_CONFLICT", "Specimen identity, sequence or barcode cannot change")
 		}
-		var prior string
-		e = t.tx.QueryRow(ctx, `INSERT INTO specimen_barcodes(barcode,order_id)VALUES($1,$2)ON CONFLICT(barcode)DO UPDATE SET barcode=EXCLUDED.barcode RETURNING order_id::text`, s.Barcode, o.ID).Scan(&prior)
-		if e != nil {
-			return e
-		}
-		if prior != o.ID {
-			return domain.Fail("STATE_CONFLICT", "Barcode already in use")
-		}
+
 	}
 	return nil
 }
@@ -512,30 +483,22 @@ func (t diagnosticTx) SeenMessage(ctx context.Context, id, hash, leaseID string)
 		return
 	}
 	var prior, status string
-	e = t.tx.QueryRow(ctx, `SELECT payload_hash,status FROM inbox WHERE message_id=$1`, id).Scan(&prior, &status)
+	var scheduledToken *string
+	e = t.tx.QueryRow(ctx, `SELECT payload_hash,status,retry_token::text FROM inbox WHERE message_id=$1`, id).Scan(&prior, &status, &scheduledToken)
 	if errors.Is(e, pgx.ErrNoRows) {
 		return false, nil
 	}
 	if e != nil {
-		return
+		return false, e
 	}
 	if prior != hash {
 		return false, domain.Fail("INVALID_MESSAGE", "Message ID reused with different content")
 	}
-	if status != "RETRY_SCHEDULED" || leaseID == "" {
-		return true, nil
-	}
-	var leased bool
-	e = t.tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM retry_jobs WHERE message_id=$1 AND lease_id=$2 AND lease_until>now() AND status='PENDING')`, id, leaseID).Scan(&leased)
-	if e != nil {
-		return false, e
-	}
-	if !leased {
-		return false, domain.Fail("INVALID_MESSAGE", "Scheduled retry requires its current database lease")
-	}
-	return false, nil
+	// A superseded broker retry is harmless. Only the current token may execute.
+	return status != "RETRY_SCHEDULED" || leaseID == "" || scheduledToken == nil || *scheduledToken != leaseID, nil
 }
+
 func (t diagnosticTx) MarkMessage(ctx context.Context, id, hash string) error {
-	_, e := t.tx.Exec(ctx, `INSERT INTO inbox(message_id,payload_hash)VALUES($1,$2) ON CONFLICT(message_id)DO UPDATE SET status='PROCESSED',processed_at=now() WHERE inbox.payload_hash=EXCLUDED.payload_hash`, id, hash)
+	_, e := t.tx.Exec(ctx, `INSERT INTO inbox(message_id,payload_hash)VALUES($1,$2) ON CONFLICT(message_id)DO UPDATE SET status='PROCESSED',retry_token=NULL,processed_at=now() WHERE inbox.payload_hash=EXCLUDED.payload_hash`, id, hash)
 	return e
 }

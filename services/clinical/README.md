@@ -71,14 +71,14 @@ The worker uses manual ack, prefetch 10, durable DB retries at 5/15/60 seconds p
 ./tools/huy/go.ps1 clinical test ./...
 ./tools/huy/go.ps1 clinical vet ./...
 ./tools/huy/go.ps1 clinical build ./...
-python tools/huy/test_clinical_postgres.py
+python tools/huy/test_postgres.py --service clinical
 python -m pip install -r tools/huy/contract-requirements.txt
 python tools/huy/check_clinical_contract.py .runtime/clinical-http-responses.json
 ```
 
 The native PostgreSQL runner creates a unique `umc_huy_test_clinical_*` database in a task-owned loopback cluster, runs real transaction/HTTP/concurrency tests, exports non-sensitive response fixtures and removes that exact test database. Override PG_BIN/GO_BIN/HUY_TEST_PG_PORT if needed. Unit tests use no broker. To exercise real AMQP mandatory confirms/returns, set TEST_RABBITMQ_URL to an isolated test broker and run `go test -tags=brokerintegration ./internal/adapters/inbound/amqp` from this service. CI also runs both database and broker integration tags.
 
-For the doctor UI, see [Clinical feature](../../apps/web/src/features/clinical/README.md) and [standalone preview](../../tools/clinical-preview/README.md). Actual queue/Gateway/Identity/shell integration requires Quân/Hưng's adapters and is a separate verification gate.
+For the doctor UI and regression tests, see [Clinical feature](../../apps/web/src/features/clinical/README.md). Run the integrated web app from `apps/web` through the shared Gateway. Queue and authorization projections come from Appointment and Identity.
 
 ## Week 3 treatment boundary
 
@@ -97,3 +97,13 @@ CL-011 requires an active Identity/PatientAccess projection and a current CL-011
 The worker binds `catalog.catalog-changed.v1` on `umc.events.catalog.v1` and `diagnostic.lab-order-resolved.v1`, `diagnostic.lab-result-published.v1`, `diagnostic.lab-cancelled.v1` on `umc.events.diagnostic.v1`. It also accepts the old `lab.order-resolved.v1` route while pending deliveries drain. It retains terminal events received before order resolution and emits one `clinical.visit-return-ready.v1` only when all registered LAB requests have reached a terminal state. It also publishes `clinical.visit-signed.v1` / `clinical.prescription-finalized.v1` on `umc.events.clinical.v1`. Foreign exchanges must be provisioned by the shared topology owner.
 
 Verification: `go test ./...`, `go vet ./...`, and `go test -tags=integration ./internal/adapters/outbound/postgres` with TEST_DATABASE_URL restricted to an isolated umc_huy_test* database. Optional CLINICAL_WEEK3_CONTRACT_RESPONSE_FILE captures actual RSA-authenticated HTTP responses. Tests cover unsigned FINAL rejection, immutable FINAL, atomic single signing event, LAB/signing serialization, required leases, multiple LAB requests and patient privacy. Full Appointment/Billing/Pharmacy/Gateway integration remains dependent on those owners' running adapters.
+
+## Local Docker and delivery/cache model
+
+Run `python tools/be/run.py` from the repository root. It starts the entire group project with the existing three owner env files and online databases, RabbitMQ and Redis. Web: http://127.0.0.1:15173; Gateway uses the port in Quân’s env. No replacement credentials, keys or demo database are generated.
+
+The API applies pending migrations at startup only when `MIGRATE_ON_START=1`, then exposes readiness. `/api healthcheck` reuses the binary for Docker health checks. Manual `/migrate` uses the API image with an overridden entrypoint and `--rm`; no separate migrate service is kept. The RabbitMQ worker remains a separate process and waits for API readiness.
+
+Retries are durable RabbitMQ deliveries handed off through outbox, with bounded prefetch and NotBefore/token/attempt validation. Failure handoff goes to RabbitMQ DLQ through outbox. The new runtime does not query retry_jobs or dead_letters. Stop old binaries before applying the broker delivery migration. Legacy orphaned retry inbox entries are preserved as LEGACY_RETRY_ORPHANED DLQ handoffs; when the old job/body is missing, historicalBodyUnavailable is explicit. They are not automatically replayed.
+
+`REDIS_URL` (or native fallback `UMC_REDIS_URL`) configures the shared Redis endpoint. Clinical cache uses `umc:clinical:v1:*`, TTL 15 seconds and a database-derived record version. Current database permissions and authorization leases are checked before every cache read. Redis failure or malformed cached data falls back to PostgreSQL. Draft data, tokens and settlement decisions are never cached.

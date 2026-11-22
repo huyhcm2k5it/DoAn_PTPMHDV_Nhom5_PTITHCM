@@ -111,14 +111,30 @@ func sameID(a, b string) bool {
 }
 func equalFoldASCII(a, b string) bool { return strings.EqualFold(a, b) }
 
+// The existing outbox is the durable handoff to the broker-owned DLQ.
 func (s *Store) QuarantineIdentity(ctx context.Context, messageID, exchange, routingKey, reason string, raw []byte) error {
-	if len(raw) > 1<<20 {
-		raw = raw[:1<<20]
+	sum := sha256.Sum256(raw)
+	hash := hex.EncodeToString(sum[:])
+	if len(messageID) > 128 {
+		messageID = messageID[:128]
 	}
-	if messageID == "" || len(messageID) > 128 {
+	if messageID == "" {
 		messageID = "invalid-envelope"
 	}
-	sum := sha256.Sum256(raw)
-	_, err := s.pool.Exec(ctx, `INSERT INTO catalog_quarantine(message_id,payload_hash,exchange_name,routing_key,reason_code) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`, messageID, hex.EncodeToString(sum[:]), exchange, routingKey, reason)
+	truncated := len(raw) > 1<<20
+	if truncated {
+		raw = raw[:1<<20]
+	}
+	body, err := json.Marshal(map[string]any{"originalMessageId": messageID, "exchange": exchange, "routingKey": routingKey,
+		"reasonCode": reason, "payloadHash": hash, "body": raw, "bodyTruncated": truncated})
+	if err != nil {
+		return err
+	}
+	bodyHash := sha256.Sum256(body)
+	_, err = s.pool.Exec(ctx, `INSERT INTO outbox(message_id,aggregate_id,aggregate_version,message_kind,message_type,
+        producer,destination,routing_key,payload,payload_hash)
+        VALUES(md5($1)::uuid,md5($1)::uuid,1,'EVENT','CatalogQuarantined','catalog',
+            'umc.deadletters.catalog.v1','catalog.quarantine.v1',$2,$3) ON CONFLICT(message_id) DO NOTHING`,
+		"catalog:dead:"+messageID+":"+hash+":"+reason, body, hex.EncodeToString(bodyHash[:]))
 	return err
 }

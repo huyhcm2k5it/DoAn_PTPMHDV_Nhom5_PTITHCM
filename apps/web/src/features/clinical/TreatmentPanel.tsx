@@ -43,7 +43,7 @@ export function TreatmentPanel({
   const [medicines, setMedicines] = useState<TreatmentCatalogMedicine[]>([]);
   const [tests, setTests] = useState<TreatmentCatalogTest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [catalogError, setCatalogError] = useState<unknown>();
+  const [catalogErrors, setCatalogErrors] = useState<string[]>([]);
   const [reload, setReload] = useState(0);
   const [medicineSearch, setMedicineSearch] = useState('');
   const [labSearch, setLabSearch] = useState('');
@@ -109,20 +109,30 @@ export function TreatmentPanel({
     const abort = new AbortController();
     let active = true;
     setLoading(true);
-    setCatalogError(undefined);
-    Promise.all([api.medicines(abort.signal), api.labTests(abort.signal)])
-      .then(([m, t]) => {
-        if (active) {
-          setMedicines(m.filter((x) => x.status === 'ACTIVE'));
-          setTests(t.filter((x) => x.status === 'ACTIVE'));
-        }
-      })
-      .catch((e) => {
-        if (active) setCatalogError(e);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+    setCatalogErrors([]);
+    void Promise.allSettled([
+      api.medicines(abort.signal),
+      api.labTests(abort.signal),
+    ]).then(([medicineResult, testResult]) => {
+      if (!active) return;
+      const errors: string[] = [];
+      if (medicineResult.status === 'fulfilled') {
+        setMedicines(
+          medicineResult.value.filter((item) => item.status === 'ACTIVE'),
+        );
+      } else {
+        setMedicines([]);
+        errors.push('thuốc');
+      }
+      if (testResult.status === 'fulfilled') {
+        setTests(testResult.value.filter((item) => item.status === 'ACTIVE'));
+      } else {
+        setTests([]);
+        errors.push('xét nghiệm');
+      }
+      setCatalogErrors(errors);
+      setLoading(false);
+    });
     return () => {
       active = false;
       abort.abort();
@@ -146,9 +156,7 @@ export function TreatmentPanel({
   }
   function savePrescription() {
     const body = { lines: lines.map((line) => ({ ...line })) };
-    const saved = (result: {
-      prescription: import('./types').Prescription;
-    }) => {
+    const saved = (result: { prescription: Prescription }) => {
       setRxId(result.prescription.id);
       setAcknowledgedRx(result.prescription);
       setLines(result.prescription.lines);
@@ -295,9 +303,9 @@ export function TreatmentPanel({
             )}
           </Notice>
         )}
-        {catalogError !== undefined && (
+        {catalogErrors.length > 0 && (
           <Notice tone="error">
-            Không tải được danh mục.
+            Không tải được danh mục {catalogErrors.join(' và ')}.
             <button type="button" onClick={() => setReload((n) => n + 1)}>
               Tải lại danh mục
             </button>
@@ -442,6 +450,7 @@ export function TreatmentPanel({
               !labAllowed ||
               mutation.locked ||
               loading ||
+              catalogErrors.includes('xét nghiệm') ||
               waitingForRegistry ||
               !selectedTests.length
             }

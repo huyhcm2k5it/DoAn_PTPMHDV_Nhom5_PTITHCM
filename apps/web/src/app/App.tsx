@@ -100,10 +100,39 @@ function formatCurrentDateVi() {
   return `${dayName}, ${date}/${month}/${year}`;
 }
 
+export function homeForSession(session?: WebRuntime['session']) {
+  if (!session) return '/login';
+  if (session.actorType === 'DOCTOR') return '/doctor/clinical';
+  if (session.actorType === 'STAFF') {
+    const destinations = [
+      ['ADMIN', '/staff/summary'],
+      ['RECEPTION', '/staff/reception'],
+      ['LAB_TECH', '/staff/diagnostic'],
+      ['LAB_REVIEW', '/staff/diagnostic'],
+      ['CASHIER', '/staff/cashier'],
+      ['PHARMACY', '/staff/pharmacy'],
+    ];
+    return (
+      destinations.find(([capability]) =>
+        session.capabilities.includes(capability),
+      )?.[1] ?? '/catalog'
+    );
+  }
+  return '/patient/home';
+}
+
 function AppLayout({ session }: { session?: WebRuntime['session'] }) {
   const location = useLocation();
   const pathname = location.pathname;
   const search = location.search;
+  const workspaceLabel: Record<string, string> = {
+    '/doctor/clinical': 'Bác sĩ / Bàn khám',
+    '/doctor/treatment': 'Bác sĩ / Chỉ định & kê đơn',
+    '/staff/diagnostic': 'Xét nghiệm / Hàng chờ & kết quả',
+    '/catalog': 'Danh mục / Dịch vụ & giá',
+    '/patient/lab-results': 'Hồ sơ sức khỏe / Kết quả xét nghiệm',
+    '/patient/medical-records': 'Hồ sơ sức khỏe / Bệnh án & toa đã ký',
+  };
 
   const isHomeActive = pathname === '/' || pathname === '/patient/home';
   const isBookingActive =
@@ -142,7 +171,7 @@ function AppLayout({ session }: { session?: WebRuntime['session'] }) {
   return (
     <div className="app-shell">
       <aside className="app-sidebar" aria-label="Điều hướng">
-        <Link className="brand-section" to="/patient/home">
+        <Link className="brand-section" to={homeForSession(session)}>
           <div className="brand-logo-icon" aria-hidden="true">
             <MedicalCross />
           </div>
@@ -377,7 +406,9 @@ function AppLayout({ session }: { session?: WebRuntime['session'] }) {
 
       <div className="app-main-container">
         <header className="app-header">
-          <span className="header-tagline">Không gian sức khỏe của bạn</span>
+          <span className="header-tagline" aria-label="Vị trí hiện tại">
+            {workspaceLabel[pathname] ?? 'Không gian sức khỏe của bạn'}
+          </span>
           <div className="header-right">
             <span className="header-date">{formatCurrentDateVi()}</span>
             <button
@@ -583,7 +614,10 @@ function AppRoutes({
       <Route path="/forgot-password/reset" element={<ResetPasswordPage />} />
 
       <Route element={<AppLayout session={session} />}>
-        <Route path="/" element={<Navigate to="/patient/home" replace />} />
+        <Route
+          path="/"
+          element={<Navigate to={homeForSession(session)} replace />}
+        />
         <Route
           path="/patient/home"
           element={

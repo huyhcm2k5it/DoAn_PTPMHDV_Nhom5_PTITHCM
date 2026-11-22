@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { FlaskConical, RefreshCw, Search } from 'lucide-react';
-import { diagnosticMessage } from './api';
+import { DiagnosticError, diagnosticMessage } from './api';
 import type {
   DiagnosticApi,
   DiagnosticOrder,
@@ -357,17 +357,33 @@ function Order({
           setError(undefined);
         }
       } catch (e) {
-        if (active) setError(e);
+        if (active) {
+          setError(e);
+          if (
+            e instanceof DiagnosticError &&
+            [401, 403, 404].includes(e.status)
+          ) {
+            setDetail(undefined);
+            active = false;
+            setLoading(false);
+          }
+        }
       } finally {
         if (active && !quiet) setLoading(false);
       }
     }
-    void load();
-    const timer = setInterval(() => void load(true), 5000);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    async function poll() {
+      await load(true);
+      if (active) timer = setTimeout(poll, 5000);
+    }
+    void load().then(() => {
+      if (active) timer = setTimeout(poll, 5000);
+    });
     return () => {
       active = false;
       abort.abort();
-      clearInterval(timer);
+      if (timer) clearTimeout(timer);
     };
   }, [api, id, reload]);
   if (loading && !detail)

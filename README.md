@@ -4,9 +4,20 @@ HQH Care là đồ án 9 microservice. Mỗi service sở hữu database, migrat
 
 | Người phụ trách | Service | Công nghệ |
 | --- | --- | --- |
-| Huy | Catalog, Clinical, Diagnostic | Go, PostgreSQL; Catalog dùng Redis cache |
+| Huy | Catalog, Clinical, Diagnostic | Go, PostgreSQL; ba service dùng Redis cache |
 | Quân | Patient, Appointment, Pharmacy | Node.js CommonJS, MongoDB |
 | Hưng | Identity, Billing, Notification | Django, PostgreSQL |
+
+## Chạy project hiện tại bằng Docker và env nhóm
+
+Dùng đúng `env/quan.env`, `env/huy.env`, `env/hung.env`: ứng dụng chạy trong Docker trên máy; dữ liệu ở MongoDB Atlas, Neon, Aiven; RabbitMQ và Redis dùng endpoint online của nhóm. Không tự tạo project, DB, broker, cache hoặc khóa JWT riêng.
+
+```powershell
+python tools/be/run.py --build
+python tools/be/run.py ps
+```
+
+Web: http://127.0.0.1:15173. Gateway dùng `GATEWAY_HOST_PORT` của Quân (thường 8080). API Huy migrate trước readiness; worker chạy sau khi API đã healthy. Không seed hoặc reset dữ liệu nhóm để khởi động. Xem [hướng dẫn Docker](infra/compose/README.md).
 
 ## GitHub workflow
 

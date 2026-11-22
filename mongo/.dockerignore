@@ -1,0 +1,8 @@
+secrets/
+node_modules/
+.git/
+.env*
+*.pem
+*.key
+*.md
+*.log

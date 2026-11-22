@@ -21,8 +21,8 @@ Các cổng ứng dụng là hợp đồng với Gateway và healthcheck; đổi
 
 ## Giá trị cần điền
 
-1. **Quân:** mỗi `*_MONGO_URI` phải trỏ đúng database của service sở hữu. `UMC_AMQP_URL=amqps://USER:PASSWORD@HOST:PORT/VHOST` là URL broker duy nhất của nhóm. Các biến `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_VHOST`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD` phải khớp URL đó vì service Hưng còn đọc dạng tách trường. `UMC_REDIS_URL=rediss://USER:PASSWORD@HOST:PORT/0` là URL Redis chung; Compose truyền nó cho Appointment và Catalog.
-2. **Huy:** `CATALOG_DATABASE_URL`, `CLINICAL_DATABASE_URL`, `DIAGNOSTIC_DATABASE_URL` trỏ ba database Neon riêng, có `sslmode=require`. Worker Huy nhận RabbitMQ từ `UMC_AMQP_URL`; Catalog API nhận Redis từ `UMC_REDIS_URL`, cả hai do Quân quản lý.
+1. **Quân:** mỗi `*_MONGO_URI` phải trỏ đúng database của service sở hữu. `UMC_AMQP_URL=amqps://USER:PASSWORD@HOST:PORT/VHOST` là URL broker duy nhất của nhóm. Các biến `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_VHOST`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD` phải khớp URL đó vì service Hưng còn đọc dạng tách trường. `UMC_REDIS_URL=rediss://USER:PASSWORD@HOST:PORT/0` là URL Redis chung; Compose truyền nó cho Appointment và cả ba service Huy.
+2. **Huy:** `CATALOG_DATABASE_URL`, `CLINICAL_DATABASE_URL`, `DIAGNOSTIC_DATABASE_URL` trỏ ba database Neon riêng, có `sslmode=require`. Worker Huy nhận RabbitMQ từ `UMC_AMQP_URL`; ba API Huy nhận Redis từ `UMC_REDIS_URL`, cả hai do Quân quản lý.
 3. **Hưng:** giữ các bộ `IDENTITY_DB_*`, `BILLING_DB_*`, `NOTIFICATION_DB_*` của Aiven với `SSLMODE=require` và giữ `DJANGO_SECRET_KEY`. Trong `env/hung.env` trên máy chạy stack, bỏ nhóm `SMS_*` và điền các dòng sau bằng cấu hình SMTP của nhóm.
 
    ```dotenv
@@ -59,8 +59,8 @@ Trước khi bật API và worker bản mới, kiểm tra migration ledger của
 - Mỗi database online đã có schema/migration và dữ liệu demo tương ứng. Mỗi service chỉ truy cập database của mình; không tự chạy seed hoặc migration lên database chung khi chưa thống nhất với owner.
 - CloudAMQP đã có vhost, exchange, queue, binding và ACL cho producer/consumer. Kết nối TLS thành công chưa chứng minh message được phát và nhận.
 - JWT có một cặp khóa chung: Identity ký bằng private key; Gateway và API xác minh bằng public key/JWKS cùng cặp.
-- Redis online cấp quyền đọc/ghi cho hai namespace khóa `umc:appointment:*` và `umc:catalog:v1:*`. Catalog parse `rediss://` và dùng TLS; kiểm quyền của cùng tài khoản trên cả hai namespace trước demo.
+- Redis online cấp quyền đọc/ghi cho `umc:appointment:*`, `umc:catalog:v1:*`, `umc:clinical:v1:*` và `umc:diagnostic:v1:*`. Cả ba service Huy đọc URL `rediss://` dùng chung của Quân; quyền nghiệp vụ vẫn kiểm trong DB.
 
-**Trạng thái Compose:** Redis đã được nối tới URL online của Quân, nhưng `infra/compose/compose.yaml` vẫn khai báo container MongoDB, PostgreSQL và RabbitMQ cùng một số biến khởi tạo của chúng. Ba file mẫu online chưa đủ để chạy Compose đó. Không dùng lệnh `up` từ Compose hiện tại như bằng chứng toàn bộ hạ tầng đã chuyển online. Xem [hướng dẫn triển khai](../infra/compose/README.md) để biết phần còn phải đổi trước khi demo.
+**Trạng thái Compose:** cấu hình chung chỉ chạy 9 API, 9 worker nghiệp vụ, Gateway và web. Database, RabbitMQ và Redis đều lấy từ ba env của nhóm. Không tạo hạ tầng hay seed riêng. Chạy `python tools/be/run.py`; thêm `--build` khi đổi source. Xem [hướng dẫn triển khai](../infra/compose/README.md).
 
 Khi sửa biến kết nối, owner cập nhật đúng file `.env.example`, code/Compose đọc biến và tài liệu này. Ba file `.env` thật chỉ cập nhật trên máy chạy service.

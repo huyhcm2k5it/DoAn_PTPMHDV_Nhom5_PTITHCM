@@ -82,10 +82,17 @@ type Stream interface {
 }
 
 func DeclareOwned(ch *amqp.Channel) error {
-	if err := ch.ExchangeDeclare("umc.events.catalog.v1", "topic", true, false, false, false, nil); err != nil {
-		return err
+	for _, exchange := range []string{"umc.events.catalog.v1", "umc.deadletters.catalog.v1"} {
+		if err := ch.ExchangeDeclare(exchange, "topic", true, false, false, false, nil); err != nil {
+			return err
+		}
 	}
-	if _, err := ch.QueueDeclare("evt.catalog.v1", true, false, false, false, amqp.Table{"x-queue-type": "quorum"}); err != nil {
+	for _, queue := range []string{"evt.catalog.v1", "dlq.catalog.v1"} {
+		if _, err := ch.QueueDeclare(queue, true, false, false, false, amqp.Table{"x-queue-type": "quorum"}); err != nil {
+			return err
+		}
+	}
+	if err := ch.QueueBind("dlq.catalog.v1", "#", "umc.deadletters.catalog.v1", false, nil); err != nil {
 		return err
 	}
 	return ch.QueueBind("evt.catalog.v1", "identity.identity-access-changed.v1", "umc.events.identity.v1", false, nil)

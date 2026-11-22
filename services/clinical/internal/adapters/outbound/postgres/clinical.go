@@ -4,64 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+
 	"github.com/jackc/pgx/v5"
 	"umccare/clinical/internal/application/ports"
 	"umccare/clinical/internal/domain"
-	"umccare/clinical/migrations"
 )
-
-func (p *Probe) Migrate(ctx context.Context) error {
-	tx, e := p.pool.Begin(ctx)
-	if e != nil {
-		return e
-	}
-	defer tx.Rollback(ctx)
-	if _, e = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended('clinical:migrate',0)); CREATE TABLE IF NOT EXISTS schema_migrations(version text PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())`); e != nil {
-		return e
-	}
-	var exists bool
-	if e = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version='000001_clinical')`).Scan(&exists); e != nil {
-		return e
-	}
-	if !exists {
-		b, err := migrations.Files.ReadFile("000001_clinical.up.sql")
-		if err != nil {
-			return err
-		}
-		if _, e = tx.Exec(ctx, string(b)); e != nil {
-			return e
-		}
-		if _, e = tx.Exec(ctx, `INSERT INTO schema_migrations(version)VALUES('000001_clinical')`); e != nil {
-			return e
-		}
-	}
-	if err := migrateTreatment(ctx, tx); err != nil {
-		return err
-	}
-	if err := migrateCatalogStream(ctx, tx); err != nil {
-		return err
-	}
-	if err := migrateLabTerminal(ctx, tx); err != nil {
-		return err
-	}
-	if err := migrateLabResubmit(ctx, tx); err != nil {
-		return err
-	}
-	if err := migrateVisitGrants(ctx, tx); err != nil {
-		return err
-	}
-	if err := migrateTreatmentNormalization(ctx, tx); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
-}
-func (p *Probe) BusinessReady(ctx context.Context) error {
-	var ok bool
-	if e := p.pool.QueryRow(ctx, `SELECT count(*)=7 FROM schema_migrations WHERE version IN ('000001_clinical','000002_treatment','000003_catalog_stream','000004_lab_terminal','000005_lab_resubmit','000006_visit_grants','000007_treatment_normalization')`).Scan(&ok); e != nil || !ok {
-		return domain.Fail("SERVICE_UNAVAILABLE", "Clinical migrations are required")
-	}
-	return nil
-}
 
 type clinicalTx struct{ tx pgx.Tx }
 
@@ -78,9 +25,6 @@ func (p *Probe) Within(ctx context.Context, lock string, fn func(ports.ClinicalT
 	}
 	if e = fn(clinicalTx{tx}); e != nil {
 		return e
-	}
-	if err := migrateLabResubmit(ctx, tx); err != nil {
-		return err
 	}
 	return tx.Commit(ctx)
 }
@@ -241,31 +185,23 @@ func (t clinicalTx) SeenMessage(ctx context.Context, id, hash, leaseID string) (
 		return
 	}
 	var prior, status string
-	e = t.tx.QueryRow(ctx, `SELECT payload_hash,status FROM inbox WHERE message_id=$1`, id).Scan(&prior, &status)
+	var scheduledToken *string
+	e = t.tx.QueryRow(ctx, `SELECT payload_hash,status,retry_token::text FROM inbox WHERE message_id=$1`, id).Scan(&prior, &status, &scheduledToken)
 	if errors.Is(e, pgx.ErrNoRows) {
 		return false, nil
 	}
 	if e != nil {
-		return
+		return false, e
 	}
 	if prior != hash {
 		return false, domain.Fail("INVALID_MESSAGE", "Message ID reused with different content")
 	}
-	if status != "RETRY_SCHEDULED" || leaseID == "" {
-		return true, nil
-	}
-	var leased bool
-	e = t.tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM retry_jobs WHERE message_id=$1 AND lease_id=$2 AND lease_until>now() AND status='PENDING')`, id, leaseID).Scan(&leased)
-	if e != nil {
-		return false, e
-	}
-	if !leased {
-		return false, domain.Fail("INVALID_MESSAGE", "Scheduled retry requires its current database lease")
-	}
-	return false, nil
+	// A superseded broker retry is harmless. Only the current token may execute.
+	return status != "RETRY_SCHEDULED" || leaseID == "" || scheduledToken == nil || *scheduledToken != leaseID, nil
 }
+
 func (t clinicalTx) MarkMessage(ctx context.Context, id, hash string) error {
-	_, e := t.tx.Exec(ctx, `INSERT INTO inbox(message_id,payload_hash)VALUES($1,$2) ON CONFLICT(message_id)DO UPDATE SET status='PROCESSED',processed_at=now() WHERE inbox.payload_hash=EXCLUDED.payload_hash`, id, hash)
+	_, e := t.tx.Exec(ctx, `INSERT INTO inbox(message_id,payload_hash)VALUES($1,$2) ON CONFLICT(message_id)DO UPDATE SET status='PROCESSED',retry_token=NULL,processed_at=now() WHERE inbox.payload_hash=EXCLUDED.payload_hash`, id, hash)
 	return e
 }
 func (t clinicalTx) UpdateAccess(ctx context.Context, a domain.Access, version int) error {
@@ -299,20 +235,4 @@ func (t clinicalTx) UpdatePatientAccess(ctx context.Context, a domain.PatientAcc
 		return domain.Fail("INVALID_MESSAGE", "Patient access projection version has conflicting content")
 	}
 	return nil
-}
-
-func migrateLabResubmit(ctx context.Context, tx pgx.Tx) error {
-	var exists bool
-	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version='000005_lab_resubmit')`).Scan(&exists); err != nil || exists {
-		return err
-	}
-	raw, err := migrations.Files.ReadFile("000005_lab_resubmit.up.sql")
-	if err != nil {
-		return err
-	}
-	if _, err = tx.Exec(ctx, string(raw)); err != nil {
-		return err
-	}
-	_, err = tx.Exec(ctx, `INSERT INTO schema_migrations(version) VALUES('000005_lab_resubmit')`)
-	return err
 }

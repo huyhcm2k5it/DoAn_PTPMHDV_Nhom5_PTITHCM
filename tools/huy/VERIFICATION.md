@@ -1,95 +1,45 @@
-# Week 3 verification (2026-11-04)
+# Kiểm chứng phần Huy — 22/11/2026
 
-Scope: CL-005–010, DI-002–006 and doctor/LAB technical features. Baseline synced to develop8259293; other owners files are unchanged by this increment.
+Checkout hiện tại, nhánh `huy_task`. Báo cáo này phân biệt kết quả chạy thật với các bước chưa nghiệm thu; không thay cho xác nhận triển khai online.
 
-- Clinical native PostgreSQL:13/13 PASS, including real RSA HTTP, immutable prescriptions, signing versus LAB creation, multiple registry requests, envelope binding, actualoutbox command, and lease expiry while blocked on a DB lock.
-- Diagnostic native PostgreSQL:6/6 PASS, zero skipped. Includes real Clinical command consumption, five HTTP operations, dedupe/sample concurrency, monotonic bootstrap/live projections, Catalog gap/catchup, persistent reserve replay and withdrawn prices.
-- Clinical and Diagnostic unit tests, go vet and go build PASS. Hexagonal dependency guard PASS.
-- Web20/20 interaction tests, TypeScript and Vite production build PASS. Run the standalone runner with vitest threads/maxWorkers1 on this Windows machine.
-- Actual PostgreSQL/RSA HTTP fixtures validated against OpenAPI; real Clinical command validated against shared message schema. Generated schemas reproduce exactly; workflow and own Compose YAML parse successfully.
-- Review regressions observed RED then GREEN: wrong aggregate IDs, mismatched lab resolution context, expired signing lease after locking, stale bootstrap overriding live rights, withdrawn prices, unstable reserve replies, and Catalog sequence gap permitting stale quotes.
+## Đã kiểm qua trên phiên bản đang sửa
 
-Commands: tools/huy/test_clinical_postgres.py; tools/huy/test_diagnostic_postgres.py; tools/huy/go.ps1 <clinical|diagnostic> test -count=1 ./... / vet ./... / build ./...; tools/huy/check_clinical_contract.py and check_diagnostic_contract.py with captured fixtures; tools/huy/check_architecture.py. Local logs/fixtures are ignored under .runtime.
-
-Local Docker daemon was unavailable: real RabbitMQ execution is a CI gate, not a locally verified result. CI captures a Clinical command from a separate database and requires Diagnostic to consume it. The shared Gate3 additionally needs live Identity/Appointment/Billing/Gateway and full Catalog entity/checkpoint feeds; trusted operator bootstrap is provisional and must not be mistaken for live production integration. No payment or acceptedclaim is fabricated by production code.
-
----
-
-# Kiểm chứng bàn giao Catalog và Clinical
-
-## Clinical tuần 2 — 31/10/2026
-
-Đã triển khai CL-001–004, migration PostgreSQL, xử lý ClaimQueueTicket/QueueTicketClaimed, projection quyền, outbox/inbox/retry/quarantine và feature bàn khám. [README Clinical](../../services/clinical/README.md) ghi lệnh chạy; [hợp đồng bàn giao](../../contracts/http/clinical-integration.md) ghi ranh giới cần ghép với Quân/Hưng.
-
-| Kiểm tra đã chạy | Kết quả |
+| Tầng | Bằng chứng |
 | --- | --- |
-| `go test -count=1 ./...`, `go vet ./...`, `go build ./...` trong Clinical | PASS |
-| `python tools/huy/test_clinical_postgres.py` | PASS 7 test với PostgreSQL 18 thật, database test riêng được dọn sau chạy |
-| HTTP dùng RSA JWT thật và PostgreSQL; kiểm phản hồi bằng OpenAPI | PASS cả 4 operation và error envelope |
-| `npm test`, `npm run build` trong `tools/clinical-preview` | PASS 8 test và build TypeScript/Vite |
-| Sinh lại contract và so hash; kiểm YAML workflow | PASS, không có contract drift |
-| Guard hướng import domain/application | PASS |
-| Compile test tag `brokerintegration` | PASS; không tính là đã chạy broker thật |
+| Go | Unit test và `go vet ./...` của Catalog, Clinical, Diagnostic PASS. Kiểm hướng import domain/application PASS. |
+| PostgreSQL 18 thật | Ba suite integration PASS trên DB test biệt lập. Bao gồm dữ liệu nhóm, migration cũ → mới, đồng thời, quyền bị thu hồi, giá, toa, LAB, hoàn và cache kết quả. DB của từng suite được dọn sau chạy. |
+| Message qua hai service | Clinical tạo command LAB thật → Diagnostic xử lý PASS. Diagnostic phát event kết quả công bố thật → Clinical xử lý PASS. Đây là kiểm hợp đồng với outbox và DB thật, chưa phải toàn hành trình qua Gateway. |
+| RabbitMQ 4.3.6 thật | Clinical/Diagnostic PASS publisher confirm, mandatory return và retry qua consumer restart với NotBefore/token/body giữ nguyên. Vhost test riêng được xóa sau suite. |
+| Redis 7.4 thật | Cả ba service PASS đọc/ghi bằng account riêng và ACL từ chối namespace ngoài owner. Clinical/Diagnostic kiểm TTL; Catalog kiểm đổi generation. |
+| HTTP/OpenAPI | Response HTTP thực dùng PostgreSQL/RSA của cả ba service khớp schema OpenAPI; kiểm input lỗi và error envelope PASS. |
+| Web | 14 file / 86 test PASS; production build PASS. Test Catalog/Clinical đã chuyển vào runner web chung. |
+| Cấu hình local | 23 test Python PASS cho topology, env cách ly, port, DB, Redis namespace, khóa JWT và thứ tự seed/start. |
 
-Các ca quan trọng gồm: start PENDING chưa tạo visit; 8 delivery claim lặp chỉ một visit; RETURN dùng lại visit; claim REJECTED không tạo visit; 6 writer cùng version chỉ một bản nháp được ghi; rollback khi outbox lỗi; bệnh nhân không đọc nháp; thu hồi quyền; cùng UUID khác chữ hoa/thường nhập lại không xung đột; message đã RETRY_SCHEDULED không chạy lại từ delivery gốc.
+Log và fixture sinh ra nằm trong `.runtime/`, ngoài Git. Container test middleware dùng `--rm`; volume cache/vhost tạm tự dọn. Không dùng credential online để chạy các suite trên.
 
-Review độc lập tìm 2 lỗi P2: giữ ý định nhận vé cũ sau lỗi 409 và delivery gốc vượt lịch retry. Đã có test tái hiện FAIL rồi PASS cho cả hai. Giao diện cũng giữ nguyên body/key khi lỗi mạng chưa xác định kết quả và giữ nháp khi nhận 409.
+## Các thay đổi cần triển khai đồng bộ
 
-**Giới hạn tích hợp:** Docker daemon local chưa sẵn sàng, nên chưa chạy RabbitMQ/Compose thật. CI đã có broker integration job nhưng chỉ được tính PASS khi có kết quả trên commit GitHub. Feed vé đáng tin cậy của Appointment, consumer claim, shared shell và Gateway/Identity live cần Quân/Hưng ghép và kiểm. Importer vé là đầu nối nội bộ tạm thời, thiếu dữ liệu thì API chặn; không tạo claim thành công giả. Clinical phân biệt doctorId của Catalog với doctorUserId của JWT qua projection đã xác thực.
+- Catalog migration `000005`, Clinical `000008`, Diagnostic `000004` chuyển retry/DLQ sang RabbitMQ qua outbox; bỏ tổng cộng sáu bảng sau khi bảo toàn dữ liệu cần chuyển.
+- Diagnostic replay chuyển vào `idempotency_records`; ràng buộc unique trên barcode thay registry phụ.
+- Redis phục vụ read cache của cả ba API. DB vẫn quyết định quyền, trạng thái và dữ liệu nghiệp vụ; Redis lỗi thì đọc DB.
+- API Huy trong Compose tự migrate trước readiness. Worker chờ API healthy. Không còn service `*-migrate` riêng; migrate là lệnh bên trong image API và được chạy trước readiness.
+- Đã bỏ preview/Compose/launcher và runner PostgreSQL trùng. Giữ test hồi quy có giá trị trong service/web hiện dùng.
+- Mỗi service Node có build context riêng; adapter Mongo là named context dùng chung. Không quét cả checkout/cache. Mỗi context chặn dependency, env và PEM; Dockerfile từng service vẫn được giữ.
 
-Log và response fixture local nằm trong `.runtime/clinical-postgres-integration.log` và `.runtime/clinical-http-responses.json`, không đưa vào Git. Phần dưới lưu bằng chứng Catalog trước đây theo đúng thời điểm chạy.
+## Kết quả chạy project thật của nhóm
 
-## Catalog — kiểm chứng ngày 22/10/2026
+- Một Compose duy nhất: 9 API, 9 worker nghiệp vụ, Gateway và web, dùng ba env hiện có. Không còn hạ tầng hoặc migrate container riêng.
+- Toàn bộ stack đã khởi động bằng `python tools/be/run.py`. 9 API, Gateway và web healthy; các worker đang chạy.
+- Đăng nhập PATIENT, DOCTOR và STAFF qua địa chỉ web đều 200, nhận JWT thật; session và API bảo vệ của từng vai trò đều 200.
+- Web → Nginx → Gateway → Catalog trả 200 với 9 khoa thật. Đã sửa HTTP/1.0 upstream khiến proxy trả 426.
+- Redis online dùng chung PING trả PONG. RabbitMQ online có consumer Clinical/Diagnostic/command/retry; Clinical queue đã rỗng ở thời điểm kiểm.
+- Neon đã áp migration Catalog 5, Clinical 8, Diagnostic 4: tổng 43 bảng. 24 inbox retry cũ thiếu pending job đã được giữ dấu vết trong outbox DLQ, không tự dựng lại payload đã mất.
+- Diagnostic còn backlog lịch sử cần xử lý. Sau khi giới hạn handler retry chạy tuần tự và thu hẹp reconcile, lượt theo dõi mới thấy worker nhận CatalogChanged/VisitDoctorGrantChanged liên tục, không còn timeout trong đoạn log cuối hơn hai phút. Cần tiếp tục theo dõi đến khi backlog đồng bộ xong.
+- Clinical medical-records và Diagnostic published-results qua web với JWT + lease thật đều đã trả 200 sau bản sửa worker. Hồ sơ Clinical được thử chưa có bản ghi; chưa được đánh dấu nghiệm thu trọn ca LAB.
+- Chưa nghiệm thu trọn hành trình đặt lịch → thanh toán → LAB → cấp thuốc. Health và login thành công không thay cho kết quả đó.
+- Đã đồng bộ `develop` tại `c345c99` vào `huy_task` rồi đẩy lên GitHub. Sau merge: unit test và go vet ba service PASS; 23 test Python, 86 test web, typecheck/production build, kiểm kiến trúc và ba OpenAPI PASS. Kết quả chạy thật ở trên thuộc lượt kiểm trước merge; chưa chạy lại toàn hành trình nhóm sau merge.
+- Compose chỉ chạy 9 API, 9 worker, Gateway và web. Cả 9 DB, RabbitMQ, Redis lấy host online từ ba env nhóm; thiếu cấu hình RabbitMQ online thì dừng, không fallback local.
 
-**Cập nhật 24/10/2026:** Huy đã yêu cầu commit, đẩy nhánh `huy` và gộp vào `develop`. Các ghi chú “chưa commit/push” bên dưới mô tả trạng thái tại lượt kiểm chứng ngày 22/10. Trước lần tích hợp này, đã chạy lại Go vet/test/build cả ba service, 13 test web + build và test PostgreSQL thật; trạng thái Git sau tích hợp xem trong lịch sử repository.
+## Chạy đúng project nhóm
 
-Nhánh `huy`, base `develop` commit `9ab152e97748e4395e721fe3c5cc46d9faf4a56e`. Source đang nằm trong working tree, **chưa commit/push**. Các tài liệu Word có sẵn được giữ nguyên. Không triển khai Gateway hoặc sửa code service của thành viên khác.
-
-## Đã chạy thật
-
-| Kiểm tra | Kết quả |
-| --- | --- |
-| Go vet, unit tests, build riêng Catalog/Clinical/Diagnostic | PASS cả ba module |
-| PostgreSQL 18 native, DB/cluster test riêng | PASS; migration, seed chạy lặp, giá null, concurrent create/overlap, rollback khi outbox lỗi, revoke quyền |
-| Cả 6 HTTP operation qua Echo + PostgreSQL + RSA JWT/lease test | PASS; public/protected/400/401/403/201/replay |
-| UUID key/actor khác chữ hoa/thường; body khác nhưng cùng UUID key | PASS với barrier khóa row để tái hiện race thật |
-| Timestamp giá sub-microsecond | Trả 400 trước persistence; read-back/boundary microsecond đúng |
-| OpenAPI 3.1.1, 6 operationId, request hợp lệ + 5 request sai | PASS |
-| Schema của 6 response HTTP thật + error envelope | PASS |
-| React/Vitest | 13 test PASS; loading/empty/error/401/403, stale request, quyền, callback, money/time validation, double submit, giữ key khi retry/đổi transport/qua mốc hiệu lực |
-| TypeScript + Vite production build | PASS |
-| npm ci theo lockfile | PASS; audit tại thời điểm chạy không báo vulnerability |
-| Hexagonal import direction; Go fmt; Prettier | PASS |
-| Binary API Linux amd64, CGO=0 | Cả ba đã build thành công; Docker image/runtime chưa được kiểm bằng kết quả này |
-| Compose config | PASS; không tạo container |
-| Workflow YAML và ví dụ role/DSN | Đã kiểm; CI có job DB thật và kiểm response theo schema |
-
-Lệnh chạy lại nằm trong `services/catalog/README.md` và `tools/catalog-preview/README.md`. Log tạm trong `.runtime/postgres-integration.log`; response test thật `.runtime/catalog-http-responses.json`. Đây là dữ liệu test, không commit. Test DB đã được xóa và cluster do tác vụ khởi động đã dừng.
-
-## Review và sửa
-
-Đã có một lượt review toàn bộ source trong context độc lập, chỉ đọc. Reviewer tìm ba lỗi Important, ba lỗi ban đầu xếp Minor; không có Critical. Author đánh giá lại tác động thực tế và sửa trong một lượt:
-
-1. Đổi lease/transport làm unmount form, mất body/key/success: test qua CatalogPage đã tái hiện FAIL, sửa rồi PASS. Preview dùng transport ổn định, lấy credential mới nhất; đổi subject sẽ reset feature.
-2. Retry nguyên request sau mốc 5 phút bị chặn tại UI: hai case đã/ chưa tới server tái hiện FAIL → PASS. Giữ key và cho server kiểm replay; body mới vẫn phải thỏa điều kiện tương lai.
-3. UUID hoa/thường bypass advisory lock: ba case đồng thời tái hiện overlap/unique error → chuẩn hóa lock ID → PASS.
-4. Precision gây 503/khác thời gian lưu: nâng Important vì ảnh hưởng hợp đồng ghi giá; domain tests from/to FAIL → PASS khi trả validation 400. HTTP/DB boundary kiểm thêm.
-5. Ví dụ DSN dùng role không được tạo: nâng Important vì ngăn chạy native theo hướng dẫn; sửa khớp local init và so lại cả ba role.
-6. CI thiếu kiểm response thật: nâng Important vì nhóm dựa vào contract gate để ghép service; thêm emit/validate fixtures trong job integration, dùng cùng lệnh đã PASS local.
-
-Không còn finding đã biết trong lượt review bị bỏ lại chưa xử lý. Không có lượt review thứ hai; các sửa được kiểm bằng test/lệnh thực tế. Điều này không có nghĩa toàn hệ thống đã tích hợp hoặc được chứng nhận chạy production.
-
-## Các quyết định triển khai và tác động
-
-- Làm trong checkout hiện tại trên đúng nhánh user yêu cầu `huy`, giữ local. Không tạo worktree khác. Tác động: source chưa commit đi cùng working tree; xem `git status` trước khi đổi branch. Không merge/push nếu chưa có yêu cầu.
-- OpenAPI dùng JSON thay tên YAML trong draft plan. Cùng chuẩn 3.1.1; tác động nếu nhóm trỏ file YAML cũ: cập nhật đường dẫn tool/owner handoff.
-- Giá dùng khoảng `[từ,đến)`, không tự cắt giá cũ, không có giá trả null; timestamp ghi giá giới hạn microsecond. Tác động: ADMIN phải chọn khoảng không chồng; client có timestamp chính xác hơn cần giảm precision trước khi gửi.
-- Claim/header JWT/lease là contract nối tạm được mô tả trong `catalog-integration.md`; xác minh chữ ký và quyền fail closed. Tác động: Hưng cần thống nhất key/issuer/audience/lease/projection trước khi demo protected live.
-- W03 là feature inject vào shell/client, preview riêng chỉ dành phát triển. Tác động: owner phải ghép route/callback/shared transport, không dùng panel token preview làm login sản phẩm.
-- Gateway, Identity live, shell và projection delivery là gate tích hợp bên ngoài phạm vi code độc lập đã được user cho phép. Tác động: chưa chứng minh login → hồ sơ → danh mục → slot.
-- RabbitMQ worker/inbox/checkpoint/Redis và nghiệp vụ Clinical/Diagnostic giữ lịch các tuần sau. Tác động: outbox vẫn PENDING, health không chứng minh xong khám/LAB. Chưa có consumer nhận giá thật.
-- Docker runtime, GitHub CI online, viewport/keyboard trên browser chưa chạy; reviewer cũng không chạy lại test trong review chỉ đọc. Tác động: cần kiểm trên môi trường ghép trước demo; kết quả local ở trên do author thực thi, không được thay cho các gate chưa chạy.
-
-## Chưa thể tính hoàn tất tích hợp tuần
-
-Docker engine phải hoạt động để thử build/start Compose. Nhóm phải ghép Gateway/Identity/shell/client và demo luồng liên service. Kiểm browser thực tế 360/768/1440px, điều hướng bàn phím và CI online sau khi được phép push. Không có nhánh/code nào được đưa lên GitHub trong lần này.
+Xem [hướng dẫn Docker](../../infra/compose/README.md). Dùng đúng `env/quan.env`, `env/huy.env`, `env/hung.env`; không chạy launcher test riêng để thay môi trường của nhóm. Không seed/reset dữ liệu online khi khởi động. Web Docker: http://127.0.0.1:15173; Gateway dùng GATEWAY_HOST_PORT của Quân.

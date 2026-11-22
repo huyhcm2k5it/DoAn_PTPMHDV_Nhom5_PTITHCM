@@ -1,4 +1,7 @@
+import { homeForSession } from '../src/app/App';
 import React from 'react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { ClinicalRoute } from '../src/features/clinical/ClinicalRoute';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   cleanup,
@@ -10,9 +13,13 @@ import {
 } from '@testing-library/react';
 import { TreatmentPanel } from '../src/features/clinical/TreatmentPanel';
 import { ResultEditor } from '../src/features/diagnostic/ResultEditor';
+import { DiagnosticFeature } from '../src/features/diagnostic/DiagnosticFeature';
 import { DraftEditor } from '../src/features/clinical/DraftEditor';
 import { ClinicalFeature } from '../src/features/clinical/ClinicalFeature';
-import { createDiagnosticApi } from '../src/features/diagnostic/api';
+import {
+  createDiagnosticApi,
+  DiagnosticError,
+} from '../src/features/diagnostic/api';
 import { ApiError } from '../src/features/clinical/api';
 import type {
   ClinicalApi,
@@ -90,7 +97,11 @@ it('requires an explicit visit selection when opening the treatment route withou
   );
   await screen.findByRole('button', { name: 'Mở lượt visit' });
   expect(api.detail).not.toHaveBeenCalled();
-  expect(screen.getByText('Chọn một lượt khám để xem bệnh án.')).toBeTruthy();
+  expect(
+    screen.getByRole('heading', {
+      name: 'Chọn lượt khám để chỉ định và kê đơn',
+    }),
+  ).toBeTruthy();
 });
 it('reloads the same visit after Appointment accepts its return ticket', async () => {
   const operation = {
@@ -164,6 +175,98 @@ function treatment(): ClinicalTreatmentApi {
     }),
   };
 }
+
+it('keeps medicine selection available when the LAB catalog fails', async () => {
+  const api = treatment();
+  vi.mocked(api.labTests).mockRejectedValue(
+    new Error('LAB catalog unavailable'),
+  );
+  render(<TreatmentPanel api={api} detail={detail} onChanged={vi.fn()} />);
+  await screen.findByText('Không tải được danh mục xét nghiệm.');
+  fireEvent.change(
+    screen.getByPlaceholderText('Nhập tên hoặc mã thuốc để thêm vào đơn…'),
+    { target: { value: 'Para' } },
+  );
+  expect(
+    await screen.findByRole('button', { name: /Paracetamol/ }),
+  ).toBeTruthy();
+  expect(api.requestLab).not.toHaveBeenCalled();
+});
+
+it('keeps the acknowledged draft version while the parent still holds older data', async () => {
+  const api: ClinicalApi = {
+    worklist: vi.fn(),
+    start: vi.fn(),
+    detail: vi.fn(),
+    saveDraft: vi.fn().mockResolvedValue({
+      visitId: detail.visit.id,
+      version: 3,
+      state: 'IN_PROGRESS',
+    }),
+  };
+  render(
+    <DraftEditor
+      api={api}
+      detail={detail}
+      onDirty={vi.fn()}
+      onContinue={vi.fn()}
+      onReload={vi.fn()}
+      onSaved={vi.fn()}
+    />,
+  );
+  const diagnosis = screen.getByLabelText('Chẩn đoán');
+  fireEvent.change(diagnosis, { target: { value: 'Chẩn đoán đã lưu mới' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Lưu nháp' }));
+  await screen.findByText('Đã lưu bệnh án nháp.');
+  expect((diagnosis as HTMLTextAreaElement).value).toBe('Chẩn đoán đã lưu mới');
+  fireEvent.click(screen.getByRole('button', { name: 'Lưu nháp' }));
+  await waitFor(() => expect(api.saveDraft).toHaveBeenCalledTimes(2));
+  expect(vi.mocked(api.saveDraft).mock.calls[1][1].expectedVersion).toBe(3);
+});
+
+it('removes previously loaded LAB details when refreshing returns revoked access', async () => {
+  const order: DiagnosticOrder = {
+    id: 'order-revoked',
+    visitId: 'visit',
+    patientId: 'patient',
+    doctorId: 'doctor',
+    state: 'PENDING_PAYMENT',
+    version: 1,
+    chargeState: 'CREATED',
+    tests: [{ testId: 'test', code: 'CBC', name: 'Huyết học', revision: 1 }],
+  };
+  const api: DiagnosticApi = {
+    list: vi.fn().mockResolvedValue({ items: [order], total: 1 }),
+    detail: vi
+      .fn()
+      .mockResolvedValueOnce({ order, specimens: [], results: [] })
+      .mockRejectedValue(
+        new DiagnosticError(403, 'FORBIDDEN', 'Access revoked'),
+      ),
+    collect: vi.fn(),
+    reject: vi.fn(),
+    recollect: vi.fn(),
+  };
+  render(
+    <DiagnosticFeature
+      api={api}
+      session={{
+        userId: 'lab',
+        actorType: 'STAFF',
+        capabilities: ['LAB_TECH'],
+      }}
+    />,
+  );
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Kiểm tra thanh toán' }),
+  );
+  await waitFor(() => expect(api.detail).toHaveBeenCalledTimes(2));
+  await waitFor(() => {
+    expect(
+      screen.queryByRole('region', { name: 'Chi tiết xét nghiệm' }),
+    ).toBeNull();
+  });
+});
 it.each(['PENDING', 'CREATED', 'REJECTED'])(
   'blocks signing when LAB remains %s',
   async (state) => {
@@ -516,4 +619,82 @@ it('attaches the right lease for each protected Diagnostic action without changi
       'X-Authorization-Lease',
     ),
   ).toBe(false);
+});
+
+it('keeps the doctor route and workspace in sync when returning from an empty treatment screen', async () => {
+  const api = {
+    worklist: vi
+      .fn()
+      .mockResolvedValue({ items: [], total: 0, startRequest: null }),
+    detail: vi.fn(),
+    start: vi.fn(),
+    saveDraft: vi.fn(),
+  } as ClinicalApi;
+  function Location() {
+    return (
+      <output data-testid="doctor-location">{useLocation().pathname}</output>
+    );
+  }
+  const props = {
+    api,
+    diagnosticApi: {} as DiagnosticApi,
+    session: { userId: 'doctor', actorType: 'DOCTOR' as const },
+  };
+  render(
+    <MemoryRouter initialEntries={['/doctor/treatment']}>
+      <Location />
+      <Routes>
+        <Route
+          path="/doctor/treatment"
+          element={<ClinicalRoute {...props} view="treatment" />}
+        />
+        <Route
+          path="/doctor/clinical"
+          element={<ClinicalRoute {...props} view="exam" />}
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
+  await screen.findByRole('heading', {
+    name: 'Chọn lượt khám để chỉ định và kê đơn',
+  });
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Về bàn khám để chọn lượt' }),
+  );
+  await waitFor(() =>
+    expect(screen.getByTestId('doctor-location').textContent).toBe(
+      '/doctor/clinical',
+    ),
+  );
+  expect(
+    screen.getByRole('heading', { name: 'Bàn khám bác sĩ', level: 1 }),
+  ).toBeTruthy();
+  expect(api.start).not.toHaveBeenCalled();
+});
+
+it('returns each actor to their own workspace instead of the patient portal', () => {
+  expect(
+    homeForSession({ userId: 'doctor', actorType: 'DOCTOR', capabilities: [] }),
+  ).toBe('/doctor/clinical');
+  expect(
+    homeForSession({
+      userId: 'patient',
+      actorType: 'PATIENT',
+      capabilities: [],
+    }),
+  ).toBe('/patient/home');
+  expect(
+    homeForSession({
+      userId: 'lab',
+      actorType: 'STAFF',
+      capabilities: ['LAB_TECH'],
+    }),
+  ).toBe('/staff/diagnostic');
+  expect(
+    homeForSession({
+      userId: 'admin',
+      actorType: 'STAFF',
+      capabilities: ['ADMIN', 'LAB_TECH'],
+    }),
+  ).toBe('/staff/summary');
 });

@@ -49,56 +49,63 @@ func (s *Service) PublishedResults(ctx context.Context, p domain.Principal, pati
 		if !patient.Active || (p.ActorType == "PATIENT" && domain.ID(patient.OwnerUserID) != domain.ID(p.UserID)) {
 			return domain.Fail("NOT_FOUND", "Patient not found")
 		}
-		if p.ActorType == "DOCTOR" {
-			out, e = doctorReader.PublishedResultsForDoctor(ctx, domain.ID(patientID), domain.ID(p.UserID), page, limit, s.now())
-			if e != nil {
-				return e
-			}
-		} else if reader, ok := t.(ports.PublishedResultsRecords); ok {
-			out, e = reader.PublishedResultsForPatient(ctx, domain.ID(patientID), page, limit)
-			if e != nil {
-				return e
-			}
-		} else {
-			orders, orderErr := t.Orders(ctx)
-			if orderErr != nil {
-				return orderErr
-			}
-			for _, order := range orders {
-				if domain.ID(order.PatientID) != domain.ID(patientID) {
-					continue
+		e = s.readRecordsCached(ctx, t, p, patientID, page, limit, &out, func() error {
+			if p.ActorType == "DOCTOR" {
+				out, e = doctorReader.PublishedResultsForDoctor(ctx, domain.ID(patientID), domain.ID(p.UserID), page, limit, s.now())
+				if e != nil {
+					return e
 				}
-				var resultID string
-				if orderErr = load(ctx, t, "result-order", order.ID, &resultID); domain.Code(orderErr) == "NOT_FOUND" {
-					continue
-				} else if orderErr != nil {
+			} else if reader, ok := t.(ports.PublishedResultsRecords); ok {
+				out, e = reader.PublishedResultsForPatient(ctx, domain.ID(patientID), page, limit)
+				if e != nil {
+					return e
+				}
+			} else {
+				orders, orderErr := t.Orders(ctx)
+				if orderErr != nil {
 					return orderErr
 				}
-				var record resultRecord
-				if orderErr = load(ctx, t, "result", domain.ID(resultID), &record); orderErr != nil {
-					return orderErr
+				for _, order := range orders {
+					if domain.ID(order.PatientID) != domain.ID(patientID) {
+						continue
+					}
+					var resultID string
+					if orderErr = load(ctx, t, "result-order", order.ID, &resultID); domain.Code(orderErr) == "NOT_FOUND" {
+						continue
+					} else if orderErr != nil {
+						return orderErr
+					}
+					var record resultRecord
+					if orderErr = load(ctx, t, "result", domain.ID(resultID), &record); orderErr != nil {
+						return orderErr
+					}
+					if record.Result.State == "PUBLISHED" && record.Result.PublishedAt != nil && record.Result.OrderID == order.ID {
+						out.Items = append(out.Items, record.Result)
+					}
 				}
-				if record.Result.State == "PUBLISHED" && record.Result.PublishedAt != nil && record.Result.OrderID == order.ID {
-					out.Items = append(out.Items, record.Result)
+				sort.Slice(out.Items, func(i, j int) bool {
+					if out.Items[i].PublishedAt.Equal(*out.Items[j].PublishedAt) {
+						return out.Items[i].ID > out.Items[j].ID
+					}
+					return out.Items[i].PublishedAt.After(*out.Items[j].PublishedAt)
+				})
+				out.Total = len(out.Items)
+				start := (page - 1) * limit
+				if start > out.Total {
+					start = out.Total
 				}
-			}
-			sort.Slice(out.Items, func(i, j int) bool {
-				if out.Items[i].PublishedAt.Equal(*out.Items[j].PublishedAt) {
-					return out.Items[i].ID > out.Items[j].ID
+				end := start + limit
+				if end > out.Total {
+					end = out.Total
 				}
-				return out.Items[i].PublishedAt.After(*out.Items[j].PublishedAt)
-			})
-			out.Total = len(out.Items)
-			start := (page - 1) * limit
-			if start > out.Total {
-				start = out.Total
+				out.Items = out.Items[start:end]
 			}
-			end := start + limit
-			if end > out.Total {
-				end = out.Total
-			}
-			out.Items = out.Items[start:end]
+			return nil
+		})
+		if e != nil {
+			return e
 		}
+
 		if !p.LeaseExpiresAt.After(s.now()) {
 			out = domain.PublishedResults{Items: []domain.Result{}}
 			return domain.Fail("AUTHZ_LEASE_EXPIRED", "Results read lease expired while waiting")

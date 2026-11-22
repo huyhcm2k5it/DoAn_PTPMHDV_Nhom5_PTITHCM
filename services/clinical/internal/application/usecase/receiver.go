@@ -19,10 +19,10 @@ type Receiver struct {
 	handler EventHandler
 	store   ports.DeliveryStore
 }
-type retryLeaseKey struct{}
+type retryTokenKey struct{}
 
-func retryLease(ctx context.Context) string {
-	value, _ := ctx.Value(retryLeaseKey{}).(string)
+func retryToken(ctx context.Context) string {
+	value, _ := ctx.Value(retryTokenKey{}).(string)
 	return value
 }
 
@@ -49,10 +49,10 @@ func (r *Receiver) Receive(ctx context.Context, d ports.Incoming) error {
 	}
 	d.MessageID = domain.ID(event.MessageID)
 	if d.Attempt > 0 {
-		if !domain.ValidID(d.LeaseID) {
+		if !domain.ValidID(d.RetryToken) {
 			return invalid()
 		}
-		ctx = context.WithValue(ctx, retryLeaseKey{}, domain.ID(d.LeaseID))
+		ctx = context.WithValue(ctx, retryTokenKey{}, domain.ID(d.RetryToken))
 	}
 	var err error
 	switch {
@@ -94,7 +94,7 @@ func (s *Service) HandleProjection(ctx context.Context, exchange string, event d
 	}
 	return s.store.Within(ctx, "projection:"+event.Producer+":"+domain.ID(event.AggregateID), func(tx ports.ClinicalTx) error {
 		hash := domain.Hash(event)
-		seen, e := tx.SeenMessage(ctx, domain.ID(event.MessageID), hash, retryLease(ctx))
+		seen, e := tx.SeenMessage(ctx, domain.ID(event.MessageID), hash, retryToken(ctx))
 		if e != nil || seen {
 			return e
 		}

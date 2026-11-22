@@ -25,9 +25,9 @@ func strictJSON(b []byte, v any) error {
 	return nil
 }
 
-type retryLeaseKey struct{}
+type retryTokenKey struct{}
 
-func retryLease(ctx context.Context) string { s, _ := ctx.Value(retryLeaseKey{}).(string); return s }
+func retryToken(ctx context.Context) string { s, _ := ctx.Value(retryTokenKey{}).(string); return s }
 
 type Receiver struct {
 	s        *Service
@@ -42,10 +42,10 @@ func (r *Receiver) Receive(ctx context.Context, in ports.Incoming) error {
 	}
 	in.MessageID = domain.ID(m.MessageID)
 	if in.Attempt > 0 {
-		if !domain.ValidID(in.LeaseID) {
+		if !domain.ValidID(in.RetryToken) {
 			return r.delivery.Quarantine(ctx, in, "INVALID_MESSAGE")
 		}
-		ctx = context.WithValue(ctx, retryLeaseKey{}, domain.ID(in.LeaseID))
+		ctx = context.WithValue(ctx, retryTokenKey{}, domain.ID(in.RetryToken))
 	}
 	e := r.s.Handle(ctx, in.Exchange, in.RoutingKey, m)
 	if e == nil {
@@ -88,7 +88,7 @@ func (s *Service) Handle(ctx context.Context, exchange, route string, m domain.E
 	gap := ""
 	err := s.store.Within(ctx, "diagnostic:business", func(t ports.Tx) error {
 		h := domain.Hash(m)
-		seen, e := t.SeenMessage(ctx, domain.ID(m.MessageID), h, retryLease(ctx))
+		seen, e := t.SeenMessage(ctx, domain.ID(m.MessageID), h, retryToken(ctx))
 		if e != nil || seen {
 			return e
 		}

@@ -4,6 +4,10 @@ Frontend React/TypeScript dùng chung cho ba actor PATIENT, DOCTOR và STAFF. Ph
 
 Quy định làm việc ngay trong thư mục web: [Phân công màn hình, thư mục và file chung](PHAN_CONG_VA_QUY_DINH_FRONTEND.md).
 
+## Chạy Docker với env nhóm
+
+Chạy project theo [hướng dẫn Docker chung](../../infra/compose/README.md) bằng đúng ba file env của nhóm. Web ở http://127.0.0.1:15173, phục vụ bằng Nginx và chuyển `/api/v1` về Gateway. API/worker dùng database, RabbitMQ, Redis online và cặp JWT hiện có của nhóm; không tạo bộ dữ liệu hoặc môi trường khác để thay thế.
+
 ## Phạm vi từng người
 
 | Owner | Màn và chức năng                                                                                                       | Thư mục chính                                                                           |
