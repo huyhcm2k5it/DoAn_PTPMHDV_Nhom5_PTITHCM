@@ -73,7 +73,7 @@ services:
     environment:
       NODE_ENV: production
       MONGODB_URI: $APPOINTMENT_MONGO_URI
-      AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL with /umc-care vhost}
+      AMQP_URL: ${UMC_AMQP_URL:?set shared online AMQP URL from Quân}
     depends_on:
       appointment:
         condition: service_healthy
@@ -95,7 +95,7 @@ services:
     environment:
       NODE_ENV: production
       MONGODB_URI: $PATIENT_MONGO_URI
-      AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL with /umc-care vhost}
+      AMQP_URL: ${UMC_AMQP_URL:?set shared online AMQP URL from Quân}
     depends_on:
       patient:
         condition: service_healthy
@@ -154,11 +154,11 @@ services:
     environment: &id002
       PORT: ${IDENTITY_PORT:?set IDENTITY_PORT}
       JWT_PUBLIC_KEY_PATH: /run/config/jwt_public.pem
-      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
-      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:?set online RabbitMQ host from Quân}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:?set online RabbitMQ TLS port from Quân}
       RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
-      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/umc-care}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:?set online RabbitMQ vhost from Quân}
       UMC_AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
       JWT_PRIVATE_KEY_PATH: /run/secrets/identity_private.pem
     volumes: &id003
@@ -187,11 +187,11 @@ services:
     environment:
       PORT: ${BILLING_PORT:?set BILLING_PORT}
       JWT_PUBLIC_KEY_PATH: /run/config/jwt_public.pem
-      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
-      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:?set online RabbitMQ host from Quân}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:?set online RabbitMQ TLS port from Quân}
       RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
-      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/umc-care}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:?set online RabbitMQ vhost from Quân}
       UMC_AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
@@ -216,11 +216,11 @@ services:
     environment:
       PORT: ${BILLING_PORT:?set BILLING_PORT}
       JWT_PUBLIC_KEY_PATH: /run/config/jwt_public.pem
-      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
-      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:?set online RabbitMQ host from Quân}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:?set online RabbitMQ TLS port from Quân}
       RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
-      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/umc-care}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:?set online RabbitMQ vhost from Quân}
       UMC_AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
@@ -247,11 +247,11 @@ services:
     environment:
       PORT: ${NOTIFICATION_PORT:?set NOTIFICATION_PORT}
       JWT_PUBLIC_KEY_PATH: /run/config/jwt_public.pem
-      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
-      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:?set online RabbitMQ host from Quân}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:?set online RabbitMQ TLS port from Quân}
       RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
-      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/umc-care}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:?set online RabbitMQ vhost from Quân}
       UMC_AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
@@ -276,11 +276,11 @@ services:
     environment:
       PORT: ${NOTIFICATION_PORT:?set NOTIFICATION_PORT}
       JWT_PUBLIC_KEY_PATH: /run/config/jwt_public.pem
-      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
-      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:?set online RabbitMQ host from Quân}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:?set online RabbitMQ TLS port from Quân}
       RABBITMQ_USER: ${RABBITMQ_USER:?set RABBITMQ_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
-      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/umc-care}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:?set online RabbitMQ vhost from Quân}
       UMC_AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
@@ -331,7 +331,7 @@ services:
     - worker
     environment:
       MONGODB_URI: $PHARMACY_MONGO_URI
-      AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL with /umc-care vhost}
+      AMQP_URL: ${UMC_AMQP_URL:?set shared online AMQP URL from Quân}
     depends_on:
       pharmacy:
         condition: service_healthy
