@@ -9,15 +9,24 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 	httpadapter "umccare/diagnostic/internal/adapters/inbound/http"
 	"umccare/diagnostic/internal/adapters/outbound/postgres"
+	rediscache "umccare/diagnostic/internal/adapters/outbound/redis"
 	"umccare/diagnostic/internal/application/health"
+	"umccare/diagnostic/internal/application/ports"
 	"umccare/diagnostic/internal/application/usecase"
 )
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "healthcheck" {
+		if !healthy() {
+			os.Exit(1)
+		}
+		return
+	}
 	if e := run(); e != nil {
 		slog.Error("diagnostic startup failed; verify DATABASE_URL and listen address")
 		os.Exit(1)
@@ -33,6 +42,15 @@ func run() error {
 		return e
 	}
 	defer db.Close()
+	if os.Getenv("MIGRATE_ON_START") == "1" {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		err := db.Migrate(ctx)
+		cancel()
+		if err != nil {
+			return err
+		}
+	}
+
 	addr := os.Getenv("LISTEN_ADDR")
 	if addr == "" {
 		addr = "127.0.0.1:8009"
@@ -52,7 +70,21 @@ func run() error {
 			return errors.New("invalid RSA public key")
 		}
 	}
-	server := &http.Server{Addr: addr, Handler: httpadapter.New(health.New(db), httpadapter.Options{App: usecase.New(db, time.Now), Auth: httpadapter.NewJWT(key, issuer, audience), Ready: db.BusinessReady}), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second}
+	var cache ports.ReadCache
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		redisURL = os.Getenv("UMC_REDIS_URL")
+	}
+	if redisURL != "" {
+		configured, err := rediscache.New(redisURL)
+		if err != nil {
+			return err
+		}
+		defer configured.Close()
+		cache = configured
+	}
+
+	server := &http.Server{Addr: addr, Handler: httpadapter.New(health.New(db), httpadapter.Options{App: usecase.NewCached(db, time.Now, cache), Auth: httpadapter.NewJWT(key, issuer, audience), Ready: db.BusinessReady}), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	done := make(chan error, 1)
@@ -68,4 +100,25 @@ func run() error {
 		defer cancel()
 		return server.Shutdown(shutdown)
 	}
+}
+
+// Reuse the application binary for container readiness; no shell or curl image is needed.
+func healthy() bool {
+	address := os.Getenv("LISTEN_ADDR")
+	if address == "" {
+		address = "127.0.0.1:8009"
+	}
+	if strings.HasPrefix(address, ":") {
+		address = "127.0.0.1" + address
+	}
+	if strings.HasPrefix(address, "0.0.0.0:") {
+		address = "127.0.0.1:" + strings.TrimPrefix(address, "0.0.0.0:")
+	}
+	client := http.Client{Timeout: 2 * time.Second}
+	response, err := client.Get("http://" + address + "/health/ready")
+	if err != nil {
+		return false
+	}
+	defer response.Body.Close()
+	return response.StatusCode == http.StatusOK
 }

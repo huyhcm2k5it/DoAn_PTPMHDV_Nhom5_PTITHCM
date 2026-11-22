@@ -34,10 +34,20 @@ type ClinicalStore interface {
 	Within(context.Context, string, func(ClinicalTx) error) error
 }
 type Incoming struct {
-	MessageID, Exchange, RoutingKey string
-	Body                            []byte
-	Attempt                         int
-	LeaseID                         string
+	MessageID  string `json:"messageId"`
+	Exchange   string `json:"exchange"`
+	RoutingKey string `json:"routingKey"`
+	Body       []byte `json:"body"`
+	Attempt    int    `json:"attempt"`
+	RetryToken string `json:"retryToken,omitempty"`
+}
+
+// BrokerRetry remains unacknowledged in the durable retry queue until NotBefore.
+type BrokerRetry struct {
+	SchemaVersion int       `json:"schemaVersion"`
+	Service       string    `json:"service"`
+	Input         Incoming  `json:"input"`
+	NotBefore     time.Time `json:"notBefore"`
 }
 type DeliveryStore interface {
 	ScheduleRetry(context.Context, Incoming, int, time.Duration) error

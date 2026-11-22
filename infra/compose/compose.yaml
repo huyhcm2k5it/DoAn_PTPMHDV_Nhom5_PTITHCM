@@ -1,115 +1,12 @@
+# Shared application stack. Infrastructure URLs come from the three owner env files.
 name: umc-care-local
 services:
-  mongo:
-    image: mongo:8.0.16
-    command:
-    - cp /run/secrets/mongo-keyfile /tmp/umc-mongo.key && chmod 400 /tmp/umc-mongo.key
-      && chown mongodb:mongodb /tmp/umc-mongo.key && exec docker-entrypoint.sh mongod
-      --replSet rs0 --bind_ip_all --keyFile /tmp/umc-mongo.key
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: $MONGO_ROOT_USER
-      MONGO_INITDB_ROOT_PASSWORD: $MONGO_ROOT_PASSWORD
-    secrets:
-    - source: mongo-keyfile
-      target: mongo-keyfile
-      mode: 256
-    volumes:
-    - mongo_data:/data/db
-    networks:
-    - private
-    healthcheck:
-      test:
-      - CMD-SHELL
-      - mongosh --quiet --host localhost --username "$$MONGO_INITDB_ROOT_USERNAME"
-        --password "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval
-        "db.adminCommand({ping:1}).ok"
-      interval: 5s
-      timeout: 5s
-      retries: 30
-      start_period: 30s
-    restart: unless-stopped
-    entrypoint:
-    - bash
-    - -ec
-  mongo-bootstrap:
-    image: mongo:8.0.16
-    depends_on:
-      mongo:
-        condition: service_healthy
-    environment:
-      MONGO_ROOT_USER: $MONGO_ROOT_USER
-      MONGO_ROOT_PASSWORD: $MONGO_ROOT_PASSWORD
-      PATIENT_DB_PASSWORD: $PATIENT_DB_PASSWORD
-      APPOINTMENT_DB_PASSWORD: $APPOINTMENT_DB_PASSWORD
-      PHARMACY_DB_PASSWORD: $PHARMACY_DB_PASSWORD
-    volumes:
-    - ../../mongo/init-replica.js:/bootstrap/init-replica.js:ro
-    - ../../mongo/init-users.js:/bootstrap/init-users.js:ro
-    networks:
-    - private
-    entrypoint:
-    - sh
-    - -ec
-    command:
-    - 'uri="mongodb://$$MONGO_ROOT_USER:$$MONGO_ROOT_PASSWORD@mongo:27017/admin?authSource=admin"
-
-      mongosh "$$uri" --quiet --eval "load(''/bootstrap/init-replica.js''); initializeReplica()"
-
-      mongosh "$$uri" --quiet --eval "load(''/bootstrap/init-users.js''); createOwnerUsers({patient:''$$PATIENT_DB_PASSWORD'',appointment:''$$APPOINTMENT_DB_PASSWORD'',pharmacy:''$$PHARMACY_DB_PASSWORD''})"
-
-      '
-    restart: 'no'
-  rabbitmq:
-    image: rabbitmq:4.3.6-management
-    hostname: rabbitmq
-    env_file:
-    - ../../env/quan.env
-    volumes:
-    - rabbitmq_data:/var/lib/rabbitmq
-    networks:
-    - private
-    - default
-    healthcheck:
-      test:
-      - CMD
-      - rabbitmq-diagnostics
-      - -q
-      - ping
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      start_period: 15s
-    restart: unless-stopped
-  postgres:
-    image: postgres:18
-    environment:
-      POSTGRES_USER: umc_bootstrap
-      POSTGRES_DB: umc_bootstrap
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
-      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:?set owner database password}
-      BILLING_DB_PASSWORD: ${BILLING_DB_PASSWORD:?set owner database password}
-      NOTIFICATION_DB_PASSWORD: ${NOTIFICATION_DB_PASSWORD:?set owner database password}
-      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD:?set owner database password}
-      CLINICAL_DB_PASSWORD: ${CLINICAL_DB_PASSWORD:?set owner database password}
-      DIAGNOSTIC_DB_PASSWORD: ${DIAGNOSTIC_DB_PASSWORD:?set owner database password}
-    volumes:
-    - postgres_be_data:/var/lib/postgresql
-    - ./postgres/all/init.sh:/docker-entrypoint-initdb.d/10-owners.sh:ro
-    networks:
-    - private
-    - default
-    healthcheck:
-      test:
-      - CMD-SHELL
-      - pg_isready -U umc_bootstrap -d umc_bootstrap
-      interval: 5s
-      timeout: 3s
-      retries: 20
-    restart: unless-stopped
   patient:
     build:
-      context: ../..
-      dockerfile: services/patient/Dockerfile
+      context: ../../services/patient
+      dockerfile: Dockerfile
+      additional_contexts:
+        mongo_shared: ../../mongo
     environment:
       NODE_ENV: production
       PORT: ${PATIENT_PORT:?set PATIENT_PORT}
@@ -119,9 +16,6 @@ services:
       JWT_AUDIENCE: umc-care-services
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
-    depends_on:
-      mongo-bootstrap:
-        condition: service_completed_successfully
     networks:
     - private
     healthcheck:
@@ -134,10 +28,14 @@ services:
       timeout: 3s
       retries: 20
     restart: unless-stopped
+    init: true
+    stop_grace_period: 20s
   appointment:
     build:
-      context: ../..
-      dockerfile: services/appointment/Dockerfile
+      context: ../../services/appointment
+      dockerfile: Dockerfile
+      additional_contexts:
+        mongo_shared: ../../mongo
     environment:
       NODE_ENV: production
       PORT: ${APPOINTMENT_PORT:?set APPOINTMENT_PORT}
@@ -148,9 +46,6 @@ services:
       APPOINTMENT_REDIS_URL: ${UMC_REDIS_URL:?set shared online Redis URL from Quân}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
-    depends_on:
-      mongo-bootstrap:
-        condition: service_completed_successfully
     networks:
     - private
     healthcheck:
@@ -163,10 +58,14 @@ services:
       timeout: 3s
       retries: 20
     restart: unless-stopped
+    init: true
+    stop_grace_period: 20s
   appointment-worker:
     build:
-      context: ../..
-      dockerfile: services/appointment/Dockerfile
+      context: ../../services/appointment
+      dockerfile: Dockerfile
+      additional_contexts:
+        mongo_shared: ../../mongo
     command:
     - npm
     - run
@@ -176,17 +75,19 @@ services:
       MONGODB_URI: $APPOINTMENT_MONGO_URI
       AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL with /umc-care vhost}
     depends_on:
-      mongo-bootstrap:
-        condition: service_completed_successfully
-      rabbitmq:
+      appointment:
         condition: service_healthy
     networks:
     - private
     restart: unless-stopped
+    init: true
+    stop_grace_period: 20s
   patient-worker:
     build:
-      context: ../..
-      dockerfile: services/patient/Dockerfile
+      context: ../../services/patient
+      dockerfile: Dockerfile
+      additional_contexts:
+        mongo_shared: ../../mongo
     command:
     - npm
     - run
@@ -196,17 +97,19 @@ services:
       MONGODB_URI: $PATIENT_MONGO_URI
       AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL with /umc-care vhost}
     depends_on:
-      mongo-bootstrap:
-        condition: service_completed_successfully
-      rabbitmq:
+      patient:
         condition: service_healthy
     networks:
     - private
     restart: unless-stopped
+    init: true
+    stop_grace_period: 20s
   pharmacy:
     build:
-      context: ../..
-      dockerfile: services/pharmacy/Dockerfile
+      context: ../../services/pharmacy
+      dockerfile: Dockerfile
+      additional_contexts:
+        mongo_shared: ../../mongo
     environment:
       NODE_ENV: production
       PORT: ${PHARMACY_PORT:?set PHARMACY_PORT}
@@ -216,9 +119,6 @@ services:
       JWT_AUDIENCE: umc-care-services
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
-    depends_on:
-      mongo-bootstrap:
-        condition: service_completed_successfully
     networks:
     - private
     healthcheck:
@@ -231,15 +131,14 @@ services:
       timeout: 3s
       retries: 20
     restart: unless-stopped
+    init: true
+    stop_grace_period: 20s
   identity:
     build: &id001
       context: ../../services/identity
       dockerfile: Dockerfile
     env_file:
     - ../../env/hung.env
-    depends_on:
-      postgres:
-        condition: service_healthy
     networks:
     - private
     healthcheck:
@@ -265,15 +164,14 @@ services:
     volumes: &id003
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
     - ../../services/identity/jwt_private.pem:/run/secrets/identity_private.pem:ro
+    init: true
+    stop_grace_period: 20s
   billing:
     build:
       context: ../../services/billing
       dockerfile: Dockerfile
     env_file:
     - ../../env/hung.env
-    depends_on:
-      postgres:
-        condition: service_healthy
     networks:
     - private
     healthcheck:
@@ -297,6 +195,8 @@ services:
       UMC_AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
+    init: true
+    stop_grace_period: 20s
   billing-worker:
     build:
       context: ../../services/billing
@@ -308,10 +208,6 @@ services:
     env_file:
     - ../../env/hung.env
     depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
       billing:
         condition: service_healthy
     networks:
@@ -328,15 +224,14 @@ services:
       UMC_AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
+    init: true
+    stop_grace_period: 20s
   notification:
     build:
       context: ../../services/notification
       dockerfile: Dockerfile
     env_file:
     - ../../env/hung.env
-    depends_on:
-      postgres:
-        condition: service_healthy
     networks:
     - private
     healthcheck:
@@ -360,6 +255,8 @@ services:
       UMC_AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
+    init: true
+    stop_grace_period: 20s
   notification-worker:
     build:
       context: ../../services/notification
@@ -372,8 +269,6 @@ services:
     - ../../env/hung.env
     restart: unless-stopped
     depends_on:
-      rabbitmq:
-        condition: service_healthy
       notification:
         condition: service_healthy
     networks:
@@ -389,6 +284,8 @@ services:
       UMC_AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
+    init: true
+    stop_grace_period: 20s
   gateway:
     build:
       context: ../../envoy
@@ -398,20 +295,36 @@ services:
     volumes:
     - ../../.runtime/jwks.json:/etc/envoy/jwks.json:ro
     depends_on:
+      patient:
+        condition: service_healthy
+      appointment:
+        condition: service_healthy
+      pharmacy:
+        condition: service_healthy
       identity:
         condition: service_healthy
       billing:
         condition: service_healthy
       notification:
         condition: service_healthy
+      catalog:
+        condition: service_healthy
+      clinical:
+        condition: service_healthy
+      diagnostic:
+        condition: service_healthy
     networks:
     - private
     - default
     restart: unless-stopped
+    init: true
+    stop_grace_period: 20s
   pharmacy-worker:
     build:
-      context: ../..
-      dockerfile: services/pharmacy/Dockerfile
+      context: ../../services/pharmacy
+      dockerfile: Dockerfile
+      additional_contexts:
+        mongo_shared: ../../mongo
     command:
     - npm
     - run
@@ -420,25 +333,13 @@ services:
       MONGODB_URI: $PHARMACY_MONGO_URI
       AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL with /umc-care vhost}
     depends_on:
-      mongo-bootstrap:
-        condition: service_completed_successfully
-      rabbitmq:
+      pharmacy:
         condition: service_healthy
     networks:
     - private
     restart: unless-stopped
-  catalog-migrate:
-    build: ../../services/catalog
-    image: umc-care-catalog:local
-    entrypoint:
-    - /migrate
-    environment:
-      DATABASE_URL: ${CATALOG_DATABASE_URL:?set Catalog PostgreSQL URL}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-    - private
+    init: true
+    stop_grace_period: 20s
   catalog:
     image: umc-care-catalog:local
     build: ../../services/catalog
@@ -449,14 +350,23 @@ services:
       JWT_ISSUER: umc-care-identity
       JWT_AUDIENCE: umc-care-services
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
+      MIGRATE_ON_START: '1'
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
-    depends_on:
-      catalog-migrate:
-        condition: service_completed_successfully
     networks:
     - private
     restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD
+      - /api
+      - healthcheck
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+    init: true
+    stop_grace_period: 20s
   catalog-worker:
     image: umc-care-catalog:local
     entrypoint:
@@ -466,25 +376,13 @@ services:
       AMQP_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
       CATALOG_DECLARE_TOPOLOGY: 'true'
     depends_on:
-      catalog-migrate:
-        condition: service_completed_successfully
-      rabbitmq:
+      catalog:
         condition: service_healthy
     networks:
     - private
     restart: unless-stopped
-  clinical-migrate:
-    build: ../../services/clinical
-    image: umc-care-clinical:local
-    entrypoint:
-    - /migrate
-    environment:
-      DATABASE_URL: ${CLINICAL_DATABASE_URL:?set Clinical PostgreSQL URL}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-    - private
+    init: true
+    stop_grace_period: 20s
   clinical:
     image: umc-care-clinical:local
     build: ../../services/clinical
@@ -494,14 +392,24 @@ services:
       JWT_ISSUER: umc-care-identity
       JWT_AUDIENCE: umc-care-services
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
+      MIGRATE_ON_START: '1'
+      REDIS_URL: ${UMC_REDIS_URL:?set shared online Redis URL from Quân}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
-    depends_on:
-      clinical-migrate:
-        condition: service_completed_successfully
     networks:
     - private
     restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD
+      - /api
+      - healthcheck
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+    init: true
+    stop_grace_period: 20s
   clinical-worker:
     image: umc-care-clinical:local
     entrypoint:
@@ -511,25 +419,13 @@ services:
       RABBITMQ_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
       CLINICAL_DECLARE_TOPOLOGY: '1'
     depends_on:
-      clinical-migrate:
-        condition: service_completed_successfully
-      rabbitmq:
+      clinical:
         condition: service_healthy
     networks:
     - private
     restart: unless-stopped
-  diagnostic-migrate:
-    build: ../../services/diagnostic
-    image: umc-care-diagnostic:local
-    entrypoint:
-    - /migrate
-    environment:
-      DATABASE_URL: ${DIAGNOSTIC_DATABASE_URL:?set Diagnostic PostgreSQL URL}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-    - private
+    init: true
+    stop_grace_period: 20s
   diagnostic:
     image: umc-care-diagnostic:local
     build: ../../services/diagnostic
@@ -539,14 +435,24 @@ services:
       JWT_ISSUER: umc-care-identity
       JWT_AUDIENCE: umc-care-services
       JWT_PUBLIC_KEY_FILE: /run/config/jwt_public.pem
+      MIGRATE_ON_START: '1'
+      REDIS_URL: ${UMC_REDIS_URL:?set shared online Redis URL from Quân}
     volumes:
     - ../../infra/certs/jwt_public.pem:/run/config/jwt_public.pem:ro
-    depends_on:
-      diagnostic-migrate:
-        condition: service_completed_successfully
     networks:
     - private
     restart: unless-stopped
+    healthcheck:
+      test:
+      - CMD
+      - /api
+      - healthcheck
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+    init: true
+    stop_grace_period: 20s
   diagnostic-worker:
     image: umc-care-diagnostic:local
     entrypoint:
@@ -556,13 +462,13 @@ services:
       RABBITMQ_URL: ${UMC_AMQP_URL:?set shared AMQP URL from Quân}
       DIAGNOSTIC_DECLARE_TOPOLOGY: '1'
     depends_on:
-      diagnostic-migrate:
-        condition: service_completed_successfully
-      rabbitmq:
+      diagnostic:
         condition: service_healthy
     networks:
     - private
     restart: unless-stopped
+    init: true
+    stop_grace_period: 20s
   identity-worker:
     build: *id001
     env_file:
@@ -576,20 +482,25 @@ services:
     depends_on:
       identity:
         condition: service_healthy
-      rabbitmq:
+    networks:
+    - private
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 20s
+  web:
+    build: ../../apps/web
+    image: hqh-care-web:local
+    ports:
+    - 127.0.0.1:15173:8080
+    depends_on:
+      gateway:
         condition: service_healthy
     networks:
     - private
     restart: unless-stopped
+    init: true
+    stop_grace_period: 20s
 networks:
   private:
     internal: false
-volumes:
-  mongo_data: null
-  rabbitmq_data: null
-  postgres_data: null
-  huy_postgres_data: null
-  postgres_be_data: null
-secrets:
-  mongo-keyfile:
-    file: ../../mongo/secrets/replica.key
+  default: {}

@@ -24,12 +24,15 @@ func main() {
 		os.Exit(1)
 	}
 	defer db.Close()
-	if e = db.Migrate(ctx); e == nil && *seed {
-		e = db.Seed(ctx)
-	}
-	if e != nil {
-		fmt.Fprintln(os.Stderr, "Migration failed; no partial schema or seed committed")
+	if e = db.Migrate(ctx); e != nil {
+		fmt.Fprintln(os.Stderr, "Catalog migration failed")
 		os.Exit(1)
+	}
+	if *seed {
+		if e = db.Seed(ctx); e != nil {
+			fmt.Fprintln(os.Stderr, "Catalog schema migrated, but the demo seed failed")
+			os.Exit(1)
+		}
 	}
 	fmt.Println("Catalog schema ready; demo seed:", *seed)
 }

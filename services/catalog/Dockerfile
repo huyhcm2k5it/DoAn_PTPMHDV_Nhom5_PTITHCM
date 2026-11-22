@@ -3,12 +3,9 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -trimpath -o /out/api ./cmd/api && CGO_ENABLED=0 go build -trimpath -o /out/migrate ./cmd/migrate && CGO_ENABLED=0 go build -trimpath -o /out/worker ./cmd/worker && CGO_ENABLED=0 go build -trimpath -o /out/snapshot ./cmd/snapshot
+RUN --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 GOMAXPROCS=2 go build -p=2 -trimpath -o /out/ ./cmd/api ./cmd/migrate ./cmd/worker ./cmd/snapshot
 FROM gcr.io/distroless/static-debian12:nonroot
-COPY --from=build /out/api /api
-COPY --from=build /out/migrate /migrate
-COPY --from=build /out/worker /worker
-COPY --from=build /out/snapshot /snapshot
+COPY --from=build /out/ /
 ENV LISTEN_ADDR=:8007
 EXPOSE 8007
 ENTRYPOINT ["/api"]

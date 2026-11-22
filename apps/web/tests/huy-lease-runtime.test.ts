@@ -4,6 +4,30 @@ afterEach(() => {
   sessionStorage.clear();
   vi.resetModules();
 });
+it('rejects login when Identity cannot return an authenticated session', async () => {
+  vi.resetModules();
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          data: {
+            accessToken: 'access',
+            refreshToken: 'refresh',
+            actorType: 'DOCTOR',
+          },
+        }),
+      ),
+    )
+    .mockResolvedValueOnce(new Response('{}', { status: 503 }));
+  vi.stubGlobal('fetch', fetchMock);
+  const { loginUser } = await import('../src/app/runtime');
+  await expect(loginUser('0900000001', 'demo-password')).rejects.toThrow(
+    'Không tải được phiên đăng nhập',
+  );
+  expect(sessionStorage.getItem('umc_access_token')).toBeNull();
+  expect(sessionStorage.getItem('umc_session')).toBeNull();
+});
 it('keeps a valid login when the short-lived signing lease expires and preserves the response body', async () => {
   const { withAuthRedirect } = await import('../src/app/runtime');
   const logout = vi.fn();

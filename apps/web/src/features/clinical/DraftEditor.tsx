@@ -47,11 +47,11 @@ export function DraftEditor({
   }, [dirty, mutation.busy, mutation.uncertain, onDirty]);
   useEffect(() => () => onDirty(false), [onDirty]);
   useEffect(() => {
-    if (!dirty) {
+    if (!dirty && detail.visit.version >= version) {
       setFields(read());
       setVersion(detail.visit.version);
     }
-  }, [detail.visit.version, last?.id, dirty]);
+  }, [detail.visit.version, last?.id, dirty, version]);
   function save(continueAfter = false) {
     if (signed) {
       if (continueAfter) onContinue();

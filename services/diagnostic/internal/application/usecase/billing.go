@@ -258,7 +258,13 @@ func (s *Service) billing(ctx context.Context, t ports.Tx, m domain.Envelope) er
 }
 func (s *Service) Reconcile(ctx context.Context) error {
 	return s.store.Within(ctx, "diagnostic:business", func(t ports.Tx) error {
-		xs, e := t.Orders(ctx)
+		var xs []domain.Order
+		var e error
+		if candidates, ok := t.(ports.SettlementCandidates); ok {
+			xs, e = candidates.SettlementOrdersDue(ctx, s.now().Add(-30*time.Second))
+		} else {
+			xs, e = t.Orders(ctx)
+		}
 		if e != nil {
 			return e
 		}

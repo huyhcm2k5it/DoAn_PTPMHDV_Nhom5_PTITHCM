@@ -44,11 +44,16 @@ def generate():
         exchanges.add(exchange)
         queues.add("dlq."+owner+".v1")
         bindings.add((exchange,"#","dlq."+owner+".v1"))
+    for owner in ("clinical","diagnostic"):
+        exchange="umc.retry."+owner+".v1"
+        exchanges.add(exchange)
+        queues.add("retry."+owner+".v1")
+        bindings.add((exchange,"retry","retry."+owner+".v1"))
     return {
         "rabbit_version":"4.3.6",
         "vhosts":[{"name":"/umc-care"}],
-        "exchanges":[{"name":name,"vhost":"/umc-care","type":"topic","durable":True,"auto_delete":False} for name in sorted(exchanges)],
-        "queues":[{"name":name,"vhost":"/umc-care","durable":True,"auto_delete":False,"arguments":{"x-queue-type":"quorum"}} for name in sorted(queues)],
+        "exchanges":[{"name":name,"vhost":"/umc-care","type":"direct" if name.startswith("umc.retry.") else "topic","durable":True,"auto_delete":False} for name in sorted(exchanges)],
+        "queues":[{"name":name,"vhost":"/umc-care","durable":True,"auto_delete":False,"arguments":{"x-queue-type":"quorum",**({"x-delivery-limit":-1} if name.startswith("retry.") else {})}} for name in sorted(queues)],
         "bindings":[{"source":e,"vhost":"/umc-care","destination":q,"destination_type":"queue","routing_key":key,"arguments":{}} for e,key,q in sorted(bindings)],
         "policies":[{"vhost":"/umc-care","name":owner+"-dlq","pattern":"^(evt|cmd)\\."+owner+"\\.v1$",
                      "apply-to":"queues","priority":10,

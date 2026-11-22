@@ -10,9 +10,13 @@ import {
 } from '@testing-library/react';
 import { TreatmentPanel } from '../src/features/clinical/TreatmentPanel';
 import { ResultEditor } from '../src/features/diagnostic/ResultEditor';
+import { DiagnosticFeature } from '../src/features/diagnostic/DiagnosticFeature';
 import { DraftEditor } from '../src/features/clinical/DraftEditor';
 import { ClinicalFeature } from '../src/features/clinical/ClinicalFeature';
-import { createDiagnosticApi } from '../src/features/diagnostic/api';
+import {
+  createDiagnosticApi,
+  DiagnosticError,
+} from '../src/features/diagnostic/api';
 import { ApiError } from '../src/features/clinical/api';
 import type {
   ClinicalApi,
@@ -164,6 +168,98 @@ function treatment(): ClinicalTreatmentApi {
     }),
   };
 }
+
+it('keeps medicine selection available when the LAB catalog fails', async () => {
+  const api = treatment();
+  vi.mocked(api.labTests).mockRejectedValue(
+    new Error('LAB catalog unavailable'),
+  );
+  render(<TreatmentPanel api={api} detail={detail} onChanged={vi.fn()} />);
+  await screen.findByText('Không tải được danh mục xét nghiệm.');
+  fireEvent.change(
+    screen.getByPlaceholderText('Nhập tên hoặc mã thuốc để thêm vào đơn…'),
+    { target: { value: 'Para' } },
+  );
+  expect(
+    await screen.findByRole('button', { name: /Paracetamol/ }),
+  ).toBeTruthy();
+  expect(api.requestLab).not.toHaveBeenCalled();
+});
+
+it('keeps the acknowledged draft version while the parent still holds older data', async () => {
+  const api: ClinicalApi = {
+    worklist: vi.fn(),
+    start: vi.fn(),
+    detail: vi.fn(),
+    saveDraft: vi.fn().mockResolvedValue({
+      visitId: detail.visit.id,
+      version: 3,
+      state: 'IN_PROGRESS',
+    }),
+  };
+  render(
+    <DraftEditor
+      api={api}
+      detail={detail}
+      onDirty={vi.fn()}
+      onContinue={vi.fn()}
+      onReload={vi.fn()}
+      onSaved={vi.fn()}
+    />,
+  );
+  const diagnosis = screen.getByLabelText('Chẩn đoán');
+  fireEvent.change(diagnosis, { target: { value: 'Chẩn đoán đã lưu mới' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Lưu nháp' }));
+  await screen.findByText('Đã lưu bệnh án nháp.');
+  expect((diagnosis as HTMLTextAreaElement).value).toBe('Chẩn đoán đã lưu mới');
+  fireEvent.click(screen.getByRole('button', { name: 'Lưu nháp' }));
+  await waitFor(() => expect(api.saveDraft).toHaveBeenCalledTimes(2));
+  expect(vi.mocked(api.saveDraft).mock.calls[1][1].expectedVersion).toBe(3);
+});
+
+it('removes previously loaded LAB details when refreshing returns revoked access', async () => {
+  const order: DiagnosticOrder = {
+    id: 'order-revoked',
+    visitId: 'visit',
+    patientId: 'patient',
+    doctorId: 'doctor',
+    state: 'PENDING_PAYMENT',
+    version: 1,
+    chargeState: 'CREATED',
+    tests: [{ testId: 'test', code: 'CBC', name: 'Huyết học', revision: 1 }],
+  };
+  const api: DiagnosticApi = {
+    list: vi.fn().mockResolvedValue({ items: [order], total: 1 }),
+    detail: vi
+      .fn()
+      .mockResolvedValueOnce({ order, specimens: [], results: [] })
+      .mockRejectedValue(
+        new DiagnosticError(403, 'FORBIDDEN', 'Access revoked'),
+      ),
+    collect: vi.fn(),
+    reject: vi.fn(),
+    recollect: vi.fn(),
+  };
+  render(
+    <DiagnosticFeature
+      api={api}
+      session={{
+        userId: 'lab',
+        actorType: 'STAFF',
+        capabilities: ['LAB_TECH'],
+      }}
+    />,
+  );
+  fireEvent.click(
+    await screen.findByRole('button', { name: 'Kiểm tra thanh toán' }),
+  );
+  await waitFor(() => expect(api.detail).toHaveBeenCalledTimes(2));
+  await waitFor(() => {
+    expect(
+      screen.queryByRole('region', { name: 'Chi tiết xét nghiệm' }),
+    ).toBeNull();
+  });
+});
 it.each(['PENDING', 'CREATED', 'REJECTED'])(
   'blocks signing when LAB remains %s',
   async (state) => {

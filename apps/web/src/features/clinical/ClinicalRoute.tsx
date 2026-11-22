@@ -53,6 +53,7 @@ export function ClinicalRoute({
     );
   return (
     <ClinicalFeature
+      key={[view, visitId, ticketId ?? '', version ?? ''].join(':')}
       api={api}
       diagnosticApi={diagnosticApi}
       session={session}

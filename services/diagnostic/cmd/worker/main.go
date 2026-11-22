@@ -2,6 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"github.com/jackc/pgx/v5/pgconn"
+	amqp "github.com/rabbitmq/amqp091-go"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -33,14 +37,17 @@ func main() {
 	service := usecase.New(db, time.Now)
 	receiver := usecase.NewReceiver(service, db)
 	go func() {
-		ticker := time.NewTicker(time.Second)
+		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				if e := service.Reconcile(ctx); e != nil && ctx.Err() == nil {
+				call, cancel := context.WithTimeout(ctx, 10*time.Second)
+				e := service.Reconcile(call)
+				cancel()
+				if e != nil && ctx.Err() == nil {
 					slog.Warn("Diagnostic settlement reconciliation deferred")
 				}
 			}
@@ -48,7 +55,16 @@ func main() {
 	}()
 	for ctx.Err() == nil {
 		if e = amqpadapter.Run(ctx, url, db, receiver, os.Getenv("DIAGNOSTIC_DECLARE_TOPOLOGY") == "1"); e != nil && ctx.Err() == nil {
-			slog.Warn("Diagnostic worker disconnected; unacknowledged deliveries remain pending")
+			var databaseError *pgconn.PgError
+			var brokerError *amqp.Error
+			switch {
+			case errors.As(e, &databaseError):
+				slog.Warn("Diagnostic worker database failure; delivery retained", "sqlState", databaseError.Code, "constraint", databaseError.ConstraintName, "column", databaseError.ColumnName)
+			case errors.As(e, &brokerError):
+				slog.Warn("Diagnostic worker broker failure; delivery retained", "brokerCode", brokerError.Code, "reason", brokerError.Reason)
+			default:
+				slog.Warn("Diagnostic worker disconnected; unacknowledged deliveries remain pending", "errorType", fmt.Sprintf("%T", e))
+			}
 		}
 		select {
 		case <-ctx.Done():

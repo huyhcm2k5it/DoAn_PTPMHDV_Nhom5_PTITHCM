@@ -40,7 +40,11 @@ func (s *Service) Records(ctx context.Context, p domain.Principal, patientID str
 		if !ok {
 			return domain.Fail("SERVICE_UNAVAILABLE", "Medical records reader unavailable")
 		}
-		out, e = reader.PatientRecords(ctx, domain.ID(patientID), page, limit)
+		e = s.readRecordsCached(ctx, tx, p, patientID, page, limit, &out, func() error {
+			var readErr error
+			out, readErr = reader.PatientRecords(ctx, domain.ID(patientID), page, limit)
+			return readErr
+		})
 		if e != nil {
 			return e
 		}

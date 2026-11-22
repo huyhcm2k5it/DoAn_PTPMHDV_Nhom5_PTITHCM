@@ -7,7 +7,7 @@ Route `/staff/diagnostic` triển khai nhóm 10 của Web UI. DiagnosticFeature 
 | Thao tác           | Điều kiện trên màn                               | API                                       |
 | ------------------ | ------------------------------------------------ | ----------------------------------------- |
 | Danh sách/chi tiết | Phiên xét nghiệm                                 | DI-002/003, lọc trạng thái đơn/phân trang |
-| Lấy mẫu            | LAB_TECH, order PAID, chargeState PAID           | DI-003                                    |
+| Lấy mẫu            | LAB_TECH, order PAID, chargeState PAID           | DI-004                                    |
 | Từ chối mẫu        | COLLECTED mới nhất, chưa có result, có lý do     | DI-005, expectedVersion của mẫu           |
 | Lấy lại mẫu        | SPECIMEN_REJECTED, đã trả tiền                   | DI-006, cùng order, không thu phí mới     |
 | Nhập/sửa kết quả   | LAB_TECH, DRAFT/REWORK, mẫu hợp lệ               | DI-007/008                                |
@@ -38,4 +38,4 @@ DI-008/009/011/012/013 dùng lease đúng action. DI-007/010 không bị adapter
 
 PublishedLabResults bàn giao khối 05.06; ResultTable dùng chung bảng. Bệnh nhân chỉ thấy PUBLISHED với giá trị, đơn vị, tham chiếu và in. JWT do transport chung của Hưng cung cấp; không có bí mật backend hoặc kết nối trực tiếp DB/RabbitMQ/Redis trong feature.
 
-DI-002/003 chưa có tên bệnh nhân, dị ứng, sinh hiệu. Khi host chưa cung cấp dữ liệu có quyền, màn hiện mã hồ sơ; không dựng thông tin theo PDF. Kiểm thử ở `apps/web/tests/huy-workspaces.test.tsx` và `tools/clinical-preview/tests/week3.test.tsx`. Chạy online cần tài khoản, grant/projection và dữ liệu thật; fixture UI không thay thế nghiệm thu tích hợp.
+DI-002/003 chưa có tên bệnh nhân, dị ứng, sinh hiệu. Khi host chưa cung cấp dữ liệu có quyền, màn hiện mã hồ sơ; không dựng thông tin theo PDF. Kiểm thử ở `apps/web/tests/huy-workspaces.test.tsx` và `apps/web/tests/huy-treatment-regression.test.tsx`. Chạy online cần tài khoản, grant/projection và dữ liệu thật; fixture UI không thay thế nghiệm thu tích hợp.

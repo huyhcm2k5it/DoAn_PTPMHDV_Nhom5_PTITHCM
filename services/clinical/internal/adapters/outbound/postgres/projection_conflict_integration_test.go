@@ -57,7 +57,7 @@ func TestAccessProjectionSameVersionConflictQuarantined(t *testing.T) {
 				t.Fatal("quarantine failed", err)
 			}
 			var reason string
-			if err := db.pool.QueryRow(ctx, `SELECT reason_code FROM dead_letters WHERE message_id=$1`, event.MessageID).Scan(&reason); err != nil || reason != "INVALID_MESSAGE" {
+			if err := db.pool.QueryRow(ctx, `SELECT envelope->>'reasonCode' FROM outbox WHERE destination='umc.deadletters.clinical.v1' AND envelope->>'originalMessageId'=$1`, event.MessageID).Scan(&reason); err != nil || reason != "INVALID_MESSAGE" {
 				t.Fatalf("conflict was not quarantined: reason=%q err=%v", reason, err)
 			}
 			var processed bool

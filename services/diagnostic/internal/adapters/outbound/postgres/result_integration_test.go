@@ -16,12 +16,15 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	httpadapter "umccare/diagnostic/internal/adapters/inbound/http"
 	"umccare/diagnostic/internal/application/ports"
+	"umccare/diagnostic/internal/application/usecase"
 	"umccare/diagnostic/internal/domain"
 )
 
 func TestResultLifecycleRealHTTPAndPostgres(t *testing.T) {
 	db := testDB(t)
 	s, in, tech := setup(t, db)
+	cache := &recordsTestCache{values: map[string][]byte{}}
+	s = usecase.NewCached(db, time.Now, cache)
 	o := createOrder(t, db, s, in)
 	pay(t, s, o)
 	if _, err := s.Sample(context.Background(), tech, o.ID, domain.NewID(), domain.SampleInput{}, false); err != nil {
@@ -167,6 +170,9 @@ func TestResultLifecycleRealHTTPAndPostgres(t *testing.T) {
 	if len(resultItems) != 1 || resultItems[0].(map[string]any)["state"] != "PUBLISHED" {
 		t.Fatalf("owner did not receive only published result: %+v", response)
 	}
+	if len(cache.values) == 0 {
+		t.Fatal("Diagnostic published results cache was not populated")
+	}
 	request(doctor, "", "GET", "/api/v1/diagnostic-orders/"+o.ID, nil, 503)
 	if path := os.Getenv("DIAGNOSTIC_RESULT_RESPONSE_FILE"); path != "" {
 		fixtures := map[string]any{"PublishedResultsResponse": response, "Error": recoveryError}
@@ -187,4 +193,15 @@ func TestResultLifecycleRealHTTPAndPostgres(t *testing.T) {
 			t.Fatal(e)
 		}
 	}
+}
+
+type recordsTestCache struct{ values map[string][]byte }
+
+func (c *recordsTestCache) Get(_ context.Context, key string) ([]byte, bool, error) {
+	raw, ok := c.values[key]
+	return raw, ok, nil
+}
+func (c *recordsTestCache) Set(_ context.Context, key string, raw []byte, _ time.Duration) error {
+	c.values[key] = append([]byte(nil), raw...)
+	return nil
 }

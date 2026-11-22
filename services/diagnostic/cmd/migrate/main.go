@@ -24,7 +24,7 @@ func main() {
 	defer db.Close()
 	e = db.Migrate(ctx)
 	if e != nil {
-		slog.Error("Diagnostic migration/seed failed")
+		slog.Error("Diagnostic migration failed")
 		os.Exit(1)
 	}
 	slog.Info("Diagnostic migration completed")

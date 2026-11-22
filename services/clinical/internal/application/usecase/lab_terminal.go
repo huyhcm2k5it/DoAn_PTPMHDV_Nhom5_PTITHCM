@@ -54,7 +54,7 @@ func (s *Service) handleLabTerminal(ctx context.Context, exchange string, m doma
 		if err != nil {
 			return err
 		}
-		seen, err := tx.SeenMessage(ctx, m.MessageID, domain.Hash(m), retryLease(ctx))
+		seen, err := tx.SeenMessage(ctx, m.MessageID, domain.Hash(m), retryToken(ctx))
 		if err != nil || seen {
 			return err
 		}

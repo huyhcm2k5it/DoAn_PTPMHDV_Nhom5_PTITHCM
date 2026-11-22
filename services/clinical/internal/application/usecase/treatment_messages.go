@@ -38,7 +38,7 @@ func (s *Service) HandleTreatmentMessage(ctx context.Context, exchange string, m
 			if e != nil {
 				return e
 			}
-			seen, e := tx.SeenMessage(ctx, m.MessageID, domain.Hash(m), retryLease(ctx))
+			seen, e := tx.SeenMessage(ctx, m.MessageID, domain.Hash(m), retryToken(ctx))
 			if e != nil || seen {
 				return e
 			}

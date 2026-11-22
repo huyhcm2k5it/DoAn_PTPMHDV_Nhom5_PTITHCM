@@ -49,6 +49,10 @@ const labels: Record<string, string> = {
   SIGNED: 'Đã ký',
 };
 
+function visitUnavailable(error: unknown) {
+  return error instanceof ApiError && [401, 403, 404].includes(error.status);
+}
+
 export function ClinicalFeature({
   api,
   session,
@@ -165,7 +169,9 @@ function Workbench({
         if (active) setDetail(data);
       })
       .catch((error) => {
-        if (active) setDetailError(error);
+        if (!active) return;
+        setDetailError(error);
+        if (visitUnavailable(error)) setDetail(null);
       })
       .finally(() => {
         if (active) setDetailLoading(false);
@@ -192,8 +198,12 @@ function Workbench({
           setDetailError(undefined);
         }
       } catch (error) {
-        // Keep the last confirmed state and all text while the status is unknown.
-        if (active) setListError(error);
+        if (!active) return;
+        setDetailError(error);
+        if (visitUnavailable(error)) {
+          setDetail(null);
+          active = false;
+        }
       } finally {
         if (active) timer = setTimeout(poll, 2000);
       }

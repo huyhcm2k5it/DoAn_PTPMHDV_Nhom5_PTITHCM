@@ -13,94 +13,106 @@ import (
 	"umccare/clinical/internal/domain"
 )
 
+func retryFromOutbox(t *testing.T, db *Probe, id string) ports.Incoming {
+	t.Helper()
+	var raw []byte
+	if err := db.pool.QueryRow(context.Background(), `SELECT envelope FROM outbox WHERE aggregate_id=$1
+        AND destination='umc.retry.clinical.v1' ORDER BY created_at DESC LIMIT 1`, id).Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	var retry ports.BrokerRetry
+	if err := json.Unmarshal(raw, &retry); err != nil {
+		t.Fatal(err)
+	}
+	if retry.Service != "clinical" || retry.SchemaVersion != 1 || retry.NotBefore.Before(time.Now().Add(-time.Second)) {
+		t.Fatal(retry)
+	}
+	return retry.Input
+}
+
 func TestDurableDeliveryState(t *testing.T) {
 	db := testDB(t)
 	ctx := context.Background()
-	_, e := db.pool.Exec(ctx, `TRUNCATE outbox,inbox,retry_jobs,dead_letters`)
-	if e != nil {
-		t.Fatal(e)
+	if _, err := db.pool.Exec(ctx, `TRUNCATE outbox,inbox`); err != nil {
+		t.Fatal(err)
 	}
 	message := domain.Envelope{MessageID: domain.NewID(), AggregateID: domain.NewID()}
-	e = db.Within(ctx, "", func(tx ports.ClinicalTx) error { return tx.AppendCommand(ctx, message) })
-	if e != nil {
-		t.Fatal(e)
+	if err := db.Within(ctx, "", func(tx ports.ClinicalTx) error { return tx.AppendCommand(ctx, message) }); err != nil {
+		t.Fatal(err)
 	}
-	sent, e := db.PublishPending(ctx, func(context.Context, ports.Outgoing) error { return errors.New("mandatory return") })
-	if e == nil || sent {
-		t.Fatal("lost unconfirmed message", sent, e)
+	sent, err := db.PublishPending(ctx, func(context.Context, ports.Outgoing) error { return errors.New("mandatory return") })
+	if err == nil || sent {
+		t.Fatal("lost unconfirmed message", sent, err)
 	}
-	var count int
-	_ = db.pool.QueryRow(ctx, `SELECT count(*) FROM outbox WHERE status='PENDING'`).Scan(&count)
-	if count != 1 {
-		t.Fatal(count)
-	}
-	sent, e = db.PublishPending(ctx, func(_ context.Context, out ports.Outgoing) error {
-		if out.MessageID != message.MessageID || out.Exchange != "umc.commands.clinical.v1" {
+	sent, err = db.PublishPending(ctx, func(_ context.Context, out ports.Outgoing) error {
+		if out.MessageID != message.MessageID {
 			t.Fatal(out)
 		}
 		return nil
 	})
-	if e != nil || !sent {
-		t.Fatal(sent, e)
+	if !sent || err != nil {
+		t.Fatal(sent, err)
 	}
-	sent, e = db.PublishPending(ctx, func(context.Context, ports.Outgoing) error { t.Fatal("republished SENT message"); return nil })
-	if e != nil || sent {
-		t.Fatal(sent, e)
+	sent, err = db.PublishPending(ctx, func(context.Context, ports.Outgoing) error { t.Fatal("republished SENT message"); return nil })
+	if sent || err != nil {
+		t.Fatal(sent, err)
 	}
-	event := domain.Envelope{MessageID: domain.NewID(), MessageType: "IdentityAccessChanged"}
-	raw, _ := json.Marshal(event)
-	d := ports.Incoming{MessageID: event.MessageID, Exchange: "umc.events.identity.v1", RoutingKey: "identity.identity-access-changed.v1", Body: raw}
-	if e = db.ScheduleRetry(ctx, d, 1, 5*time.Second); e != nil {
-		t.Fatal(e)
+	raw, _ := json.Marshal(domain.Envelope{MessageID: domain.NewID(), MessageType: "IdentityAccessChanged"})
+	d := ports.Incoming{MessageID: domain.NewID(), Exchange: "umc.events.identity.v1", RoutingKey: "identity.identity-access-changed.v1", Body: raw}
+	if err = db.ScheduleRetry(ctx, d, 1, 5*time.Second); err != nil {
+		t.Fatal(err)
 	}
-	var status string
-	_ = db.pool.QueryRow(ctx, `SELECT status FROM inbox WHERE message_id=$1`, d.MessageID).Scan(&status)
-	if status != "RETRY_SCHEDULED" {
-		t.Fatal(status)
+	first := retryFromOutbox(t, db, d.MessageID)
+	if !domain.ValidID(first.RetryToken) || first.Attempt != 1 {
+		t.Fatal(first)
 	}
-	_, _ = db.pool.Exec(ctx, `UPDATE retry_jobs SET due_at=now()-interval '1 second'`)
-	jobs, e := db.DueRetries(ctx, 10)
-	if e != nil || len(jobs) != 1 || jobs[0].Attempt != 1 || !domain.ValidID(jobs[0].LeaseID) {
-		t.Fatal(jobs, e)
+	if err = db.ScheduleRetry(ctx, d, 1, 5*time.Second); err != nil {
+		t.Fatal(err)
 	}
-	others, e := db.DueRetries(ctx, 10)
-	if e != nil || len(others) != 0 {
-		t.Fatal("duplicate retry lease", others, e)
-	}
-	if e = db.ScheduleRetry(ctx, jobs[0], 2, 15*time.Second); e != nil {
-		t.Fatal(e)
-	}
-	if e = db.CompleteRetry(ctx, jobs[0]); e != nil {
-		t.Fatal(e)
-	}
-	var attempt int
-	_ = db.pool.QueryRow(ctx, `SELECT status,attempt FROM retry_jobs WHERE message_id=$1`, d.MessageID).Scan(&status, &attempt)
-	if status != "PENDING" || attempt != 2 {
-		t.Fatal("old lease completed newer retry", status, attempt)
-	}
-	if e = db.Quarantine(ctx, d, "RETRY_EXHAUSTED"); e != nil {
-		t.Fatal(e)
-	}
-	if e = db.Quarantine(ctx, d, "RETRY_EXHAUSTED"); e != nil {
-		t.Fatal(e)
-	}
-	_ = db.pool.QueryRow(ctx, `SELECT count(*) FROM dead_letters`).Scan(&count)
+	var count int
+	db.pool.QueryRow(ctx, `SELECT count(*) FROM outbox WHERE destination='umc.retry.clinical.v1'`).Scan(&count)
 	if count != 1 {
-		t.Fatal("quarantine not idempotent", count)
+		t.Fatal("original redelivery scheduled twice", count)
 	}
-	_ = db.pool.QueryRow(ctx, `SELECT count(*) FROM outbox WHERE destination='umc.deadletters.clinical.v1'`).Scan(&count)
+	if err = db.ScheduleRetry(ctx, first, 2, 15*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	second := retryFromOutbox(t, db, d.MessageID)
+	if second.Attempt != 2 || second.RetryToken == first.RetryToken {
+		t.Fatal(second)
+	}
+	if err = db.Within(ctx, "", func(tx ports.ClinicalTx) error {
+		old, e := tx.SeenMessage(ctx, d.MessageID, incomingHash(d), first.RetryToken)
+		if e != nil || !old {
+			t.Fatal("old retry remained executable", old, e)
+		}
+		current, e := tx.SeenMessage(ctx, d.MessageID, incomingHash(d), second.RetryToken)
+		if e != nil || current {
+			t.Fatal("current retry was lost", current, e)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.Quarantine(ctx, second, "RETRY_EXHAUSTED"); err != nil {
+		t.Fatal(err)
+	}
+	if err = db.Quarantine(ctx, second, "RETRY_EXHAUSTED"); err != nil {
+		t.Fatal(err)
+	}
+	db.pool.QueryRow(ctx, `SELECT count(*) FROM outbox WHERE destination='umc.deadletters.clinical.v1'`).Scan(&count)
 	if count != 1 {
-		t.Fatal("deadletter not in transactional outbox", count)
+		t.Fatal("DLQ handoff not idempotent", count)
 	}
 }
 
 func TestOriginalRedeliveryAcknowledgesScheduledRetryWithoutRunningHandler(t *testing.T) {
 	db := testDB(t)
 	ctx := context.Background()
-	app := usecase.New(db, time.Now)
-	receiver := usecase.NewReceiver(app, db)
+	receiver := usecase.NewReceiver(usecase.New(db, time.Now), db)
 	id := domain.NewID()
-	event := domain.Envelope{MessageID: domain.NewID(), MessageKind: "EVENT", MessageType: "IdentityAccessChanged", SchemaVersion: 1, Producer: "identity", AggregateID: id, AggregateVersion: 1, CorrelationID: domain.NewID(), CausationID: domain.NewID(), RequestID: domain.NewID(), OccurredAt: time.Now().UTC()}
+	event := domain.Envelope{MessageID: domain.NewID(), MessageKind: "EVENT", MessageType: "IdentityAccessChanged", SchemaVersion: 1,
+		Producer: "identity", AggregateID: id, AggregateVersion: 1, CorrelationID: domain.NewID(), CausationID: domain.NewID(), RequestID: domain.NewID(), OccurredAt: time.Now().UTC()}
 	event.Payload, _ = json.Marshal(map[string]any{"userId": id, "actorType": "DOCTOR", "status": "ACTIVE", "tokenVersion": 1, "version": 1, "capabilities": []string{}, "phoneVerified": true})
 	body, _ := json.Marshal(event)
 	d := ports.Incoming{MessageID: event.MessageID, Exchange: "umc.events.identity.v1", RoutingKey: "identity.identity-access-changed.v1", Body: body}
@@ -111,33 +123,20 @@ func TestOriginalRedeliveryAcknowledgesScheduledRetryWithoutRunningHandler(t *te
 		t.Fatal(err)
 	}
 	var count int
-	_ = db.pool.QueryRow(ctx, `SELECT count(*) FROM user_access_projection WHERE user_id=$1`, id).Scan(&count)
+	db.pool.QueryRow(ctx, `SELECT count(*) FROM user_access_projection WHERE user_id=$1`, id).Scan(&count)
 	if count != 0 {
-		t.Fatal("original redelivery bypassed scheduled backoff")
+		t.Fatal("original delivery bypassed broker backoff")
 	}
-	_, _ = db.pool.Exec(ctx, `UPDATE retry_jobs SET due_at=now()-interval '1 second' WHERE message_id=$1`, d.MessageID)
-	jobs, err := db.DueRetries(ctx, 10)
-	if err != nil {
+	retry := retryFromOutbox(t, db, d.MessageID)
+	if err := receiver.Receive(ctx, retry); err != nil {
 		t.Fatal(err)
 	}
-	var job *ports.Incoming
-	for i := range jobs {
-		if jobs[i].MessageID == d.MessageID {
-			job = &jobs[i]
-		}
-	}
-	if job == nil {
-		t.Fatal("scheduled job missing")
-	}
-	if err = receiver.Receive(ctx, *job); err != nil {
+	if err := receiver.Receive(ctx, retry); err != nil {
 		t.Fatal(err)
 	}
-	if err = db.CompleteRetry(ctx, *job); err != nil {
-		t.Fatal(err)
-	}
-	_ = db.pool.QueryRow(ctx, `SELECT count(*) FROM user_access_projection WHERE user_id=$1`, id).Scan(&count)
+	db.pool.QueryRow(ctx, `SELECT count(*) FROM user_access_projection WHERE user_id=$1`, id).Scan(&count)
 	if count != 1 {
-		t.Fatal("leased retry did not apply projection")
+		t.Fatal("broker retry failed or duplicated projection", count)
 	}
 }
 

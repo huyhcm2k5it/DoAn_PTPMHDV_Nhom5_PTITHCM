@@ -91,7 +91,7 @@ func (s *Service) handleCatalogChanged(ctx context.Context, exchange string, m d
 			return err
 		}
 		hash := domain.Hash(m)
-		seen, err := tx.SeenMessage(ctx, m.MessageID, hash, retryLease(ctx))
+		seen, err := tx.SeenMessage(ctx, m.MessageID, hash, retryToken(ctx))
 		if err != nil || seen {
 			return err
 		}

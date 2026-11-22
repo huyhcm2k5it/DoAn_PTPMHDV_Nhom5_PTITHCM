@@ -45,7 +45,7 @@ Owner chính viết code, migration, seed, unit/integration test, worker và REA
 
 | Người | Backend sở hữu | Web feature sở hữu | Phần riêng khác |
 | --- | --- | --- | --- |
-| **Huy** | `services/catalog/`, `services/clinical/`, `services/diagnostic/` | `apps/web/src/features/catalog/`, `clinical/`, `diagnostic/` | `tools/huy/`, `tools/catalog-preview/`, cấu hình riêng trong `infra/compose/postgres/huy/` |
+| **Huy** | `services/catalog/`, `services/clinical/`, `services/diagnostic/` | `apps/web/src/features/catalog/`, `clinical/`, `diagnostic/` | `tools/huy/`; phối hợp review Docker/Compose chung, không giữ preview hoặc stack riêng |
 | **Quân** | `services/patient/`, `services/appointment/`, `services/pharmacy/` | `apps/web/src/features/patient/`, `appointment/`, `pharmacy/` | Các công cụ riêng của ba service trên |
 | **Hưng** | `services/identity/`, `services/billing/`, `services/notification/` | `apps/web/src/features/identity/`, `billing/`, `notification/` | Toàn bộ `apps/android/` |
 
@@ -76,7 +76,7 @@ Không lấy code backend của service khác import trực tiếp vào service 
 
 **Điểm cần cập nhật khi đưa quy định vào repo:** README `shared/api/` hiện còn ghi Quân. Theo bảng này, Hưng phụ trách shared API; Quân phụ trách ghép nó vào web shell. Không coi README cũ đã được sửa chỉ vì đã viết file này.
 
-File cấu hình riêng của Huy, ví dụ `infra/compose/huy.catalog.yml` và workflow `huy-go.yml`, là đầu vào để tích hợp, không thay thế Compose/CI toàn nhóm. Đổi file riêng nhưng ảnh hưởng port/network/check của nhóm vẫn cần owner phần chung review.
+Cả nhóm dùng `infra/compose/compose.yaml` và launcher `tools/be/run.py`. Dockerfile từng service được giữ; không tạo Compose hoặc runtime riêng theo thành viên. Workflow `huy-go.yml` kiểm phần Huy trong CI. Đổi port/network/check chung vẫn cần owner phần chung review.
 
 ## 5. Quy trình mỗi người làm một task
 

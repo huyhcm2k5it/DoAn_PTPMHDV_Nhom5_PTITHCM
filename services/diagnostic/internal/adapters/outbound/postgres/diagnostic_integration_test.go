@@ -65,8 +65,9 @@ func TestDiagnosticCatalogSnapshotImport(t *testing.T) {
 func testDB(t *testing.T) *Probe {
 	t.Helper()
 	dsn := os.Getenv("TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Fatal("TEST_DATABASE_URL required")
+	target, parseErr := url.Parse(dsn)
+	if parseErr != nil || !strings.HasPrefix(target.Path, "/umc_huy_test") {
+		t.Fatal("isolated umc_huy_test* database required")
 	}
 	ctx := context.Background()
 	admin, e := New(ctx, dsn)
@@ -330,7 +331,7 @@ func TestClinicalCreateLabWire(t *testing.T) {
 	}
 	db.pool.QueryRow(ctx, "SELECT count(*) FROM outbox WHERE envelope->>'messageType'='RequestCharge'").Scan(&charges)
 	db.pool.QueryRow(ctx, "SELECT count(*) FROM outbox WHERE envelope->>'messageType'='LabOrderResolved'").Scan(&resolved)
-	db.pool.QueryRow(ctx, "SELECT count(*) FROM dead_letters").Scan(&dead)
+	db.pool.QueryRow(ctx, "SELECT count(*) FROM outbox WHERE destination='umc.deadletters.diagnostic.v1'").Scan(&dead)
 	if orders != 1 || charges != 1 || resolved != 1 || dead != 0 {
 		t.Fatalf("Clinical wire produced orders=%d charges=%d resolved=%d dead=%d", orders, charges, resolved, dead)
 	}

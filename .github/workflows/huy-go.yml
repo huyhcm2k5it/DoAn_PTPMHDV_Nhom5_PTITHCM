@@ -1,9 +1,9 @@
 name: Huy services and contracts
 on:
   push:
-    paths: ['services/catalog/**', 'services/clinical/**', 'services/diagnostic/**', 'contracts/http/catalog*', 'contracts/http/clinical*', 'contracts/http/diagnostic*', 'contracts/messages/**', 'tools/huy/**', 'tools/catalog-preview/**', 'tools/clinical-preview/**', 'apps/web/src/features/catalog/**', 'apps/web/src/features/clinical/**', 'apps/web/src/features/diagnostic/**', '.github/workflows/huy-go.yml']
+    paths: ['services/catalog/**', 'services/clinical/**', 'services/diagnostic/**', 'contracts/http/catalog*', 'contracts/http/clinical*', 'contracts/http/diagnostic*', 'contracts/messages/**', 'tools/huy/**', 'apps/web/**', '.github/workflows/huy-go.yml']
   pull_request:
-    paths: ['services/catalog/**', 'services/clinical/**', 'services/diagnostic/**', 'contracts/http/catalog*', 'contracts/http/clinical*', 'contracts/http/diagnostic*', 'contracts/messages/**', 'tools/huy/**', 'tools/catalog-preview/**', 'tools/clinical-preview/**', 'apps/web/src/features/catalog/**', 'apps/web/src/features/clinical/**', 'apps/web/src/features/diagnostic/**', '.github/workflows/huy-go.yml']
+    paths: ['services/catalog/**', 'services/clinical/**', 'services/diagnostic/**', 'contracts/http/catalog*', 'contracts/http/clinical*', 'contracts/http/diagnostic*', 'contracts/messages/**', 'tools/huy/**', 'apps/web/**', '.github/workflows/huy-go.yml']
 permissions:
   contents: read
 jobs:
@@ -101,22 +101,6 @@ jobs:
           python tools/huy/generate_week3_messages.py
           python tools/huy/generate_remaining_contracts.py
           git diff --exit-code -- contracts/http/catalog.openapi.json contracts/http/clinical.openapi.json contracts/http/diagnostic.openapi.json contracts/messages
-  catalog-web:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: tools/catalog-preview
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24.14.0'
-          cache: npm
-          cache-dependency-path: tools/catalog-preview/package-lock.json
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
   clinical-integration:
     runs-on: ubuntu-latest
     services:
@@ -215,23 +199,14 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: tools/clinical-preview
+        working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24.14.0'
           cache: npm
-          cache-dependency-path: tools/clinical-preview/package-lock.json
-      - name: Install shared web dependencies
-        working-directory: apps/web
-        run: npm ci
-      - name: Verify shared web and Huy workspaces
-        working-directory: apps/web
-        run: |
-          npm run typecheck
-          npm test
-          npm run build
+          cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
       - run: npm run typecheck
       - run: npm test

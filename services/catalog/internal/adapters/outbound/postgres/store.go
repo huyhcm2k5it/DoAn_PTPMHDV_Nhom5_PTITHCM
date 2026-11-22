@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"time"
 	"umccare/catalog/internal/application/ports"
 	"umccare/catalog/internal/domain"
-	"umccare/catalog/migrations"
 )
 
 type Store struct{ pool *pgxpool.Pool }
@@ -30,64 +30,7 @@ func New(ctx context.Context, dsn string) (*Store, error) {
 	return &Store{pool}, nil
 }
 func (s *Store) Close() { s.pool.Close() }
-func (s *Store) Ready(ctx context.Context) error {
-	var version int
-	if err := s.pool.QueryRow(ctx, "SELECT COALESCE(max(version),0) FROM schema_migrations").Scan(&version); err != nil {
-		return err
-	}
-	if version < 4 {
-		return domain.Fail("SERVICE_UNAVAILABLE", "Catalog schema migrations are required")
-	}
-	return nil
-}
-func (s *Store) Migrate(ctx context.Context) error {
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-	if _, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(74001001)"); err != nil {
-		return err
-	}
-	if _, err = tx.Exec(ctx, "CREATE TABLE IF NOT EXISTS schema_migrations(version integer PRIMARY KEY,applied_at timestamptz NOT NULL DEFAULT now())"); err != nil {
-		return err
-	}
-	for _, migration := range []struct {
-		version int
-		file    string
-	}{{1, "000001_catalog.up.sql"}, {2, "000002_catalog_stream.up.sql"}, {3, "000003_doctor_mapping.up.sql"}, {4, "000004_catalog_erd_alignment.up.sql"}} {
-		var exists bool
-		if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=$1)", migration.version).Scan(&exists); err != nil {
-			return err
-		}
-		if exists {
-			continue
-		}
-		sql, readErr := migrations.Files.ReadFile(migration.file)
-		if readErr != nil {
-			return readErr
-		}
-		if _, err = tx.Exec(ctx, string(sql)); err != nil {
-			return err
-		}
-		if _, err = tx.Exec(ctx, "INSERT INTO schema_migrations(version) VALUES($1)", migration.version); err != nil {
-			return err
-		}
-	}
-	return tx.Commit(ctx)
-}
-func (s *Store) Seed(ctx context.Context) error {
-	sql, _ := migrations.Files.ReadFile("seed.sql")
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-	if _, err = tx.Exec(ctx, string(sql)); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
-}
+
 func (s *Store) Departments(ctx context.Context) ([]domain.Department, error) {
 	rows, err := s.pool.Query(ctx, "SELECT id::text,code,name,status FROM departments WHERE status='ACTIVE' ORDER BY name,id")
 	if err != nil {

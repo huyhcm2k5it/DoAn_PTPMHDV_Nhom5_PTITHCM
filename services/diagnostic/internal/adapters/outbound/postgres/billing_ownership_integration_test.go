@@ -43,7 +43,7 @@ func TestSharedBillingEventsDoNotPolluteDiagnosticRetries(t *testing.T) {
 	}
 	var processed, retries, dead, orders, objects, outgoing int
 	err := db.pool.QueryRow(ctx, `SELECT (SELECT count(*) FROM inbox WHERE status='PROCESSED'),
-		(SELECT count(*) FROM retry_jobs),(SELECT count(*) FROM dead_letters),
+		(SELECT count(*) FROM outbox WHERE destination='umc.retry.diagnostic.v1'),(SELECT count(*) FROM outbox WHERE destination='umc.deadletters.diagnostic.v1'),
 		(SELECT count(*) FROM lab_orders),(SELECT count(*) FROM objects),(SELECT count(*) FROM outbox)`).Scan(&processed, &retries, &dead, &orders, &objects, &outgoing)
 	if err != nil || processed != 6 || retries != 0 || dead != 0 || orders != 0 || objects != 0 || outgoing != 0 {
 		t.Fatalf("foreign billing receipts=%d retries=%d dead=%d orders=%d objects=%d outbox=%d err=%v", processed, retries, dead, orders, objects, outgoing, err)
