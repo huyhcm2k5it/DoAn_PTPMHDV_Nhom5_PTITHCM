@@ -63,6 +63,17 @@ def send_otp(email, code, purpose, correlation_id):
             "meta": {"correlationId": correlation_id}
         }, status=503)
 
+
+def otp_cooldown(phone, purpose, correlation_id):
+    """Caller holds the User row lock so all send routes share one cooldown."""
+    latest = OtpRequest.objects.filter(phone=phone, purpose=purpose).order_by("-created_at").first()
+    if latest and (timezone.now() - latest.created_at).total_seconds() < 60:
+        return Response({
+            "error": {"code": "OTP_NOT_RESENDABLE_YET", "message": "Chưa hết thời gian chờ gửi OTP (60s)."},
+            "meta": {"correlationId": correlation_id},
+        }, status=409)
+    return None
+
 # ==============================================================================
 # IA-001: ĐĂNG KÝ TÀI KHOẢN PATIENT
 # ==============================================================================
@@ -109,10 +120,24 @@ def register_view(request):
     if not existing_user:
         user = User(phone=phone, email=email, actor_type="PATIENT", status="PENDING_VERIFICATION")
         user.set_password(password)
-        user.save()
-        from app.application.access_events import publish_access
-        publish_access(user)
-    else:
+        user, created = User.objects.get_or_create(phone=phone, defaults={
+            "email": email, "password_hash": user.password_hash,
+            "actor_type": "PATIENT", "status": "PENDING_VERIFICATION",
+        })
+        # Lock even when another registration won the first-insert race.
+        user = User.objects.select_for_update().get(pk=user.pk)
+        if created:
+            from app.application.access_events import publish_access
+            publish_access(user)
+        else:
+            existing_user = user
+    if existing_user:
+        if existing_user.status != "PENDING_VERIFICATION" or existing_user.actor_type != "PATIENT":
+            return Response({"error": {"code": "PHONE_ALREADY_REGISTERED", "message": "Số điện thoại này đã được đăng ký."},
+                             "meta": {"correlationId": correlation_id}}, status=409)
+        cooldown = otp_cooldown(phone, "REGISTER", correlation_id)
+        if cooldown is not None:
+            return cooldown
         user = existing_user
         user.email = email
         user.set_password(password)
@@ -248,16 +273,11 @@ def otp_resend_view(request):
             "meta": {"correlationId": correlation_id}
         }, status=400)
 
-    latest_otp = OtpRequest.objects.select_for_update().filter(phone=phone, purpose=purpose).order_by("-created_at").first()
-    if latest_otp:
-        time_elapsed = (timezone.now() - latest_otp.created_at).total_seconds()
-        if time_elapsed < 60:
-            return Response({
-                "error": {"code": "OTP_NOT_RESENDABLE_YET", "message": f"Chưa hết thời gian chờ ({int(60 - time_elapsed)}s)."},
-                "meta": {"correlationId": correlation_id}
-            }, status=409)
-
     user = User.objects.select_for_update().filter(phone=phone).first()
+    cooldown = otp_cooldown(phone, purpose, correlation_id)
+    if cooldown is not None:
+        return cooldown
+    latest_otp = OtpRequest.objects.filter(phone=phone, purpose=purpose).order_by("-created_at").first()
     if purpose == "REGISTER" and (not user or user.actor_type != "PATIENT" or user.status != "PENDING_VERIFICATION"):
         return Response({"error": {"code": "ACCOUNT_NOT_ACTIVATABLE", "message": "Account cannot be activated."}}, status=409)
 
@@ -304,7 +324,7 @@ def forgot_password_view(request):
         }, status=400)
 
     user = User.objects.select_for_update().filter(phone=phone).first()
-    if user and user.status == "ACTIVE":
+    if user and user.status == "ACTIVE" and otp_cooldown(phone, "RESET", correlation_id) is None:
         target_email = user.email
         otp_code = f"{secrets.randbelow(900000) + 100000:06d}"
         expires_at = timezone.now() + timedelta(minutes=5)
