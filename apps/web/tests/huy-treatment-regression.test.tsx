@@ -76,24 +76,20 @@ function treatment() {
       .mockResolvedValue([
         { id: 'test', name: 'Huyết học', revision: 1, status: 'ACTIVE' },
       ]),
-    createPrescription: vi
-      .fn()
-      .mockResolvedValue({
-        prescription: { id: 'rx', state: 'DRAFT', version: 1, lines: [] },
-      }),
+    createPrescription: vi.fn().mockResolvedValue({
+      prescription: { id: 'rx', state: 'DRAFT', version: 1, lines: [] },
+    }),
     updatePrescription: vi.fn(),
     deletePrescription: vi.fn(),
     finalizePrescription: vi.fn(),
     complete: vi
       .fn()
       .mockResolvedValue({ visitId: 'visit', state: 'SIGNED', version: 3 }),
-    requestLab: vi
-      .fn()
-      .mockResolvedValue({
-        requestId: 'req',
-        state: 'PENDING',
-        statusUrl: '/api/v1/visits/visit',
-      }),
+    requestLab: vi.fn().mockResolvedValue({
+      requestId: 'req',
+      state: 'PENDING',
+      statusUrl: '/api/v1/visits/visit',
+    }),
   };
 }
 it('keeps LAB pending as pending and submits only Catalog IDs/revisions', async () => {

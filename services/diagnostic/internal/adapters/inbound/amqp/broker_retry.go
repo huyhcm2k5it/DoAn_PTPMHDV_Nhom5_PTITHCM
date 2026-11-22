@@ -59,7 +59,10 @@ func startBrokerRetries(parent context.Context, conn *amqp.Connection,
 		return nil, nil, err
 	}
 	ctx, cancel := context.WithCancel(parent)
-	deliveries, err := ch.ConsumeWithContext(ctx, retryQueue, "", false, false, false, false, nil)
+	// This channel has one lifecycle owner: stop closes it after canceling jobs.
+	// ConsumeWithContext would send an asynchronous basic.cancel that can race
+	// channel.close and invalidate the shared connection during a restart.
+	deliveries, err := ch.Consume(retryQueue, "", false, false, false, false, nil)
 	if err != nil {
 		cancel()
 		ch.Close()
@@ -124,6 +127,14 @@ func startBrokerRetries(parent context.Context, conn *amqp.Connection,
 			}
 		}
 	}()
-	stop := func() { cancel(); ch.Close(); <-done; jobs.Wait() }
+	var stopOnce sync.Once
+	stop := func() {
+		stopOnce.Do(func() {
+			cancel()
+			ch.Close()
+			<-done
+			jobs.Wait()
+		})
+	}
 	return failures, stop, nil
 }

@@ -138,7 +138,7 @@ func Run(ctx context.Context, url string, store Store, receiver Receiver, declar
 	if e = inCh.Qos(10, 0, false); e != nil {
 		return e
 	}
-	deliveries, e := inCh.ConsumeWithContext(ctx, "evt.clinical.v1", "", false, false, false, false, nil)
+	deliveries, e := inCh.Consume("evt.clinical.v1", "", false, false, false, false, nil)
 	if e != nil {
 		return e
 	}

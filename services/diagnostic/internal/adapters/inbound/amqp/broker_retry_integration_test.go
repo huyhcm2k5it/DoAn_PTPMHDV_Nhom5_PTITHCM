@@ -78,6 +78,7 @@ func TestBrokerRetrySurvivesConsumerRestartAndHonorsDelay(t *testing.T) {
 		}
 	}
 	stop()
+	stop() // Repeated shutdown must be safe before reusing the connection.
 	stop = func() {}
 	select {
 	case <-received:
@@ -100,6 +101,7 @@ func TestBrokerRetrySurvivesConsumerRestartAndHonorsDelay(t *testing.T) {
 		t.Fatal(ctx.Err())
 	}
 	stop()
+	stop() // Repeated shutdown must be safe before reusing the connection.
 	stop = func() {}
 	// If the callback returned but the ACK lost the race with stop, redelivery is
 	// valid and the PostgreSQL inbox token test guarantees idempotent processing.
