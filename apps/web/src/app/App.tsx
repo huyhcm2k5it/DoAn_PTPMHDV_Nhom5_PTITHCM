@@ -53,6 +53,8 @@ import { DiagnosticFeature } from '../features/diagnostic/DiagnosticFeature';
 import type { DiagnosticApi } from '../features/diagnostic/types';
 import { createPharmacyApi } from '../features/pharmacy/api';
 import type { PharmacyApi } from '../features/pharmacy/types';
+import { createBillingApi } from '../features/billing/api';
+import type { BillingApi } from '../features/billing/types';
 import { StockPage } from '../features/pharmacy/pages/StockPage';
 import { PrescriptionQueue } from '../features/pharmacy/pages/PrescriptionQueue';
 import { PrescriptionDetail } from '../features/pharmacy/pages/PrescriptionDetail';
@@ -595,6 +597,7 @@ function AppRoutes({
   clinicalApi,
   diagnosticApi,
   pharmacyApi,
+  billingApi,
   session,
 }: {
   patientApi: PatientApi;
@@ -603,6 +606,7 @@ function AppRoutes({
   clinicalApi: ClinicalApi;
   diagnosticApi: DiagnosticApi;
   pharmacyApi: PharmacyApi;
+  billingApi: BillingApi;
   session?: WebRuntime['session'];
 }) {
   return (
@@ -663,7 +667,12 @@ function AppRoutes({
         />
         <Route
           path="/patient/appointments/review"
-          element={<BookingReview api={appointmentApi} />}
+          element={
+            <BookingReview
+              api={appointmentApi}
+              billingApi={billingApi}
+            />
+          }
         />
         <Route
           path="/patient/appointments"
@@ -899,6 +908,10 @@ export function App({ runtime: propRuntime }: { runtime?: WebRuntime } = {}) {
       }),
     [apiTransport, runtime?.session?.lease],
   );
+  const billingApi = useMemo(
+    () => createBillingApi(apiTransport, runtime?.session?.lease),
+    [apiTransport, runtime?.session?.lease],
+  );
   return (
     <BrowserRouter>
       <AppRoutes
@@ -909,6 +922,7 @@ export function App({ runtime: propRuntime }: { runtime?: WebRuntime } = {}) {
         clinicalApi={clinicalApi}
         diagnosticApi={diagnosticApi}
         pharmacyApi={pharmacyApi}
+        billingApi={billingApi}
         session={runtime?.session}
       />
     </BrowserRouter>
