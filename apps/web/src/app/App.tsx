@@ -670,10 +670,7 @@ function AppRoutes({
         <Route
           path="/patient/appointments/review"
           element={
-            <BookingReview
-              api={appointmentApi}
-              billingApi={billingApi}
-            />
+            <BookingReview api={appointmentApi} billingApi={billingApi} />
           }
         />
         <Route
