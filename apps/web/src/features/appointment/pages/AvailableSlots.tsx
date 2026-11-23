@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import type {
   CatalogApi,
@@ -29,55 +29,6 @@ function timeInVietnam(value: string) {
       }).format(date)
     : value;
 }
-
-// Dữ liệu mẫu chuẩn Figma (1:3502)
-const FIGMA_DOCTORS = [
-  {
-    id: 'doc-nguyen-minh-anh',
-    degree: 'Tiến sĩ, Bác sĩ',
-    displayName: 'TS.BS Nguyễn Minh Anh',
-    specialty: 'Tim mạch',
-    rating: '★ 4.9',
-    fee: '150.000 đ',
-    availableSlotsCount: 6,
-    avatar: '/images/doctors/doctor-1.png',
-  },
-  {
-    id: 'doc-tran-thi-mai',
-    degree: 'Bác sĩ chuyên khoa II',
-    displayName: 'BS.CKII Trần Thị Mai',
-    specialty: 'Tim mạch can thiệp',
-    rating: '★ 4.8',
-    fee: '150.000 đ',
-    availableSlotsCount: 4,
-    avatar: '/images/doctors/doctor-2.png',
-  },
-  {
-    id: 'doc-le-hoang-nam',
-    degree: 'Thạc sĩ, Bác sĩ',
-    displayName: 'ThS.BS Lê Hoàng Nam',
-    specialty: 'Nội tim mạch',
-    rating: '★ 4.7',
-    fee: '150.000 đ',
-    availableSlotsCount: 5,
-    avatar: '/images/doctors/doctor-3.png',
-  },
-];
-
-const DEFAULT_TIME_SLOTS = [
-  { time: '08:00', state: 'available' },
-  { time: '08:30', state: 'selected' },
-  { time: '09:00', state: 'available' },
-  { time: '09:30', state: 'booked' },
-  { time: '10:00', state: 'available' },
-  { time: '10:30', state: 'available' },
-  { time: '13:30', state: 'available' },
-  { time: '14:00', state: 'booked' },
-  { time: '14:30', state: 'available' },
-  { time: '15:00', state: 'available' },
-  { time: '15:30', state: 'available' },
-  { time: '16:00', state: 'booked' },
-];
 
 const MONTH_NAMES = [
   'Tháng 1',
@@ -160,21 +111,18 @@ export function AvailableSlots({
   }>({ loading: true });
   const [catalogRetry, setCatalogRetry] = useState(0);
 
-  const [submitted, setSubmitted] = useState(false);
   const [slotState, setSlotState] = useState<{
+    key?: string;
     loading: boolean;
     items?: AvailableSlot[];
     error?: unknown;
   }>({ loading: false });
   const [slotRetry, setSlotRetry] = useState(0);
   const [holdError, setHoldError] = useState<unknown>();
-  const [selectedSlot, setSelectedSlot] = useState<AvailableSlot>();
+  const [selectedSlotId, setSelectedSlotId] = useState('');
   const [doctorPage, setDoctorPage] = useState(1);
   const [doctorTotal, setDoctorTotal] = useState(0);
   const [holdingSlot, setHoldingSlot] = useState<string>();
-
-  // Slot đang được người dùng chọn trên UI
-  const [selectedSlotTime, setSelectedSlotTime] = useState<string>('08:30');
 
   // Lịch tương tác tháng / năm
   const [calendarYear, setCalendarYear] = useState(() => {
@@ -204,7 +152,6 @@ export function AvailableSlots({
     const safeDay = Math.min(currentDay, maxDays);
     const formatted = `${calendarYear}-${String(newMonth + 1).padStart(2, '0')}-${String(safeDay).padStart(2, '0')}`;
     setDate(formatted);
-    setSubmitted(true);
     setSlotRetry((r) => r + 1);
   }
 
@@ -215,7 +162,6 @@ export function AvailableSlots({
     const safeDay = Math.min(currentDay, maxDays);
     const formatted = `${newYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(safeDay).padStart(2, '0')}`;
     setDate(formatted);
-    setSubmitted(true);
     setSlotRetry((r) => r + 1);
   }
 
@@ -228,7 +174,6 @@ export function AvailableSlots({
     setCalendarYear(y);
     setCalendarMonth(m);
     setDate(formatted);
-    setSubmitted(true);
     setSlotRetry((r) => r + 1);
   }
 
@@ -255,7 +200,6 @@ export function AvailableSlots({
   function handleSelectDay(dayNum: number) {
     const formatted = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
     setDate(formatted);
-    setSubmitted(true);
     setSlotRetry((r) => r + 1);
   }
 
@@ -270,9 +214,9 @@ export function AvailableSlots({
   }, [calendarYear, calendarMonth]);
 
   const selectedDateLabel = useMemo(() => {
-    if (!date) return 'Buổi sáng';
+    if (!date) return 'Giờ khám';
     const [y, m, d] = date.split('-').map(Number);
-    if (!y || !m || !d) return 'Buổi sáng';
+    if (!y || !m || !d) return 'Giờ khám';
     const dateObj = new Date(y, m - 1, d);
     const dayNames = [
       'Chủ Nhật',
@@ -286,7 +230,7 @@ export function AvailableSlots({
     const dayName = dayNames[dateObj.getDay()] || 'Thứ Hai';
     const dayStr = String(d).padStart(2, '0');
     const monthStr = String(m).padStart(2, '0');
-    return `${dayName}, ${dayStr}/${monthStr} · Buổi sáng`;
+    return `${dayName}, ${dayStr}/${monthStr}`;
   }, [date]);
 
   // Load danh sách chuyên khoa ban đầu
@@ -321,11 +265,6 @@ export function AvailableSlots({
 
   // Load danh sách bác sĩ & dịch vụ theo chuyên khoa
   useEffect(() => {
-    if (!departmentId) {
-      setDoctors([]);
-      setServices([]);
-      return;
-    }
     const controller = new AbortController();
     let current = true;
     setCatalogState({ loading: true });
@@ -335,9 +274,11 @@ export function AvailableSlots({
     ]).then(
       ([doctorPageData, serviceItems]) => {
         if (!current) return;
-        setDoctors(doctorPageData.items);
+        setDoctors(
+          doctorPageData.items.filter((item) => item.status === 'ACTIVE'),
+        );
         setDoctorTotal(doctorPageData.total);
-        setServices(serviceItems);
+        setServices(serviceItems.filter((item) => item.status === 'ACTIVE'));
         setCatalogState({ loading: false });
       },
       (error) => {
@@ -352,201 +293,93 @@ export function AvailableSlots({
     };
   }, [catalog, departmentId, catalogRetry, doctorPage]);
 
-  // Tra cứu khung giờ thực tế từ API
+  const canBook = Boolean(
+    assistedPatient?.id === patientId ||
+    profiles?.some((profile) => profile.id === patientId),
+  );
+  const filtersReady = Boolean(doctorId && serviceId && date);
+  const slotKey = JSON.stringify([doctorId, serviceId, date, slotRetry]);
+  const currentSlots =
+    filtersReady && slotState.key === slotKey ? (slotState.items ?? []) : [];
+  const selectedSlot = currentSlots.find(
+    (slot) => slot.slotId === selectedSlotId,
+  );
+  const loadingSlots =
+    filtersReady && (slotState.key !== slotKey || slotState.loading);
+  const visibleDoctors = doctors.filter((doctor) =>
+    doctor.displayName
+      .toLocaleLowerCase('vi')
+      .includes(searchKeyword.trim().toLocaleLowerCase('vi')),
+  );
+  const service = services.find((item) => item.id === serviceId);
+
   useEffect(() => {
-    if (!submitted || !doctorId || !serviceId || !date) return;
+    setSelectedSlotId('');
+    setHoldError(undefined);
+    if (!doctorId || !serviceId || !date) return;
     const controller = new AbortController();
-    let current = true;
-    setSelectedSlot(undefined);
-    setSlotState({ loading: true });
+    setSlotState({ key: slotKey, loading: true });
     api.listAvailable({ doctorId, serviceId, date }, controller.signal).then(
       (items) => {
-        if (current) setSlotState({ loading: false, items });
+        if (!controller.signal.aborted)
+          setSlotState({ key: slotKey, loading: false, items });
       },
       (error) => {
-        if (current && !controller.signal.aborted) {
-          setSlotState({ loading: false, error });
-        }
+        if (!controller.signal.aborted)
+          setSlotState({ key: slotKey, loading: false, error });
       },
     );
-    return () => {
-      current = false;
-      controller.abort();
-    };
-  }, [api, submitted, doctorId, serviceId, date, slotRetry]);
+    return () => controller.abort();
+  }, [api, doctorId, serviceId, date, slotKey]);
 
-  function searchSlots(event?: React.FormEvent<HTMLFormElement>) {
-    if (event) event.preventDefault();
-    setSubmitted(true);
-    setSlotRetry((value) => value + 1);
-  }
-
-  // Danh sách bác sĩ hiển thị (kết hợp API hoặc dữ liệu Figma mẫu)
-  const displayDoctors = useMemo(() => {
-    if (doctors.length > 0) {
-      return doctors
-        .filter((d) =>
-          searchKeyword
-            ? d.displayName.toLowerCase().includes(searchKeyword.toLowerCase())
-            : true,
-        )
-        .map((d, index) => ({
-          id: d.id,
-          degree: 'Bác sĩ chuyên khoa',
-          displayName: d.displayName,
-          specialty:
-            departments.find((dep) => dep.id === d.departmentId)?.name ??
-            'Chuyên khoa',
-          rating: '★ 4.9',
-          fee: '150.000 đ',
-          availableSlotsCount: 4,
-          avatar:
-            index % 3 === 0
-              ? '/images/doctors/doctor-1.png'
-              : index % 3 === 1
-                ? '/images/doctors/doctor-2.png'
-                : '/images/doctors/doctor-3.png',
-        }));
-    }
-    return FIGMA_DOCTORS.filter((d) =>
-      searchKeyword
-        ? d.displayName.toLowerCase().includes(searchKeyword.toLowerCase()) ||
-          d.specialty.toLowerCase().includes(searchKeyword.toLowerCase())
-        : true,
-    );
-  }, [doctors, departments, searchKeyword]);
-
-  async function holdSlot(slot: AvailableSlot) {
-    const currentDoc =
-      displayDoctors.find((d) => d.id === doctorId) || displayDoctors[0];
-    const docName = currentDoc?.displayName || 'TS.BS Nguyễn Minh Anh';
-    const specName = currentDoc?.specialty || 'Tim mạch';
-    const slotString = `${timeInVietnam(slot.startAt)} · ${date}`;
-
-    const targetPatientId = patientId || 'patient-default';
-    const signature = JSON.stringify([targetPatientId, slot.slotId]);
+  async function handleContinue() {
+    if (!selectedSlot || !canBook || holdingSlot) return;
+    const slot = selectedSlot;
+    const signature = JSON.stringify([patientId, slot.slotId]);
     if (holdIntent.current?.signature !== signature) {
       holdIntent.current = { signature, key: crypto.randomUUID() };
     }
-
     setHoldError(undefined);
     setHoldingSlot(slot.slotId);
     try {
       const hold = await api.createHold(
-        { patientId: targetPatientId, slotId: slot.slotId },
+        { patientId, slotId: slot.slotId },
         holdIntent.current.key,
       );
       holdIntent.current = null;
-      navigate(
-        `/patient/appointments/review?patientId=${encodeURIComponent(targetPatientId)}&holdId=${encodeURIComponent(hold.holdId)}&doctorName=${encodeURIComponent(docName)}&specialty=${encodeURIComponent(specName)}&timeSlot=${encodeURIComponent(slotString)}`,
-        {
-          state: {
-            expiresAt: hold.expiresAt,
-            amountVnd: hold.priceSnapshot?.amountVnd ?? 150000,
-            startAt: slot.startAt,
-            patientName:
-              assistedPatient?.fullName ??
-              profiles?.find((item) => item.id === targetPatientId)?.fullName ??
-              'Nguyễn Hoàng Nam',
-            doctorName: docName,
-            serviceName:
-              services.find((item) => item.id === serviceId)?.name ??
-              'Khám Tim mạch theo yêu cầu',
-            departmentName:
-              departments.find((item) => item.id === departmentId)?.name ??
-              specName,
-            timeSlot: slotString,
-            returnTo: assistedPatient
-              ? '/staff/reception?tab=r02'
-              : '/patient/appointments/new?' +
-                new URLSearchParams({
-                  patientId: targetPatientId,
-                  departmentId,
-                  doctorId,
-                  serviceId,
-                  date,
-                }),
-          },
+      const params = new URLSearchParams({ patientId, holdId: hold.holdId });
+      navigate('/patient/appointments/review?' + params, {
+        state: {
+          holdId: hold.holdId,
+          patientId,
+          expiresAt: hold.expiresAt,
+          amountVnd: hold.priceSnapshot?.amountVnd,
+          startAt: slot.startAt,
+          patientName:
+            assistedPatient?.fullName ??
+            profiles?.find((item) => item.id === patientId)?.fullName,
+          doctorName: doctors.find((item) => item.id === slot.doctorId)
+            ?.displayName,
+          serviceName: service?.name,
+          departmentName: departments.find(
+            (item) => item.id === (service?.departmentId ?? departmentId),
+          )?.name,
+          returnTo: assistedPatient
+            ? '/staff/reception?tab=r02'
+            : '/patient/appointments/new?' +
+              new URLSearchParams({
+                patientId,
+                departmentId,
+                doctorId,
+                serviceId,
+                date,
+              }),
         },
-      );
+      });
     } catch (error) {
       setHoldError(error);
     } finally {
       setHoldingSlot(undefined);
-    }
-  }
-
-  async function handleContinue() {
-    const currentDoc =
-      displayDoctors.find((d) => d.id === doctorId) || displayDoctors[0];
-    const docName = currentDoc?.displayName || 'TS.BS Nguyễn Minh Anh';
-    const specName = currentDoc?.specialty || 'Tim mạch';
-    const slotString = `${selectedSlotTime} · ${date}`;
-
-    // Nếu có danh sách slot thực tế từ API, giữ slot tương ứng
-    if (slotState.items && slotState.items.length > 0) {
-      const targetSlot =
-        slotState.items.find(
-          (s) => timeInVietnam(s.startAt) === selectedSlotTime,
-        ) ?? slotState.items[0];
-      await holdSlot(targetSlot);
-      return;
-    }
-
-    // Nếu dùng demo mode hoặc slot chưa nạp từ API, tạo hold qua API nếu có
-    setHoldError(undefined);
-    try {
-      const targetPatientId = patientId || 'patient-default';
-      const slotId = `slot-${selectedSlotTime.replace(':', '')}`;
-      const signature = JSON.stringify([targetPatientId, slotId]);
-      if (holdIntent.current?.signature !== signature) {
-        holdIntent.current = { signature, key: crypto.randomUUID() };
-      }
-      if (api.createHold) {
-        const hold = await api.createHold(
-          { patientId: targetPatientId, slotId },
-          holdIntent.current.key,
-        );
-        holdIntent.current = null;
-        navigate(
-          `/patient/appointments/review?patientId=${encodeURIComponent(targetPatientId)}&holdId=${encodeURIComponent(hold.holdId)}&doctorName=${encodeURIComponent(docName)}&specialty=${encodeURIComponent(specName)}&timeSlot=${encodeURIComponent(slotString)}`,
-          {
-            state: {
-              expiresAt: hold.expiresAt,
-              amountVnd: hold.priceSnapshot?.amountVnd ?? 150000,
-              patientName:
-                assistedPatient?.fullName ??
-                profiles?.find((item) => item.id === targetPatientId)
-                  ?.fullName ??
-                'Nguyễn Hoàng Nam',
-              doctorName: docName,
-              serviceName:
-                services.find((item) => item.id === serviceId)?.name ??
-                'Khám Tim mạch theo yêu cầu',
-              departmentName:
-                departments.find((item) => item.id === departmentId)?.name ??
-                specName,
-              timeSlot: slotString,
-              returnTo: assistedPatient
-                ? '/staff/reception?tab=r02'
-                : '/patient/appointments/new?' +
-                  new URLSearchParams({
-                    patientId: targetPatientId,
-                    departmentId,
-                    doctorId,
-                    serviceId,
-                    date,
-                  }),
-            },
-          },
-        );
-      } else {
-        navigate(
-          `/patient/appointments/review?patientId=${encodeURIComponent(targetPatientId)}&holdId=hold-demo-1&doctorName=${encodeURIComponent(docName)}&specialty=${encodeURIComponent(specName)}&timeSlot=${encodeURIComponent(slotString)}`,
-        );
-      }
-    } catch (error) {
-      setHoldError(error);
     }
   }
 
@@ -591,23 +424,24 @@ export function AvailableSlots({
       </nav>
 
       {/* 2. Bố cục 2 cột chính: Cột trái (Bác sĩ) + Cột phải (Lịch & Giờ) */}
-      <div className="booking-columns-layout">
+      <div className="booking-layout-grid">
         {/* CỘT TRÁI (697px): Tìm kiếm & Danh sách thẻ bác sĩ (Figma 1:3552) */}
         <section
-          className="booking-doctors-section"
+          className="booking-doctors-section booking-left-col"
           aria-label="Danh sách bác sĩ"
         >
           {/* Thanh tìm kiếm & lọc chuyên khoa (Figma 1:3554) */}
-          <div className="doctor-filter-bar">
+          <div className="doctor-filter-toolbar">
             <select
-              className="doctor-dept-select"
+              className="doctor-filter-select"
               value={departmentId}
-              aria-label="Chọn chuyên khoa lọc"
+              aria-label="Chuyên khoa"
+              disabled={holdingSlot != null}
               onChange={(e) => {
                 setDepartmentId(e.target.value);
+                setDoctorPage(1);
                 setDoctorId('');
                 setServiceId('');
-                setSubmitted(false);
               }}
             >
               <option value="">Chuyên khoa: Tất cả ▾</option>
@@ -628,81 +462,42 @@ export function AvailableSlots({
             />
           </div>
 
-          {/* Form ẩn nhưng đầy đủ input & label để đảm bảo 100% test contract / accessibility pass */}
-          <form className="sr-hidden-form" onSubmit={searchSlots}>
-            <label htmlFor="test-patient-id">Mã hồ sơ bệnh nhân</label>
-            <input
-              id="test-patient-id"
-              value={patientId}
-              onChange={(e) => setPatientId(e.target.value)}
-            />
-
-            <label htmlFor="test-department">Chuyên khoa</label>
+          <label className="booking-field">
+            <span>Dịch vụ khám</span>
             <select
-              id="test-department"
-              value={departmentId}
-              onChange={(e) => {
-                setDepartmentId(e.target.value);
-                setDoctorId('');
-                setServiceId('');
-                setSubmitted(false);
-              }}
-            >
-              <option value="">Chọn chuyên khoa</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-
-            <label htmlFor="test-doctor">Bác sĩ</label>
-            <select
-              id="test-doctor"
-              value={doctorId}
-              onChange={(e) => {
-                setDoctorId(e.target.value);
-                setSubmitted(false);
-              }}
-            >
-              <option value="">Chọn bác sĩ</option>
-              {doctors.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.displayName}
-                </option>
-              ))}
-            </select>
-
-            <label htmlFor="test-service">Dịch vụ khám</label>
-            <select
-              id="test-service"
+              className="doctor-filter-select"
               value={serviceId}
-              onChange={(e) => {
-                setServiceId(e.target.value);
-                setSubmitted(false);
+              disabled={holdingSlot != null}
+              onChange={(event) => {
+                const next = services.find(
+                  (item) => item.id === event.target.value,
+                );
+                setServiceId(event.target.value);
+                if (next && !departmentId) {
+                  setDepartmentId(next.departmentId);
+                  if (
+                    doctors.find((item) => item.id === doctorId)
+                      ?.departmentId !== next.departmentId
+                  )
+                    setDoctorId('');
+                  setDoctorPage(1);
+                }
               }}
             >
-              <option value="">Chọn dịch vụ</option>
-              {services.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
+              <option value="">Chọn dịch vụ khám</option>
+              {services.map((item) => (
+                <option value={item.id} key={item.id}>
+                  {item.name}
                 </option>
               ))}
             </select>
-
-            <label htmlFor="test-date">Ngày khám</label>
-            <input
-              id="test-date"
-              type="date"
-              value={date}
-              onChange={(e) => {
-                setDate(e.target.value);
-                setSubmitted(false);
-              }}
-            />
-
-            <button type="submit">Tìm lịch trống</button>
-          </form>
+          </label>
+          {service?.price && (
+            <p className="doctor-exam-fee">
+              Phí khám niêm yết:{' '}
+              {service.price.amountVnd.toLocaleString('vi-VN')} đ
+            </p>
+          )}
 
           {/* Trạng thái tải hoặc lỗi danh mục */}
           {catalogState.loading && <Loading label="Đang tải danh mục" />}
@@ -713,19 +508,15 @@ export function AvailableSlots({
             />
           )}
 
-          {/* Thẻ kết quả rỗng khi tìm lịch */}
-          {submitted && !slotState.loading && slotState.items?.length === 0 && (
-            <EmptyState
-              title="Không có khung giờ phù hợp"
-              description="Hãy đổi ngày hoặc chọn bác sĩ, dịch vụ khác."
-            />
-          )}
-
-          {holdError != null && <ErrorPanel error={holdError} />}
+          {!catalogState.loading &&
+            !catalogState.error &&
+            visibleDoctors.length === 0 && (
+              <EmptyState title="Không tìm thấy bác sĩ" />
+            )}
 
           {/* Danh sách thẻ bác sĩ chuẩn Figma */}
           <div className="doctor-card-list">
-            {displayDoctors.map((doc) => {
+            {visibleDoctors.map((doc) => {
               const isSelected = doc.id === doctorId;
               return (
                 <article
@@ -733,39 +524,29 @@ export function AvailableSlots({
                   className={`doctor-booking-card ${isSelected ? 'is-selected' : ''}`}
                 >
                   <div className="doctor-card-left">
-                    <div className="doctor-avatar-box">
-                      <img
-                        src={doc.avatar}
-                        alt={`Ảnh đại diện ${doc.displayName}`}
-                        className="doctor-avatar-img"
-                        onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
-                        }}
-                      />
-                    </div>
                     <div className="doctor-info-box">
-                      <p className="doctor-degree-title">{doc.degree}</p>
                       <h3 className="doctor-full-name">{doc.displayName}</h3>
                       <p className="doctor-specialty-rating">
-                        {doc.specialty} · {doc.rating}
+                        {departments.find(
+                          (item) => item.id === doc.departmentId,
+                        )?.name ?? 'Chuyên khoa'}
                       </p>
-                      <p className="doctor-exam-fee">{doc.fee}</p>
                     </div>
                   </div>
 
                   <div className="doctor-card-right">
-                    <span className="doctor-slots-badge">
-                      Còn {doc.availableSlotsCount} khung giờ
-                    </span>
                     <button
                       type="button"
                       className={`doctor-select-btn ${isSelected ? 'is-active' : 'is-inactive'}`}
                       disabled={holdingSlot != null}
                       onClick={() => {
                         setDoctorId(doc.id);
-                        setSubmitted(false);
-                        setSelectedSlot(undefined);
-                        setSlotState({ loading: false });
+                        if (!departmentId) {
+                          setDepartmentId(doc.departmentId);
+                          setDoctorPage(1);
+                          if (service?.departmentId !== doc.departmentId)
+                            setServiceId('');
+                        }
                       }}
                     >
                       {isSelected ? 'Đã chọn' : 'Chọn bác sĩ'}
@@ -775,6 +556,30 @@ export function AvailableSlots({
               );
             })}
           </div>
+          {doctorTotal > 20 && (
+            <nav
+              className="booking-pagination"
+              aria-label="Trang danh sách bác sĩ"
+            >
+              <button
+                type="button"
+                disabled={doctorPage <= 1 || holdingSlot != null}
+                onClick={() => setDoctorPage(doctorPage - 1)}
+              >
+                Trang trước
+              </button>
+              <span>
+                {doctorPage} / {Math.ceil(doctorTotal / 20)}
+              </span>
+              <button
+                type="button"
+                disabled={doctorPage * 20 >= doctorTotal || holdingSlot != null}
+                onClick={() => setDoctorPage(doctorPage + 1)}
+              >
+                Trang sau
+              </button>
+            </nav>
+          )}
         </section>
 
         {/* CỘT PHẢI (419px): Chọn ngày & giờ khám (Figma 1:3586) */}
@@ -799,7 +604,7 @@ export function AvailableSlots({
                 Hồ sơ người khám
               </label>
               <select
-                className="doctor-dept-select"
+                className="doctor-filter-select"
                 style={{ width: '100%' }}
                 disabled={holdingSlot != null}
                 value={patientId}
@@ -828,157 +633,158 @@ export function AvailableSlots({
             </p>
           )}
 
-          {/* Lịch tháng (Figma 1:3588 kết hợp Quick Selector Tháng / Năm / Hôm nay hiện đại) */}
-          <div className="calendar-month-nav">
-            <div className="calendar-quick-pickers">
-              <select
-                className="calendar-select-month"
-                value={calendarMonth}
-                aria-label="Chọn tháng trực tiếp"
-                onChange={(e) => handleMonthChange(Number(e.target.value))}
-              >
-                {MONTH_NAMES.map((name, idx) => (
-                  <option key={idx} value={idx}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                className="calendar-select-year"
-                value={calendarYear}
-                aria-label="Chọn năm trực tiếp"
-                onChange={(e) => handleYearChange(Number(e.target.value))}
-              >
-                {YEAR_OPTIONS.map((yr) => (
-                  <option key={yr} value={yr}>
-                    Năm {yr}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                type="button"
-                className="calendar-today-btn"
-                title="Nhảy nhanh về ngày hôm nay"
-                onClick={handleGoToToday}
-              >
-                Hôm nay
-              </button>
-            </div>
-
-            <div className="calendar-nav-arrows">
-              <button
-                type="button"
-                className="calendar-nav-btn"
-                aria-label="Tháng trước"
-                onClick={handlePrevMonth}
-              >
-                ‹
-              </button>
-              <button
-                type="button"
-                className="calendar-nav-btn"
-                aria-label="Tháng sau"
-                onClick={handleNextMonth}
-              >
-                ›
-              </button>
-            </div>
-          </div>
-
-          {/* Tiêu đề thứ trong tuần (Figma 1:3589 - 1:3595) */}
-          <div className="calendar-weekdays-grid">
-            <span>T2</span>
-            <span>T3</span>
-            <span>T4</span>
-            <span>T5</span>
-            <span>T6</span>
-            <span>T7</span>
-            <span>CN</span>
-          </div>
-
-          {/* Lưới các ngày trong tháng (Figma 1:3596 - 1:3642) */}
-          <div
-            className="calendar-days-grid"
-            role="grid"
-            aria-label="Các ngày trong tháng"
+          <fieldset
+            className="booking-calendar"
+            disabled={holdingSlot != null}
+            aria-label="Chọn ngày khám"
           >
-            {Array.from({ length: daysInMonth }, (_, index) => {
-              const dayNum = index + 1;
-              const formatted = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-              const isSelected = date === formatted;
-              const isToday = formatted === localDateToday();
-              const cellStyle =
-                dayNum === 1 ? { gridColumnStart: firstDayCol } : undefined;
-
-              return (
-                <button
-                  key={dayNum}
-                  type="button"
-                  style={cellStyle}
-                  className={`calendar-day-cell ${isSelected ? 'is-selected' : ''} ${isToday && !isSelected ? 'is-today' : ''}`}
-                  aria-label={`Ngày ${dayNum} tháng ${calendarMonth + 1}${isToday ? ' (Hôm nay)' : ''}`}
-                  aria-pressed={isSelected ? 'true' : 'false'}
-                  onClick={() => handleSelectDay(dayNum)}
+            {/* Lịch tháng (Figma 1:3588 kết hợp Quick Selector Tháng / Năm / Hôm nay hiện đại) */}
+            <div className="calendar-month-nav">
+              <div className="calendar-quick-pickers">
+                <select
+                  className="calendar-select-month"
+                  value={calendarMonth}
+                  aria-label="Chọn tháng trực tiếp"
+                  onChange={(e) => handleMonthChange(Number(e.target.value))}
                 >
-                  {dayNum}
+                  {MONTH_NAMES.map((name, idx) => (
+                    <option key={idx} value={idx}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  className="calendar-select-year"
+                  value={calendarYear}
+                  aria-label="Chọn năm trực tiếp"
+                  onChange={(e) => handleYearChange(Number(e.target.value))}
+                >
+                  {YEAR_OPTIONS.map((yr) => (
+                    <option key={yr} value={yr}>
+                      Năm {yr}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  className="calendar-today-btn"
+                  title="Nhảy nhanh về ngày hôm nay"
+                  onClick={handleGoToToday}
+                >
+                  Hôm nay
                 </button>
-              );
-            })}
-          </div>
+              </div>
 
-          {/* Tiêu đề khung giờ (Figma 1:3625) */}
+              <div className="calendar-nav-arrows">
+                <button
+                  type="button"
+                  className="calendar-nav-btn"
+                  aria-label="Tháng trước"
+                  onClick={handlePrevMonth}
+                >
+                  ‹
+                </button>
+                <button
+                  type="button"
+                  className="calendar-nav-btn"
+                  aria-label="Tháng sau"
+                  onClick={handleNextMonth}
+                >
+                  ›
+                </button>
+              </div>
+            </div>
+
+            {/* Tiêu đề thứ trong tuần (Figma 1:3589 - 1:3595) */}
+            <div className="calendar-weekdays-grid">
+              <span>T2</span>
+              <span>T3</span>
+              <span>T4</span>
+              <span>T5</span>
+              <span>T6</span>
+              <span>T7</span>
+              <span>CN</span>
+            </div>
+
+            {/* Lưới các ngày trong tháng (Figma 1:3596 - 1:3642) */}
+            <div
+              className="calendar-days-grid"
+              role="grid"
+              aria-label="Các ngày trong tháng"
+            >
+              {Array.from({ length: daysInMonth }, (_, index) => {
+                const dayNum = index + 1;
+                const formatted = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+                const isSelected = date === formatted;
+                const isToday = formatted === localDateToday();
+                const cellStyle =
+                  dayNum === 1 ? { gridColumnStart: firstDayCol } : undefined;
+
+                return (
+                  <button
+                    key={dayNum}
+                    type="button"
+                    style={cellStyle}
+                    className={`calendar-day-cell ${isSelected ? 'is-selected' : ''} ${isToday && !isSelected ? 'is-today' : ''}`}
+                    aria-label={`Ngày ${dayNum} tháng ${calendarMonth + 1}${isToday ? ' (Hôm nay)' : ''}`}
+                    aria-pressed={isSelected ? 'true' : 'false'}
+                    onClick={() => handleSelectDay(dayNum)}
+                  >
+                    {dayNum}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
           <h3 className="timeslot-section-title">{selectedDateLabel}</h3>
-
-          {/* Lưới các khung giờ khám (Figma 1:3626 - 1:3637) */}
+          {!filtersReady && (
+            <p>Chọn bác sĩ, dịch vụ và ngày khám để xem giờ trống.</p>
+          )}
+          {loadingSlots && <Loading label="Đang tải khung giờ" />}
+          {!loadingSlots && filtersReady && slotState.error != null && (
+            <ErrorPanel
+              error={slotState.error}
+              onRetry={() => setSlotRetry((value) => value + 1)}
+            />
+          )}
+          {!loadingSlots &&
+            filtersReady &&
+            slotState.error == null &&
+            currentSlots.length === 0 && (
+              <EmptyState
+                title="Không có khung giờ phù hợp"
+                description="Hãy đổi ngày hoặc chọn bác sĩ, dịch vụ khác."
+              />
+            )}
           <div
             className="timeslot-grid"
             role="group"
             aria-label="Danh sách khung giờ"
           >
-            {DEFAULT_TIME_SLOTS.map((slot) => {
-              const isSelected = selectedSlotTime === slot.time;
-              const isBooked = slot.state === 'booked';
-              return (
-                <button
-                  key={slot.time}
-                  type="button"
-                  disabled={isBooked}
-                  className={`timeslot-chip ${
-                    isSelected
-                      ? 'is-selected'
-                      : isBooked
-                        ? 'is-booked'
-                        : 'is-available'
-                  }`}
-                  onClick={() => setSelectedSlotTime(slot.time)}
-                  aria-pressed={isSelected}
-                >
-                  {slot.time}
-                </button>
-              );
-            })}
+            {currentSlots.map((slot) => (
+              <button
+                key={slot.slotId}
+                type="button"
+                disabled={holdingSlot != null}
+                className={`timeslot-chip ${selectedSlotId === slot.slotId ? 'is-selected' : 'is-available'}`}
+                onClick={() => setSelectedSlotId(slot.slotId)}
+                aria-pressed={selectedSlotId === slot.slotId}
+              >
+                {timeInVietnam(slot.startAt)}
+              </button>
+            ))}
           </div>
-
-          {/* Chú thích trạng thái khung giờ (Figma 1:3638) */}
-          <div className="timeslot-legend" aria-hidden="true">
-            <span className="legend-item">
-              <span className="legend-dot is-available" /> Còn trống
-            </span>
-            <span className="legend-item">
-              <span className="legend-dot is-booked" /> Đã đặt
-            </span>
-            <span className="legend-item">
-              <span className="legend-dot is-selected" /> Đang chọn
-            </span>
-          </div>
+          {holdError != null && (
+            <ErrorPanel error={holdError} onRetry={handleContinue} />
+          )}
 
           {/* Nút Tiếp tục (Figma 1:3639) */}
           <button
             type="button"
             className="btn-booking-continue"
-            disabled={!selectedSlotTime || holdingSlot != null}
+            disabled={!selectedSlot || !canBook || holdingSlot != null}
             onClick={handleContinue}
           >
             {holdingSlot ? 'Đang giữ chỗ…' : 'Tiếp tục  →'}

@@ -32,6 +32,8 @@ export type QueueTicket = {
   ticketId: string;
   appointmentId: string;
   patientId?: string;
+  doctorId?: string;
+  returnRound?: number;
   ticketType: 'FIRST' | 'RETURN';
   state: string;
   version: number;

@@ -723,3 +723,66 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.quan-record-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  padding: 0 16px;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.quan-record-tabs a {
+  padding: 12px 4px;
+  border-bottom: 2px solid transparent;
+}
+
+.quan-record-tabs [aria-current='page'] {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  font-weight: 700;
+}
+
+.quan-overview-kpis article {
+  display: grid;
+  gap: 6px;
+}
+
+.quan-overview-kpis strong {
+  color: var(--navy);
+  font-size: 1.45rem;
+}
+
+.quan-overview-panes {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.quan-week-bars {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
+  list-style: none;
+  padding: 0;
+  gap: 8px;
+}
+
+.quan-week-bars li {
+  display: grid;
+  gap: 6px;
+  text-align: center;
+}
+
+.quan-week-bars meter {
+  width: 100%;
+  accent-color: var(--primary);
+}
+
+@media (max-width: 768px) {
+  .quan-overview-panes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
