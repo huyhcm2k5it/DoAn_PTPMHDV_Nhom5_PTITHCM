@@ -15,6 +15,7 @@ import '../appointment.css';
 type BookingState =
   | 'idle'
   | 'creating'
+  | 'created'
   | 'waiting_counter'
   | 'processing_simulate'
   | 'confirmed'
@@ -34,6 +35,8 @@ export function BookingReview({
   const navigate = useNavigate();
 
   const details = useLocation().state as {
+    holdId?: string;
+    patientId?: string;
     expiresAt?: string;
     amountVnd?: number;
     startAt?: string;
@@ -60,52 +63,34 @@ export function BookingReview({
 
   const patientId = params.get('patientId') ?? '';
   const holdId = params.get('holdId') ?? '';
-  const doctorName = details?.doctorName || params.get('doctorName') || 'TS.BS Nguyễn Minh Anh';
-  const specialty = details?.departmentName || params.get('specialty') || 'Tim mạch';
+  const hasHoldDetails =
+    Boolean(patientId && holdId) &&
+    details?.holdId === holdId &&
+    details.patientId === patientId &&
+    Number.isFinite(expiresAt) &&
+    typeof details.amountVnd === 'number' &&
+    Number.isFinite(details.amountVnd) &&
+    details.amountVnd >= 0;
+  const doctorName = details?.doctorName || '—';
+  const specialty = details?.departmentName || '—';
   const timeSlot =
     details?.timeSlot ||
     (details?.startAt ? formatAppointmentTime(details.startAt) : '') ||
-    params.get('timeSlot') ||
-    '08:30 · 09/11/2026';
-  const location = params.get('location') || 'Phòng 204 · Cơ sở 1';
-  const patientName = details?.patientName || params.get('patientName') || 'Nguyễn Hoàng Nam';
-  const amountVnd = details?.amountVnd ?? 150000;
+    '—';
+  const patientName = details?.patientName || '—';
+  const amount = details?.amountVnd;
+  const formattedAmount =
+    typeof amount === 'number' ? amount.toLocaleString('vi-VN') + ' đ' : '—';
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>('simulate');
-  const [agreedTerms, setAgreedTerms] = useState(true);
-  const [countdownSeconds, setCountdownSeconds] = useState(599); // 09:59
-  const [simulatedExpired, setSimulatedExpired] = useState(false);
+  const [agreedTerms, setAgreedTerms] = useState(false);
 
   const [bookingState, setBookingState] = useState<BookingState>('idle');
   const [confirmedAppointmentId, setConfirmedAppointmentId] = useState<string>('');
   const [error, setError] = useState<unknown>();
   const idempotency = useRef<{ holdId: string; key: string } | null>(null);
 
-  const isExpired = simulatedExpired || expired;
-  const currentSeconds = Number.isFinite(expiresAt) ? seconds : countdownSeconds;
-
-  // Countdown 10 phút fallback khi không có expiresAt từ server
-  useEffect(() => {
-    if (
-      Number.isFinite(expiresAt) ||
-      bookingState === 'confirmed' ||
-      simulatedExpired
-    )
-      return;
-
-    const timer = setInterval(() => {
-      setCountdownSeconds((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setSimulatedExpired(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [expiresAt, bookingState, simulatedExpired]);
+  const isExpired = expired;
 
   const formatTimer = (totalSec: number) => {
     const m = Math.floor(totalSec / 60);
@@ -157,13 +142,15 @@ export function BookingReview({
 
   async function confirm() {
     if (
+      !hasHoldDetails ||
       bookingState === 'creating' ||
+      bookingState === 'created' ||
       bookingState === 'processing_simulate' ||
+      bookingState === 'confirmed' ||
       isExpired ||
       !agreedTerms
     )
       return;
-
     if (idempotency.current?.holdId !== holdId) {
       idempotency.current = { holdId, key: crypto.randomUUID() };
     }
@@ -178,8 +165,14 @@ export function BookingReview({
         { patientId, holdId },
         idempotencyKey,
       );
-      const apptId = appointmentResult.appointmentId || 'UMC091126';
+      const apptId = appointmentResult.appointmentId;
       setConfirmedAppointmentId(apptId);
+
+      // Nếu chưa gắn BillingApi (chỉ tạo lịch ở Appointment service), giữ trạng thái đã tạo lịch chờ thanh toán
+      if (!billingApi) {
+        setBookingState('created');
+        return;
+      }
 
       // 2. Nhánh Thanh toán tại quầy (Figma 04.09)
       if (paymentMethod === 'counter') {
@@ -203,22 +196,14 @@ export function BookingReview({
     }
   }
 
-  function handleSimulateExpired() {
-    setCountdownSeconds(0);
-    setSimulatedExpired(true);
-  }
-
-  function handleSimulateFailure() {
-    setBookingState('payment_failed');
-    setError(new Error('Mô phỏng lỗi giao dịch: Ngân hàng từ chối thanh toán.'));
-  }
-
   // Tiêu đề phụ chuẩn Figma
   const getPageSubtitle = () => {
-    const displayId = confirmedAppointmentId || 'UMC091126';
+    const displayId = confirmedAppointmentId || '—';
     switch (bookingState) {
       case 'creating':
         return `Đang tạo khoản thu · ${displayId} · ${patientName}`;
+      case 'created':
+        return `Đã tạo lịch chờ thanh toán · ${displayId} · ${patientName}`;
       case 'waiting_counter':
         return `Lịch chờ thanh toán · ${displayId} · ${patientName}`;
       case 'processing_simulate':
@@ -245,6 +230,8 @@ export function BookingReview({
     switch (bookingState) {
       case 'creating':
         return { label: 'Đang tạo khoản thu', className: 'is-held' };
+      case 'created':
+        return { label: 'Lịch chờ thanh toán', className: 'is-confirmed' };
       case 'waiting_counter':
         return { label: 'Lịch chờ thanh toán', className: 'is-counter' };
       case 'processing_simulate':
@@ -269,12 +256,14 @@ export function BookingReview({
     switch (bookingState) {
       case 'creating':
         return 'Hệ thống đang chuẩn bị hồ sơ và khởi tạo khoản thu.';
+      case 'created':
+        return `Lịch ${confirmedAppointmentId} đã được tạo. Xem chi tiết để theo dõi khoản thu.`;
       case 'waiting_counter':
         return 'Lịch đang chờ thanh toán · Chưa xác nhận · Chưa cấp số khám.';
       case 'processing_simulate':
         return 'Đang chờ kết quả từ hệ thống. Không tạo giao dịch mới.';
       case 'confirmed':
-        return `Phí khám đã thanh toán · Lịch ${confirmedAppointmentId || 'UMC091126'} đã xác nhận.`;
+        return `Phí khám đã thanh toán · Lịch ${confirmedAppointmentId} đã xác nhận.`;
       case 'payment_failed':
         return 'Giao dịch chưa hoàn tất. Bạn có thể thử lại hoặc chuyển sang thanh toán tại quầy.';
       default:
@@ -287,7 +276,7 @@ export function BookingReview({
 
   const badgeInfo = getBadgeInfo();
 
-  if (!patientId || !holdId) {
+  if (!hasHoldDetails) {
     return (
       <section
         className="page-content"
@@ -356,10 +345,6 @@ export function BookingReview({
               <div className="review-info-item">
                 <span className="review-info-label">Thời gian</span>
                 <span className="review-info-value">{timeSlot}</span>
-              </div>
-              <div className="review-info-item">
-                <span className="review-info-label">Địa điểm</span>
-                <span className="review-info-value">{location}</span>
               </div>
             </div>
 
@@ -536,7 +521,7 @@ export function BookingReview({
             {/* Countdown card */}
             <div
               className={`payment-countdown-card ${
-                bookingState === 'confirmed'
+                bookingState === 'confirmed' || bookingState === 'created'
                   ? 'is-confirmed'
                   : isExpired
                     ? 'is-expired'
@@ -545,20 +530,22 @@ export function BookingReview({
             >
               <span className="payment-countdown-label">
                 {bookingState === 'confirmed'
-                  ? 'Hệ thống đã xác nhận thu'
-                  : isExpired
-                    ? 'Đã hết hạn giữ chỗ (10 phút)'
-                    : paymentMethod === 'counter' ||
-                        bookingState === 'waiting_counter'
-                      ? 'Thanh toán tại quầy trước khi hết hạn'
-                      : 'Giữ chỗ 10 phút · Còn lại'}
+                  ? 'Phí khám đã thanh toán'
+                  : bookingState === 'created'
+                    ? 'Khoản thu đang chờ xử lý'
+                    : isExpired
+                      ? 'Đã hết hạn giữ chỗ (10 phút)'
+                      : paymentMethod === 'counter' ||
+                          bookingState === 'waiting_counter'
+                        ? 'Thanh toán tại quầy trước khi hết hạn'
+                        : 'Giữ chỗ 10 phút · Còn lại'}
               </span>
               <span className="payment-countdown-timer">
-                {bookingState === 'confirmed'
-                  ? `${amountVnd.toLocaleString('vi-VN')} đ`
+                {bookingState === 'confirmed' || bookingState === 'created'
+                  ? formattedAmount
                   : isExpired
                     ? '00:00'
-                    : formatTimer(currentSeconds)}
+                    : formatTimer(seconds)}
               </span>
             </div>
 
@@ -572,7 +559,7 @@ export function BookingReview({
               </h3>
               <div className="payment-breakdown-row">
                 <span className="muted">Phí khám</span>
-                <span>{amountVnd.toLocaleString('vi-VN')} đ</span>
+                <span>{formattedAmount}</span>
               </div>
               <div className="payment-breakdown-row">
                 <span className="muted">Giảm trừ BHYT</span>
@@ -585,14 +572,13 @@ export function BookingReview({
               <div className="payment-divider" />
               <div className="payment-total-row">
                 <span className="payment-total-label">Tổng thanh toán</span>
-                <span className="payment-total-amount">
-                  {amountVnd.toLocaleString('vi-VN')} đ
-                </span>
+                <span className="payment-total-amount">{formattedAmount}</span>
               </div>
             </div>
 
             {/* Cam kết điều khoản */}
             {bookingState !== 'confirmed' &&
+              bookingState !== 'created' &&
               bookingState !== 'waiting_counter' &&
               !isExpired && (
                 <label className="payment-terms-label">
@@ -631,13 +617,13 @@ export function BookingReview({
             )}
 
             {/* Nút hành động theo từng trạng thái */}
-            {bookingState === 'confirmed' ? (
+            {bookingState === 'confirmed' || bookingState === 'created' ? (
               <button
                 type="button"
                 className="btn-payment-action"
                 onClick={() =>
                   navigate(
-                    `/patient/appointments/${encodeURIComponent(confirmedAppointmentId || 'UMC091126')}`,
+                    `/patient/appointments/${encodeURIComponent(confirmedAppointmentId)}`,
                   )
                 }
               >
@@ -694,38 +680,11 @@ export function BookingReview({
               </button>
             )}
 
-            {/* Support footer & Demo buttons */}
+            {/* Support footer */}
             <div className="payment-support-footer">
               <span>
                 Hỗ trợ giao dịch: <strong>1900 7178</strong>
               </span>
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '8px',
-                  flexWrap: 'wrap',
-                  marginTop: '8px',
-                }}
-              >
-                {bookingState === 'idle' && !isExpired && (
-                  <>
-                    <button
-                      type="button"
-                      className="btn-demo-expired"
-                      onClick={handleSimulateExpired}
-                    >
-                      Mô phỏng hết hạn giữ chỗ
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-demo-expired"
-                      onClick={handleSimulateFailure}
-                    >
-                      Mô phỏng thanh toán thất bại
-                    </button>
-                  </>
-                )}
-              </div>
             </div>
           </div>
         </aside>

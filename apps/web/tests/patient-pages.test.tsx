@@ -229,18 +229,57 @@ describe('available slot screen', () => {
         },
       ]),
     } as unknown as CatalogApi;
-    const listAvailable = vi.fn().mockResolvedValue([]);
+    const listAvailable = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          slotId: 'slot-real-a',
+          scheduleId: 'schedule-1',
+          doctorId: 'doc-1',
+          serviceId: 'svc-1',
+          startAt: '2026-11-03T01:00:00Z',
+          endAt: '2026-11-03T01:15:00Z',
+          remainingCapacity: 1,
+        },
+        {
+          slotId: 'slot-real-b',
+          scheduleId: 'schedule-1',
+          doctorId: 'doc-1',
+          serviceId: 'svc-1',
+          startAt: '2026-11-03T01:30:00Z',
+          endAt: '2026-11-03T01:45:00Z',
+          remainingCapacity: 1,
+        },
+      ]);
     const appointmentApi = {
       listAvailable,
-      createHold: vi.fn(),
+      createHold: vi.fn().mockResolvedValue({
+        holdId: 'hold-1',
+        expiresAt: '2099-01-01T00:00:00Z',
+        priceSnapshot: { amountVnd: 175000 },
+      }),
       releaseHold: vi.fn(),
       createAppointment: vi.fn(),
       getAppointment: vi.fn(),
       listAppointments: vi.fn(),
     };
     render(
-      <MemoryRouter>
-        <AvailableSlots api={appointmentApi} catalog={catalog} />
+      <MemoryRouter
+        initialEntries={['/patient/appointments/new?date=2026-11-02']}
+      >
+        <AvailableSlots
+          api={appointmentApi}
+          catalog={catalog}
+          assistedPatient={{
+            id: 'patient-1',
+            ownerUserId: 'user-1',
+            fullName: 'Demo',
+            relation: 'SELF',
+            birthDate: '2000-01-01',
+            version: 1,
+          }}
+        />
       </MemoryRouter>,
     );
 
@@ -251,15 +290,21 @@ describe('available slot screen', () => {
     fireEvent.change(await screen.findByLabelText('Dịch vụ khám'), {
       target: { value: 'svc-1' },
     });
-    fireEvent.change(screen.getByLabelText('Ngày khám'), {
-      target: { value: '2026-11-02' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Tìm lịch trống' }));
-
     expect(await screen.findByText('Không có khung giờ phù hợp')).toBeTruthy();
     expect(listAvailable).toHaveBeenCalledWith(
       { doctorId: 'doc-1', serviceId: 'svc-1', date: '2026-11-02' },
       expect.any(AbortSignal),
+    );
+    expect(
+      (screen.getByRole('button', { name: /Tiếp tục/ }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: /Ngày 3 tháng 11/ }));
+    fireEvent.click(await screen.findByRole('button', { name: '08:30' }));
+    fireEvent.click(screen.getByRole('button', { name: /Tiếp tục/ }));
+    expect(appointmentApi.createHold).toHaveBeenCalledWith(
+      { patientId: 'patient-1', slotId: 'slot-real-b' },
+      expect.any(String),
     );
   });
 });

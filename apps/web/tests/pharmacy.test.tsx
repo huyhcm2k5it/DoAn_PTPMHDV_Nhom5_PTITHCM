@@ -80,7 +80,7 @@ describe('pharmacy UI and transport', () => {
     expect(transport.mock.calls[0][1].headers['x-authorization-lease']).toBe(
       'signed-lease',
     );
-    expect(lease).toHaveBeenCalledWith('PH005');
+    expect(lease).toHaveBeenCalledWith('PH-005');
     expect(JSON.parse(transport.mock.calls[0][1].body)).toEqual({
       prescriptionRevision: 2,
     });

@@ -35,7 +35,7 @@ export type MedicationHold = {
   status: HoldState;
   version: number;
   expiresAt: string;
-  amountVnd: number;
+  amountVnd?: number;
   chargeId?: string;
   chargeSync: string;
   settlementState: string;

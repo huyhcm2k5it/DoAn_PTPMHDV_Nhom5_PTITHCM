@@ -598,6 +598,7 @@ function AppRoutes({
   diagnosticApi,
   pharmacyApi,
   billingApi,
+  transport,
   session,
 }: {
   patientApi: PatientApi;
@@ -607,6 +608,7 @@ function AppRoutes({
   diagnosticApi: DiagnosticApi;
   pharmacyApi: PharmacyApi;
   billingApi: BillingApi;
+  transport: WebRuntime['transport'];
   session?: WebRuntime['session'];
 }) {
   return (
@@ -703,7 +705,13 @@ function AppRoutes({
         />
         <Route
           path="/staff/summary"
-          element={<AdminSummary api={appointmentApi} />}
+          element={
+            <AdminSummary
+              api={appointmentApi}
+              catalog={catalogApi}
+              transport={transport}
+            />
+          }
         />
         <Route
           path="/staff/cashier"
@@ -819,7 +827,16 @@ function AppRoutes({
         />
         <Route
           path="/patient/appointments/:appointmentId"
-          element={<AppointmentDetail api={appointmentApi} />}
+          element={
+            <AppointmentDetail
+              api={appointmentApi}
+              records={
+                session?.actorType === 'PATIENT'
+                  ? { clinical: clinicalApi, diagnostic: diagnosticApi }
+                  : undefined
+              }
+            />
+          }
         />
         <Route
           path="/patient/appointments/:appointmentId/reschedule"
@@ -923,6 +940,7 @@ export function App({ runtime: propRuntime }: { runtime?: WebRuntime } = {}) {
         diagnosticApi={diagnosticApi}
         pharmacyApi={pharmacyApi}
         billingApi={billingApi}
+        transport={apiTransport}
         session={runtime?.session}
       />
     </BrowserRouter>
