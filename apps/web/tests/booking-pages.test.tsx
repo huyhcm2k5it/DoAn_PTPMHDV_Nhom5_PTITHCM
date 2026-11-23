@@ -169,7 +169,9 @@ describe('appointment booking screens', () => {
       );
     });
 
-    expect(await screen.findByRole('button', { name: 'Xem lịch khám của tôi →' })).toBeTruthy();
+    expect(
+      await screen.findByRole('button', { name: 'Xem lịch khám của tôi →' }),
+    ).toBeTruthy();
   });
 
   it('handles counter payment method: creates appointment in waiting counter state', async () => {
@@ -212,7 +214,9 @@ describe('appointment booking screens', () => {
     expect(billing.simulatePayment).not.toHaveBeenCalled();
 
     // Hiển thị nút Xem lịch chờ thanh toán
-    expect(await screen.findByRole('button', { name: 'Xem lịch chờ thanh toán →' })).toBeTruthy();
+    expect(
+      await screen.findByRole('button', { name: 'Xem lịch chờ thanh toán →' }),
+    ).toBeTruthy();
   });
 
   it('handles simulate payment failure and allows retry', async () => {
@@ -247,7 +251,9 @@ describe('appointment booking screens', () => {
     fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(screen.getByRole('button', { name: 'Xác nhận tạo lịch' }));
 
-    expect(await screen.findByRole('button', { name: 'Thử lại thanh toán' })).toBeTruthy();
+    expect(
+      await screen.findByRole('button', { name: 'Thử lại thanh toán' }),
+    ).toBeTruthy();
   });
 
   it('loads the patient list and renders a link to detail', async () => {

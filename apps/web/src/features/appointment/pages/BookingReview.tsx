@@ -82,11 +82,13 @@ export function BookingReview({
   const formattedAmount =
     typeof amount === 'number' ? amount.toLocaleString('vi-VN') + ' đ' : '—';
 
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType>('simulate');
+  const [paymentMethod, setPaymentMethod] =
+    useState<PaymentMethodType>('simulate');
   const [agreedTerms, setAgreedTerms] = useState(false);
 
   const [bookingState, setBookingState] = useState<BookingState>('idle');
-  const [confirmedAppointmentId, setConfirmedAppointmentId] = useState<string>('');
+  const [confirmedAppointmentId, setConfirmedAppointmentId] =
+    useState<string>('');
   const [error, setError] = useState<unknown>();
   const idempotency = useRef<{ holdId: string; key: string } | null>(null);
 
