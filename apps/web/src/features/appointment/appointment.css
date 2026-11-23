@@ -90,14 +90,14 @@
 /* 2. Bố cục 2 cột chính (Figma 1:3543) */
 .booking-layout-grid {
   display: grid;
-  grid-template-columns: 697px 419px;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 3fr);
   gap: 20px;
   align-items: start;
 }
 
 @media (max-width: 1150px) {
   .booking-layout-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -935,5 +935,42 @@
   .booking-review-main,
   .booking-review-sidebar {
     width: 100%;
+  }
+}
+
+.booking-field {
+  display: grid;
+  gap: 4px;
+}
+
+.booking-field .doctor-filter-select {
+  width: 100%;
+}
+
+.booking-calendar {
+  min-inline-size: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.booking-pagination {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+@media (max-width: 480px) {
+  .booking-stepper,
+  .calendar-month-nav,
+  .calendar-quick-pickers {
+    flex-wrap: wrap;
+  }
+
+  .booking-doctors-section,
+  .booking-datetime-panel,
+  .doctor-filter-toolbar > *,
+  .booking-field .doctor-filter-select {
+    min-width: 0;
   }
 }

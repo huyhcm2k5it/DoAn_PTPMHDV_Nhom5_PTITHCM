@@ -31,6 +31,10 @@ export function ReceptionQueue({
   const [items, setItems] = useState<QueueTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>();
+  const [handoff, setHandoff] = useState('');
+  const callIntent = useRef<
+    { ticketType: QueueTicket['ticketType']; key: string } | undefined
+  >(undefined);
   const [ticketType, setTicketType] = useState<'FIRST' | 'RETURN'>('FIRST');
   const [reload, setReload] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -59,7 +63,12 @@ export function ReceptionQueue({
     setBusy(true);
     setError(undefined);
     try {
-      setTicket(await api.callNext?.({ ticketType }, crypto.randomUUID()));
+      if (callIntent.current?.ticketType !== ticketType) {
+        callIntent.current = { ticketType, key: crypto.randomUUID() };
+      }
+      setTicket(await api.callNext({ ticketType }, callIntent.current.key));
+      callIntent.current = undefined;
+      setHandoff('');
       setReload((value) => value + 1);
     } catch (caught) {
       setError(caught);
@@ -362,8 +371,44 @@ export function ReceptionQueue({
           </div>
           {ticket && (
             <p role="status" className="state-card">
-              Đã gọi lượt {ticket.ticketId} · {ticket.ticketType}
+              Đã gọi lượt {ticket.ticketId} ·{' '}
+              {ticket.ticketType === 'RETURN'
+                ? 'Quay lại sau xét nghiệm'
+                : 'Khám lần đầu'}
+              {ticket.ticketType === 'RETURN' &&
+                ticket.returnRound != null &&
+                ' · Lần quay lại ' + ticket.returnRound}
+              {' · Lịch ' + ticket.appointmentId}
             </p>
+          )}
+          {ticket?.state === 'CALLED' && ticket.doctorId && (
+            <div className="quan-actions">
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={async () => {
+                  if (!ticket.doctorId) return;
+                  const url = new URL(
+                    '/doctor/clinical',
+                    window.location.origin,
+                  );
+                  url.search = new URLSearchParams({
+                    ticketId: ticket.ticketId,
+                    doctorId: ticket.doctorId,
+                    ticketVersion: String(ticket.version),
+                  }).toString();
+                  try {
+                    await navigator.clipboard.writeText(url.toString());
+                    setHandoff('Đã sao chép liên kết để chuyển cho bác sĩ.');
+                  } catch {
+                    setHandoff(url.toString());
+                  }
+                }}
+              >
+                Sao chép liên kết bàn khám
+              </button>
+              {handoff && <output>{handoff}</output>}
+            </div>
           )}
           <label>
             Loại lượt khám

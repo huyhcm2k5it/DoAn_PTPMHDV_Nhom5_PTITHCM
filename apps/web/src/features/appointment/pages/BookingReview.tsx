@@ -16,6 +16,8 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
   const navigate = useNavigate();
 
   const details = useLocation().state as {
+    holdId?: string;
+    patientId?: string;
     expiresAt?: string;
     amountVnd?: number;
     startAt?: string;
@@ -42,62 +44,37 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
 
   const patientId = params.get('patientId') ?? '';
   const holdId = params.get('holdId') ?? '';
-  const doctorName =
-    details?.doctorName || params.get('doctorName') || 'TS.BS Nguyễn Minh Anh';
-  const specialty =
-    details?.departmentName || params.get('specialty') || 'Tim mạch';
-  const timeSlot =
-    details?.timeSlot ||
-    (details?.startAt ? formatAppointmentTime(details.startAt) : '') ||
-    params.get('timeSlot') ||
-    '08:30 · 09/11/2026';
-  const location = params.get('location') || 'Phòng 204 · Cơ sở 1';
-  const patientName =
-    details?.patientName || params.get('patientName') || 'Nguyễn Hoàng Nam';
-  const amountVnd = details?.amountVnd ?? 150000;
+  const hasHoldDetails =
+    Boolean(patientId && holdId) &&
+    details?.holdId === holdId &&
+    details.patientId === patientId &&
+    Number.isFinite(expiresAt) &&
+    typeof details.amountVnd === 'number' &&
+    Number.isFinite(details.amountVnd) &&
+    details.amountVnd >= 0;
+  const doctorName = details?.doctorName || '—';
+  const specialty = details?.departmentName || '—';
+  const timeSlot = details?.startAt
+    ? formatAppointmentTime(details.startAt)
+    : '—';
+  const patientName = details?.patientName || '—';
+  const amount = details?.amountVnd;
+  const formattedAmount =
+    typeof amount === 'number' ? amount.toLocaleString('vi-VN') + ' đ' : '—';
 
   const [paymentMethod, setPaymentMethod] = useState<'simulate' | 'counter'>(
     'simulate',
   );
-  const [agreedTerms, setAgreedTerms] = useState(true);
-  const [countdownSeconds, setCountdownSeconds] = useState(599); // 09:59
-  const [simulatedExpired, setSimulatedExpired] = useState(false);
-
+  const [agreedTerms, setAgreedTerms] = useState(false);
   const [bookingState, setBookingState] = useState<
-    'idle' | 'loading' | 'confirmed' | 'error'
+    'idle' | 'loading' | 'created' | 'error'
   >('idle');
   const [confirmedAppointmentId, setConfirmedAppointmentId] =
     useState<string>('');
   const [error, setError] = useState<unknown>();
   const idempotency = useRef<{ holdId: string; key: string } | null>(null);
 
-  const isExpired = simulatedExpired || expired;
-  const currentSeconds = Number.isFinite(expiresAt)
-    ? seconds
-    : countdownSeconds;
-
-  // Countdown 10 phút fallback khi không có expiresAt từ server
-  useEffect(() => {
-    if (
-      Number.isFinite(expiresAt) ||
-      bookingState === 'confirmed' ||
-      simulatedExpired
-    )
-      return;
-
-    const timer = setInterval(() => {
-      setCountdownSeconds((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setSimulatedExpired(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [expiresAt, bookingState, simulatedExpired]);
+  const isExpired = expired;
 
   const formatTimer = (totalSec: number) => {
     const m = Math.floor(totalSec / 60);
@@ -106,7 +83,14 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
   };
 
   async function confirm() {
-    if (bookingState === 'loading' || isExpired || !agreedTerms) return;
+    if (
+      !hasHoldDetails ||
+      bookingState === 'loading' ||
+      bookingState === 'created' ||
+      isExpired ||
+      !agreedTerms
+    )
+      return;
     if (idempotency.current?.holdId !== holdId) {
       idempotency.current = { holdId, key: crypto.randomUUID() };
     }
@@ -118,19 +102,14 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
         idempotency.current.key,
       );
       setConfirmedAppointmentId(result.appointmentId);
-      setBookingState('confirmed');
+      setBookingState('created');
     } catch (caught) {
       setBookingState('error');
       setError(caught);
     }
   }
 
-  function handleSimulateExpired() {
-    setCountdownSeconds(0);
-    setSimulatedExpired(true);
-  }
-
-  if (!patientId || !holdId) {
+  if (!hasHoldDetails) {
     return (
       <section
         className="page-content"
@@ -166,8 +145,8 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
           Xác nhận &amp; thanh toán
         </h1>
         <p className="page-subtitle">
-          {bookingState === 'confirmed'
-            ? `Lịch đã xác nhận · ${confirmedAppointmentId || 'UMC091126'} · ${patientName}`
+          {bookingState === 'created'
+            ? `Đã tạo lịch chờ thanh toán · ${confirmedAppointmentId} · ${patientName}`
             : isExpired
               ? `Đã hết hạn giữ chỗ · ${patientName}`
               : paymentMethod === 'counter'
@@ -188,7 +167,7 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
               <h2 className="review-card-title">Thông tin lịch khám</h2>
               <span
                 className={`review-badge ${
-                  bookingState === 'confirmed'
+                  bookingState === 'created'
                     ? 'is-confirmed'
                     : isExpired
                       ? 'is-expired'
@@ -197,8 +176,8 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
                         : 'is-held'
                 }`}
               >
-                {bookingState === 'confirmed'
-                  ? 'Lịch đã xác nhận'
+                {bookingState === 'created'
+                  ? 'Lịch chờ thanh toán'
                   : isExpired
                     ? 'Đã hết hạn giữ chỗ'
                     : paymentMethod === 'counter'
@@ -223,10 +202,6 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
               <div className="review-info-item">
                 <span className="review-info-label">Thời gian</span>
                 <span className="review-info-value">{timeSlot}</span>
-              </div>
-              <div className="review-info-item">
-                <span className="review-info-label">Địa điểm</span>
-                <span className="review-info-value">{location}</span>
               </div>
             </div>
 
@@ -295,8 +270,8 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
             </div>
 
             <p className="payment-note-text">
-              {bookingState === 'confirmed'
-                ? `Phí khám đã thanh toán · Lịch ${confirmedAppointmentId || 'UMC091126'} đã xác nhận.`
+              {bookingState === 'created'
+                ? `Lịch ${confirmedAppointmentId} đã được tạo. Xem chi tiết để theo dõi khoản thu.`
                 : isExpired
                   ? 'Khung giờ đã được giải phóng. Chọn lại trước khi thanh toán.'
                   : paymentMethod === 'counter'
@@ -315,7 +290,7 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
             {/* Countdown card */}
             <div
               className={`payment-countdown-card ${
-                bookingState === 'confirmed'
+                bookingState === 'created'
                   ? 'is-confirmed'
                   : isExpired
                     ? 'is-expired'
@@ -323,8 +298,8 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
               }`}
             >
               <span className="payment-countdown-label">
-                {bookingState === 'confirmed'
-                  ? 'Hệ thống đã xác nhận thu'
+                {bookingState === 'created'
+                  ? 'Khoản thu đang chờ xử lý'
                   : isExpired
                     ? 'Đã hết hạn giữ chỗ (10 phút)'
                     : paymentMethod === 'counter'
@@ -332,11 +307,11 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
                       : 'Giữ chỗ 10 phút · Còn lại'}
               </span>
               <span className="payment-countdown-timer">
-                {bookingState === 'confirmed'
-                  ? `${amountVnd.toLocaleString('vi-VN')} đ`
+                {bookingState === 'created'
+                  ? formattedAmount
                   : isExpired
                     ? '00:00'
-                    : formatTimer(currentSeconds)}
+                    : formatTimer(seconds)}
               </span>
             </div>
 
@@ -350,7 +325,7 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
               </h3>
               <div className="payment-breakdown-row">
                 <span className="muted">Phí khám</span>
-                <span>{amountVnd.toLocaleString('vi-VN')} đ</span>
+                <span>{formattedAmount}</span>
               </div>
               <div className="payment-breakdown-row">
                 <span className="muted">Phí dịch vụ</span>
@@ -359,14 +334,12 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
               <div className="payment-divider" />
               <div className="payment-total-row">
                 <span className="payment-total-label">Tổng thanh toán</span>
-                <span className="payment-total-amount">
-                  {amountVnd.toLocaleString('vi-VN')} đ
-                </span>
+                <span className="payment-total-amount">{formattedAmount}</span>
               </div>
             </div>
 
             {/* Cam kết điều khoản */}
-            {bookingState !== 'confirmed' && !isExpired && (
+            {bookingState !== 'created' && !isExpired && (
               <label className="payment-terms-label">
                 <input
                   type="checkbox"
@@ -392,13 +365,13 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
             )}
 
             {/* Nút hành động */}
-            {bookingState === 'confirmed' ? (
+            {bookingState === 'created' ? (
               <button
                 type="button"
                 className="btn-payment-action"
                 onClick={() =>
                   navigate(
-                    `/patient/appointments/${encodeURIComponent(confirmedAppointmentId || 'UMC091126')}`,
+                    `/patient/appointments/${encodeURIComponent(confirmedAppointmentId)}`,
                   )
                 }
               >
@@ -433,15 +406,6 @@ export function BookingReview({ api }: { api: AppointmentApi }) {
               <span>
                 Hỗ trợ giao dịch: <strong>1900 7178</strong>
               </span>
-              {bookingState === 'idle' && !isExpired && (
-                <button
-                  type="button"
-                  className="btn-demo-expired"
-                  onClick={handleSimulateExpired}
-                >
-                  Mô phỏng hết hạn giữ chỗ
-                </button>
-              )}
             </div>
           </div>
         </aside>
