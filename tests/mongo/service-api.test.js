@@ -1,6 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const mongoose = require('mongoose');
+const { randomUUID } = require('node:crypto');
+const Ajv = require('ajv/dist/2020');
+const addFormats = require('ajv-formats');
+const { mongoHarness } = require('./test-harness');
+const appointmentOpenApi = require('../../contracts/http/appointment.openapi.json');
+const { handleBillingMessage } = require('../../services/appointment/src/workers/billing-events.worker');
 const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const { ensurePatientStorage } = require('../../services/patient/src/dbs/indexes.js');
 const { getPatientModel } = require('../../services/patient/src/models/patient.model.js');
@@ -95,4 +101,186 @@ test('AP-004 returns only open available slots in the Vietnam business day', asy
   assert.equal(badDate.status, 400);
   const outOfRangeDate = await fetch(base + '/api/v1/slots/available?doctorId=' + doctor + '&serviceId=' + service + '&date=2026-13-30');
   assert.equal(outOfRangeDate.status, 400);
+});
+
+test.describe('Appointment OpenAPI read responses', () => {
+  const h = mongoHarness(ensureAppointmentStorage, 'appointment_db');
+  const ajv = new Ajv({ strict: false, allErrors: true });
+  addFormats(ajv);
+  const contract = 'urn:umc-care:appointment-http';
+  ajv.addSchema(appointmentOpenApi, contract);
+
+  test('AP-011 and AP-012 validate and expose the latest refund status', async (t) => {
+    const id = randomUUID();
+    const chargeId = randomUUID();
+    const rows = h.connection.collection('appointments');
+    await rows.insertOne({
+      id,
+      holdId: randomUUID(),
+      chargeId,
+      patientId: patientA,
+      recipientUserId: ownerA,
+      slotId: randomUUID(),
+      doctorId: doctor,
+      serviceId: service,
+      state: 'CANCELLED',
+      chargeSync: 'CREATED',
+      chargeStatus: 'PAID',
+      version: 1,
+      createdAt: new Date('2026-11-24T00:00:00Z'),
+    });
+    const base = await listen(createAppointmentApp({
+      connection: h.connection,
+      verifyBearerToken: async (token) => tokenClaims[token],
+      authorizePatientAccess: async ({ authContext, patientId }) =>
+        patientId === patientA && authContext.userId === ownerA,
+    }), t);
+    async function get(path, contractPath) {
+      const res = await fetch(base + path, { headers: { authorization: 'Bearer ownerA' } });
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      const schema = appointmentOpenApi.paths[contractPath].get.responses['200']
+        .content['application/json'].schema;
+      const validate = ajv.compile({ $ref: contract + schema.$ref });
+      assert.ok(validate(body), JSON.stringify(validate.errors));
+      return body.data;
+    }
+    const detailPath = '/api/v1/appointments/' + id;
+    const detailContract = '/api/v1/appointments/{appointmentId}';
+    assert.equal((await get(detailPath, detailContract)).refundStatus, 'NONE');
+    for (const [version, refundStatus] of [[3, 'SUCCEEDED'], [2, 'REQUESTED']]) {
+      await handleBillingMessage({
+        connection: h.connection,
+        message: {
+          messageId: randomUUID(),
+          messageKind: 'EVENT',
+          messageType: 'BillingStatusChanged',
+          producer: 'billing',
+          payload: { chargeId, sourceId: id, version, refundStatus },
+        },
+      });
+    }
+    const detail = await get(detailPath, detailContract);
+    assert.equal(detail.refundStatus, 'SUCCEEDED');
+    assert.deepEqual(detail.chargeSync, { state: 'CREATED', chargeId });
+    assert.equal(detail.appointment._id, undefined);
+    assert.equal((await rows.findOne({ id })).billingStatusVersion, undefined);
+    const list = await get(
+      '/api/v1/patients/' + patientA + '/appointments?page=1&limit=20',
+      '/api/v1/patients/{patientId}/appointments',
+    );
+    assert.equal(list.items[0].id, id);
+    assert.equal(list.total, 1);
+  });
+
+  test('AP-019 returns only the summary fields declared in OpenAPI', async (t) => {
+    const now = new Date('2026-11-24T01:00:00Z');
+    await h.connection.collection('appointments').insertOne({
+      id: randomUUID(), holdId: randomUUID(), patientId: patientA,
+      slotId: randomUUID(), doctorId: doctor, serviceId: service,
+      state: 'COMPLETED', version: 1, startAt: now,
+      stateHistory: ['PENDING_PAYMENT', 'CONFIRMED', 'CHECKED_IN', 'COMPLETED']
+        .map((state) => ({ state, at: now })),
+    });
+    const base = await listen(createAppointmentApp({
+      connection: h.connection,
+      verifyBearerToken: async () => ({
+        sub: ownerA, actorType: 'STAFF', capabilities: ['ADMIN'],
+      }),
+    }), t);
+    const response = await fetch(base + '/api/v1/admin/appointments/summary?date=2026-11-24',
+      { headers: { authorization: 'Bearer staff' } });
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    const schema = appointmentOpenApi.paths['/api/v1/admin/appointments/summary']
+      .get.responses['200'].content['application/json'].schema;
+    const validate = ajv.compile({ $ref: contract + schema.$ref });
+    assert.ok(validate(body), JSON.stringify(validate.errors));
+    assert.deepEqual({ ...body.data, asOf: undefined },
+      { booked: 1, cancelled: 0, checkedIn: 1, completed: 1, asOf: undefined });
+    const invalid = await fetch(base + '/api/v1/admin/appointments/summary?date=2026-02-30',
+      { headers: { authorization: 'Bearer staff' } });
+    assert.equal(invalid.status, 400);
+  });
+
+  test('AP-013 through AP-018 mutation responses match OpenAPI', async (t) => {
+    const now = new Date('2026-11-24T00:00:00Z');
+    const holdId = randomUUID(), scheduleId = randomUUID();
+    const slotId = randomUUID(), newSlotId = randomUUID(), id = randomUUID();
+    const quote = { amountVnd: 100000, priceVersionId: randomUUID(), snapshotHash: 'test-quote' };
+    await h.connection.collection('patient_access_projection').insertOne({
+      patientId: patientA, ownerUserId: ownerA, active: true,
+    });
+    await h.connection.collection('schedules').insertOne({
+      id: scheduleId, doctorId: doctor, doctorUserId: doctor, departmentId: service,
+      serviceId: service, status: 'OPEN',
+    });
+    for (const [key, hour, confirmedCount] of [[slotId, 4, 1], [newSlotId, 5, 0]]) {
+      await h.connection.collection('slots').insertOne({
+        id: key, scheduleId, capacity: 2, heldCount: 0, confirmedCount, version: 1,
+        startAt: new Date(+now + hour * 3600000), endAt: new Date(+now + hour * 3600000 + 1800000),
+      });
+    }
+    await h.connection.collection('holds').insertOne({
+      id: holdId, priceSnapshot: quote, principalId: ownerA, idempotencyKey: randomUUID(),
+      patientId: patientA, slotId, expiresAt: new Date(+now + 600000),
+    });
+    const original = {
+      id, holdId, patientId: patientA, principalId: ownerA, recipientUserId: ownerA,
+      slotId, scheduleId, doctorId: doctor, doctorUserId: doctor, departmentId: service,
+      serviceId: service, state: 'CONFIRMED', chargeStatus: 'PAID', chargeSync: 'CREATED',
+      sourceRevision: 1, version: 1, createdAt: now, updatedAt: now,
+      startAt: new Date(+now + 4 * 3600000), endAt: new Date(+now + 4.5 * 3600000),
+    };
+    await h.connection.collection('appointments').insertOne(original);
+    const base = await listen(createAppointmentApp({
+      connection: h.connection,
+      now: () => now,
+      resolvePriceSnapshot: async () => quote,
+      verifyBearerToken: async () => ({ sub: ownerA, actorType: 'STAFF', capabilities: ['RECEPTION'] }),
+      verifyAuthorizationLease: async (_token, options) => ({
+        tokenType: 'LEASE', action: options.action, sub: options.subject,
+        tokenVersion: options.tokenVersion, iat: +now / 1000, exp: +now / 1000 + 30,
+      }),
+      authorizePatientAccess: async () => true,
+    }), t);
+    async function request(method, path, input) {
+      const response = await fetch(base + path, {
+        method,
+        headers: {
+          authorization: 'Bearer staff', 'x-authorization-lease': 'test',
+          'content-type': 'application/json', 'idempotency-key': randomUUID(),
+        },
+        ...(input ? { body: JSON.stringify(input) } : {}),
+      });
+      const body = await response.json();
+      assert.equal(response.status, 200, JSON.stringify(body));
+      const template = Object.keys(appointmentOpenApi.paths).find((route) =>
+        new RegExp('^' + route.replace(/\{[^}]+\}/g, '[^/]+') + '$').test(path.split('?')[0]));
+      const schema = appointmentOpenApi.paths[template][method.toLowerCase()]
+        .responses['200'].content['application/json'].schema;
+      const validate = ajv.compile({ $ref: contract + schema.$ref });
+      assert.ok(validate(body), JSON.stringify(validate.errors));
+      return body.data;
+    }
+    const moved = await request('POST', '/api/v1/appointments/' + id + '/reschedule',
+      { newSlotId, expectedVersion: 1 });
+    assert.equal(moved.appointment.slotId, newSlotId);
+    const cancelled = await request('POST', '/api/v1/appointments/' + id + '/cancel',
+      { reasonCode: 'PATIENT_REQUEST', expectedVersion: moved.appointment.version });
+    assert.equal(cancelled.state, 'CANCELLED');
+    const checkId = randomUUID();
+    await h.connection.collection('appointments').insertOne({
+      ...original, _id: new mongoose.Types.ObjectId(), id: checkId, holdId: randomUUID(),
+    });
+    const checked = await request('POST', '/api/v1/appointments/' + checkId + '/check-in',
+      { expectedVersion: 1 });
+    const queue = await request('GET', '/api/v1/queues/today?ticketType=FIRST');
+    assert.equal(queue.items[0].ticketId, checked.ticket.ticketId);
+    const called = await request('POST', '/api/v1/queues/call-next', { ticketType: 'FIRST' });
+    assert.equal(called.ticket.ticketId, checked.ticket.ticketId);
+    await request('POST', '/api/v1/queues/' + called.ticket.ticketId + '/no-show',
+      { expectedVersion: called.ticket.version, reasonCode: 'PATIENT_ABSENT' });
+  });
+
 });

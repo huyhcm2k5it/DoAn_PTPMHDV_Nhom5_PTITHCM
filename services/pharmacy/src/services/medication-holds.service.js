@@ -160,12 +160,9 @@ async function createMedicationHold(args) {
         version: (old?.version || 0) + 1,
         itemsSnapshot: items,
         amountVnd,
-        currency: 'VND',
         snapshotHash: hash(items),
         requestId,
         expiresAt: new Date(now.getTime() + 900000),
-        createdAt: old?.createdAt || now,
-        updatedAt: now,
         chargeSync: 'PENDING',
         chargeId: null,
         settlementId: null,
@@ -248,7 +245,7 @@ async function returnReservation({ connection, session, hold, state, now }) {
   await connection.collection('medication_holds').updateOne(
     { id: hold.id, version: hold.version, status: 'HELD' },
     {
-      $set: { status: state, cancellationId, updatedAt: now },
+      $set: { status: state, cancellationId },
       $inc: { version: 1 },
     },
     { session },

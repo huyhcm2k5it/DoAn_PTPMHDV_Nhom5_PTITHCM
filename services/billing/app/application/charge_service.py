@@ -1,8 +1,8 @@
 import uuid
 from django.db import transaction
 from django.utils.dateparse import parse_datetime
-from app.domain.models import Charge, ChargeSource, BillingEventOutbox, MessageInbox
-from app.infrastructure.message_delivery import validate, digest, positive_int, make_envelope, OWNERS
+from app.domain.models import Charge, ChargeSource, CancellationEvidence, BillingEventOutbox, MessageInbox
+from app.infrastructure.message_delivery import validate, digest, positive_int, make_envelope, OWNERS, lock_source
 
 
 @transaction.atomic
@@ -26,11 +26,15 @@ def handle_request_charge(envelope, delivery_context=None):
         raise ValueError("Immutable owner snapshotHash required")
     source_id = uuid.UUID(str(payload["sourceId"]))
     patient_id = uuid.UUID(str(payload["patientId"]))
+    lock_source(source, source_id)
     charge_source, _ = ChargeSource.objects.select_for_update().get_or_create(
         source_type=source, source_id=source_id, defaults={"patient_id": patient_id},
     )
     if charge_source.patient_id != patient_id:
         raise ValueError("Charge source patient conflict")
+    cancelled = CancellationEvidence.objects.filter(
+        source_type=source, source_id=source_id, source_revision=payload["sourceRevision"],
+    ).exists()
     lines = payload.get("linesSnapshot", [])
     expires_at = parse_datetime(payload["expiresAt"]) if payload.get("expiresAt") else None
     charge, created = Charge.objects.select_for_update().get_or_create(
@@ -46,6 +50,9 @@ def handle_request_charge(envelope, delivery_context=None):
         or charge.expires_at != expires_at
     ):
         raise ValueError("Source revision snapshot conflict")
+    if cancelled and charge.state == "OPEN":
+        charge.state = "VOID"
+        charge.save(update_fields=["state"])
     response = {"requestId":payload.get("requestId") or envelope["requestId"], "sourceType":source,
         "sourceId":str(charge.source_id), "sourceRevision":charge.source_revision,
         "chargeId":str(charge.id), "state":"CREATED", "reasonCode":None}

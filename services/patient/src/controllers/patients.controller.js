@@ -70,11 +70,12 @@ function createPatientsController(dependencies) {
         const projection = await dependencies.getUserProjection(
           req.authContext.userId,
         );
+        const query = req.query.q || req.query.name || req.query.phone;
         const data = await searchPatients({
           repository: dependencies.repository,
           authContext: req.authContext,
           projection,
-          query: req.query.q,
+          query,
           page: req.query.page,
           limit: req.query.limit,
         });

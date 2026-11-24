@@ -1,7 +1,7 @@
 """Cancellation evidence is accepted only from the actual owner event."""
 from django.db import transaction
-from app.domain.models import CancellationEvidence, Charge, MessageInbox
-from app.infrastructure.message_delivery import validate, digest, positive_int
+from app.domain.models import CancellationEvidence, Charge, ChargeSource, MessageInbox
+from app.infrastructure.message_delivery import validate, digest, positive_int, lock_source
 
 
 @transaction.atomic
@@ -12,7 +12,7 @@ def apply_source_cancellation(envelope):
              "MedicationHoldChanged":"pharmacy"}.get(kind)
     if envelope["producer"] != owner:
         raise ValueError("Cancellation owner mismatch")
-    if kind == "AppointmentChanged" and p.get("changeType") != "CANCELLED":
+    if kind == "AppointmentChanged" and p.get("changeType") not in ("CANCELLED", "EXPIRED", "EXPIRED_LATE_PAID"):
         return "IGNORED"
     if kind == "MedicationHoldChanged" and p.get("changeType") not in ("RELEASED","EXPIRED"):
         return "IGNORED"
@@ -28,6 +28,11 @@ def apply_source_cancellation(envelope):
             raise ValueError("Cancellation revision not resolved")
         revision = charges[0].source_revision
     positive_int(revision)
+    lock_source(source_type, source_id)
+    # Serialize both delivery orders with RequestCharge on the owner source key.
+    ChargeSource.objects.select_for_update().filter(
+        source_type=source_type, source_id=source_id,
+    ).first()
     fingerprint = digest(p)
     record, created = CancellationEvidence.objects.get_or_create(cancellation_id=p["cancellationId"], defaults={
         "source_type":source_type,"source_id":source_id,"source_revision":revision,

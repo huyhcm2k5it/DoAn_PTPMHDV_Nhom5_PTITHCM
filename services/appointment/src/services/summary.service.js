@@ -17,6 +17,17 @@ async function getAdminSummary({ connection, authContext, date }) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date || ''))
     throw new ApiError(400, 'VALIDATION_ERROR', 'date must be YYYY-MM-DD.');
   const start = new Date(`${date}T00:00:00+07:00`);
+  if (
+    !Number.isFinite(start.getTime()) ||
+    new Date(start.getTime() + 7 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10) !== date
+  )
+    throw new ApiError(
+      400,
+      'VALIDATION_ERROR',
+      'date must be a valid calendar day.',
+    );
   const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
   const Appointment = getAppointmentModel(connection);
   const QueueTicket = getQueueTicketModel(connection);

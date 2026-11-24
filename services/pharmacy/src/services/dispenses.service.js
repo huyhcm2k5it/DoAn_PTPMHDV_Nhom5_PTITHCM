@@ -17,7 +17,13 @@ async function dispenseMedication(args) {
         .collection('medication_holds')
         .findOne({ id: holdId }, { session });
       if (!hold) throw failure(404, 'NOT_FOUND', 'Hold not found.');
-      if (hold.status === 'DISPENSED')
+      const alreadyDispensed = await connection
+        .collection('dispenses')
+        .findOne(
+          { prescriptionId: hold.prescriptionId, revision: hold.revision },
+          { session },
+        );
+      if (hold.status === 'DISPENSED' || alreadyDispensed)
         throw failure(
           409,
           'ALREADY_DISPENSED',
@@ -89,7 +95,7 @@ async function dispenseMedication(args) {
       await connection.collection('medication_holds').updateOne(
         { id: holdId, version: expectedVersion },
         {
-          $set: { status: 'DISPENSED', dispensedAt: now },
+          $set: { status: 'COMMITTED' },
           $inc: { version: 1 },
         },
         { session },

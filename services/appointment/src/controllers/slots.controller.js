@@ -20,7 +20,12 @@ function createSlotsController(dependencies) {
         );
         res
           .status(200)
-          .json({ data, meta: { correlationId: req.correlationId } });
+          .set('X-Availability-As-Of', data.asOf)
+          .set('X-Availability-Is-Advisory', 'true')
+          .json({
+            data: { items: data.items },
+            meta: { correlationId: req.correlationId },
+          });
       } catch (error) {
         next(error);
       }

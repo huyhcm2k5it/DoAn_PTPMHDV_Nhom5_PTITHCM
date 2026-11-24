@@ -1,4 +1,7 @@
 const { createHash, randomUUID } = require('node:crypto');
+const {
+  refreshPatientIntervals,
+} = require('../services/patient-time-lock.service');
 const { withMongoTransaction } = require('../../../../mongo/transaction.js');
 const {
   getAppointmentModel,
@@ -200,7 +203,6 @@ async function handleClaimQueueTicketCommand({
               state: 'CLAIMED',
               claimId,
               ...(visitId ? { visitId } : {}),
-              claimedAt: now,
               claimedBy: ticket.doctorUserId || null,
               updatedAt: now,
             },
@@ -238,6 +240,7 @@ async function handleClaimQueueTicketCommand({
             },
             { session },
           );
+          await refreshPatientIntervals(connection, ticket.patientId, session);
         }
         response = {
           requestId: payload.requestId,
@@ -391,7 +394,6 @@ async function handleClinicalMessage({
             state: 'CLAIMED',
             claimId: payload.claimId,
             visitId: payload.visitId || undefined,
-            claimedAt: now,
             claimedBy: ticket.doctorUserId || null,
             updatedAt: now,
           },
@@ -428,6 +430,7 @@ async function handleClinicalMessage({
         },
         { session },
       );
+      await refreshPatientIntervals(connection, ticket.patientId, session);
       return { duplicate: false, state: 'ACCEPTED', claimId: payload.claimId };
     }
     if (message.messageType === 'VisitSigned') {
@@ -463,6 +466,7 @@ async function handleClinicalMessage({
         },
         { session },
       );
+      await refreshPatientIntervals(connection, appointment.patientId, session);
       const completing = {
         appointmentId: appointment.id,
         state: { $in: ['CLAIMED', 'IN_SERVICE'] },
@@ -473,7 +477,7 @@ async function handleClinicalMessage({
       await QueueTicket.updateMany(
         completing,
         {
-          $set: { state: 'DONE', completedAt: now, updatedAt: now },
+          $set: { state: 'DONE', updatedAt: now },
           $push: { stateHistory: { state: 'DONE', at: now } },
           $inc: { version: 1 },
         },
