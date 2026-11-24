@@ -11,7 +11,7 @@ const {
 } = require('./common');
 const { returnReservation } = require('./medication-holds.service');
 
-async function maybeCommit(connection, session, hold, now) {
+async function maybeCommit(connection, session, hold) {
   if (
     hold.status !== 'SETTLEMENT_LOCKED' ||
     !hold.paidEvidence ||
@@ -21,8 +21,6 @@ async function maybeCommit(connection, session, hold, now) {
   const next = {
     ...hold,
     status: 'COMMITTED',
-    committedAt: now,
-    updatedAt: now,
     version: hold.version + 1,
   };
   await connection
@@ -73,7 +71,6 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
               $set: {
                 billingStatusVersion: p.version,
                 refundStatus: p.refundStatus || hold.refundStatus,
-                billingAsOf: p.asOf || now.toISOString(),
               },
             },
             { session },
@@ -143,7 +140,6 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
             $set: {
               chargeSync: p.state,
               chargeId: p.state === 'CREATED' ? p.chargeId : null,
-              updatedAt: now,
             },
           },
           { session },
@@ -234,7 +230,6 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
           fence,
           fenceCounter: fence,
           version: hold.version + 1,
-          updatedAt: now,
         };
         locked.reserveResponseId = await outbox(connection, session, {
           type: 'SettlementReserved',
@@ -372,10 +367,10 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
             'STATE_CONFLICT',
             'A terminal source cannot receive payment.',
           );
-        const changed = { ...hold, paidEvidence: evidence, updatedAt: now };
+        const changed = { ...hold, paidEvidence: evidence };
         await coll.replaceOne({ id: hold.id }, changed, { session });
         return {
-          state: (await maybeCommit(connection, session, changed, now)).status,
+          state: (await maybeCommit(connection, session, changed)).status,
         };
       }
       integer(p.decisionVersion, 'decisionVersion');
@@ -438,7 +433,6 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
         ...hold,
         settlementState: p.state,
         settlementVersion: p.decisionVersion,
-        updatedAt: now,
       };
       if (p.state === 'FAILED') {
         changed = {
@@ -462,7 +456,7 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
       }
       await coll.replaceOne({ id: hold.id }, changed, { session });
       return {
-        state: (await maybeCommit(connection, session, changed, now)).status,
+        state: (await maybeCommit(connection, session, changed)).status,
       };
     },
   );
@@ -482,7 +476,7 @@ async function reconcileMedicationHold(args) {
         throw failure(409, 'STATE_CONFLICT', 'Attempt changed.');
       if (['RELEASED', 'EXPIRED'].includes(hold.status))
         throw failure(409, 'HOLD_EXPIRED', 'Hold is no longer active.');
-      const updated = await maybeCommit(connection, session, hold, now);
+      const updated = await maybeCommit(connection, session, hold);
       return pending(updated);
     },
   );

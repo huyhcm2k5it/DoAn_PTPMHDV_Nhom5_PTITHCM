@@ -1,5 +1,6 @@
 const { ApiError } = require('../core/errors');
 function requireLease(dependencies, action) {
+  const expectedActions = Array.isArray(action) ? action : [action];
   return async (req, res, next) => {
     try {
       const token = req.get('x-authorization-lease');
@@ -12,7 +13,8 @@ function requireLease(dependencies, action) {
       let lease;
       try {
         lease = await dependencies.verifyAuthorizationLease(token, {
-          action,
+          action: expectedActions[0],
+          expectedActions,
           subject: req.authContext.userId,
           tokenVersion: req.authContext.tokenVersion,
         });
@@ -29,7 +31,7 @@ function requireLease(dependencies, action) {
       if (
         !lease ||
         lease.tokenType !== 'LEASE' ||
-        lease.action !== action ||
+        !expectedActions.includes(lease.action) ||
         lease.sub !== req.authContext.userId ||
         lease.tokenVersion !== req.authContext.tokenVersion
       )

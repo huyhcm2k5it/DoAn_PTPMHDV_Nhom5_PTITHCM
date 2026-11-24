@@ -1,4 +1,8 @@
 const { randomUUID } = require('node:crypto');
+const { ApiError } = require('../core/errors');
+const {
+  refreshPatientIntervals,
+} = require('../services/patient-time-lock.service');
 const { withMongoTransaction } = require('../../../../mongo/transaction.js');
 const {
   getAppointmentModel,
@@ -15,14 +19,28 @@ async function expirePendingAppointments({
   const Appointment = getAppointmentModel(connection);
   const candidates = await Appointment.find({
     state: 'PENDING_PAYMENT',
-    paymentDueAt: { $lte: now },
+    $or: [
+      { expiresAt: { $lte: now } },
+      { expiresAt: { $exists: false }, paymentDueAt: { $lte: now } },
+    ],
   })
-    .sort({ paymentDueAt: 1 })
+    .sort({ expiresAt: 1, paymentDueAt: 1 })
     .limit(batchSize)
     .lean();
   let expired = 0;
   for (const candidate of candidates) {
     await withMongoTransaction(connection, async (session) => {
+      const access = await connection
+        .collection('patient_access_projection')
+        .findOne({ patientId: candidate.patientId, active: true }, { session });
+      const recipientUserId = access?.ownerUserId ?? candidate.recipientUserId;
+      if (!recipientUserId)
+        throw new ApiError(
+          503,
+          'AUTH_PROJECTION_UNAVAILABLE',
+          'Expiry recipient is unavailable.',
+        );
+      const cancellationId = createId();
       const changed = await Appointment.updateOne(
         {
           id: candidate.id,
@@ -30,7 +48,7 @@ async function expirePendingAppointments({
           version: candidate.version,
         },
         {
-          $set: { state: 'EXPIRED', updatedAt: now, chargeStatus: 'EXPIRED' },
+          $set: { state: 'EXPIRED', cancellationId, updatedAt: now },
           $push: {
             stateHistory: {
               state: 'EXPIRED',
@@ -50,6 +68,7 @@ async function expirePendingAppointments({
         { session },
       );
       if (!released.modifiedCount) throw new Error('CAPACITY_INVARIANT_BROKEN');
+      await refreshPatientIntervals(connection, candidate.patientId, session);
       const Outbox = getOutboxModel(connection);
       await Outbox.create(
         [
@@ -64,11 +83,17 @@ async function expirePendingAppointments({
             correlation_id: candidate.requestId,
             occurred_at: now,
             payload: {
+              appointmentId: candidate.id,
+              patientId: candidate.patientId,
+              recipientUserId,
+              changeType: 'EXPIRED',
+              version: candidate.version + 1,
+              cancellationId,
+              reasonCode: 'PAYMENT_TIMEOUT',
               sourceType: 'APPOINTMENT',
               sourceId: candidate.id,
               sourceRevision: candidate.sourceRevision,
               state: 'EXPIRED',
-              reason: 'PAYMENT_TIMEOUT',
             },
           },
         ],

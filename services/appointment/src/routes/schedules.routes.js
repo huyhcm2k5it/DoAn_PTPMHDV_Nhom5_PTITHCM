@@ -15,13 +15,13 @@ function schedulesRoutes(dependencies) {
   router.post(
     '/',
     authenticate,
-    requireLease(dependencies, 'AP-002'),
+    requireLease(dependencies, ['AP-005', 'AP-002']),
     controller.create,
   );
   router.patch(
     '/:scheduleId',
     authenticate,
-    requireLease(dependencies, 'AP-003'),
+    requireLease(dependencies, ['AP-006', 'AP-003']),
     controller.update,
   );
   return router;

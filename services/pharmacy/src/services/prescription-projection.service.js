@@ -46,7 +46,25 @@ async function applyPrescriptionFinalized({
       const coll = connection.collection('prescription_projection');
       const query = { prescriptionId: p.prescriptionId, revision: p.revision };
       const current = await coll.findOne(query, { session });
-      if (current && current.payloadHash !== hash(p))
+      const originalDelivery = current?.sourceEventId
+        ? await connection.collection('inbox').findOne(
+            {
+              message_id: current.sourceEventId,
+              consumer_name: 'pharmacy-prescription',
+            },
+            { session },
+          )
+        : null;
+      const deliveryHash = hash({
+        kind: message.messageKind,
+        type: message.messageType,
+        producer: message.producer,
+        payload: p,
+      });
+      const matchesOriginal = originalDelivery
+        ? originalDelivery.payload_hash === deliveryHash
+        : current?.payloadHash === hash(p);
+      if (current && !matchesOriginal)
         throw failure(
           409,
           'PROJECTION_CONFLICT',
@@ -60,16 +78,12 @@ async function applyPrescriptionFinalized({
             revision: p.revision,
             visitId: p.visitId,
             patientId: p.patientId,
-            finalizedAt: p.finalizedAt,
-            state: 'FINAL',
             linesSnapshot: p.itemsSnapshot,
-            payloadHash: hash(p),
             sourceEventId: message.messageId,
-            updatedAt: now,
           },
           { session },
         );
-      return {};
+      return { finalizedAt: p.finalizedAt };
     },
   );
 }

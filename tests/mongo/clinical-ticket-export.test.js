@@ -143,6 +143,7 @@ test('check-in commits the trusted Clinical ticket event atomically', async () =
     state: 'CONFIRMED',
     chargeStatus: 'PAID',
     startAt: now,
+    endAt: new Date(+now + 30 * 60 * 1000),
     version: 1,
   });
   const result = await checkInAppointment({

@@ -297,6 +297,9 @@ test('FINAL projection replays, rejects same revision changed content and reject
   assert.match(stored.id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   assert.deepEqual(stored.linesSnapshot, m.payload.itemsSnapshot);
   assert.equal(stored.itemsSnapshot, undefined);
+  assert.deepEqual(Object.keys(stored).filter((k) => k !== '_id').sort(), ['id', 'prescriptionId', 'revision', 'visitId', 'linesSnapshot', 'sourceEventId', 'patientId'].sort());
+  await applyPrescriptionFinalized({ connection: h.connection, message: { ...m, messageId: key() }, now });
+  await assert.rejects(applyPrescriptionFinalized({ connection: h.connection, message: { ...m, messageId: key(), payload: { ...m.payload, finalizedAt: new Date(+now + 1000).toISOString() } }, now }), bad('PROJECTION_CONFLICT'));
   assert.equal(
     (await applyPrescriptionFinalized({ connection: h.connection, message: m, now })).duplicate,
     true,

@@ -29,7 +29,7 @@ function createQueueController(dependencies) {
             'VALIDATION_ERROR',
             'expectedVersion is required.',
           );
-        const data = await checkInAppointment({
+        const ticket = await checkInAppointment({
           connection: dependencies.connection,
           appointmentId: req.params.appointmentId,
           staffId: req.authContext.userId,
@@ -38,9 +38,14 @@ function createQueueController(dependencies) {
           now: dependencies.now?.() || new Date(),
           createId: dependencies.createId,
         });
-        res
-          .status(200)
-          .json({ data, meta: { correlationId: req.correlationId } });
+        res.status(200).json({
+          data: {
+            appointmentId: req.params.appointmentId,
+            state: 'CHECKED_IN',
+            ticket,
+          },
+          meta: { correlationId: req.correlationId },
+        });
       } catch (error) {
         next(error);
       }
@@ -59,9 +64,10 @@ function createQueueController(dependencies) {
           limit: req.query.limit,
           now: dependencies.now?.() || new Date(),
         });
-        res
-          .status(200)
-          .json({ data, meta: { correlationId: req.correlationId } });
+        res.status(200).json({
+          data: { items: data.items, total: data.total },
+          meta: { correlationId: req.correlationId },
+        });
       } catch (error) {
         next(error);
       }
@@ -74,7 +80,7 @@ function createQueueController(dependencies) {
             'VALIDATION_ERROR',
             'ticketType is required and must be FIRST or RETURN.',
           );
-        const data = await callNextQueueTicket({
+        const ticket = await callNextQueueTicket({
           connection: dependencies.connection,
           actorType: req.authContext.actorType,
           capabilities: req.authContext.capabilities,
@@ -85,9 +91,10 @@ function createQueueController(dependencies) {
           idempotencyKey: req.get('idempotency-key'),
           now: dependencies.now?.() || new Date(),
         });
-        res
-          .status(200)
-          .json({ data, meta: { correlationId: req.correlationId } });
+        res.status(200).json({
+          data: { ticket },
+          meta: { correlationId: req.correlationId },
+        });
       } catch (error) {
         next(error);
       }
@@ -104,9 +111,10 @@ function createQueueController(dependencies) {
           idempotencyKey: req.get('idempotency-key'),
           now: dependencies.now?.() || new Date(),
         });
-        res
-          .status(200)
-          .json({ data, meta: { correlationId: req.correlationId } });
+        res.status(200).json({
+          data: { ticketId: data.ticketId, state: data.state },
+          meta: { correlationId: req.correlationId },
+        });
       } catch (error) {
         next(error);
       }
