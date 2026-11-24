@@ -2,6 +2,7 @@ import uuid
 from django.db import transaction
 from django.utils.dateparse import parse_datetime
 from app.domain.models import Charge, ChargeSource, CancellationEvidence, BillingEventOutbox, MessageInbox
+from app.application.refund_workflow import reconcile_source_cancellation
 from app.infrastructure.message_delivery import validate, digest, positive_int, make_envelope, OWNERS, lock_source
 
 
@@ -32,9 +33,9 @@ def handle_request_charge(envelope, delivery_context=None):
     )
     if charge_source.patient_id != patient_id:
         raise ValueError("Charge source patient conflict")
-    cancelled = CancellationEvidence.objects.filter(
+    cancellation = CancellationEvidence.objects.filter(
         source_type=source, source_id=source_id, source_revision=payload["sourceRevision"],
-    ).exists()
+    ).order_by("source_version", "cancellation_id").first()
     lines = payload.get("linesSnapshot", [])
     expires_at = parse_datetime(payload["expiresAt"]) if payload.get("expiresAt") else None
     charge, created = Charge.objects.select_for_update().get_or_create(
@@ -50,9 +51,8 @@ def handle_request_charge(envelope, delivery_context=None):
         or charge.expires_at != expires_at
     ):
         raise ValueError("Source revision snapshot conflict")
-    if cancelled and charge.state == "OPEN":
-        charge.state = "VOID"
-        charge.save(update_fields=["state"])
+    if cancellation is not None:
+        reconcile_source_cancellation(charge, cancellation)
     response = {"requestId":payload.get("requestId") or envelope["requestId"], "sourceType":source,
         "sourceId":str(charge.source_id), "sourceRevision":charge.source_revision,
         "chargeId":str(charge.id), "state":"CREATED", "reasonCode":None}

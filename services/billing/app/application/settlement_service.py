@@ -2,6 +2,7 @@
 from django.db import transaction
 from django.utils import timezone
 from app.domain.models import BillingEventOutbox
+from app.application.refund_workflow import reconcile_source_cancellation
 
 
 def drain_outbox():
@@ -61,14 +62,14 @@ def apply_settlement_reserved(envelope):
             raise ValueError("Message identity conflict")
         return "DUPLICATE"
     payment = Payment.objects.select_for_update().get(saga=saga)
-    if payment.charge_id != charge.id:
+    if payment.charge.id != charge.id:
         raise ValueError("Payment belongs to another charge")
     if saga.state in ("FAILED", "SUCCEEDED"):
         if saga.state == "SUCCEEDED" and payload.get("fence") != saga.fence:
             raise ValueError("Fence conflict")
         enqueue_decision(saga, payment, envelope)
     else:
-        if charge.settlement_saga_id != saga.id:
+        if getattr(charge, "settlement_saga_id", None) != saga.id:
             raise ValueError("Reservation is not for the current saga")
         state = payload.get("state")
         if state not in ("ACCEPTED", "REJECTED") or payment.state != "PENDING":
@@ -121,6 +122,8 @@ def apply_settlement_reserved(envelope):
         charge.version += 1
         charge.save(update_fields=["state", "updated_at", "version"])
         enqueue_decision(saga, payment, envelope)
+
+    reconcile_source_cancellation(charge)
     MessageInbox.objects.create(message_id=envelope["messageId"],
                                 handler="SettlementReserved", body_hash=fingerprint)
     return "APPLIED"

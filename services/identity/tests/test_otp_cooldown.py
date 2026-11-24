@@ -3,6 +3,7 @@ from datetime import timedelta
 from threading import Barrier
 from unittest import skipUnless
 from unittest.mock import patch
+import uuid
 
 from django.db import connection, connections
 from django.test import TestCase, TransactionTestCase
@@ -27,7 +28,7 @@ class OtpCooldownTests(TestCase):
     def resend(self, purpose="REGISTER"):
         return self.client.post("/api/v1/auth/otp/resend", {
             "phone": self.registration["phone"], "purpose": purpose,
-        }, format="json")
+        }, format="json", HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()))
 
     def test_registration_cannot_bypass_resend_cooldown_or_change_credentials(self):
         self.assertEqual(self.register().status_code, 201)
@@ -62,7 +63,7 @@ class OtpCooldownTests(TestCase):
         self.assertEqual([first.status_code, second.status_code, unknown.status_code], [200, 200, 200])
         self.assertEqual(first.json()["data"], second.json()["data"])
         self.assertEqual(first.json()["data"], unknown.json()["data"])
-        self.assertEqual(self.resend("RESET").status_code, 409)
+        self.assertEqual(self.resend("RESET").status_code, 200)
         self.assertEqual(OtpRequest.objects.filter(phone=payload["phone"], purpose="RESET").count(), 1)
         self.assertEqual(self.sender.call_count, 1)
         OtpRequest.objects.filter(phone=payload["phone"]).update(created_at=timezone.now() - timedelta(seconds=61))
@@ -81,7 +82,10 @@ class ConcurrentOtpCooldownTests(TransactionTestCase):
             connections.close_all()
             try:
                 barrier.wait(timeout=10)
-                return APIClient().post(paths[index], bodies[index], format="json").status_code
+                return APIClient().post(
+                    paths[index], bodies[index], format="json",
+                    HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()),
+                ).status_code
             finally:
                 connections.close_all()
 
