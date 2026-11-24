@@ -1,4 +1,5 @@
 const { createHash, randomUUID } = require('node:crypto');
+const { refreshPatientIntervals } = require('./patient-time-lock.service');
 const { withMongoTransaction } = require('../../../../mongo/transaction.js');
 const {
   getScheduleModel,
@@ -135,15 +136,21 @@ async function createHold({
         );
       await Lock.updateOne(
         { patientId },
-        { $set: { updatedAt: now }, $inc: { version: 1 } },
+        { $inc: { version: 1 } },
         { upsert: true, session },
       );
+      const overlappingSlots = await Slot.find({
+        startAt: { $lt: slot.endAt },
+        endAt: { $gt: slot.startAt },
+      })
+        .select('id')
+        .session(session)
+        .lean();
       const activeHold = await Hold.findOne({
         patientId,
         status: 'HELD',
         expiresAt: { $gt: now },
-        slotStartAt: { $lt: slot.endAt },
-        slotEndAt: { $gt: slot.startAt },
+        slotId: { $in: overlappingSlots.map((item) => item.id) },
       })
         .session(session)
         .lean();
@@ -205,20 +212,13 @@ async function createHold({
         idempotencyKey,
         patientId,
         slotId,
-        scheduleId: slot.scheduleId,
-        doctorId: schedule.doctorId,
-        doctorUserId: schedule.doctorUserId,
-        departmentId: schedule.departmentId,
-        serviceId: schedule.serviceId,
-        slotStartAt: slot.startAt,
-        slotEndAt: slot.endAt,
         status: 'HELD',
         expiresAt,
         createdAt: now,
-        version: 1,
         priceSnapshot,
       };
       await Hold.create([hold], { session });
+      await refreshPatientIntervals(connection, patientId, session);
       const response = responseForHold(hold);
       await Idempotency.create(
         [
@@ -288,7 +288,10 @@ async function releaseHold({
         throw new ApiError(404, 'HOLD_NOT_FOUND', 'Hold không tồn tại.');
       if (hold.principalId !== principalId)
         throw new ApiError(403, 'FORBIDDEN', 'Không có quyền trên hold này.');
-      if (expectedVersion != null && Number(expectedVersion) !== hold.version)
+      if (
+        expectedVersion != null &&
+        Number(expectedVersion) !== (hold.status === 'HELD' ? 1 : 2)
+      )
         throw new ApiError(409, 'VERSION_CONFLICT', 'Hold đã thay đổi.');
       if (hold.status !== 'HELD')
         throw new ApiError(
@@ -297,8 +300,8 @@ async function releaseHold({
           'Hold không còn hiệu lực.',
         );
       const changed = await Hold.updateOne(
-        { id: holdId, status: 'HELD', version: hold.version },
-        { $set: { status: 'RELEASED', releasedAt: now }, $inc: { version: 1 } },
+        { id: holdId, status: 'HELD' },
+        { $set: { status: 'RELEASED' } },
         { session },
       );
       if (!changed.modifiedCount)
@@ -314,6 +317,7 @@ async function releaseHold({
           'CAPACITY_INVARIANT_BROKEN',
           'Không thể trả sức chứa slot.',
         );
+      await refreshPatientIntervals(connection, hold.patientId, session);
       const response = { holdId, state: 'RELEASED' };
       await Idempotency.create(
         [
@@ -360,10 +364,9 @@ async function expireHolds({ connection, now = new Date(), batchSize = 100 }) {
     try {
       await withMongoTransaction(connection, async (session) => {
         const changed = await Hold.updateOne(
-          { id: candidate.id, status: 'HELD', version: candidate.version },
+          { id: candidate.id, status: 'HELD' },
           {
-            $set: { status: 'EXPIRED', releasedAt: now },
-            $inc: { version: 1 },
+            $set: { status: 'EXPIRED' },
           },
           { session },
         );
@@ -379,6 +382,7 @@ async function expireHolds({ connection, now = new Date(), batchSize = 100 }) {
             'CAPACITY_INVARIANT_BROKEN',
             'Không thể trả sức chứa slot.',
           );
+        await refreshPatientIntervals(connection, candidate.patientId, session);
         count += 1;
       });
     } catch (error) {

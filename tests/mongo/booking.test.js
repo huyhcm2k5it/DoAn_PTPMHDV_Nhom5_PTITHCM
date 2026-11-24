@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { randomUUID } = require('node:crypto');
 const mongoose = require('mongoose');
 const { MongoMemoryReplSet } = require('mongodb-memory-server');
 const { ensureAppointmentStorage } = require('../../services/appointment/src/dbs/indexes.js');
@@ -165,7 +166,7 @@ test('twenty different patients competing for the final slot have exactly one wi
 });
 
 test('AP-008 reserves the last slot once and AP-009 releases it', async (t) => {
-  const { Slot, base } = await setup(t);
+  const { connection, Slot, base } = await setup(t);
   const hold = await fetch(base + '/api/v1/appointment-holds', {
     method: 'POST',
     headers: {
@@ -216,6 +217,12 @@ test('AP-008 reserves the last slot once and AP-009 releases it', async (t) => {
     body: JSON.stringify({ patientId: patientA, slotId: 'slot-1' }),
   });
   assert.equal(conflict.status, 409);
+  const timeLocks = connection.collection('patient_time_locks');
+  const locked = await timeLocks.findOne({ patientId: patientA });
+  assert.deepEqual(Object.keys(locked).filter((key) => key !== '_id').sort(),
+    ['intervals', 'patientId', 'version']);
+  assert.equal(locked.intervals[0].holdId, payload.data.holdId);
+  assert.equal(locked.intervals[0].state, 'HELD');
 
   const release = await fetch(base + '/api/v1/appointment-holds/' + payload.data.holdId, {
     method: 'DELETE',
@@ -226,6 +233,7 @@ test('AP-008 reserves the last slot once and AP-009 releases it', async (t) => {
     },
   });
   assert.equal(release.status, 200);
+  assert.deepEqual((await timeLocks.findOne({ patientId: patientA })).intervals, []);
   assert.equal((await Slot.findOne({ id: 'slot-1' })).heldCount, 0);
 });
 
@@ -507,6 +515,19 @@ test('Billing messages require matching source and fence before CONFIRMED', asyn
   );
   const row = await connection.collection('appointments').findOne({ id: appointmentId });
   assert.equal(row.state, 'CONFIRMED');
+  const events = await connection.collection('outbox').find({
+    message_type: 'AppointmentChanged',
+    aggregate_id: appointmentId,
+    'payload.changeType': 'CONFIRMED',
+  }).toArray();
+  assert.equal(events.length, 1);
+  assert.deepEqual(events[0].payload, {
+    appointmentId,
+    patientId: patientA,
+    recipientUserId: ownerA,
+    changeType: 'CONFIRMED',
+    version: row.version,
+  });
   const slot = await Slot.findOne({ id: 'slot-1' }).lean();
   assert.equal(slot.heldCount, 0);
   assert.equal(slot.confirmedCount, 1);
@@ -758,6 +779,14 @@ test('AP-013 reschedules atomically and AP-014 cancels with one refund request',
     now: new Date('2026-10-30T00:30:00Z'),
     createId: () => 'cancel-event-1',
   });
+  const sourceEvent = await connection.collection('outbox').findOne({
+    message_type: 'AppointmentChanged', 'payload.changeType': 'RESCHEDULED',
+  });
+  const cancelledEvent = await connection.collection('outbox').findOne({
+    message_type: 'AppointmentChanged', 'payload.changeType': 'CANCELLED',
+  });
+  assert.equal(sourceEvent.payload.sourceRevision, 1);
+  assert.equal(cancelledEvent.payload.cancelledSourceRevision, 1);
   assert.equal(cancelled.state, 'CANCELLED');
   assert.equal(cancelled.refundStatus, 'REQUESTED');
   assert.equal((await Slot.findOne({ id: 'slot-2' })).confirmedCount, 0);
@@ -812,6 +841,30 @@ test('pending payment expiry releases capacity once and emits AppointmentChanged
     await connection.collection('outbox').countDocuments({ message_type: 'AppointmentChanged' }),
     1,
   );
+  const expiryEvent = await connection.collection('outbox').findOne({
+    message_type: 'AppointmentChanged',
+    'payload.changeType': 'EXPIRED',
+  });
+  assert.equal(expiryEvent.payload.appointmentId, appointmentId);
+  assert.equal(expiryEvent.payload.patientId, patientA);
+  assert.equal(expiryEvent.payload.recipientUserId, ownerA);
+  assert.equal(expiryEvent.payload.reasonCode, 'PAYMENT_TIMEOUT');
+  assert.ok(expiryEvent.payload.cancellationId);
+  assert.equal(expiryEvent.payload.sourceRevision, 1);
+  await handleBillingMessage({
+    connection,
+    message: {
+      messageId: randomUUID(),
+      messageType: 'ChargePrepared',
+      payload: {
+        sourceType: 'APPOINTMENT', sourceId: appointmentId,
+        sourceRevision: 1, state: 'CREATED', chargeId: randomUUID(),
+      },
+    },
+  });
+  const expired = await connection.collection('appointments').findOne({ id: appointmentId });
+  assert.equal(expired.state, 'EXPIRED');
+  assert.equal(expired.chargeStatus, 'VOID');
 });
 
 test('outbox publisher marks RequestCharge only after confirm', async (t) => {
@@ -893,8 +946,10 @@ test('holds reject unusable clinical mapping without consuming capacity, then ac
   await Schedule.updateOne({ id: 'schedule-1' }, { $set: trustedMapping });
   const result = await createHold(options);
   const stored = await connection.collection('holds').findOne({ id: result.holdId });
-  assert.equal(stored.doctorUserId, doctor);
-  assert.equal(stored.departmentId, service);
+  assert.deepEqual(Object.keys(stored).filter((key) => key !== '_id').sort(), [
+    'id', 'slotId', 'patientId', 'status', 'expiresAt', 'principalId',
+    'idempotencyKey', 'createdAt', 'priceSnapshot',
+  ].sort());
   assert.equal((await Slot.findOne({ id: 'slot-1' }).lean()).heldCount, 1);
 });
 
@@ -915,7 +970,11 @@ test('reception booking sends the patient owner as charge recipient', async (t) 
     principalId: staff,
     idempotencyKey: 'reception-hold',
     now,
-    resolvePriceSnapshot: async () => ({ amountVnd: 100000, snapshotHash: 'a'.repeat(64) }),
+    resolvePriceSnapshot: async () => ({
+      amountVnd: 100000,
+      priceVersionId: '41bd471b-486c-4d8a-8688-44676bbcba0d',
+      snapshotHash: 'a'.repeat(64),
+    }),
   });
   const created = await createAppointment({
     connection,
@@ -927,6 +986,15 @@ test('reception booking sends the patient owner as charge recipient', async (t) 
   });
   const event = await connection.collection('outbox').findOne({ message_type: 'RequestCharge' });
   assert.equal(event.payload.recipientUserId, ownerA);
+  const stored = await connection.collection('appointments').findOne(
+    { id: created.appointmentId },
+    { useBigInt64: true },
+  );
+  assert.equal(stored.priceSnapshotVnd, 100000n);
+  assert.equal(stored.priceVersion, '41bd471b-486c-4d8a-8688-44676bbcba0d');
+  assert.ok(stored.expiresAt instanceof Date);
+  assert.equal(Object.hasOwn(stored, 'priceSnapshot'), false);
+  assert.equal(Object.hasOwn(stored, 'paymentDueAt'), false);
   await cancelAppointment({
     connection,
     appointmentId: created.appointmentId,

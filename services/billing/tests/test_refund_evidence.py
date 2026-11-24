@@ -4,14 +4,42 @@ from tests.fixtures import create_charge
 from typing import Any, cast
 from django.test import TestCase
 from rest_framework.test import APIClient
-from app.domain.models import BillingEventOutbox, Refund, BillingAuditEvent
+from app.domain.models import BillingEventOutbox, Charge, CancellationEvidence, Refund, BillingAuditEvent
 from app.application.refund_service import apply_source_cancellation
+from app.application.charge_service import handle_request_charge
 from app.infrastructure.message_delivery import make_envelope
 from tests.test_billing import cashier
 from copy import deepcopy
 
 
 class RefundEvidenceTests(TestCase):
+    def test_expiry_voids_unpaid_charge_in_both_delivery_orders(self):
+        for cancellation_first in (True, False):
+            with self.subTest(cancellation_first=cancellation_first):
+                source_id, patient_id, owner_id = (str(uuid.uuid4()) for _ in range(3))
+                cancellation = make_envelope("AppointmentChanged", {
+                    "appointmentId": source_id, "patientId": patient_id,
+                    "recipientUserId": owner_id, "changeType": "EXPIRED",
+                    "reasonCode": "PAYMENT_TIMEOUT", "version": 2,
+                    "cancellationId": str(uuid.uuid4()), "sourceRevision": 1,
+                }, source_id, 2)
+                cancellation["producer"] = "appointment"
+                request = make_envelope("RequestCharge", {
+                    "sourceType": "APPOINTMENT", "sourceId": source_id, "sourceRevision": 1,
+                    "patientId": patient_id, "recipientUserId": owner_id,
+                    "amountVnd": 1000, "snapshotHash": "a" * 64, "linesSnapshot": [],
+                }, source_id, kind="COMMAND")
+                request["producer"] = "appointment"
+                handlers = [(apply_source_cancellation, cancellation), (handle_request_charge, request)]
+                if not cancellation_first:
+                    handlers.reverse()
+                for handler, envelope in handlers:
+                    self.assertEqual(handler(envelope), "APPLIED")
+                self.assertEqual(handle_request_charge(request), "DUPLICATE")
+                self.assertEqual(apply_source_cancellation(cancellation), "APPLIED")
+                self.assertEqual(Charge.objects.get(source_id=source_id).state, "VOID")
+                self.assertEqual(CancellationEvidence.objects.filter(source_id=source_id).count(), 1)
+
     @staticmethod
     def _cashier_headers(code: str) -> dict[str, Any]:
         return {key: value for key, value in cashier(code).items() if key != "follow"}
@@ -64,7 +92,7 @@ class RefundEvidenceTests(TestCase):
         self.assertEqual(response.status_code,409)
         self.assertEqual(response.json()["error"]["code"],"CANCELLATION_EVIDENCE_REQUIRED")
 
-        def _paid_charge_and_cancellation(self):
+    def _paid_charge_and_cancellation(self):
         charge = create_charge(
             patient_id=uuid.uuid4(),
             recipient_user_id=uuid.uuid4(),

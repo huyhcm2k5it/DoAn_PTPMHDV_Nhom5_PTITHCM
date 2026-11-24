@@ -308,4 +308,17 @@ test('PH-003 and PH-005..008 use actual HTTP responses validated against OpenAPI
   const minimal = await request('/prescriptions/' + rx, 'owner');
   assert.equal(minimal.body.data.latestHoldState, 'DISPENSED');
   assert.equal(minimal.body.data.stock, undefined);
+  const storedDispense = await h.connection.collection('dispenses').findOne({ holdId });
+  const storedHold = await h.connection.collection('medication_holds').findOne({ id: holdId });
+  assert.equal(minimal.body.data.dispensedAt, storedDispense.dispensedAt.toISOString());
+  assert.equal(Object.hasOwn(storedHold, 'dispensedAt'), false);
+  assert.equal(storedHold.status, 'COMMITTED');
+  const staffAfterDispense = await request('/prescriptions/' + rx, 'staff');
+  assert.equal(staffAfterDispense.body.data.holds[0].status, 'DISPENSED');
+  const duplicateDispense = await request(
+    '/holds/' + holdId + '/dispense', 'staff',
+    post({ expectedVersion: storedHold.version }),
+  );
+  assert.equal(duplicateDispense.status, 409);
+  assert.equal(duplicateDispense.body.error.code, 'ALREADY_DISPENSED');
 });

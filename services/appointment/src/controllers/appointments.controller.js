@@ -114,7 +114,7 @@ function createAppointmentsController(dependencies) {
           existing.appointment.patientId,
           'APPOINTMENT_RESCHEDULE',
         );
-        const data = await rescheduleAppointment({
+        const changed = await rescheduleAppointment({
           connection: dependencies.connection,
           appointmentId: req.params.appointmentId,
           principalId: req.authContext.userId,
@@ -127,9 +127,17 @@ function createAppointmentsController(dependencies) {
           resolvePriceSnapshot: dependencies.resolvePriceSnapshot,
           createId: dependencies.createId,
         });
-        res
-          .status(200)
-          .json({ data, meta: { correlationId: req.correlationId } });
+        const result = await getAppointment({
+          connection: dependencies.connection,
+          appointmentId: changed.appointmentId,
+        });
+        res.status(200).json({
+          data: {
+            appointment: result.appointment,
+            slotHistory: changed.slotHistory,
+          },
+          meta: { correlationId: req.correlationId },
+        });
       } catch (error) {
         next(error);
       }
@@ -146,7 +154,7 @@ function createAppointmentsController(dependencies) {
           existing.appointment.patientId,
           'APPOINTMENT_CANCEL',
         );
-        const data = await cancelAppointment({
+        const changed = await cancelAppointment({
           connection: dependencies.connection,
           appointmentId: req.params.appointmentId,
           principalId: req.authContext.userId,
@@ -158,9 +166,14 @@ function createAppointmentsController(dependencies) {
           now: dependencies.now?.() || new Date(),
           createId: dependencies.createId,
         });
-        res
-          .status(200)
-          .json({ data, meta: { correlationId: req.correlationId } });
+        res.status(200).json({
+          data: {
+            appointmentId: changed.appointmentId,
+            state: changed.state,
+            refundStatus: changed.refundStatus,
+          },
+          meta: { correlationId: req.correlationId },
+        });
       } catch (error) {
         next(error);
       }

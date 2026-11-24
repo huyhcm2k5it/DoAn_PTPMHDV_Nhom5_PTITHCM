@@ -15,8 +15,7 @@ from app.auth.jwt_auth import (
     patient_scope_error,
     require_staff,
 )
-from app.domain.models import BillingAuditEvent, BillingEventOutbox, Charge, Refund
-from app.infrastructure.message_delivery import make_envelope
+from app.domain.models import Charge, Refund
 from app.application.refund_workflow import (enqueue_refund_status, record_audit, RefundPolicyError, ensure_refund_requested)
 
 REFUND_STATES = ("REQUESTED", "SUCCEEDED", "FAILED")
@@ -374,17 +373,7 @@ def execute_refund_view(request, refund_id):
                 "meta": {"correlationId": correlation_id}
             }, status=409)
 
-        # Reject execution unless refund.state is REQUESTED (e.g. FAILED cannot later succeed)
-        if refund.state not in ("REQUESTED", "FAILED"):
-            return Response({
-                "error": {
-                    "code": "REFUND_NOT_EXECUTABLE",
-                    "message": f"Yêu cầu hoàn tiền {refund_id} không ở trạng thái REQUESTED (trạng thái hiện tại: {refund.state})."
-                },
-                "meta": {"correlationId": correlation_id}
-            }, status=409)
-
-        # Reject execution unless refund.state is REQUESTED (e.g. FAILED cannot later succeed)
+        # REQUESTED can execute; FAILED retries the same refund.
         if refund.state not in ("REQUESTED", "FAILED"):
             return Response({
                 "error": {
@@ -403,17 +392,6 @@ def execute_refund_view(request, refund_id):
                 },
                 "meta": {"correlationId": correlation_id}
             }, status=409)
-
-        try:
-            charge = Charge.objects.select_for_update().get(id=refund.charge.id)
-        except Charge.DoesNotExist:
-            return Response({
-                "error": {
-                    "code": "NOT_FOUND",
-                    "message": f"Khoản thu {refund.charge.id} không tồn tại."
-                },
-                "meta": {"correlationId": correlation_id}
-            }, status=404)
 
         if scenario == "SUCCESS":
             # Kiểm tra trần số tiền hoàn

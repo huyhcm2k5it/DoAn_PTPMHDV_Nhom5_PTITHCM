@@ -1,4 +1,5 @@
 const { randomUUID } = require('node:crypto');
+const { refreshPatientIntervals } = require('./patient-time-lock.service');
 const { withMongoTransaction } = require('../../../../mongo/transaction.js');
 const {
   getAppointmentModel,
@@ -223,8 +224,6 @@ async function checkInAppointment({
         {
           $set: {
             state: 'CHECKED_IN',
-            checkedInAt: now,
-            checkedInBy: staffId,
             updatedAt: now,
           },
           $push: {
@@ -254,6 +253,7 @@ async function checkInAppointment({
         appointmentDate: vietnamDate(appointment.startAt),
       };
       await QueueTicket.create([ticket], { session });
+      await refreshPatientIntervals(connection, appointment.patientId, session);
       await enqueueClinicalTicket(connection, session, ticket, now);
       const response = responseForTicket(ticket);
       response.appointmentId = appointmentId;
@@ -397,7 +397,7 @@ async function callNextQueueTicket({
     const ticket = await QueueTicket.findOneAndUpdate(
       query,
       {
-        $set: { state: 'CALLED', calledAt: now, calledBy, updatedAt: now },
+        $set: { state: 'CALLED', calledAt: now, updatedAt: now },
         $push: { stateHistory: { state: 'CALLED', at: now, by: calledBy } },
         $inc: { version: 1 },
       },
@@ -494,7 +494,6 @@ async function markNoShow({
           $set: {
             state: 'NO_SHOW',
             noShowReason: reasonCode,
-            noShowAt: now,
             updatedAt: now,
           },
           $push: {
@@ -535,6 +534,7 @@ async function markNoShow({
           },
           { session },
         );
+        await refreshPatientIntervals(connection, ticket.patientId, session);
       }
       const updated = {
         ...ticket,

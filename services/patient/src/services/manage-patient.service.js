@@ -183,7 +183,12 @@ async function createPatient({
     const owner = await connection
       .collection('user_access_projection')
       .findOne({ userId: ownerUserId });
-    if (!owner || owner.status !== 'ACTIVE' || owner.actorType !== 'PATIENT')
+    if (
+      !owner ||
+      owner.status !== 'ACTIVE' ||
+      owner.actorType !== 'PATIENT' ||
+      owner.phoneVerified !== true
+    )
       throw new ApiError(
         403,
         'ACCOUNT_PROOF_REQUIRED',
@@ -210,6 +215,24 @@ async function createPatient({
       now,
     },
     async (session) => {
+      const duplicate = await Patient.findOne({
+        ownerUserId,
+        active: { $ne: false },
+        $or: [
+          ...(patient.relation === 'SELF' ? [{ relation: 'SELF' }] : []),
+          { fullName: patient.fullName, birthDate: patient.birthDate },
+        ],
+      })
+        .session(session)
+        .lean();
+      if (duplicate)
+        throw new ApiError(
+          409,
+          'DUPLICATE_PATIENT_PROFILE',
+          duplicate.relation === 'SELF' && patient.relation === 'SELF'
+            ? 'Account already has a primary (SELF) patient profile.'
+            : 'A patient profile with the same full name and birth date already exists under this account.',
+        );
       await Patient.create([patient], { session });
       await connection.collection('outbox').insertOne(
         {
@@ -246,7 +269,6 @@ async function createPatient({
               (field) => profile[field] !== undefined,
             ),
           ],
-          version: 1,
           at: now,
         },
         { session },
@@ -338,6 +360,26 @@ async function updatePatient({
           next[field] = profile[field];
         }
       }
+      if (
+        changedFields.includes('fullName') ||
+        changedFields.includes('birthDate')
+      ) {
+        const dup = await Patient.findOne({
+          ownerUserId: current.ownerUserId,
+          fullName: next.fullName,
+          birthDate: next.birthDate,
+          id: { $ne: patientId },
+          active: { $ne: false },
+        })
+          .session(session)
+          .lean();
+        if (dup)
+          throw new ApiError(
+            409,
+            'DUPLICATE_PATIENT_PROFILE',
+            'A patient profile with the same full name and birth date already exists under this account.',
+          );
+      }
       const changed = await Patient.updateOne(
         { id: patientId, version: current.version, active: { $ne: false } },
         {
@@ -381,7 +423,6 @@ async function updatePatient({
           actorUserId: authContext.userId,
           action: 'UPDATED',
           changedFields,
-          version: next.version,
           at: now,
         },
         { session },

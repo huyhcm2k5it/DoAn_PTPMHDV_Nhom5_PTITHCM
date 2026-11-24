@@ -9,9 +9,13 @@ function createSummaryController(dependencies) {
           authContext: req.authContext,
           date: req.query.date,
         });
-        res
-          .status(200)
-          .json({ data, meta: { correlationId: req.correlationId } });
+        res.status(200).json({
+          data: {
+            ...data.appointments.metrics,
+            asOf: new Date().toISOString(),
+          },
+          meta: { correlationId: req.correlationId },
+        });
       } catch (error) {
         next(error);
       }

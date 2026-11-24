@@ -47,8 +47,15 @@ test('changed body same key returns 409', async () => {
 });
 test('reception cannot assign unverified account', async () => {
   const args = await input('STAFF');
+  const ownerUserId = randomUUID();
+  await h.connection.collection('user_access_projection').insertOne({
+    userId: ownerUserId,
+    actorType: 'PATIENT',
+    status: 'ACTIVE',
+    phoneVerified: false,
+  });
   await assert.rejects(
-    createPatient({ ...args, body: { ...args.body, ownerUserId: randomUUID() } }),
+    createPatient({ ...args, body: { ...args.body, ownerUserId } }),
     (e) => e.status === 403 || e.statusCode === 403,
   );
 });
@@ -67,7 +74,10 @@ test('audit records only actual profile field changes and no-op replay stays qui
     body: { ...args.body, birthDate: '2000-02-29', sex: 'FEMALE' },
   });
   const audit = h.connection.collection('profile_audit');
+  const auditFields = ['action', 'actorUserId', 'at', 'changedFields', 'id', 'patientId'];
   const initial = await audit.findOne({ action: 'CREATED' });
+  const storedFields = (record) => Object.keys(record).filter((key) => key !== '_id').sort();
+  assert.deepEqual(storedFields(initial), auditFields);
   assert.ok(initial.changedFields.includes('birthDate'));
   assert.ok(initial.changedFields.includes('sex'));
   assert.ok(!initial.changedFields.includes('2000-02-29'));
@@ -81,7 +91,9 @@ test('audit records only actual profile field changes and no-op replay stays qui
   const changed = await updatePatient(update);
   assert.equal(changed.sex, undefined);
   assert.deepEqual(await updatePatient(update), changed);
-  assert.deepEqual((await audit.findOne({ action: 'UPDATED' })).changedFields, ['sex', 'address']);
+  const updatedAudit = await audit.findOne({ action: 'UPDATED' });
+  assert.deepEqual(storedFields(updatedAudit), auditFields);
+  assert.deepEqual(updatedAudit.changedFields, ['sex', 'address']);
 
   const noOp = await updatePatient({
     ...update,
@@ -101,4 +113,27 @@ test('patient rejects impossible dates and undeclared sex values', async () => {
       code: 'VALIDATION_ERROR',
     });
   assert.equal(await h.connection.collection('patients').countDocuments(), 0);
+});
+
+test('patient rejects duplicate profile with 409 DUPLICATE_PATIENT_PROFILE', async () => {
+  const args = await input();
+  await createPatient(args);
+  // Same owner, new idempotency key, same fullName and birthDate
+  await assert.rejects(
+    createPatient({
+      ...args,
+      idempotencyKey: randomUUID(),
+      body: { ...args.body, relation: 'OTHER' },
+    }),
+    (e) => (e.status === 409 || e.statusCode === 409) && e.code === 'DUPLICATE_PATIENT_PROFILE',
+  );
+  // Same owner, new idempotency key, second SELF profile
+  await assert.rejects(
+    createPatient({
+      ...args,
+      idempotencyKey: randomUUID(),
+      body: { fullName: 'Different Name', birthDate: '1995-05-05', relation: 'SELF' },
+    }),
+    (e) => (e.status === 409 || e.statusCode === 409) && e.code === 'DUPLICATE_PATIENT_PROFILE',
+  );
 });
