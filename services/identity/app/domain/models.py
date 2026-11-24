@@ -47,7 +47,21 @@ class User(models.Model):
         self.password_hash = make_password(raw_password)
 
     def check_password(self, raw_password):
-        return check_password(raw_password, self.password_hash)
+        previous_hash = self.password_hash
+
+        def upgrade(password):
+            upgraded = make_password(password)
+            if self._state.adding:
+                self.password_hash = upgraded
+                return
+            # A rehash must never overwrite a concurrently changed password.
+            changed = type(self).objects.filter(
+                pk=self.pk, password_hash=previous_hash,
+            ).update(password_hash=upgraded)
+            if changed:
+                self.password_hash = upgraded
+
+        return check_password(raw_password, previous_hash, setter=upgrade)
 
     def __str__(self):
         return f"{self.phone} [{self.actor_type}] ({self.status})"
@@ -65,11 +79,14 @@ class OtpRequest(models.Model):
     used_at = models.DateTimeField(null=True, blank=True)
     attempts = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
+    # Legacy rows count conservatively as resends; issuance sets this explicitly.
+    is_resend = models.BooleanField(default=True)
 
     class Meta:
         db_table = "otp_requests"
         indexes = [
             models.Index(fields=["phone", "purpose", "expires_at"]),
+            models.Index(fields=["phone", "purpose", "created_at"], name="idx_otp_send_window"),
         ]
 
     def set_code(self, raw_code):
