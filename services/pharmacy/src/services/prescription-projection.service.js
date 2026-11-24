@@ -48,13 +48,18 @@ async function applyPrescriptionFinalized({
       const current = await coll.findOne(query, { session });
       const originalDelivery = current?.sourceEventId
         ? await connection.collection('inbox').findOne(
-            { message_id: current.sourceEventId, consumer_name: 'pharmacy-prescription' },
+            {
+              message_id: current.sourceEventId,
+              consumer_name: 'pharmacy-prescription',
+            },
             { session },
           )
         : null;
       const deliveryHash = hash({
-        kind: message.messageKind, type: message.messageType,
-        producer: message.producer, payload: p,
+        kind: message.messageKind,
+        type: message.messageType,
+        producer: message.producer,
+        payload: p,
       });
       const matchesOriginal = originalDelivery
         ? originalDelivery.payload_hash === deliveryHash

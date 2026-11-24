@@ -5,10 +5,14 @@ async function listPrescriptions({ connection, page = 1, limit = 20 }) {
   integer(page, 'page');
   integer(limit, 'limit', 100);
   const pipeline = [
-    { $match: { $or: [
-      { state: 'FINAL' },
-      { state: { $exists: false }, sourceEventId: { $exists: true } },
-    ] } },
+    {
+      $match: {
+        $or: [
+          { state: 'FINAL' },
+          { state: { $exists: false }, sourceEventId: { $exists: true } },
+        ],
+      },
+    },
     { $sort: { revision: -1 } },
     { $group: { _id: '$prescriptionId', prescription: { $first: '$$ROOT' } } },
     { $replaceRoot: { newRoot: '$prescription' } },
@@ -30,14 +34,23 @@ async function listPrescriptions({ connection, page = 1, limit = 20 }) {
     },
     {
       $lookup: {
-        from: 'inbox', localField: 'sourceEventId', foreignField: 'message_id',
+        from: 'inbox',
+        localField: 'sourceEventId',
+        foreignField: 'message_id',
         as: 'delivery',
       },
     },
-    { $set: {
-      finalizedAt: { $ifNull: [{ $arrayElemAt: ['$delivery.result.finalizedAt', 0] }, '$finalizedAt'] },
-      state: 'FINAL',
-    } },
+    {
+      $set: {
+        finalizedAt: {
+          $ifNull: [
+            { $arrayElemAt: ['$delivery.result.finalizedAt', 0] },
+            '$finalizedAt',
+          ],
+        },
+        state: 'FINAL',
+      },
+    },
     { $project: { delivery: 0 } },
     { $sort: { finalizedAt: 1, prescriptionId: 1 } },
     {

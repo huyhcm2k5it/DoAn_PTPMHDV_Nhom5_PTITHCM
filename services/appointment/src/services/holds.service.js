@@ -139,7 +139,13 @@ async function createHold({
         { $inc: { version: 1 } },
         { upsert: true, session },
       );
-      const overlappingSlots = await Slot.find({ startAt: { $lt: slot.endAt }, endAt: { $gt: slot.startAt } }).select('id').session(session).lean();
+      const overlappingSlots = await Slot.find({
+        startAt: { $lt: slot.endAt },
+        endAt: { $gt: slot.startAt },
+      })
+        .select('id')
+        .session(session)
+        .lean();
       const activeHold = await Hold.findOne({
         patientId,
         status: 'HELD',
@@ -282,7 +288,10 @@ async function releaseHold({
         throw new ApiError(404, 'HOLD_NOT_FOUND', 'Hold không tồn tại.');
       if (hold.principalId !== principalId)
         throw new ApiError(403, 'FORBIDDEN', 'Không có quyền trên hold này.');
-      if (expectedVersion != null && Number(expectedVersion) !== (hold.status === 'HELD' ? 1 : 2))
+      if (
+        expectedVersion != null &&
+        Number(expectedVersion) !== (hold.status === 'HELD' ? 1 : 2)
+      )
         throw new ApiError(409, 'VERSION_CONFLICT', 'Hold đã thay đổi.');
       if (hold.status !== 'HELD')
         throw new ApiError(

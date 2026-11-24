@@ -24,9 +24,13 @@ async function refreshPatientIntervals(connection, patientId, session) {
     .select('id holdId startAt endAt state')
     .session(session)
     .lean();
-  const slots = await getSlotModel(connection).find({ id: { $in: holds.map((hold) => hold.slotId) } }).session(session).lean();
+  const slots = await getSlotModel(connection)
+    .find({ id: { $in: holds.map((hold) => hold.slotId) } })
+    .session(session)
+    .lean();
   const slotById = new Map(slots.map((slot) => [slot.id, slot]));
-  if (holds.some((hold) => !slotById.has(hold.slotId))) throw new Error('Active hold references a missing slot.');
+  if (holds.some((hold) => !slotById.has(hold.slotId)))
+    throw new Error('Active hold references a missing slot.');
   const intervals = holds
     .map((hold) => ({
       holdId: hold.id,

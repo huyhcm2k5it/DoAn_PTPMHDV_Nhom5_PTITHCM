@@ -145,8 +145,16 @@ async function createAppointment({
         .lean();
       if (!slot)
         throw new ApiError(404, 'SLOT_NOT_FOUND', 'Slot không tồn tại.');
-      const schedule = await getScheduleModel(connection).findOne({ id: slot.scheduleId }).session(session).lean();
-      if (!schedule) throw new ApiError(503, 'SCHEDULE_UNAVAILABLE', 'Booking schedule is unavailable.');
+      const schedule = await getScheduleModel(connection)
+        .findOne({ id: slot.scheduleId })
+        .session(session)
+        .lean();
+      if (!schedule)
+        throw new ApiError(
+          503,
+          'SCHEDULE_UNAVAILABLE',
+          'Booking schedule is unavailable.',
+        );
       const recipientUserId = await resolveRecipient(
         connection,
         patientId,
@@ -463,7 +471,13 @@ async function rescheduleAppointment({
         { $inc: { version: 1 } },
         { upsert: true, session },
       );
-      const overlappingSlots = await Slot.find({ startAt: { $lt: slot.endAt }, endAt: { $gt: slot.startAt } }).select('id').session(session).lean();
+      const overlappingSlots = await Slot.find({
+        startAt: { $lt: slot.endAt },
+        endAt: { $gt: slot.startAt },
+      })
+        .select('id')
+        .session(session)
+        .lean();
       const [activeHold, activeAppointment] = await Promise.all([
         getHoldModel(connection)
           .findOne({
