@@ -739,7 +739,16 @@ Ref: prescription_projection.(prescriptionId, revision) - medication_holds.(pres
 | prescription\_projection | id: uuid PK; prescriptionId: uuid LREF; revision: int; visitId: uuid LREF; linesSnapshot: object[]; sourceEventId: uuid; patientId: uuid LREF | UQ(prescriptionId, revision) nhận từ sự kiện PrescriptionFinalized. Nhà thuốc không bao giờ cấp phát từ toa DRAFT. patientId lấy từ PrescriptionFinalized để PH-004 kiểm quyền PATIENT owner với patient\_access\_projection. |
 | medication\_holds | id: uuid PK; prescriptionId: uuid LREF; revision: int; attemptNo: int; status: enum (HELD|SETTLEMENT\_LOCKED|COMMITTED|RELEASED|EXPIRED); itemsSnapshot: object[]; expiresAt: UTC; chargeId: uuid LREF?; version: int; attemptHistory: object[]; patientId: uuid LREF; settlementId: uuid?; settlementState: enum; settlementVersion: int | UQ(prescriptionId, revision). Giữ đủ toàn toa (thiếu 1 dòng thì không giữ dòng nào). Khi giữ lại sau khi nhả/hết hạn sẽ tăng attemptNo (tương ứng sourceRevision bên Billing). Khi đang SETTLEMENT\_LOCKED tuyệt đối không tự nhả tồn do timeout. |
 | dispenses | id: uuid PK; holdId: uuid ref UQ; prescriptionId: uuid LREF; revision: int; actorUserId: uuid LREF; itemsSnapshot: object[]; dispensedAt: UTC; attemptNo: int | UQ(holdId); UQ(prescriptionId, revision). Cùng transaction giảm onHand, giảm reserved, ghi dispenses và phát MedicationDispensed. |
+| stock\_audit | id: uuid; medicineId: uuid LREF; kind: string (RECEIPT\|DISPENSE); quantity: int; receiptId: uuid ref?; holdId: uuid ref?; attemptNo: int?; actorUserId: uuid LREF; at: UTC | Khóa duy nhất id; INDEX(medicineId, at DESC). RECEIPT ghi quantity > 0 và receiptId tham chiếu stock_receipts.id; DISPENSE ghi quantity < 0, holdId tham chiếu medication_holds.id và attemptNo của lần giữ. Ghi audit cùng Mongo transaction với thay đổi tồn và chứng từ tương ứng; tham chiếu nội bộ Mongo không phải SQL FK. |
 | **Collection kỹ thuật** | settlement\_decisions, command\_results, catalog\_projection, patient\_access\_projection, user\_access\_projection, projection\_checkpoints, outbox, inbox, idempotency\_records, retry\_jobs, dead\_letters | Kiểm tra bằng chứng thanh toán từ settlement\_decisions cục bộ đúng fence và attemptNo trước khi chuyển COMMITTED và phát thuốc. |
+
+### Ánh xạ trạng thái cấp thuốc giữa ERD và SRS
+
+Theo PR #53 tại commit `c041c568cf922cf2d62f616f6360773cfb525426`, `medication_holds.status` tiếp tục lưu `COMMITTED` sau khi cấp thuốc. Trạng thái nghiệp vụ `DISPENSED` trong máy trạng thái SRS được xác định từ bản ghi `dispenses` liên kết với hold và cùng toa/revision; thời điểm cấp lấy từ `dispenses.dispensedAt`. API chi tiết trả `DISPENSED` khi có chứng từ này. Chỉ có hold `COMMITTED` chưa đủ kết luận thuốc đã được cấp. Cách ánh xạ này không bổ sung giá trị `DISPENSED` vào enum lưu trữ của thiết kế đích.
+
+Trước khi cấp, kiểm tra chưa có dispense cho cùng toa/revision. Việc giảm `onHand`, giảm `reserved`, ghi `dispenses`, ghi `stock_audit` và outbox `MedicationDispensed` phải cùng transaction. Khóa duy nhất của `dispenses` và idempotency bảo vệ thao tác retry; không dùng riêng giá trị `COMMITTED` để cho phép cấp lại.
+
+Code lịch sử có thể lưu trực tiếp `DISPENSED` trong hold. Khi triển khai hoặc import seed phải đối chiếu phiên bản code/validator và chứng từ cấp thuốc; không tự chuyển trạng thái lịch sử hay tạo chứng từ chỉ để khớp sơ đồ. Mapping chi tiết: [mapping-erd-quan.md](ban-giao-hqh-care/mapping-erd-quan.md). Mô tả này là quy tắc của bản tích hợp nêu trên, không xác nhận mọi DB đã migrate hoặc bộ seed đã đạt kiểm tra.
 
 ## 8. Billing Service (billing\_db — PostgreSQL · Owner: Hưng · Django)
 
@@ -850,7 +859,27 @@ Table refunds {
 | payments | id: uuid PK; charge\_id: uuid FK; saga\_id: uuid FK UQ; transaction\_id: text UQ; state: text (PENDING\|SUCCEEDED\|FAILED); method: text; attempted\_at: timestamptz; paid\_at: timestamptz?; idempotency\_key: text; fence: int | FK charge\_id -> charges.id; FK saga\_id -> settlement\_sagas.id; charge\_id phải trùng khoản thu của saga; UQ(saga\_id); UQ(transaction\_id); Partial UQ(charge\_id) WHERE state = 'SUCCEEDED'. Số tiền và phiên bản nguồn lấy từ charges. Chỉ chuyển SUCCEEDED sau khi nhận SettlementReserved(ACCEPTED) kèm fence hợp lệ. |
 | receipts | id: uuid PK; payment\_id: uuid FK UQ; charge\_id: uuid FK UQ; receipt\_no: text UQ; amount\_vnd: bigint; issued\_at: timestamptz | FK payment\_id -> payments.id; FK charge\_id -> charges.id. Khoản thu phải trùng với khoản thu của payment. Mỗi khoản thu có tối đa một payment SUCCEEDED và tối đa một biên nhận. Ghi biên nhận cùng SQL transaction với payment SUCCEEDED và outbox. Biên nhận bất biến sau khi cấp. |
 | refunds | id: uuid PK; charge\_id: uuid FK; cancellation\_id: uuid LREF; reason\_code: text; amount\_vnd: bigint; state: text (REQUESTED\|SUCCEEDED\|FAILED); attempts: jsonb; version: int; updated\_at: timestamptz | FK charge\_id -> charges.id; UQ(charge\_id, cancellation\_id, reason\_code). Dùng SELECT FOR UPDATE trên charge khi thực thi hoàn để bảo đảm tổng tiền hoàn thành công ≤ số tiền đã thu. |
-| **Bảng kỹ thuật** | command\_results, catalog\_projection, patient\_access\_projection, user\_access\_projection, projection\_checkpoints, outbox, inbox, idempotency\_records, retry\_jobs, dead\_letters | Phát ReserveSettlement (command) và các events ChargePrepared, ChargePaid, BillingStatusChanged, SettlementDecision. |
+| **Bảng kỹ thuật** | cancellation_evidence (model CancellationEvidence), billing_audit_events, command\_results, catalog\_projection, patient\_access\_projection, user\_access\_projection, projection\_checkpoints, outbox, inbox, idempotency\_records, retry\_jobs, dead\_letters | Phát ReserveSettlement (command) và các events ChargePrepared, ChargePaid, BillingStatusChanged, SettlementDecision. Tên kỹ thuật logic được ánh xạ sang tên vật lý trong phần dưới. |
+
+### Từ điển dữ liệu kỹ thuật — căn cứ hủy và audit Billing
+
+Các bảng dưới hỗ trợ SRS FR-12, FR-23, FR-30 và yêu cầu ghi vết nghiệp vụ tại owner. Chúng được mô tả ngoài sơ đồ nghiệp vụ chính; không tạo FK hoặc JOIN sang DB Appointment, Diagnostic, Pharmacy hay Identity.
+
+| **Thực thể / tên vật lý** | **Thuộc tính & Kiểu dữ liệu** | **Khóa, liên kết & quy tắc** |
+| --- | --- | --- |
+| cancellation_evidence / `app_cancellationevidence` | cancellation_id: uuid PK; source_type: varchar(50); source_id: uuid; source_revision: positive int; source_version: positive bigint; body_hash: varchar(64) | Model `CancellationEvidence` chưa đặt `Meta.db_table`, nên migration hiện có dùng tên mặc định Django `app_cancellationevidence`; `cancellation_evidence` là tên logic trong tài liệu. Bộ source_type/source_id/source_revision liên kết logic đến bộ nguồn của charges, có thể có evidence trước khi charge tồn tại nên không đặt FK bắt buộc đến charge. source_version là aggregateVersion của event owner, khác source_revision. Chỉ nhận event từ đúng owner; cùng cancellation_id nhưng khác nội dung phải bị từ chối. |
+| cancellation_evidence.context — trường mở rộng | context: jsonb NOT NULL, mặc định `{}`; metadata gồm messageId, requestId, correlationId và reasonCode khi có | Giữ ngữ cảnh event owner để đối soát sau settlement; không sao chép bệnh án, secret hoặc token. Trường này đã được bổ sung trong model local khi cập nhật tài liệu nhưng cần migration trước khi dùng trên DB. Dữ liệu cũ có thể có context rỗng; không suy diễn người thực hiện hoặc lịch sử còn thiếu. |
+| billing_audit_events | id: uuid PK; action: varchar(60); actor_user_id: uuid? LREF; target_id: uuid?; payload: jsonb; correlation_id: varchar(64); at: timestamptz | INDEX(action, at). target_id trỏ logic đến đối tượng Billing được mô tả bởi action/payload, không phải FK đa hình. Audit lưu thao tác, căn cứ hủy, khoản thu/hoàn và số tiền cần truy vết; actor có thể NULL cho xử lý tự động. Giữ audit nghiệp vụ cùng transaction với thay đổi tương ứng; không ghi OTP, token hoặc dữ liệu y tế nhạy cảm. |
+
+### Bất biến hủy và hoàn tiền theo SRS
+
+- FR-30 yêu cầu consumer xử lý AppointmentChanged(CANCELLED/EXPIRED/EXPIRED_LATE_PAID) và LabCancelled: khoản OPEN không còn settlement đang xử lý được vô hiệu; khoản đã thu có căn cứ hợp lệ được tạo refund REQUESTED, thu ngân thực hiện hoàn. Đây là yêu cầu đích, không phải xác nhận mọi nhánh code hiện tại đã triển khai.
+- Bằng chứng hủy phải khớp nguồn và revision khoản thu. Đổi lịch cùng bác sĩ/giá, giữ charge cũ thì giữ revision khoản thu; version của appointment có thể tăng độc lập. LabCancelled cần revision đủ rõ để xử lý cả trường hợp event hủy đến trước RequestCharge; không suy đoán từ nhiều charge hoặc từ aggregateVersion.
+- Khi settlement còn REQUESTED/RESERVED/IN_DOUBT, lưu evidence và đối soát kết quả trước khi void hoặc tạo hoàn. Timeout và UNKNOWN không chứng minh giao dịch đã thất bại. Việc tiếp nhận evidence, quyết định xử lý và outbox/inbox phải có ranh giới transaction rõ ràng.
+- Khóa charge khi tạo/thực hiện hoàn. Tổng tiền đã hoàn thành công không vượt số đã thu; khi tạo yêu cầu phải tính cả khoản đã phân bổ cho REQUESTED và khoản FAILED còn được phép retry. Nếu giữ chính sách retry trên refund FAILED cũ thì phần tiền đó vẫn được giữ, không tạo yêu cầu khác chiếm cùng phần tiền.
+- UQ(charge_id, cancellation_id, reason_code) là khóa hiện có, chưa tự bảo đảm chỉ một yêu cầu nghiệp vụ cho mỗi lần hủy khi reason_code thay đổi. Handler phải kiểm idempotency, số tiền và evidence; đổi lý do không được tạo hoàn trùng. Refund attempts lưu lịch sử thử; không xóa dấu vết lần thất bại để retry.
+
+Đồng bộ chi tiết chính sách retry với SRS và API trước khi triển khai: SRS ghi request mới gắn nguồn cũ nhưng chưa quy định phải tạo refund row mới hay thêm attempt vào row cũ. Mô tả bất biến trên không thay đổi khóa của bảng refunds và không cho phép hoàn vượt số tiền đã thu.
 
 ## 9. Notification Service (notification\_db — PostgreSQL · Owner: Hưng · Django)
 
@@ -920,8 +949,28 @@ Table inbox {
 | retry_jobs & dead_letters | Các service còn dùng scheduler DB; Huy đã có migration chuyển sang broker | Huy giữ tác vụ retry/DLQ qua outbox và RabbitMQ. Message retry durable chứa source/body/attempt/token/NotBefore; worker không ACK trước khi xử lý hoặc commit handoff. Các service khác giữ cơ chế đã được owner triển khai. |
 | idempotency\_records | Cả 9 Services (HTTP Write) | UQ(principal\_id, route, key). Lưu request\_hash và response\_ref tối thiểu ≥ 24h cho mọi lệnh POST/PUT/PATCH/DELETE có Idempotency-Key. |
 | settlement\_sagas & settlement\_decisions | Billing (sagas) & Appt/Diag/Pharm (decisions) | Bảo vệ giao dịch thu tiền hai pha qua RabbitMQ. Nếu SettlementDecision(FAILED) đến trước ReserveSettlement, owner ghi ngay **tombstone FAILED** vào settlement\_decisions để chặn lệnh reserve đến muộn khóa lại nguồn. Trạng thái UNKNOWN không bao giờ tự mở khóa SETTLEMENT\_LOCKED. |
+| cancellation_evidence & billing_audit_events | Billing | Evidence giữ danh tính hủy và bộ nguồn/revision kể cả trước khi có charge; audit ghi vết nghiệp vụ tại Billing. Tên vật lý và trường mở rộng được mô tả ở mục 8. |
+| stock_audit | Pharmacy | Khóa id; index medicineId/at; audit nhập và cấp thuốc cùng transaction thay đổi tồn và chứng từ. Chi tiết ở mục 7. |
 | user\_access\_projection & patient\_access\_projection | Các Consumer Services | Đồng bộ từ IdentityAccessChanged và PatientAccessChanged. Kiểm tra quyền cục bộ kết hợp với Authorization Lease (hạn tối đa 30s) mà không cần gọi HTTP chéo về Identity hay Patient. |
 | catalog\_projection & projection\_checkpoints | Appt, Clin, Diag, Pharm, Bill | UQ(entity\_type, entity\_id) và UQ(producer, stream\_id). Theo dõi CHECKPOINT mỗi 10s từ Catalog; nếu phát hiện gap hoặc checkpoint trễ quá 30s thì chặn tạo báo giá mới bằng mã lỗi 503 PRICE\_PROJECTION\_STALE. |
+
+## Từ điển định danh và phiên bản settlement
+
+Tên trong hợp đồng message dùng camelCase; PostgreSQL thường dùng snake_case. Bảng này mô tả ý nghĩa chung, không buộc mọi owner lưu trùng toàn bộ trường. Diagnostic có thể giữ metadata trong `objects` theo kind/key; Appointment/Pharmacy dùng collection `settlement_decisions`.
+
+| **Trường / ánh xạ** | **Ý nghĩa và phạm vi bất biến** |
+| --- | --- |
+| sourceType/source_type, sourceId/source_id | Bộ định danh nguồn do Appointment, Diagnostic hoặc Pharmacy sở hữu; giá trị chuẩn APPOINTMENT/LAB_ORDER/MED_HOLD. UUID nguồn là LREF, không phải FK xuyên service. |
+| sourceRevision/source_revision | Phiên bản nguồn tính phí, nằm trong unique key của charges. Không đồng nhất với version aggregate; Pharmacy ánh xạ attemptNo của lần giữ vào revision này. |
+| settlementId / settlement_sagas.id | ID của một lần điều phối thu tiền. Billing lưu saga hiện tại qua charges.settlement_saga_id; quyết định của saga cũ không được ghi đè saga mới. |
+| attemptVersion / settlement_sagas.version | Phiên bản lần thử reserve gửi cho owner, được kiểm cùng nguồn và số tiền. Không thay cho sourceRevision hoặc decisionVersion. |
+| fence | Số dương do owner cấp khi chấp nhận khóa nguồn. Khi áp dụng quyết định hoặc bằng chứng PAID phải khớp settlementId, nguồn/revision và fence của lần khóa; counter không được lùi hoặc tái sử dụng để hợp thức hóa message cũ. |
+| decisionVersion / settlement_sagas.decision_version | Thứ tự quyết định của một settlement, không phải version appointment/order/hold. Appointment có unique(settlementId, decisionVersion) trong settlement_decisions; các owner khác kiểm phiên bản theo schema riêng. Message lặp có nội dung khác phải bị từ chối. |
+| settlementVersion, settlement_version | Phiên bản quyết định đã áp dụng tại owner theo settlement đang xét. Khi chuyển scope sang settlement mới phải khởi tạo theo quy tắc owner; không dùng quyết định cũ để mở khóa hoặc xác nhận nguồn mới. |
+| amountHash / charges.snapshot_hash | Hash snapshot bất biến do owner cung cấp và Billing lưu để đối soát reserve. Billing không tự tính lại giá từ Catalog để thay snapshot lịch sử. |
+| paidEvidence | Bằng chứng thanh toán cục bộ tại owner khi implementation có lưu, phải liên kết đúng charge/nguồn/revision/settlement/fence. Không tạo evidence giả khi import hoặc coi một cờ trạng thái đơn lẻ là bằng chứng đầy đủ. |
+
+Các bổ sung từ điển không thay đổi khối DBML của 9 sơ đồ chính hay các quan hệ nghiệp vụ đang vẽ. ERD chính thể hiện cấu trúc nghiệp vụ; các bảng kỹ thuật, guard transaction và ánh xạ trạng thái nằm trong từ điển đi kèm. Khi cần sơ đồ vật lý đầy đủ để triển khai, phải bổ sung các bảng kỹ thuật vào một sơ đồ riêng và đối chiếu migration; không coi sơ đồ nghiệp vụ hiện tại là bản vẽ mọi bảng/cột của DB.
 
 # PHẦN 3: KHÓA ỨNG VIÊN VÀ PHỤ THUỘC HÀM CỦA THIẾT KẾ ĐÍCH
 

@@ -4,10 +4,11 @@ from tests.fixtures import create_charge
 from typing import Any, cast
 from django.test import TestCase
 from rest_framework.test import APIClient
-from app.domain.models import BillingEventOutbox
+from app.domain.models import BillingEventOutbox, Refund, BillingAuditEvent
 from app.application.refund_service import apply_source_cancellation
 from app.infrastructure.message_delivery import make_envelope
 from tests.test_billing import cashier
+from copy import deepcopy
 
 
 class RefundEvidenceTests(TestCase):
@@ -62,3 +63,105 @@ class RefundEvidenceTests(TestCase):
             HTTP_IDEMPOTENCY_KEY=str(uuid.uuid4()), **self._cashier_headers("BI-007")))
         self.assertEqual(response.status_code,409)
         self.assertEqual(response.json()["error"]["code"],"CANCELLATION_EVIDENCE_REQUIRED")
+
+        def _paid_charge_and_cancellation(self):
+        charge = create_charge(
+            patient_id=uuid.uuid4(),
+            recipient_user_id=uuid.uuid4(),
+            source_type="APPOINTMENT",
+            source_id=uuid.uuid4(),
+            amount_vnd=1000,
+            state="PAID",
+        )
+
+        event = make_envelope(
+            "AppointmentChanged",
+            {
+                "appointmentId": str(charge.source_id),
+                "sourceRevision": charge.source_revision,
+                "changeType": "CANCELLED",
+                "reasonCode": "PATIENT_REQUEST",
+                "cancellationId": str(uuid.uuid4()),
+                "version": 2,
+            },
+            charge.source_id,
+            2,
+        )
+        event["producer"] = "appointment"
+        return charge, event
+
+    def test_paid_cancellation_automatically_requests_full_refund(self):
+        charge, event = self._paid_charge_and_cancellation()
+
+        self.assertEqual(
+            apply_source_cancellation(event), "APPLIED"
+        )
+
+        refund = Refund.objects.get(charge=charge)
+        self.assertEqual(refund.state, "REQUESTED")
+        self.assertEqual(refund.amount_vnd, 1000)
+        self.assertEqual(refund.reason_code, "SOURCE_CANCELLED")
+
+        status = BillingEventOutbox.objects.get(
+            event_type="BillingStatusChanged"
+        )
+        self.assertEqual(
+            status.payload["payload"]["refundStatus"],
+            "REQUESTED",
+        )
+
+        self.assertEqual(
+            BillingAuditEvent.objects.filter(
+                action="REFUND_REQUESTED"
+            ).count(),
+            1,
+        )
+
+    def test_redelivery_has_no_additional_effects(self):
+        charge, event = self._paid_charge_and_cancellation()
+
+        apply_source_cancellation(event)
+        apply_source_cancellation(event)
+
+        # Cùng nghiệp vụ, messageId mới cũng không tạo thêm refund.
+        repeated = deepcopy(event)
+        repeated["messageId"] = str(uuid.uuid4())
+        apply_source_cancellation(repeated)
+
+        self.assertEqual(
+            Refund.objects.filter(charge=charge).count(), 1
+        )
+        self.assertEqual(
+            BillingEventOutbox.objects.filter(
+                event_type="BillingStatusChanged"
+            ).count(),
+            1,
+        )
+        self.assertEqual(
+            BillingAuditEvent.objects.filter(
+                action="REFUND_REQUESTED"
+            ).count(),
+            1,
+        )
+
+    def test_same_message_id_with_changed_payload_is_rejected(self):
+        charge, event = self._paid_charge_and_cancellation()
+        apply_source_cancellation(event)
+
+        conflicting = deepcopy(event)
+        conflicting["payload"]["cancellationId"] = str(uuid.uuid4())
+
+        with self.assertRaisesRegex(
+            ValueError, "Message identity conflict"
+        ):
+            apply_source_cancellation(conflicting)
+
+        self.assertEqual(
+            Refund.objects.filter(charge=charge).count(), 1
+        )
+        self.assertEqual(
+            CancellationEvidence.objects.filter(
+                source_id=charge.source_id
+            ).count(),
+            1,
+        )

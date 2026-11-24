@@ -253,6 +253,7 @@ class CancellationEvidence(models.Model):
     source_revision = models.PositiveIntegerField()
     source_version = models.PositiveBigIntegerField()
     body_hash = models.CharField(max_length=64)
+    context = models.JSONField(default=dict, blank=True)
 
 
 

@@ -2,6 +2,7 @@
 from django.db import transaction
 from django.utils import timezone
 from app.domain.models import BillingEventOutbox
+from app.application.refund_workflow import reconcile_source_cancellation
 
 
 def drain_outbox():
@@ -121,6 +122,8 @@ def apply_settlement_reserved(envelope):
         charge.version += 1
         charge.save(update_fields=["state", "updated_at", "version"])
         enqueue_decision(saga, payment, envelope)
+
+    reconcile_source_cancellation(charge)
     MessageInbox.objects.create(message_id=envelope["messageId"],
                                 handler="SettlementReserved", body_hash=fingerprint)
     return "APPLIED"

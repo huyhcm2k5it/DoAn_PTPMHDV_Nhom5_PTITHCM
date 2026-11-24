@@ -17,37 +17,9 @@ from app.auth.jwt_auth import (
 )
 from app.domain.models import BillingAuditEvent, BillingEventOutbox, Charge, Refund
 from app.infrastructure.message_delivery import make_envelope
+from app.application.refund_workflow import (enqueue_refund_status, record_audit, RefundPolicyError, ensure_refund_requested)
 
 REFUND_STATES = ("REQUESTED", "SUCCEEDED", "FAILED")
-
-
-def enqueue_refund_status(charge, refund, correlation_id):
-    # Call inside the transaction holding the charge lock.
-    charge.version += 1
-    charge.save(update_fields=["version", "updated_at"])
-    if not charge.recipient_user_id:
-        return
-    payload = {
-        "chargeId": str(charge.id),
-        "recipientUserId": str(charge.recipient_user_id),
-        "refundId": str(refund.id),
-        "sourceId": str(charge.source_id),
-        "sourceType": charge.source_type,
-        "refundStatus": refund.state,
-        "state": "REFUNDED" if refund.state == "SUCCEEDED" else charge.state,
-        "version": charge.version,
-    }
-    BillingEventOutbox.objects.create(
-        event_type="BillingStatusChanged",
-        exchange="umc.events.billing.v1",
-        routing_key="billing.billing-status-changed.v1",
-        payload=make_envelope(
-            "BillingStatusChanged", payload, charge.id, charge.version,
-            cause={"correlationId": correlation_id},
-        ),
-    )
-
-
 
 def get_correlation_id(request):
     return request.headers.get("X-Correlation-Id", str(uuid.uuid4()))
@@ -72,28 +44,6 @@ def validation_error(request, message):
         "error": {"code": "VALIDATION_ERROR", "message": message},
         "meta": {"correlationId": get_correlation_id(request)}
     }, status=400)
-
-
-def record_audit(action, actor_user_id, target_id, payload, correlation_id):
-    """Ghi vết nghiệp vụ tiền.
-
-    BI-007 quy định reasonCode "được ghi vào audit"; bảng BillingAuditEvent là
-    nơi lưu vết đó, tách khỏi audit an ninh của Identity.
-    """
-    actor = None
-    if actor_user_id:
-        try:
-            actor = uuid.UUID(str(actor_user_id))
-        except (ValueError, TypeError):
-            actor = None
-    BillingAuditEvent.objects.create(
-        action=action,
-        actor_user_id=actor,
-        target_id=target_id,
-        payload=payload,
-        correlation_id=str(correlation_id)[:64],
-    )
-
 
 def parse_vn_date(request, name):
     parsed, bad = parse_date_param(request.query_params.get(name))
@@ -205,26 +155,6 @@ def create_refund(request):
             "meta": {"correlationId": correlation_id}
         }, status=201)
 
-    # Chống trùng lặp theo UniqueConstraint (charge, cancellation_id, reason_code)
-    existing_refund = Refund.objects.filter(
-        charge_id=charge_uuid,
-        cancellation_id=cancellation_uuid,
-        reason_code=reason_code
-    ).first()
-    if existing_refund:
-        if existing_refund.amount_vnd != amount_vnd:
-            return Response({
-                "error": {
-                    "code": "REFUND_CONFLICT",
-                    "message": f"Yêu cầu hoàn tiền đã tồn tại với số tiền khác ({existing_refund.amount_vnd}đ != {amount_vnd}đ)."
-                },
-                "meta": {"correlationId": correlation_id}
-            }, status=409)
-        return Response({
-            "data": {"refund": serialize_refund(existing_refund)},
-            "meta": {"correlationId": correlation_id}
-        }, status=201)
-
     with transaction.atomic():
         try:
             charge = Charge.objects.select_for_update().get(id=charge_uuid)
@@ -232,97 +162,77 @@ def create_refund(request):
             return Response({
                 "error": {
                     "code": "NOT_FOUND",
-                    "message": f"Khoản thu {charge_uuid} không tồn tại."
+                    "message": "Charge not found.",
                 },
-                "meta": {"correlationId": correlation_id}
+                "meta": {"correlationId": correlation_id},
             }, status=404)
 
-        # Double-check sau khi đã giữ lock để đảm bảo idempotency tuyệt đối
-        existing_locked_refund = Refund.objects.filter(
-            charge=charge,
-            cancellation_id=cancellation_uuid,
-            reason_code=reason_code
-        ).first()
-        if existing_locked_refund:
-            if existing_locked_refund.amount_vnd != amount_vnd:
-                return Response({
-                    "error": {
-                        "code": "REFUND_CONFLICT",
-                        "message": f"Yêu cầu hoàn tiền đã tồn tại với số tiền khác ({existing_locked_refund.amount_vnd}đ != {amount_vnd}đ)."
-                    },
-                    "meta": {"correlationId": correlation_id}
-                }, status=409)
+        # Recheck sau khi giữ khóa charge.
+        data, conflict = idempotency.replay(
+            scope, idempotency_key, payload
+        )
+        if conflict:
+            return idempotency.conflict_response(
+                request, correlation_id
+            )
+        if data is not None:
             return Response({
-                "data": {"refund": serialize_refund(existing_locked_refund)},
-                "meta": {"correlationId": correlation_id}
+                "data": data,
+                "meta": {"correlationId": correlation_id},
             }, status=201)
 
         from app.domain.models import CancellationEvidence
-        evidence = CancellationEvidence.objects.filter(cancellation_id=cancellation_uuid,
-            source_type=charge.source_type, source_id=charge.source_id,
-            source_revision=charge.source_revision).first()
-        if not evidence:
-            return Response({"error": {"code": "CANCELLATION_EVIDENCE_REQUIRED",
-                "message": "Owner cancellation evidence has not synchronized."},
-                "meta": {"correlationId": correlation_id}}, status=409)
 
-        # Ràng buộc 1: Chỉ cho phép hoàn khi khoản thu đã thanh toán thành công (PAID)
-        if charge.state != "PAID":
+        evidence = CancellationEvidence.objects.filter(
+            cancellation_id=cancellation_uuid,
+            source_type=charge.source_type,
+            source_id=charge.source_id,
+            source_revision=charge.source_revision,
+        ).first()
+
+        if evidence is None:
+            return Response({
+                "error": {
+                    "code": "CANCELLATION_EVIDENCE_REQUIRED",
+                    "message": "Owner cancellation evidence is unavailable.",
+                },
+                "meta": {"correlationId": correlation_id},
+            }, status=409)
+
+        try:
+            refund = ensure_refund_requested(
+                charge,
+                evidence,
+                requested_amount=amount_vnd,
+                reason_code=reason_code,
+                actor_user_id=request.principal.user_id,
+            )
+        except RefundPolicyError as error:
+            return Response({
+                "error": {
+                    "code": error.code,
+                    "message": str(error),
+                },
+                "meta": {"correlationId": correlation_id},
+            }, status=409)
+
+        if refund is None:
             return Response({
                 "error": {
                     "code": "REFUND_NOT_ELIGIBLE",
-                    "message": f"Khoản thu chưa ở trạng thái PAID để hoàn tiền (hiện tại: {charge.state})."
+                    "message": "No money to refund.",
                 },
-                "meta": {"correlationId": correlation_id}
+                "meta": {"correlationId": correlation_id},
             }, status=409)
-
-        # Ràng buộc 2: tổng tiền đã hoàn + đang chờ hoàn không vượt quá số tiền đã thu.
-        # Phải cộng cả REQUESTED, nếu không có thể tạo nhiều yêu cầu vượt trần rồi kẹt ở bước execute.
-        committed_refunded = Refund.objects.filter(
-            charge=charge, state__in=("REQUESTED", "SUCCEEDED")
-        ).aggregate(total=Sum("amount_vnd"))["total"] or 0
-
-        if committed_refunded + amount_vnd > charge.amount_vnd:
-            return Response({
-                "error": {
-                    "code": "REFUND_EXCEEDS_PAID",
-                    "message": (
-                        f"Tổng tiền hoàn đã cam kết ({committed_refunded + amount_vnd}đ) "
-                        f"vượt quá số tiền đã thanh toán ({charge.amount_vnd}đ)."
-                    )
-                },
-                "meta": {"correlationId": correlation_id}
-            }, status=409)
-
-        refund = Refund.objects.create(
-            charge=charge,
-            cancellation_id=cancellation_uuid,
-            reason_code=reason_code,
-            amount_vnd=amount_vnd,
-            state="REQUESTED",
-            attempts=[],
-            version=1
-        )
-        enqueue_refund_status(charge, refund, correlation_id)
 
         data = {"refund": serialize_refund(refund)}
-        idempotency.remember(scope, idempotency_key, payload, data)
-        record_audit(
-            "REFUND_REQUESTED",
-            request.principal.user_id,
-            refund.id,
-            {
-                "chargeId": str(charge.id),
-                "cancellationId": str(cancellation_uuid),
-                "reasonCode": reason_code,
-                "amountVnd": amount_vnd,
-            },
-            correlation_id,
+        idempotency.remember(
+            scope, idempotency_key, payload, data
         )
 
     return Response({
         "data": data,
-        "meta": {"correlationId": correlation_id}
+        "meta": {"correlationId": correlation_id},
     }, status=201)
 
 
@@ -428,8 +338,17 @@ def execute_refund_view(request, refund_id):
 
     with transaction.atomic():
         try:
-            refund = Refund.objects.select_for_update().get(id=refund_id)
-        except Refund.DoesNotExist:
+            charge_id = (
+                Refund.objects
+                .values_list("charge_id", flat=True)
+                .get(id=refund_id)
+            )
+            charge = Charge.objects.select_for_update().get(id=charge_id)
+            refund = Refund.objects.select_for_update().get(
+                id=refund_id,
+                charge=charge,
+            )
+        except (Refund.DoesNotExist, Charge.DoesNotExist):
             return Response({
                 "error": {
                     "code": "NOT_FOUND",
@@ -499,7 +418,8 @@ def execute_refund_view(request, refund_id):
         if scenario == "SUCCESS":
             # Kiểm tra trần số tiền hoàn
             other_refunded = Refund.objects.filter(
-                charge=charge, state="SUCCEEDED"
+                charge=charge,
+                state__in=("REQUESTED", "SUCCEEDED", "FAILED"),
             ).exclude(id=refund.id).aggregate(total=Sum("amount_vnd"))["total"] or 0
 
             if other_refunded + refund.amount_vnd > charge.amount_vnd:
