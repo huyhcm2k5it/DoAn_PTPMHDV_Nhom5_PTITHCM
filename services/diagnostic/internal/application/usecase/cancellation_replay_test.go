@@ -37,7 +37,7 @@ func TestCancellationRetryAfterSigningStillRequiresCurrentReadGrant(t *testing.T
 	m := &memory{objects: map[string]json.RawMessage{}}
 	doctor := domain.NewID()
 	_ = m.Put(ctx, "access", doctor, domain.Access{UserID: doctor, ActorType: "DOCTOR", Status: "ACTIVE", TokenVersion: 1})
-	o := domain.Order{ID: domain.NewID(), RequestID: domain.NewID(), VisitID: domain.NewID(), PatientID: domain.NewID(), State: "PAID", ChargeState: "PAID", SettlementState: "SUCCEEDED", Version: 1}
+	o := domain.Order{ID: domain.NewID(), RequestID: domain.NewID(), VisitID: domain.NewID(), PatientID: domain.NewID(), State: "PAID", ChargeState: "PAID", SettlementState: "SUCCEEDED", Version: 1, SourceRevision: 1}
 	m.orders = []domain.Order{o}
 	g := &changingGrant{canCancel: true}
 	s := New(changingGrantStore{m, g}, func() time.Time { return now })

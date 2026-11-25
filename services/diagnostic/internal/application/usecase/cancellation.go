@@ -51,22 +51,31 @@ func (s *Service) CancelOrder(ctx context.Context, p domain.Principal, id, key s
 		if e = verifier.VerifyVisitGrant(ctx, o.VisitID, o.PatientID, domain.ID(p.UserID), true, s.now()); e != nil {
 			return e
 		}
-		if o.Version != in.ExpectedVersion || len(o.Specimens) != 0 || o.State != "PAID" || o.ChargeState != "PAID" || o.SettlementState != "SUCCEEDED" {
-			return domain.Fail("STATE_CONFLICT", "Only a successfully settled, uncollected order can be cancelled")
+		paid := o.State == "PAID" && o.ChargeState == "PAID" && o.SettlementState == "SUCCEEDED"
+		unpaid := o.State == "PENDING_PAYMENT" && domain.Has([]string{"PENDING", "CREATED", "REJECTED"}, o.ChargeState) &&
+			(o.SettlementState == "" || o.SettlementState == "FAILED")
+		if o.Version != in.ExpectedVersion || len(o.Specimens) != 0 || (!paid && !unpaid) {
+			return domain.Fail("STATE_CONFLICT", "Cancellation requires no specimen and no unresolved settlement")
+		}
+		if o.SourceRevision < 1 {
+			return domain.Fail("SERVICE_UNAVAILABLE", "Source revision unavailable for cancellation evidence")
 		}
 		cancellationID := domain.NewID()
 		o.State = "CANCELLED"
-		o.RefundStatus = "PENDING_SYNC"
+		o.RefundStatus = "NOT_REQUIRED"
+		if paid {
+			o.RefundStatus = "PENDING_SYNC"
+		}
 		o.Version++
-		out = domain.CancelData{CancellationID: cancellationID, Order: o, RefundStatus: "PENDING_SYNC"}
+		out = domain.CancelData{CancellationID: cancellationID, Order: o, RefundStatus: o.RefundStatus}
 		if e = t.SaveOrder(ctx, o); e != nil {
 			return e
 		}
-		if e = t.Put(ctx, "cancellation", o.ID, map[string]any{"cancellationId": cancellationID, "refundStatus": "PENDING_SYNC", "reasonCode": in.ReasonCode, "actorId": domain.ID(p.UserID), "at": s.now().UTC()}); e != nil {
+		if e = t.Put(ctx, "cancellation", o.ID, map[string]any{"cancellationId": cancellationID, "refundStatus": o.RefundStatus, "reasonCode": in.ReasonCode, "actorId": domain.ID(p.UserID), "at": s.now().UTC()}); e != nil {
 			return e
 		}
 		cause := domain.Envelope{MessageID: domain.ID(key), CorrelationID: meta.CorrelationID, RequestID: o.RequestID}
-		if e = s.emit(ctx, t, cause, "EVENT", "LabCancelled", o.ID, "diagnostic.lab-cancelled.v1", o.Version, map[string]any{"orderId": o.ID, "visitId": o.VisitID, "cancellationId": cancellationID, "noSpecimen": true, "reasonCode": in.ReasonCode, "version": o.Version}); e != nil {
+		if e = s.emit(ctx, t, cause, "EVENT", "LabCancelled", o.ID, "diagnostic.lab-cancelled.v1", o.Version, map[string]any{"orderId": o.ID, "visitId": o.VisitID, "sourceRevision": o.SourceRevision, "cancellationId": cancellationID, "noSpecimen": true, "reasonCode": in.ReasonCode, "version": o.Version}); e != nil {
 			return e
 		}
 		return saveReplay(ctx, t, rk, hash, out)

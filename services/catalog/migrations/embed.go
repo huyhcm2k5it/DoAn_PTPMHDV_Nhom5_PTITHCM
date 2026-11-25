@@ -2,7 +2,7 @@ package migrations
 
 import "embed"
 
-// Files contains the ordered schema and explicit opt-in demo seed.
+// Files contains schema migrations only. Test fixtures are not bundled in binaries.
 //
 //go:embed *.sql
 var Files embed.FS

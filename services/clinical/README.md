@@ -33,22 +33,15 @@ Health live checks the process. Health ready checks Clinical's schema migration;
 
 ## Ticket handoff and fake fixtures
 
-The claim command requires patientId although CL-002 accepts only ticketId, doctorId and version. The worker reads versioned `QueueTicketChanged` snapshots from Appointment and still waits for an authoritative `QueueTicketClaimed` result before creating a visit. The operator-only importer remains available for isolated fixtures.
+The claim command requires patientId although CL-002 accepts only ticketId, doctorId and version. The worker reads versioned `QueueTicketChanged` snapshots from Appointment and still waits for an authoritative `QueueTicketClaimed` result before creating a visit. The operator-only importer remains available for a trusted Appointment export.
 
 ```powershell
-./tools/huy/go.ps1 clinical run ./cmd/import-tickets -file services/clinical/tests/fixtures/tickets.json
+./tools/huy/go.ps1 clinical run ./cmd/import-tickets -file PATH_TO_TRUSTED_APPOINTMENT_EXPORT.json
 ```
 
 Only import a trusted Appointment export. `doctorId` identifies the Catalog doctor while `doctorUserId` is the JWT subject. The API verifies their mapping from this snapshot, never from patientId supplied by a browser. Missing projection returns 503; the actual Appointment consumer must still validate ticket version/assignment when claiming.
 
-The following fake fixture is for isolated development only; do not use it as evidence of the online group demo:
-
-```powershell
-$env:CLINICAL_ALLOW_DEMO_SEED='1'
-./tools/huy/go.ps1 clinical run ./cmd/migrate -seed-demo
-```
-
-This seeds a fake doctor/patient/ticket only; it never manufactures an ACCEPTED claim or a successful visit. See the fixture JSON for IDs. Shared environments must use Identity/Patient projections and real Appointment snapshots.
+Migration commands update the schema only. The runtime no longer includes a demo seed command or fictional access/ticket insertion. Business data is maintained in the group online database; import only trusted owner exports for projections. Test fixtures are used only by tests and are not a fallback for online data.
 
 ## Worker and RabbitMQ
 

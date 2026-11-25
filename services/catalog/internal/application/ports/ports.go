@@ -19,6 +19,19 @@ type SearchQuery struct {
 	Q      string
 	Status string
 }
+type PriceQuery struct {
+	ItemType string
+	ItemID   string
+	Page     int
+	Limit    int
+}
+type PriceVersions struct {
+	Items []domain.PriceVersion `json:"items"`
+	Total int                   `json:"total"`
+}
+type PriceHistoryReader interface {
+	PriceHistory(context.Context, PriceQuery) (PriceVersions, error)
+}
 type Doctors struct {
 	Items []domain.Doctor `json:"items"`
 	Total int             `json:"total"`
@@ -87,6 +100,7 @@ type RealClock struct{}
 func (RealClock) Now() time.Time { return time.Now().UTC() }
 
 type Catalog interface {
+	PriceHistory(context.Context, domain.Principal, PriceQuery) (PriceVersions, error)
 	Departments(context.Context) ([]domain.Department, error)
 	Doctors(context.Context, DoctorQuery) (Doctors, error)
 	MedicalServices(context.Context, ServiceQuery) ([]domain.MedicalService, error)

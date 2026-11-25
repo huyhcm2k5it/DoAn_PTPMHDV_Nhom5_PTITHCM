@@ -167,6 +167,27 @@ func New(cfg Config, app ports.Catalog, auth Authenticator) *echo.Echo {
 		}
 		return ok(c, x, 200)
 	})
+	e.GET("/api/v1/prices", func(c *echo.Context) error {
+		p, err := protected(c, false)
+		if err != nil {
+			return err
+		}
+		page, err := integer(c.QueryParam("page"), 1)
+		if err != nil {
+			return err
+		}
+		limit, err := integer(c.QueryParam("limit"), 20)
+		if err != nil {
+			return err
+		}
+		x, err := app.PriceHistory(c.Request().Context(), p, ports.PriceQuery{
+			ItemType: c.QueryParam("itemType"), ItemID: c.QueryParam("itemId"), Page: page, Limit: limit,
+		})
+		if err != nil {
+			return err
+		}
+		return ok(c, x, 200)
+	})
 	e.POST("/api/v1/prices", func(c *echo.Context) error {
 		p, err := protected(c, true)
 		if err != nil {

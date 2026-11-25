@@ -292,6 +292,16 @@ static_resources:
                 route:
                   cluster: appointment_service
                   timeout: 15s
+              - name: CA-007
+                match:
+                  path: /api/v1/prices
+                  headers:
+                  - name: :method
+                    string_match:
+                      exact: GET
+                route:
+                  cluster: catalog_service
+                  timeout: 15s
               - name: CA-004
                 match:
                   path: /api/v1/prices

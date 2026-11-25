@@ -3,7 +3,9 @@
 Component React/TypeScript độc lập với router và auth provider. Không sửa app shell, shared UI, login hoặc API client do Quân/Hưng phụ trách.
 
 ```tsx
-const catalog = createCatalogApi(sharedTransport); // (url, RequestInit) => Promise<Response>
+const catalog = createCatalogApi(sharedTransport, {
+  authorizationLease: session?.lease,
+}); // (url, RequestInit) => Promise<Response>
 <CatalogPage
   api={catalog}
   session={session}
@@ -12,7 +14,7 @@ const catalog = createCatalogApi(sharedTransport); // (url, RequestInit) => Prom
 />;
 ```
 
-Giữ `api`/`session` ổn định bằng useMemo/provider. Shared transport thêm bearer và lease CA-004 hiện tại vào POST; phải trả Response nguyên bản, không bóc envelope trước adapter. Không tự retry POST với key mới. Router/menu/app shell do owner ghép sau.
+Giữ `api`/`session` ổn định bằng useMemo/provider. Shared transport thêm bearer; adapter Catalog lấy lease CA-004 mới qua callback khi POST; phải trả Response nguyên bản, không bóc envelope trước adapter. Không tự retry POST với key mới. Router/menu/app shell do owner ghép sau.
 
 - Public: chuyên khoa, bác sĩ có phân trang/lọc khoa, dịch vụ và giá hiệu lực.
 - DOCTOR: thêm danh mục thuốc/xét nghiệm. STAFF: PHARMACY cho thuốc; LAB_TECH/LAB_REVIEW cho test; ADMIN được cả hai và tạo giá.
@@ -23,3 +25,7 @@ Giữ `api`/`session` ổn định bằng useMemo/provider. Shared transport th�
 - Callback chỉ chuyển ID danh mục cho Appointment; không tự tạo lịch.
 
 Kiểm thử nằm trong `apps/web/tests/huy-catalog-api.test.ts`, `huy-catalog-regression.test.tsx` và `catalog.test.tsx`. Chạy bằng runner chung của `apps/web`. Scope CSS `.umc-catalog`, responsive 700px và giảm chuyển động theo thiết lập hệ điều hành.
+
+## Phiên bản giá 12.01 / 12.06
+
+`PriceVersionsPage` tại `/staff/prices` dành cho STAFF ADMIN, tái dùng PriceForm. `PriceHistory` đọc GET `/api/v1/prices` (CA-007), lọc itemType/itemId, phân trang cả quá khứ/hiện tại/tương lai. Mỗi request kiểm ADMIN từ token và projection hiện tại; không đọc lịch sử từ cache public hoặc localStorage. POST giữ cùng intent/key khi retry nhưng lấy lease mới; sau tạo chỉ reload bảng lịch sử, giữ phản hồi lưu thành công trong form. Dữ liệu là từ Catalog DB online hiện có; không seed runtime hoặc thay lịch sử giá cũ.

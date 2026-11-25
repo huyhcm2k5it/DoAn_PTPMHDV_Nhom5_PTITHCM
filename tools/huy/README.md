@@ -2,8 +2,8 @@
 
 Nhánh làm việc là `huy_task`, đồng bộ từ `develop`. Huy phụ trách Catalog, Clinical và Diagnostic, gồm HTTP API, PostgreSQL, Redis cho cả ba service, worker RabbitMQ và hợp đồng giao tiếp.
 
-1. Đọc `services/catalog/README.md`: DB, migrate, seed, API, lệnh chạy/test.
-2. Xem `contracts/http/catalog.openapi.json` và `catalog-integration.md`: schema/claim/quyền/seed ID/điểm nối còn chờ.
+1. Đọc `services/catalog/README.md`: DB online, schema migration, API, lệnh chạy/test.
+2. Xem `contracts/http/catalog.openapi.json` và `catalog-integration.md`: schema/claim/quyền/ID từ dữ liệu online/điểm nối còn chờ.
 3. Chạy web tại `apps/web` qua Gateway. Các màn Catalog, Clinical và Diagnostic dùng chung phiên đăng nhập, router và runner kiểm thử của web.
 4. Clinical đã có nhận lượt, ghi nháp, chỉ định LAB, toa, ký khám và đọc lịch sử. Diagnostic có thanh toán LAB, mẫu, kết quả, duyệt, công bố, hủy và nhận trạng thái hoàn. Đọc `contracts/http/clinical-integration.md` và `diagnostic-integration.md` trước khi nối frontend.
 
@@ -24,3 +24,7 @@ Image Clinical có sẵn `/visit-grant` cho tác vụ đồng bộ lại quyền
 Với hướng EC2 và Vercel, backend chạy sau Gateway HTTPS. Web gọi đường dẫn tương đối `/api/v1`, nên cấu hình triển khai web phải chuyển `/api/v1/*` tới Gateway. `HQH_GATEWAY_URL` của Vite cấu hình proxy của Vite khi phát triển. Cấu hình DB, RabbitMQ, Redis và khóa triển khai nằm ở môi trường backend.
 
 Xem `tools/huy/VERIFICATION.md` để đối chiếu các đợt kiểm thử backend trước đó.
+
+## Runtime không có seed giả
+
+Catalog không còn cờ -seed hoặc migrations/seed.sql; Clinical không còn -seed-demo/SeedDemo. Migration chỉ áp schema. Fixture SQL của Catalog chỉ embed trong file integration_test.go và không vào binary. Import projection vẫn giữ vì nhận snapshot owner có căn cứ, không thay bằng dữ liệu tự tạo. Các bài test fixture không là cách nạp dữ liệu vào Neon.

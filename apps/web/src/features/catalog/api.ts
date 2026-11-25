@@ -19,7 +19,12 @@ export class ApiError extends Error {
     super(message);
   }
 }
-export function createCatalogApi(transport: Transport): CatalogApi {
+export function createCatalogApi(
+  transport: Transport,
+  options: {
+    authorizationLease?: (action: string) => Promise<string>;
+  } = {},
+): CatalogApi {
   async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const res = await transport(`/api/v1/${path}`, init);
     const body = await res.json().catch(() => null);
@@ -39,6 +44,16 @@ export function createCatalogApi(transport: Transport): CatalogApi {
     return body.data as T;
   }
   return {
+    priceHistory: (query, signal) =>
+      request(
+        `prices?${new URLSearchParams({
+          ...(query.itemType && { itemType: query.itemType }),
+          ...(query.itemId && { itemId: query.itemId }),
+          page: String(query.page),
+          limit: String(query.limit),
+        })}`,
+        { signal, cache: 'no-store' },
+      ),
     departments: async (signal) =>
       (await request<{ items: Department[] }>('departments', { signal })).items,
     doctors: (departmentId, page, signal) =>
@@ -63,12 +78,20 @@ export function createCatalogApi(transport: Transport): CatalogApi {
         `catalog/lab-tests?${new URLSearchParams({ q, status: 'ACTIVE' })}`,
         { signal },
       ),
-    createPrice: (input, key) =>
-      request<PriceResult>('prices', {
+    createPrice: async (input, key) => {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': key,
+      };
+      if (options.authorizationLease)
+        headers['X-Authorization-Lease'] =
+          await options.authorizationLease('CA-004');
+      return request<PriceResult>('prices', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key },
+        headers,
         body: JSON.stringify(input),
-      }),
+      });
+    },
   };
 }
 export function errorMessage(error: unknown): string {

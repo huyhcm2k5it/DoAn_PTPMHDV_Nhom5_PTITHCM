@@ -487,6 +487,171 @@
             }
           }
         }
+      },
+      "get": {
+        "operationId": "CA_007",
+        "summary": "Read immutable price history",
+        "description": "STAFF ADMIN only; current access projection checked on every read. Includes past, current and future versions. Read-only; no lease required. Stable ordering by effectiveFrom descending, itemType/itemId, revision descending and ID.",
+        "tags": [
+          "Catalog"
+        ],
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,100}$"
+            },
+            "description": "Optional. Missing/unsafe value is replaced by a server UUID."
+          },
+          {
+            "name": "itemType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "EXAM",
+                "LAB",
+                "MEDICINE"
+              ]
+            },
+            "description": ""
+          },
+          {
+            "name": "itemId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": ""
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000,
+              "default": 1
+            },
+            "description": ""
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "description": ""
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "VALIDATION_ERROR: Invalid input",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "SERVICE_UNAVAILABLE: Database or required Identity verification unavailable",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UNAUTHENTICATED: Missing, invalid or expired bearer",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "FORBIDDEN: Insufficient current permission or authorization lease",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Correlation ID for this response",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceHistoryResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/catalog/medicines": {
@@ -1294,6 +1459,107 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/PriceResult"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          }
+        },
+        "required": [
+          "data",
+          "meta"
+        ],
+        "additionalProperties": false
+      },
+      "PriceVersion": {
+        "type": "object",
+        "properties": {
+          "priceVersionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "itemType": {
+            "type": "string",
+            "enum": [
+              "EXAM",
+              "LAB",
+              "MEDICINE"
+            ]
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amountVnd": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 9223372036854775807
+          },
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "description": "At most 6 fractional-second digits (PostgreSQL microsecond precision)"
+          },
+          "effectiveTo": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "pattern": "T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?(?:Z|[+-]\\d{2}:\\d{2})$",
+            "description": "At most 6 fractional-second digits (PostgreSQL microsecond precision)"
+          },
+          "itemCode": {
+            "type": "string"
+          },
+          "itemName": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "priceVersionId",
+          "revision",
+          "itemType",
+          "itemId",
+          "amountVnd",
+          "effectiveFrom",
+          "itemCode",
+          "itemName",
+          "createdBy"
+        ],
+        "additionalProperties": false
+      },
+      "PriceHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PriceVersion"
+                }
+              },
+              "total": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "items",
+              "total"
+            ],
+            "additionalProperties": false
           },
           "meta": {
             "$ref": "#/components/schemas/Meta"

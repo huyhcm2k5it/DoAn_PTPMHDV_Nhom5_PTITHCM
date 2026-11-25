@@ -4,7 +4,7 @@ Web React/TypeScript dùng chung cho PATIENT, DOCTOR và STAFF. **Phân công c�
 
 **[Phân công chi tiết: màn → người làm → file → API → phần còn lại → tiêu chí bàn giao](PHAN_CONG_VA_QUY_DINH_FRONTEND.md)**
 
-Tài liệu có kiểm kê tên **đủ 138 PDF** (gồm 21 biến thể thông báo đã đọc), việc đã có code, việc cần sửa/thêm, khoảng trống backend và thứ tự ghép. “Có code” không đồng nghĩa đã kiểm thử đầy đủ. Đối chiếu này dùng source local `huy_task`, không xác nhận đã lấy `develop` mới nhất.
+Tài liệu có kiểm kê tên **đủ 138 PDF** (gồm 21 biến thể thông báo đã đọc), việc đã có code, việc cần sửa/thêm, khoảng trống backend và thứ tự ghép. “Có code” không đồng nghĩa đã kiểm thử đầy đủ. Đã đồng bộ `origin/develop` tại commit `b355d60` vào `huy_task` trước phần hoàn thiện Huy; trạng thái bên dưới được cập nhật theo nền này.
 
 ## Ai làm phần nào
 
@@ -21,9 +21,9 @@ Tài liệu có kiểm kê tên **đủ 138 PDF** (gồm 21 biến thể thông 
 
 ## Hiện có và việc cần làm trước
 
-Có các feature Patient/Appointment/Pharmacy, Catalog/Clinical/Diagnostic và page tài khoản Identity. Hai trang Huy đọc kết quả/toa theo hồ sơ đã có adapter, nhưng nút từ màn cha 05 chưa nối; chưa có lọc kết quả theo một appointment cụ thể.
+Có các feature Patient/Appointment/Pharmacy, Catalog/Clinical/Diagnostic và page tài khoản Identity. Hai trang Huy đọc kết quả/toa theo hồ sơ đã có adapter, Develop đã có tab/nút và AppointmentRecords của Quân để ghép theo lịch; trang riêng Huy hiển thị theo hồ sơ, giữ patientId qua ba tab và đường quay lại.
 
-Thu ngân `/staff/cashier` hiện còn khung tĩnh; `features/billing/` và `features/notification/` hiện chỉ có README. Các page quản trị quyền/audit/Billing report chưa có. Catalog đã có tạo giá, chưa có API đọc lịch sử mọi phiên bản cho bảng 12.01/12.06. Tài liệu phân công giao rõ Q-01–Q-08, H-01–H-07, U-01–U-09 và B-01–B-08 để xử lý các phần này.
+Thu ngân `/staff/cashier` hiện còn khung tĩnh; Billing đã có api.ts/types.ts và phần thanh toán ở BookingReview; Notification chưa có FE component. Các page quản trị quyền/audit/Billing report chưa có. Huy đã bổ sung trang `/staff/prices`, API CA-007 đọc lịch sử giá và lease CA-004 khi tạo giá, không thay schema DB. Tài liệu phân công giao rõ Q-01–Q-08, H-01–H-07, U-01–U-09 và B-01–B-08 để xử lý các phần này.
 
 Thứ tự làm: (1) chốt session/props/route/nguồn API; (2) hồ sơ → đặt lịch → thanh toán → 05 và hai trang Huy; (3) tiếp nhận → khám → LAB → ký → thuốc/hoàn; (4) quản trị/thông báo và đối chiếu đủ PDF. Mỗi owner tiếp tục sửa phần đã có, không dựng lại ứng dụng.
 
@@ -66,4 +66,4 @@ Sau đó đối chiếu luồng đi/về, refresh/deep link, đổi hồ sơ/tà
 
 `tests/fixtures/huy-demo.json` chỉ là fixture kiểm thử. Không fallback fixture thành dữ liệu online khi request lỗi. Không commit env thật, private PEM, token hay log có bí mật. Chạy test mô phỏng/build thành công chưa chứng minh DB/JWT/message liên service đã thông suốt.
 
-Lần cập nhật README/phân công này **không chạy service/test, không đổi source FE/BE hay dữ liệu**. Xem [Clinical](src/features/clinical/README.md), [Diagnostic](src/features/diagnostic/README.md), [shell](src/app/README.md), [shared API](src/shared/api/README.md), [HTTP contracts](../../contracts/http/README.md) và [phân công đầy đủ](PHAN_CONG_VA_QUY_DINH_FRONTEND.md).
+Sau cập nhật phân công đã thực hiện code phần Huy, chạy kiểm tra tự động phù hợp; chưa chạy E2E online hoặc ghi/migrate dữ liệu Neon. Runtime Catalog/Clinical đã gỡ seed demo; fixture chỉ dành cho test, không được đưa vào binary. Xem [Clinical](src/features/clinical/README.md), [Diagnostic](src/features/diagnostic/README.md), [shell](src/app/README.md), [shared API](src/shared/api/README.md), [HTTP contracts](../../contracts/http/README.md) và [phân công đầy đủ](PHAN_CONG_VA_QUY_DINH_FRONTEND.md).

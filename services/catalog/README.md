@@ -42,10 +42,11 @@ Response `{data,meta:{correlationId}}`; lỗi `{error:{code,message},meta:{corre
 - Price VND nguyên không âm, immutable, thời điểm mới >= now + 5 phút; độ chính xác tối đa microsecond (phần lẻ giây tối đa 6 chữ số có nghĩa), vượt độ chính xác trả 400 trước khi ghi DB. Khoảng `[effectiveFrom,effectiveTo)`; null/missing end = vô hạn. Không tự cắt khoảng giá cũ. Trùng → 409 `OVERLAPPING_PRICE_PERIOD`; item không tồn tại/inactive → 400.
 - Mỗi cặp type/item khóa trước khi tính revision và ghi. DB exclusion constraint bảo vệ giá không chồng. Cùng actor/key/body chuẩn hóa UTC trả lại bản 201 cũ; actor/key UUID được chuẩn hóa hoa/thường khi khóa; đổi body với key cũ → 409 `IDEMPOTENCY_CONFLICT`.
 - Chưa có giá hiệu lực → `price:null`, không phải giá 0. Giá Catalog chỉ để hiển thị, Billing chốt quote/snapshot sau.
-- Seed dữ liệu học tập có ID cố định, không phải bác sĩ/bệnh nhân thật. Giá seed hữu hạn: từ đầu ngày hôm qua đến đầu ngày sau 2 ngày; chạy seed lại không ghi đè lịch sử hoặc quyền đã đổi. Khi demo ngoài cửa sổ đó cần tạo phiên bản tương lai hợp lệ bằng ADMIN, không sửa lịch sử.
 - Cache-aside dùng khóa `umc:catalog:v1:{generation}:{filterHash}`, TTL 60 giây ±10% jitter và tối đa dừng trước mốc đổi giá. Cache không lưu quyền truy cập; mỗi request thuốc/xét nghiệm xác minh quyền trước khi đọc cache. Redis timeout 100 ms; circuit breaker mở 15 giây sau ba lỗi; fallback PostgreSQL giới hạn 10 request đồng thời.
 - Khi tạo giá thành công, generation cache đổi sau commit. Nếu Redis vắng mặt/lỗi, GET dùng giới hạn fallback; vượt giới hạn trả 503. Chạy native không cấu hình Redis sẽ dùng PostgreSQL trực tiếp.
 - `/health/live` chỉ kiểm process; `/health/ready` kiểm kết nối/schema Catalog. Không yêu cầu broker cho GET. Clinical/Diagnostic readiness mới kiểm own DB connectivity.
+
+Migration chỉ thay schema; không có cờ `-seed` hay seed demo trong binary. Dữ liệu nghiệp vụ lấy từ database online do nhóm quản lý. Fixture test nằm riêng trong adapter PostgreSQL, chỉ biên dịch với tag integration.
 
 ## Cấu trúc code
 
@@ -75,7 +76,7 @@ Web feature và kiểm thử dùng runner chung tại `apps/web`. Xem `apps/web/
 
 ## Repair a verified doctor mapping
 
-Run Catalog migrations before deploying this version: migration `000003_doctor_mapping` adds doctor revisions and the repair audit. It does not change existing account mappings automatically. Fresh demo seeds keep the doctor linked to the unprovided Identity account `...912` inactive.
+Run Catalog migrations before deploying this version: migration `000003_doctor_mapping` adds doctor revisions and the repair audit. It does not change existing account mappings automatically. The runtime no longer ships a demo seed. Existing online mappings must be verified against the actual Identity owner; missing accounts must not be activated by guesswork.
 
 After verifying the target account with Identity and its ACTIVE DOCTOR projection in Catalog, an owner can repair a reviewed mapping with the Catalog database URL already loaded in `DATABASE_URL`:
 
@@ -88,3 +89,7 @@ The command checks the expected old mapping, rejects inactive/non-doctor target 
 ## Local Docker
 
 Use `python tools/be/run.py` from the repository root to run the entire group with the three existing owner env files. Catalog, Clinical and Diagnostic share the online Redis with separate namespaces. The API migrates before readiness when `MIGRATE_ON_START=1`; `/api healthcheck` is the container health check. Manual `/migrate` is a one-shot operation using the API image, not a separate service. Quarantine now uses outbox to deliver failures to RabbitMQ DLQ; migration 000005 preserves historical quarantine metadata before dropping that table.
+
+## Read price history for web administration
+
+GET `/api/v1/prices` (CA-007) accepts optional itemType/itemId and page/limit, returning data.items/total for all immutable revisions. Requires STAFF ADMIN in both the JWT and current Identity projection; no lease is required for this read. It queries the existing price_versions table without schema changes or writes. Runtime migrations have no demo seed command.

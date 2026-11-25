@@ -10,9 +10,9 @@ ROOT = Path(__file__).resolve().parents[2]
 class BaselineTests(unittest.TestCase):
     def test_every_interface_and_decision(self):
         manifest = json.loads((ROOT / "contracts/be-baseline-manifest.json").read_text(encoding="utf-8"))
-        self.assertEqual(len(manifest["http"]), 86)
-        self.assertEqual(len({row["id"] for row in manifest["http"]}), 86)
-        self.assertEqual(sum(row["profile"] == "normal" for row in manifest["http"]), 83)
+        self.assertEqual(len(manifest["http"]), 87)
+        self.assertEqual(len({row["id"] for row in manifest["http"]}), 87)
+        self.assertEqual(sum(row["profile"] == "normal" for row in manifest["http"]), 84)
         self.assertEqual(len(manifest["events"]), 20)
         self.assertEqual(len(manifest["commands"]), 5)
         self.assertEqual(set(manifest["decisions"]), {f"C{i:02}" for i in range(1, 11)})

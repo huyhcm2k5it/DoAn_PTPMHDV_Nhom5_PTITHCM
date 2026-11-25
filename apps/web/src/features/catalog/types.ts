@@ -20,6 +20,11 @@ export type PriceInput = {
   effectiveTo?: string;
 };
 export type Price = PriceInput & { priceVersionId: string; revision: number };
+export type PriceVersion = Price & {
+  itemCode: string;
+  itemName: string;
+  createdBy: string;
+};
 export type MedicalService = {
   id: string;
   departmentId: string;
@@ -59,6 +64,15 @@ export type Session = {
   capabilities: string[];
 };
 export interface CatalogApi {
+  priceHistory?(
+    query: {
+      itemType?: ItemType;
+      itemId?: string;
+      page: number;
+      limit: number;
+    },
+    signal?: AbortSignal,
+  ): Promise<{ items: PriceVersion[]; total: number }>;
   departments(signal?: AbortSignal): Promise<Department[]>;
   doctors(
     departmentId: string,

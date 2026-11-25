@@ -25,6 +25,8 @@ export function PublishedLabResults({
   });
   const [loading, setLoading] = useState(true),
     [error, setError] = useState<unknown>();
+  const queryKey = `${patientId}:${page}:${reload}`;
+  const [loadedFor, setLoadedFor] = useState('');
   useEffect(() => {
     setPage(1);
     setData({ items: [], total: 0 });
@@ -45,14 +47,18 @@ export function PublishedLabResults({
         if (active) setError(e);
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) {
+          setLoadedFor(queryKey);
+          setLoading(false);
+        }
       });
     return () => {
       active = false;
       abort.abort();
     };
   }, [api, patientId, page, reload]);
-  if (loading) return <Loading>Đang tải kết quả xét nghiệm…</Loading>;
+  if (loading || loadedFor !== queryKey)
+    return <Loading>Đang tải kết quả xét nghiệm…</Loading>;
   if (error)
     return (
       <Notice tone="error">
@@ -62,44 +68,43 @@ export function PublishedLabResults({
         </button>
       </Notice>
     );
+  const published = data.items.filter((result) => result.state === 'PUBLISHED');
   return (
     <section
       className="huy-published-results"
       aria-label="Kết quả xét nghiệm đã công bố"
     >
-      {!data.items.length ? (
+      {!published.length ? (
         <Empty>Chưa có kết quả xét nghiệm đã công bố.</Empty>
       ) : (
-        data.items
-          .filter((result) => result.state === 'PUBLISHED')
-          .map((result) => (
-            <article className="huy-history-record" key={result.id}>
-              <div className="huy-section-title">
-                <div>
-                  <h3>Kết quả xét nghiệm #{shortId(result.orderId)}</h3>
-                  <p className="huy-muted">
-                    Công bố lúc {timeLabel(result.publishedAt)} · Lần{' '}
-                    {result.revision}
-                  </p>
-                </div>
-                <span className="huy-badge success">Đã công bố</span>
+        published.map((result) => (
+          <article className="huy-history-record" key={result.id}>
+            <div className="huy-section-title">
+              <div>
+                <h3>Kết quả xét nghiệm #{shortId(result.orderId)}</h3>
+                <p className="huy-muted">
+                  Công bố lúc {timeLabel(result.publishedAt)} · Lần{' '}
+                  {result.revision}
+                </p>
               </div>
-              <ResultTable result={result} />
-              <button
-                type="button"
-                className="huy-button secondary huy-no-print"
-                onClick={(event) => {
-                  const section = event.currentTarget.closest('article');
-                  section?.classList.add('huy-print-target');
-                  window.print();
-                  section?.classList.remove('huy-print-target');
-                }}
-              >
-                <Printer size={16} aria-hidden="true" />
-                In kết quả
-              </button>
-            </article>
-          ))
+              <span className="huy-badge success">Đã công bố</span>
+            </div>
+            <ResultTable result={result} />
+            <button
+              type="button"
+              className="huy-button secondary huy-no-print"
+              onClick={(event) => {
+                const section = event.currentTarget.closest('article');
+                section?.classList.add('huy-print-target');
+                window.print();
+                section?.classList.remove('huy-print-target');
+              }}
+            >
+              <Printer size={16} aria-hidden="true" />
+              In kết quả
+            </button>
+          </article>
+        ))
       )}
       <nav className="huy-pagination" aria-label="Phân trang kết quả">
         <button

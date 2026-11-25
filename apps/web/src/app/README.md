@@ -6,9 +6,9 @@
 
 ## Tích hợp còn lại
 
-- Q-05: nối tab/nút lịch khám → kết quả LAB/toa đã ký → quay lại, giữ hồ sơ và mapping lịch/visit khi có nguồn. Hai route Huy là trang riêng phù hợp ZIP mới.
+- Q-05: develop đã có `AppointmentRecords` ghép kết quả LAB/toa vào lịch khám. Giữ mapping lịch/visit và hồ sơ khi điều hướng. Hai route bệnh nhân của Huy đọc dữ liệu theo hồ sơ đã chọn, có đường quay lại lịch hẹn.
 - U-03 + Q-01: Hưng bàn giao component thu ngân có API để thay `CashierQueueRoute` đang là khung tĩnh.
-- Q-08 + H-07 + U-05/U-06/U-07: ghép quản trị giá/ca/quyền/audit/báo cáo theo đúng owner; route đề xuất trong phân công chưa có nghĩa đã được khai báo.
+- Q-08 + H-07 + U-05/U-06/U-07: Huy đã có `/staff/prices` đọc lịch sử giá CA-007 và tạo giá CA-004. Các màn ca/quyền/audit/báo cáo còn ghép theo đúng owner; route đề xuất chưa có nghĩa đã triển khai.
 - U-08 + Q-01: dùng một chuông/trạng thái thông báo đã đọc chung, không sao chép từng page theo PDF.
 - Các route Patient/Appointment/Pharmacy, Catalog/Clinical/Diagnostic và page Identity đã có. Nhóm 03 đã có code chọn slot/hold và 04 đã có tạo appointment; không coi là chỉ tra cứu slot, cũng không coi tạo appointment là đã thu tiền.
 

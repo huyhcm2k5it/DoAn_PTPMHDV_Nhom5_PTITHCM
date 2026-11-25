@@ -666,3 +666,61 @@
     contain: none;
   }
 }
+.huy-record-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border, #dbe5ef);
+  border-radius: 12px;
+  background: #fff;
+}
+.huy-record-tabs a {
+  padding: 0.85rem 1.25rem;
+  color: var(--muted, #526a85);
+  text-decoration: none;
+  border-bottom: 3px solid transparent;
+}
+.huy-record-tabs a[aria-current='page'] {
+  color: var(--primary, #006e9d);
+  border-color: currentColor;
+  font-weight: 700;
+}
+.huy-record-context {
+  margin: 1rem 0;
+  max-width: 30rem;
+}
+.huy-record-context label {
+  display: grid;
+  gap: 0.5rem;
+}
+.huy-record-context select {
+  padding: 0.75rem;
+  border: 1px solid var(--border, #dbe5ef);
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+}
+.huy-patient-record-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(260px, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+.huy-patient-record-grid > * {
+  min-width: 0;
+}
+.huy-record-summary {
+  display: grid;
+  gap: 1rem;
+}
+.huy-record-summary p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 960px) {
+  .huy-patient-record-grid {
+    grid-template-columns: 1fr;
+  }
+}

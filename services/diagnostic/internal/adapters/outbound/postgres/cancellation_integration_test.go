@@ -23,7 +23,7 @@ func (visitGrantTx) VerifyVisitGrant(context.Context, string, string, string, bo
 	return nil
 }
 
-func TestCancellationRejectsInFlightChargeBeforeDelayedChargePrepared(t *testing.T) {
+func TestUnpaidCancellationIsTerminalAcrossDelayedChargePrepared(t *testing.T) {
 	db := testDB(t)
 	s, in, _ := setup(t, db)
 	o := createOrder(t, db, s, in)
@@ -36,8 +36,9 @@ func TestCancellationRejectsInFlightChargeBeforeDelayedChargePrepared(t *testing
 	}
 	service := usecase.New(visitGrantStore{db}, time.Now)
 	cancel := domain.CancelInput{ReasonCode: "DOCTOR_REQUEST", ExpectedVersion: o.Version}
-	if _, err := service.CancelOrder(ctx, doctor, o.ID, domain.NewID(), cancel, domain.ResultMeta{CorrelationID: domain.NewID()}); domain.Code(err) != "STATE_CONFLICT" {
-		t.Fatalf("order with pending charge was cancelled: %v", err)
+	out, err := service.CancelOrder(ctx, doctor, o.ID, domain.NewID(), cancel, domain.ResultMeta{CorrelationID: domain.NewID()})
+	if err != nil || out.Order.State != "CANCELLED" || out.RefundStatus != "NOT_REQUIRED" {
+		t.Fatalf("unpaid order cancellation failed: %+v %v", out, err)
 	}
 
 	chargeID := domain.NewID()
@@ -58,8 +59,8 @@ func TestCancellationRejectsInFlightChargeBeforeDelayedChargePrepared(t *testing
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if updated.State != "PENDING_PAYMENT" || updated.ChargeState != "CREATED" || updated.ChargeID != chargeID {
-		t.Fatalf("delayed charge event did not retain a payable order: %+v", updated)
+	if updated.State != "CANCELLED" || updated.ChargeState != "CREATED" || updated.ChargeID != chargeID {
+		t.Fatalf("delayed charge event reopened or lost a cancelled order: %+v", updated)
 	}
 	cancel.ExpectedVersion = updated.Version
 	if _, err := service.CancelOrder(ctx, doctor, o.ID, domain.NewID(), cancel, domain.ResultMeta{CorrelationID: domain.NewID()}); domain.Code(err) != "STATE_CONFLICT" {
@@ -69,7 +70,7 @@ func TestCancellationRejectsInFlightChargeBeforeDelayedChargePrepared(t *testing
 	if err := db.pool.QueryRow(ctx, `SELECT count(*) FROM outbox WHERE envelope->>'messageType'='LabCancelled'`).Scan(&cancellations); err != nil {
 		t.Fatal(err)
 	}
-	if cancellations != 0 {
-		t.Fatalf("active charge has %d cancellation events", cancellations)
+	if cancellations != 1 {
+		t.Fatalf("cancelled charge has %d cancellation events", cancellations)
 	}
 }

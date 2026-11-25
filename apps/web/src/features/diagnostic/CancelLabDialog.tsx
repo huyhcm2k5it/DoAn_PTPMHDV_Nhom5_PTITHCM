@@ -40,10 +40,13 @@ export function CancelLabDialog({
       abort.abort();
     };
   }, [api, orderId]);
+  const paid =
+    detail?.order.state === 'PAID' && detail.order.chargeState === 'PAID';
+  const unpaid =
+    detail?.order.state === 'PENDING_PAYMENT' &&
+    ['PENDING', 'CREATED', 'REJECTED'].includes(detail.order.chargeState);
   const eligible =
-    detail?.order.chargeState === 'PAID' &&
-    detail.specimens.length === 0 &&
-    detail.order.state === 'PAID';
+    !!detail && detail.specimens.length === 0 && (paid || unpaid);
   return (
     <ConfirmDialog
       title={'Hủy chỉ định #' + shortId(orderId)}
@@ -77,15 +80,16 @@ export function CancelLabDialog({
       )}
       {detail && !eligible && (
         <Notice tone="warning">
-          Chỉ hủy được xét nghiệm đã thanh toán và chưa từng lấy mẫu. Chỉ định
-          này chưa đáp ứng điều kiện.
+          Chỉ hủy được chỉ định chưa từng lấy mẫu và không có thanh toán đang
+          đối soát. Chỉ định này chưa đáp ứng điều kiện.
         </Notice>
       )}
       {eligible && (
         <>
           <p>
-            Chỉ định đã thanh toán và chưa lấy mẫu. Trạng thái hoàn tiền được
-            cập nhật từ viện phí.
+            {paid
+              ? 'Chỉ định đã thanh toán và chưa lấy mẫu. Trạng thái hoàn tiền được cập nhật từ viện phí.'
+              : 'Chỉ định chưa thu tiền và chưa lấy mẫu. Hủy sẽ gửi yêu cầu đóng khoản phí tới viện phí, không tạo khoản hoàn tiền.'}
           </p>
           <label>
             Lý do hủy

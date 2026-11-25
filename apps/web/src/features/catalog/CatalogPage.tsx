@@ -13,6 +13,7 @@ import type {
 import { can } from './types';
 import { errorMessage } from './api';
 import { PriceForm } from './PriceForm';
+import { PriceHistory } from './PriceHistory';
 import type { PriceChoice } from './PriceForm';
 import './catalog.css';
 
@@ -132,7 +133,7 @@ export function CatalogPage({
   return (
     <section className="umc-catalog" aria-labelledby="catalog-heading">
       <header className="catalog-header">
-        <p className="catalog-eyebrow">UMC CARE · ĐỒ ÁN NHÓM 5</p>
+        <p className="catalog-eyebrow">HQH CARE · DANH MỤC</p>
         <h1 id="catalog-heading">
           Chọn chuyên khoa.
           <br />
@@ -341,6 +342,7 @@ export function CatalogPage({
           onSaved={() => setRefresh((x) => x + 1)}
         />
       )}
+      {admin && <PriceHistory api={api} revision={refresh} />}
       <footer className="catalog-note">
         Dữ liệu đồ án phục vụ học tập. Danh mục thuốc không thể hiện tồn kho và
         không thay thế chỉ định khám.

@@ -67,19 +67,3 @@ func (s *Store) Migrate(ctx context.Context) error {
 	}
 	return tx.Commit(ctx)
 }
-
-func (s *Store) Seed(ctx context.Context) error {
-	sql, err := migrations.Files.ReadFile("seed.sql")
-	if err != nil {
-		return fmt.Errorf("read Catalog seed: %w", err)
-	}
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-	if _, err = tx.Exec(ctx, string(sql)); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
-}

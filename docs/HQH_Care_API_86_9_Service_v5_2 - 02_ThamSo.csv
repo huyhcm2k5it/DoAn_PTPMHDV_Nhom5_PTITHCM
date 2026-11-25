@@ -326,3 +326,7 @@ CA-005,query,q,string,Không,,Từ khóa tìm kiếm tự do theo phạm vi API.
 CA-005,query,status,string,Không,,Trạng thái dùng lọc danh sách theo API.
 CA-006,query,q,string,Không,,Từ khóa tìm kiếm tự do theo phạm vi API.
 CA-006,query,status,string,Không,,Trạng thái dùng lọc danh sách theo API.
+CA-007,query,itemType,string,Không,EXAM|LAB|MEDICINE,Không truyền để xem mọi loại.
+CA-007,query,itemId,string:uuid,Không,,"Lọc chính xác item, không đoán từ code."
+CA-007,query,page,integer,Không,1..1000000; default=1,Trang kết quả.
+CA-007,query,limit,integer,Không,1..100; default=20,Kích thước trang.

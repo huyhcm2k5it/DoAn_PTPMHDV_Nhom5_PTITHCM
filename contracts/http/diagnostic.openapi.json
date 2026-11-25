@@ -1902,7 +1902,7 @@
             }
           }
         },
-        "description": "Cancellation is limited to a successfully settled, uncollected order and requires the current Clinical-owned doctor/visit grant projection. Billing owns refund execution."
+        "description": "Cancellation is allowed before any specimen for unpaid or successfully settled orders. Unresolved settlements are blocked. Requires the current Clinical-owned doctor/visit grant, lease and expectedVersion. LabCancelled includes sourceRevision; Billing owns void/refund. Unpaid cancellations return NOT_REQUIRED."
       }
     },
     "/api/v1/patients/{patientId}/published-results": {
@@ -2228,6 +2228,7 @@
           },
           "refundStatus": {
             "enum": [
+              "NOT_REQUIRED",
               "PENDING_SYNC",
               "REQUESTED",
               "SUCCEEDED",
