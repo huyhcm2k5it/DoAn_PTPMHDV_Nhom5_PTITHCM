@@ -36,3 +36,9 @@ Khi Diagnostic bị gap stream, dùng `services/diagnostic/cmd/recover-visit-gra
 Nạp `CLINICAL_DATABASE_URL` và `DIAGNOSTIC_DATABASE_URL` từ env Huy hiện có vào môi trường tiến trình. Tại `services/diagnostic`, chạy `go run ./cmd/recover-visit-grants` để dry-run; chỉ thêm `-apply` khi đã kiểm kết quả và được phép phục hồi projection shared. Công cụ từ chối sai database, snapshot thiếu quyền, watermark lùi/đã có gap mới hơn hoặc snapshot quá hạn. Không cấp DSN Clinical cho API/worker Diagnostic; đây là lệnh operator riêng, không có HTTP endpoint hoặc worker mới. Image Diagnostic có binary `/recover-visit-grants` sau khi build lại.
 
 Sau recovery, phải kiểm checkpoint mới tiếp tục đến, Last bắt kịp GapThrough và checkpoint chưa quá 30 giây, rồi thử đúng/sai bác sĩ và quyền đã thu hồi. Snapshot không thay thế việc xử lý backlog RabbitMQ. Không bỏ guard hoặc tự điền timestamp mới để làm health giả. Các checkpoint backlog hoặc DLQ chỉ được xử lý theo quy trình đã được duyệt; giữ bằng chứng nguồn và trạng thái nghiệp vụ.
+
+## Độ bền stream Catalog và lỗi Gateway
+
+Publisher Catalog chạy độc lập với consumer Identity, dùng một publisher duy nhất và join khi shutdown trước khi đóng channel. Bootstrap chỉ chạy lại nếu chưa thành công; checkpoint được kiểm theo nhịp 10 giây bằng thời gian thực lúc tick. Lỗi broker giữ event đầu stream PENDING và backoff 5/15/60 giây (capped 60), không chuyển FAILED rồi vượt qua sequence. Channel publisher đóng sẽ kết thúc lượt worker để cơ chế restart kết nối lại. Không tự gộp, bỏ qua hoặc xóa checkpoint cũ.
+
+Ba adapter FE Huy giữ mã lỗi nghiệp vụ từ JSON. Với phản hồi text của Gateway, 401/403/5xx lần lượt được thể hiện là UNAUTHENTICATED/FORBIDDEN/SERVICE_UNAVAILABLE và giữ X-Correlation-ID khi có. HTTP 2xx thiếu data vẫn là INVALID_RESPONSE; không đổi lỗi kết nối thành dữ liệu demo hoặc danh sách trống.

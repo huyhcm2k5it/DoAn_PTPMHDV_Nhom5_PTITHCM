@@ -48,9 +48,19 @@ export function createClinicalApi(
     if (!response.ok)
       throw new ApiError(
         response.status,
-        body?.error?.code ?? 'INVALID_RESPONSE',
+        body?.error?.code ??
+          (response.status === 401
+            ? 'UNAUTHENTICATED'
+            : response.status === 403
+              ? 'FORBIDDEN'
+              : response.status >= 500
+                ? 'SERVICE_UNAVAILABLE'
+                : 'INVALID_RESPONSE'),
         body?.error?.message ?? 'Không đọc được phản hồi máy chủ',
-        body?.meta?.correlationId,
+        body?.meta?.correlationId ??
+          body?.correlationId ??
+          response.headers?.get('X-Correlation-ID') ??
+          undefined,
       );
     if (response.status !== expected || !body || !Object.hasOwn(body, 'data'))
       throw new ApiError(

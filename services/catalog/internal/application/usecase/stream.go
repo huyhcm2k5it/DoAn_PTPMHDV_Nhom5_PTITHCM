@@ -13,17 +13,29 @@ type StreamStore interface {
 	ports.PublisherStore
 }
 
-type Stream struct{ store StreamStore }
+// Tick has one owner: the publisher pump. Bootstrap and heartbeat bookkeeping
+// do not need a database transaction on every 250 ms drain tick.
+type Stream struct {
+	store          StreamStore
+	bootstrapped   bool
+	nextCheckpoint time.Time
+}
 
 func NewStream(store StreamStore) *Stream { return &Stream{store: store} }
 
 // Tick bootstraps once, maintains the heartbeat, and drains a bounded outbox batch.
 func (s *Stream) Tick(ctx context.Context, now time.Time, publish func(context.Context, ports.Outgoing) error) error {
-	if err := s.store.BootstrapCatalogStream(ctx); err != nil {
-		return err
+	if !s.bootstrapped {
+		if err := s.store.BootstrapCatalogStream(ctx); err != nil {
+			return err
+		}
+		s.bootstrapped = true
 	}
-	if err := s.store.EnsureCheckpoint(ctx, now); err != nil {
-		return err
+	if !now.Before(s.nextCheckpoint) {
+		if err := s.store.EnsureCheckpoint(ctx, now); err != nil {
+			return err
+		}
+		s.nextCheckpoint = now.Add(10 * time.Second)
 	}
 	for i := 0; i < 20; i++ {
 		sent, err := s.store.PublishPending(ctx, publish)

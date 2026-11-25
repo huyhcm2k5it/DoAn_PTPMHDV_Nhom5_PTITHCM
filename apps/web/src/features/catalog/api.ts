@@ -31,9 +31,19 @@ export function createCatalogApi(
     if (!res.ok)
       throw new ApiError(
         res.status,
-        body?.error?.code ?? 'INVALID_RESPONSE',
+        body?.error?.code ??
+          (res.status === 401
+            ? 'UNAUTHENTICATED'
+            : res.status === 403
+              ? 'FORBIDDEN'
+              : res.status >= 500
+                ? 'SERVICE_UNAVAILABLE'
+                : 'INVALID_RESPONSE'),
         body?.error?.message ?? 'Không đọc được phản hồi máy chủ',
-        body?.meta?.correlationId,
+        body?.meta?.correlationId ??
+          body?.correlationId ??
+          res.headers?.get('X-Correlation-ID') ??
+          undefined,
       );
     if (!body || !Object.hasOwn(body, 'data'))
       throw new ApiError(
