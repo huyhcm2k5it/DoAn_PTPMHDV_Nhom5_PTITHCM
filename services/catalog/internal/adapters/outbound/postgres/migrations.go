@@ -17,6 +17,7 @@ var catalogMigrations = [...]struct {
 	{3, "000003_doctor_mapping.up.sql"},
 	{4, "000004_catalog_erd_alignment.up.sql"},
 	{5, "000005_broker_delivery.up.sql"},
+	{6, "000006_outbox_stream_order.up.sql"},
 }
 
 func (s *Store) Ready(ctx context.Context) error {

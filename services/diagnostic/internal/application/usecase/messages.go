@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"math/rand/v2"
 	"time"
@@ -50,6 +51,12 @@ func (r *Receiver) Receive(ctx context.Context, in ports.Incoming) error {
 	e := r.s.Handle(ctx, in.Exchange, in.RoutingKey, m)
 	if e == nil {
 		return nil
+	}
+	// Infrastructure failures must retain the broker delivery, even on the
+	// last business retry. A database outage is not a poison message.
+	var businessError *domain.Error
+	if !errors.As(e, &businessError) {
+		return e
 	}
 	if domain.Code(e) != "SERVICE_UNAVAILABLE" {
 		return r.delivery.Quarantine(ctx, in, domain.Code(e))
