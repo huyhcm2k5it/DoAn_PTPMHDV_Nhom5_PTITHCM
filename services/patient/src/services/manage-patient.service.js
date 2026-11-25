@@ -22,11 +22,7 @@ function assertProjection(authContext, projection) {
     throw new ApiError(403, 'FORBIDDEN', 'Token has been revoked.');
 }
 
-function cleanPatient(patient) {
-  if (!patient) return null;
-  const { _id, ...data } = patient;
-  return data;
-}
+const { patientDto: cleanPatient } = require('./patient-dto');
 
 function isCalendarDate(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value))
@@ -167,7 +163,39 @@ async function createPatient({
       'Actor cannot create patient profiles.',
     );
   const profile = validateProfile(body);
-  const ownerUserId = isReception ? body.ownerUserId : authContext.userId;
+  let ownerUserId = authContext.userId;
+  let resolvedOwnerPhone;
+  if (isReception) {
+    const phone =
+      typeof body.ownerPhone === 'string'
+        ? body.ownerPhone.trim().replace(/ /g, '')
+        : '';
+    if (!/^[0-9]{9,11}$/.test(phone))
+      throw new ApiError(
+        400,
+        'VALIDATION_ERROR',
+        'ownerPhone must be a valid account phone.',
+      );
+    resolvedOwnerPhone = phone;
+    const owners = await connection
+      .collection('user_access_projection')
+      .find({ phone })
+      .limit(2)
+      .toArray();
+    if (owners.length !== 1)
+      throw new ApiError(
+        503,
+        'AUTH_PROJECTION_UNAVAILABLE',
+        'A unique Identity account phone projection is required.',
+      );
+    ownerUserId = owners[0].userId;
+    if (body.ownerUserId && body.ownerUserId !== ownerUserId)
+      throw new ApiError(
+        403,
+        'FORBIDDEN',
+        'Account owner does not match the Identity phone projection.',
+      );
+  }
   assertUuid(ownerUserId, 'ownerUserId');
   if (
     !isReception &&
@@ -183,7 +211,12 @@ async function createPatient({
     const owner = await connection
       .collection('user_access_projection')
       .findOne({ userId: ownerUserId });
-    if (!owner || owner.status !== 'ACTIVE' || owner.actorType !== 'PATIENT')
+    if (
+      !owner ||
+      owner.status !== 'ACTIVE' ||
+      owner.actorType !== 'PATIENT' ||
+      owner.phoneVerified !== true
+    )
       throw new ApiError(
         403,
         'ACCOUNT_PROOF_REQUIRED',
@@ -210,6 +243,50 @@ async function createPatient({
       now,
     },
     async (session) => {
+      if (isReception) {
+        const owner = await connection
+          .collection('user_access_projection')
+          .findOne({ userId: ownerUserId }, { session });
+        if (
+          !owner ||
+          owner.phone !== resolvedOwnerPhone ||
+          owner.status !== 'ACTIVE' ||
+          owner.actorType !== 'PATIENT' ||
+          owner.phoneVerified !== true
+        )
+          throw new ApiError(
+            403,
+            'ACCOUNT_PROOF_REQUIRED',
+            'Current verified Identity ownership is required.',
+          );
+      }
+      const duplicate = await connection.collection('patients').findOne(
+        {
+          ownerUserId,
+          active: { $ne: false },
+          $or: [
+            ...(patient.relation === 'SELF' ? [{ relation: 'SELF' }] : []),
+            {
+              fullName: patient.fullName,
+              birthDate: {
+                $in: [
+                  patient.birthDate,
+                  new Date(patient.birthDate + 'T00:00:00.000Z'),
+                ],
+              },
+            },
+          ],
+        },
+        { session },
+      );
+      if (duplicate)
+        throw new ApiError(
+          409,
+          'DUPLICATE_PATIENT_PROFILE',
+          duplicate.relation === 'SELF' && patient.relation === 'SELF'
+            ? 'Account already has a primary (SELF) patient profile.'
+            : 'A patient profile with the same full name and birth date already exists under this account.',
+        );
       await Patient.create([patient], { session });
       await connection.collection('outbox').insertOne(
         {
@@ -246,7 +323,6 @@ async function createPatient({
               (field) => profile[field] !== undefined,
             ),
           ],
-          version: 1,
           at: now,
         },
         { session },
@@ -314,7 +390,7 @@ async function updatePatient({
       if (current.version !== Number(expectedVersion))
         throw new ApiError(409, 'VERSION_CONFLICT', 'Patient changed.');
       const profile = validateProfile(
-        { ...current, ...body },
+        { ...cleanPatient(current), ...body },
         {
           validateBirthDate: Object.hasOwn(body || {}, 'birthDate'),
           validateSex: Object.hasOwn(body || {}, 'sex'),
@@ -322,7 +398,8 @@ async function updatePatient({
       );
       const changedFields = Object.keys(profile).filter(
         (field) =>
-          Object.hasOwn(body || {}, field) && profile[field] !== current[field],
+          Object.hasOwn(body || {}, field) &&
+          profile[field] !== cleanPatient(current)[field],
       );
       if (!changedFields.length) return cleanPatient(current);
 
@@ -337,6 +414,32 @@ async function updatePatient({
           $set[field] = profile[field];
           next[field] = profile[field];
         }
+      }
+      if (
+        changedFields.includes('fullName') ||
+        changedFields.includes('birthDate')
+      ) {
+        const dup = await connection.collection('patients').findOne(
+          {
+            ownerUserId: current.ownerUserId,
+            fullName: next.fullName,
+            birthDate: {
+              $in: [
+                cleanPatient(next).birthDate,
+                new Date(cleanPatient(next).birthDate + 'T00:00:00.000Z'),
+              ],
+            },
+            id: { $ne: patientId },
+            active: { $ne: false },
+          },
+          { session },
+        );
+        if (dup)
+          throw new ApiError(
+            409,
+            'DUPLICATE_PATIENT_PROFILE',
+            'A patient profile with the same full name and birth date already exists under this account.',
+          );
       }
       const changed = await Patient.updateOne(
         { id: patientId, version: current.version, active: { $ne: false } },
@@ -381,7 +484,6 @@ async function updatePatient({
           actorUserId: authContext.userId,
           action: 'UPDATED',
           changedFields,
-          version: next.version,
           at: now,
         },
         { session },

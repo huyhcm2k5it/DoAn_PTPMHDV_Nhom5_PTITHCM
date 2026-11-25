@@ -1,7 +1,8 @@
 const {
-  getAppointmentModel,
-  getQueueTicketModel,
-} = require('../models/appointment.model.js');
+  getAppointmentRepository,
+  getQueueTicketRepository,
+} = require('./appointment.repository');
+const {} = require('../models/appointment.model.js');
 const { ApiError } = require('../core/errors.js');
 
 function assertAdmin(authContext) {
@@ -17,15 +18,30 @@ async function getAdminSummary({ connection, authContext, date }) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date || ''))
     throw new ApiError(400, 'VALIDATION_ERROR', 'date must be YYYY-MM-DD.');
   const start = new Date(`${date}T00:00:00+07:00`);
+  if (
+    !Number.isFinite(start.getTime()) ||
+    new Date(start.getTime() + 7 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10) !== date
+  )
+    throw new ApiError(
+      400,
+      'VALIDATION_ERROR',
+      'date must be a valid calendar day.',
+    );
   const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-  const Appointment = getAppointmentModel(connection);
-  const QueueTicket = getQueueTicketModel(connection);
+  const Appointment = getAppointmentRepository(connection);
+  const QueueTicket = getQueueTicketRepository(connection);
   const [appointments, queueRows] = await Promise.all([
     Appointment.find({ startAt: { $gte: start, $lt: end } }).lean(),
-    QueueTicket.aggregate([
-      { $match: { appointmentDate: date } },
-      { $group: { _id: '$state', count: { $sum: 1 } } },
-    ]),
+    QueueTicket.find({ appointmentDate: date })
+      .lean()
+      .then((rows) => {
+        const counts = {};
+        for (const row of rows)
+          counts[row.state] = (counts[row.state] || 0) + 1;
+        return Object.entries(counts).map(([_id, count]) => ({ _id, count }));
+      }),
   ]);
   const byState = {};
   const metrics = { booked: 0, cancelled: 0, checkedIn: 0, completed: 0 };

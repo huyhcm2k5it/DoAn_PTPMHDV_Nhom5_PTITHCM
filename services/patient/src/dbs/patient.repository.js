@@ -1,3 +1,4 @@
+const { patientDto } = require('../services/patient-dto');
 function createPatientsRepository(Patient) {
   return {
     async listOwned(ownerUserId, { skip, limit }) {
@@ -10,7 +11,7 @@ function createPatientsRepository(Patient) {
           .lean(),
         Patient.countDocuments(filter),
       ]);
-      return { items: items.map(({ _id, ...patient }) => patient), total };
+      return { items: items.map(patientDto), total };
     },
     async findById(patientId) {
       const patient = await Patient.findOne({
@@ -18,8 +19,7 @@ function createPatientsRepository(Patient) {
         active: { $ne: false },
       }).lean();
       if (!patient) return null;
-      const { _id, ...data } = patient;
-      return data;
+      return patientDto(patient);
     },
 
     async findOwned(patientId, ownerUserId) {
@@ -29,8 +29,7 @@ function createPatientsRepository(Patient) {
         active: { $ne: false },
       }).lean();
       if (!patient) return null;
-      const { _id, ...data } = patient;
-      return data;
+      return patientDto(patient);
     },
 
     async search(query, { skip, limit }) {
@@ -55,10 +54,7 @@ function createPatientsRepository(Patient) {
         Patient.countDocuments(filter),
       ]);
       return {
-        items: items.map((item) => {
-          const { _id, ...data } = item;
-          return data;
-        }),
+        items: items.map(patientDto),
         total,
       };
     },

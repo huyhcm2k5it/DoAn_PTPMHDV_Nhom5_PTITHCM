@@ -107,6 +107,36 @@ export function MyAppointments({
           Đặt lịch khám mới
         </Link>
       </div>
+      <nav
+        className="quan-record-tabs"
+        aria-label="Lịch khám và hồ sơ sức khỏe"
+      >
+        <Link aria-current="page" to="/patient/appointments">
+          Lịch hẹn của tôi
+        </Link>
+        <Link
+          to={
+            selected
+              ? '/patient/appointments/' +
+                encodeURIComponent(selected.appointmentId) +
+                '?tab=lab'
+              : '/patient/lab-results'
+          }
+        >
+          Kết quả xét nghiệm
+        </Link>
+        <Link
+          to={
+            selected
+              ? '/patient/appointments/' +
+                encodeURIComponent(selected.appointmentId) +
+                '?tab=prescription'
+              : '/patient/medical-records'
+          }
+        >
+          Đơn thuốc
+        </Link>
+      </nav>
       {profileError != null && <ErrorPanel error={profileError} />}
       {patientApi ? (
         <div className="search-panel">

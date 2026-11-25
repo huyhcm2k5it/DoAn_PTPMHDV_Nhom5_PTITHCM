@@ -1,3 +1,8 @@
+const {
+  loadMedicationHold,
+  replaceMedicationHold,
+  hydrateMedicationHold,
+} = require('./medication-hold.repository');
 const { uuid, integer, staffAccess, failure } = require('./common');
 const { prescriptionLines } = require('./prescription-projection.service');
 
@@ -5,7 +10,14 @@ async function listPrescriptions({ connection, page = 1, limit = 20 }) {
   integer(page, 'page');
   integer(limit, 'limit', 100);
   const pipeline = [
-    { $match: { state: 'FINAL' } },
+    {
+      $match: {
+        $or: [
+          { state: 'FINAL' },
+          { state: { $exists: false }, sourceEventId: { $exists: true } },
+        ],
+      },
+    },
     { $sort: { revision: -1 } },
     { $group: { _id: '$prescriptionId', prescription: { $first: '$$ROOT' } } },
     { $replaceRoot: { newRoot: '$prescription' } },
@@ -25,6 +37,26 @@ async function listPrescriptions({ connection, page = 1, limit = 20 }) {
         itemsSnapshot: { $ifNull: ['$linesSnapshot', '$itemsSnapshot'] },
       },
     },
+    {
+      $lookup: {
+        from: 'inbox',
+        localField: 'sourceEventId',
+        foreignField: 'message_id',
+        as: 'delivery',
+      },
+    },
+    {
+      $set: {
+        finalizedAt: {
+          $ifNull: [
+            { $arrayElemAt: ['$delivery.result.finalizedAt', 0] },
+            '$finalizedAt',
+          ],
+        },
+        state: 'FINAL',
+      },
+    },
+    { $project: { delivery: 0 } },
     { $sort: { finalizedAt: 1, prescriptionId: 1 } },
     {
       $facet: {
@@ -69,16 +101,27 @@ async function prescriptionDetail({
     revision: prescription.revision,
     ...(holdId ? { id: holdId } : {}),
   };
-  const holds = await connection
+  const holdRows = await connection
     .collection('medication_holds')
     .find(query)
     .toArray();
+  const holds = await Promise.all(
+    holdRows.map((row) => hydrateMedicationHold(connection, row)),
+  );
   const hold = holds[0];
+  const dispense = hold
+    ? await connection
+        .collection('dispenses')
+        .findOne(
+          { holdId: hold.id },
+          { projection: { dispensedAt: 1, holdId: 1 } },
+        )
+    : null;
   const minimal = {
     prescriptionId,
     revision: prescription.revision,
-    latestHoldState: hold?.status || 'NOT_HELD',
-    dispensedAt: hold?.dispensedAt || null,
+    latestHoldState: dispense ? 'DISPENSED' : hold?.status || 'NOT_HELD',
+    dispensedAt: dispense?.dispensedAt ?? hold?.dispensedAt ?? null,
   };
   if (authContext.actorType === 'PATIENT') {
     const access = await connection
@@ -141,7 +184,7 @@ async function prescriptionDetail({
       prescriptionId,
       revision: h.revision,
       attemptNo: h.attemptNo,
-      status: h.status,
+      status: dispense && dispense.holdId === h.id ? 'DISPENSED' : h.status,
       version: h.version,
       expiresAt: h.expiresAt,
       chargeId: h.chargeId,

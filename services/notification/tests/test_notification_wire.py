@@ -9,10 +9,46 @@ from rest_framework.test import APIClient
 
 from app.api.view_notifications import serialize
 from app.application.messages import digest
-from app.domain.models import LegacyMessageInbox, LegacyNotification, MessageInbox, Notification, ReceivedMessage
-from app.worker.consumer import route_event
+from app.domain.models import DeadLetter, LegacyMessageInbox, LegacyNotification, MessageInbox, Notification, NotificationDeliveryKey, ReceivedMessage, RetryJob
+from app.worker.consumer import record_failure, route_event
 
 class NotificationWireTests(TestCase):
+    def test_invalid_envelope_metadata_has_no_business_writes(self):
+        invalid = {
+            "occurredAt": ["INVALID_DATE", "2026-02-30T10:00:00Z", "2026-11-23", "2026-11-23T10:00:00", None, 123],
+            "correlationId": ["", "x" * 129, None],
+            "requestId": ["invalid", 123], "causationId": ["invalid", 123],
+            "messageId": [123, None], "aggregateId": [123, None],
+            "aggregateVersion": [True, 0, 9007199254740992],
+            "schemaVersion": [True, 2], "payload": [[], None],
+        }
+        for field, values in invalid.items():
+            for value in values:
+                with self.subTest(field=field, value=value):
+                    event = {**self.appointment_event(uuid.uuid4()), field: value}
+                    with self.assertRaises((ValueError, TypeError)):
+                        route_event("appointment.appointment-changed.v1", event)
+                    self.assertFalse(ReceivedMessage.objects.exists())
+                    self.assertFalse(MessageInbox.objects.exists())
+                    self.assertFalse(Notification.objects.exists())
+                    self.assertFalse(NotificationDeliveryKey.objects.exists())
+
+    def test_valid_utc_and_offset_timestamps_are_accepted(self):
+        for value in ("2026-11-23T01:10:00Z", "2026-11-23T08:10:00.123+07:00"):
+            event = {**self.appointment_event(uuid.uuid4()), "occurredAt": value}
+            self.assertEqual(route_event("appointment.appointment-changed.v1", event), "APPLIED")
+        self.assertEqual(Notification.objects.count(), 2)
+
+    def test_invalid_timestamp_is_recorded_as_dead_letter(self):
+        event = {**self.appointment_event(uuid.uuid4()), "occurredAt": "INVALID_DATE"}
+        routing = "appointment.appointment-changed.v1"
+        with self.assertRaises(ValueError):
+            route_event(routing, event)
+        record_failure(routing, event, transient=False)
+        self.assertEqual(DeadLetter.objects.get().reason, "INVALID_MESSAGE")
+        self.assertFalse(RetryJob.objects.exists())
+        self.assertFalse(Notification.objects.exists())
+
     def test_canonical_envelope_creates_one_minimal_notification(self):
         event={"messageId":str(uuid.uuid4()),"messageKind":"EVENT","messageType":"MedicationDispensed","schemaVersion":1,"producer":"pharmacy","aggregateId":str(uuid.uuid4()),"aggregateVersion":1,"correlationId":str(uuid.uuid4()),"causationId":None,"requestId":None,"occurredAt":timezone.now().isoformat(),"payload":{"recipientUserId":str(uuid.uuid4()),"prescriptionId":str(uuid.uuid4()),"drugName":"SECRET","diagnosis":"SECRET"}}
         route_event("pharmacy.medication-dispensed.v1",event)

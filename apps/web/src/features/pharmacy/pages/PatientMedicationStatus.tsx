@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { PharmacyApi } from '../types';
 import { statusLabel } from '../status';
 import { useMedicationPolling } from '../hooks/useMedicationPolling';
@@ -21,8 +22,9 @@ function MedicationStatus({ api, id }: { api: PharmacyApi; id: string }) {
   );
 }
 export function PatientMedicationStatus({ api }: { api: PharmacyApi }) {
-  const [draft, setDraft] = useState(''),
-    [id, setId] = useState('');
+  const [params, setParams] = useSearchParams();
+  const id = params.get('prescriptionId') ?? '';
+  const [draft, setDraft] = useState(id);
   return (
     <section className="page-content pharmacy">
       <header className="page-heading">
@@ -36,7 +38,7 @@ export function PatientMedicationStatus({ api }: { api: PharmacyApi }) {
         className="search-panel"
         onSubmit={(e) => {
           e.preventDefault();
-          setId(draft.trim());
+          setParams(draft.trim() ? { prescriptionId: draft.trim() } : {});
         }}
       >
         <label>

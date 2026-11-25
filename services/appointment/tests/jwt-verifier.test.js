@@ -89,3 +89,47 @@ test('JWT authorization lease is short-lived and action-bound', async () => {
     /too long/,
   );
 });
+
+test('signed schedule lease aliases remain action, identity and time bound', async () => {
+  const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+  });
+  const verify = createJwtVerifier({
+    publicKey,
+    issuer: 'issuer',
+    audience: 'audience',
+    now: () => 1000,
+  });
+  const claims = {
+    iss: 'issuer',
+    aud: 'audience',
+    sub: 'admin',
+    tokenType: 'LEASE',
+    tokenVersion: 1,
+    iat: 995,
+    exp: 1025,
+    action: 'AP-002',
+  };
+  const options = {
+    action: 'AP-005',
+    expectedActions: ['AP-005', 'AP-002'],
+    subject: 'admin',
+    tokenVersion: 1,
+  };
+  assert.equal(
+    (await verify(tokenFor(privateKey, claims), options)).action,
+    'AP-002',
+  );
+  await assert.rejects(
+    verify(tokenFor(privateKey, { ...claims, action: 'AP-003' }), options),
+    /action/,
+  );
+  await assert.rejects(
+    verify(tokenFor(privateKey, { ...claims, sub: 'other' }), options),
+    /identity/,
+  );
+  await assert.rejects(
+    verify(tokenFor(privateKey, { ...claims, exp: 1000 }), options),
+    /expired/,
+  );
+});

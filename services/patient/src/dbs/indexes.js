@@ -28,6 +28,7 @@ const patientStorage = [
     name: 'user_access_projection',
     indexes: [
       { name: 'uq_user_access_projection', key: { userId: 1 }, unique: true },
+      { name: 'ix_user_access_phone', key: { phone: 1 }, sparse: true },
     ],
   },
   {

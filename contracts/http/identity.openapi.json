@@ -302,6 +302,7 @@
       "post": {
         "operationId": "IA_003",
         "summary": "Gửi lại OTP cho đúng purpose khi hết thời gian chờ; áp dụng rate limit và vô hiệu mã cũ theo chính sách Identity.",
+        "description": "Idempotency-Key là UUID, được scope theo số điện thoại đã chuẩn hóa. Cùng key/payload replay phản hồi đã lưu trước khi kiểm cooldown; một ý định mới dùng key mới. REGISTER áp dụng cooldown 60 giây và tối đa 3 lần gửi lại trong cửa sổ 1 giờ. RESET luôn trả 200 accepted cho request hợp lệ, kể cả khi tài khoản không tồn tại, bị khóa, đang cooldown, vượt hạn mức hoặc gửi email lỗi; accepted không xác nhận email đã được gửi.",
         "x-actor-policy": "PATIENT (chưa đăng nhập)",
         "security": [],
         "parameters": [
@@ -368,7 +369,7 @@
             ]
           },
           "409": {
-            "description": "OTP_NOT_RESENDABLE_YET: Chưa hết thời gian chờ để gửi lại OTP.",
+            "description": "OTP_NOT_RESENDABLE_YET: REGISTER chưa hết cooldown. ACCOUNT_NOT_ACTIVATABLE: tài khoản không thể kích hoạt. IDEMPOTENCY_KEY_REUSED: key đã gắn với payload khác.",
             "content": {
               "application/json": {
                 "schema": {
@@ -377,7 +378,9 @@
               }
             },
             "x-error-codes": [
-              "OTP_NOT_RESENDABLE_YET"
+              "OTP_NOT_RESENDABLE_YET",
+              "ACCOUNT_NOT_ACTIVATABLE",
+              "IDEMPOTENCY_KEY_REUSED"
             ]
           },
           "429": {

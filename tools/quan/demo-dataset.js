@@ -69,18 +69,7 @@ function buildDataset({
     'Dương',
     'Lý',
   ];
-  const middles = [
-    'Gia',
-    'Minh',
-    'Thanh',
-    'Ngọc',
-    'Quốc',
-    'Thành',
-    'Hoài',
-    'Bảo',
-    'Khánh',
-    'Tuệ',
-  ];
+  const middles = ['Gia', 'Minh', 'Thanh', 'Ngọc', 'Quốc', 'Thành', 'Hoài', 'Bảo', 'Khánh', 'Tuệ'];
   const names = [
     'An',
     'Bình',
@@ -108,14 +97,7 @@ function buildDataset({
     'Uyên',
     'Vi',
   ];
-  const places = [
-    'TP. Hồ Chí Minh',
-    'Hà Nội',
-    'Đà Nẵng',
-    'Cần Thơ',
-    'Huế',
-    'Đồng Nai',
-  ];
+  const places = ['TP. Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng', 'Cần Thơ', 'Huế', 'Đồng Nai'];
   const person = (index) =>
     `${surnames[index % surnames.length]} ${middles[Math.floor(index / surnames.length) % middles.length]} ${names[Math.floor(index / (surnames.length * middles.length)) % names.length]}`;
   const patients = Array.from({ length: patientCount }, (_, index) => ({
@@ -123,7 +105,10 @@ function buildDataset({
     ownerUserId: id('fictional-owner', Math.floor(index / 2)),
     relation: index % 2 ? 'OTHER' : 'SELF',
     fullName: `DEMO ${person(index)} ${String(index + 1).padStart(5, '0')}`,
-    birthDate: `${1950 + (index % 60)}-${String(1 + (index % 12)).padStart(2, '0')}-${String(1 + (index % 28)).padStart(2, '0')}`,
+    birthDate: new Date(
+      `${1950 + (index % 60)}-${String(1 + (index % 12)).padStart(2, '0')}-${String(1 + (index % 28)).padStart(2, '0')}` +
+        'T00:00:00.000Z',
+    ),
     sex: index % 2 ? 'FEMALE' : 'MALE',
     contactPhone: '000' + String(index + 1).padStart(7, '0'),
     address: `Địa chỉ giả lập DEMO ${index + 1}, ${places[index % places.length]}`,
@@ -180,15 +165,11 @@ function buildDataset({
       .slice(0, 10);
     doctors.forEach((doctor, index) => {
       for (const hour of [8, 13]) {
-        const startAt = new Date(
-          `${date}T${String(hour).padStart(2, '0')}:00:00+07:00`,
-        );
+        const startAt = new Date(`${date}T${String(hour).padStart(2, '0')}:00:00+07:00`);
         const endAt = new Date(startAt.getTime() + 4 * 3600000);
         const schedule = {
           id: id('schedule', `${day}:${index}:${hour}`),
           doctorId: doctor.id,
-          doctorUserId: doctor.userId,
-          departmentId: doctor.departmentId,
           serviceId: doctor.serviceId,
           room: `DEMO-${String(index + 1).padStart(3, '0')}`,
           startAt,
@@ -217,14 +198,7 @@ function buildDataset({
     medicines = [],
     receipts = [],
     audits = [];
-  const labels = [
-    'Viên mẫu',
-    'Dung dịch mẫu',
-    'Gói mẫu',
-    'Viên bổ sung mẫu',
-    'Kem mẫu',
-    'Ống mẫu',
-  ];
+  const labels = ['Viên mẫu', 'Dung dịch mẫu', 'Gói mẫu', 'Viên bổ sung mẫu', 'Kem mẫu', 'Ống mẫu'];
   const units = ['viên', 'chai', 'gói', 'viên', 'tuýp', 'ống'];
   for (let index = 0; index < medicineCount; index++) {
     const medicineId = id('medicine', index);
@@ -237,11 +211,7 @@ function buildDataset({
       revision: 1,
     };
     const onHand =
-      index % 17 === 0
-        ? 0
-        : index % 11 === 0
-          ? 5 + (index % 10)
-          : 100 + ((index * 37) % 2900);
+      index % 17 === 0 ? 0 : index % 11 === 0 ? 5 + (index % 10) : 100 + ((index * 37) % 2900);
     inventory.push({
       id: id('inventory', index),
       medicineId,
@@ -269,19 +239,15 @@ function buildDataset({
       actorUserId: id('seed-operator', 0),
       items: [{ medicineId, quantity: onHand, batchRef: 'DEMO-OPENING-STOCK' }],
       receivedAt: createdAt,
-      source: 'DEMO_FIXTURE',
-      seedBatch: batchId,
     });
     audits.push({
       id: id('opening-audit', index),
       medicineId,
-      kind: 'DEMO_OPENING_BALANCE',
+      kind: 'RECEIPT',
       quantity: onHand,
       receiptId,
       actorUserId: id('seed-operator', 0),
       at: createdAt,
-      source: 'DEMO_FIXTURE',
-      seedBatch: batchId,
     });
   }
   return {

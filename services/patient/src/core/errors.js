@@ -14,6 +14,7 @@ function errorHandler(err, req, res, next) {
       code: err.code || (status === 500 ? 'INTERNAL_ERROR' : 'REQUEST_ERROR'),
       message: status === 500 ? 'Đã xảy ra lỗi nội bộ.' : err.message,
     },
+    meta: { correlationId: req.correlationId },
     correlationId: req.correlationId,
   };
   if (err.details !== undefined && status < 500)
@@ -23,6 +24,7 @@ function errorHandler(err, req, res, next) {
 function notFound(req, res) {
   res.status(404).json({
     error: { code: 'NOT_FOUND', message: 'Không tìm thấy tài nguyên.' },
+    meta: { correlationId: req.correlationId },
     correlationId: req.correlationId,
   });
 }

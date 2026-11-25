@@ -58,7 +58,8 @@ class Charge(models.Model):
 
     @property
     def settlement_state(self):
-        return self.settlement_saga.state if self.settlement_saga_id else "NONE"
+        saga = self.settlement_saga
+        return saga.state if saga is not None else "NONE"
 
     def __str__(self):
         return f"Charge {self.id} [{self.source_type}:{self.source_id}] - {self.amount_vnd}đ ({self.state})"
@@ -253,6 +254,7 @@ class CancellationEvidence(models.Model):
     source_revision = models.PositiveIntegerField()
     source_version = models.PositiveBigIntegerField()
     body_hash = models.CharField(max_length=64)
+    context = models.JSONField(default=dict, blank=True)
 
 
 

@@ -10,7 +10,8 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from app.application.token_service import generate_access_token, verify_access_token, generate_authorization_lease
 from app.api.audit import record_audit
-from app.domain.models import User, OtpRequest, Session, StaffCapability
+from app.domain.models import User, OtpRequest, Session, StaffCapability, IdempotencyRecord
+from app.api.idempotency import canonical_hash, conflict_response
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from app.infrastructure.email_sender import get_email_sender
@@ -22,6 +23,8 @@ MIN_PASSWORD_LENGTH = 8
 MAX_PASSWORD_LENGTH = 128
 MAX_FAILED_LOGINS = 5
 LOCKOUT_MINUTES = 15
+OTP_PURPOSES = ("REGISTER", "RESET")
+MAX_OTP_RESENDS_PER_HOUR = 3
 
 def get_correlation_id(request):
     """Lấy correlationId từ header hoặc tự sinh nếu thiếu."""
@@ -54,7 +57,8 @@ def send_otp(email, code, purpose, correlation_id):
         get_email_sender().send_otp(email, code, purpose)
         return None
     except Exception:
-        logger.exception("Email adapter unavailable; correlation=%s", correlation_id)
+        # Adapter exceptions can contain the recipient or message body.
+        logger.warning("Email adapter unavailable; correlation=%s", correlation_id)
         return Response({
             "error": {
                 "code": "EMAIL_UNAVAILABLE",
@@ -62,6 +66,57 @@ def send_otp(email, code, purpose, correlation_id):
             },
             "meta": {"correlationId": correlation_id}
         }, status=503)
+
+
+def otp_cooldown(phone, purpose, correlation_id):
+    """Caller holds the User row lock; every send route shares these limits."""
+    now = timezone.now()
+    latest = OtpRequest.objects.filter(phone=phone, purpose=purpose).order_by("-created_at").first()
+    if latest and (now - latest.created_at).total_seconds() < 60:
+        return Response({
+            "error": {"code": "OTP_NOT_RESENDABLE_YET", "message": "Chưa hết thời gian chờ gửi OTP (60s)."},
+            "meta": {"correlationId": correlation_id},
+        }, status=409)
+    resends = OtpRequest.objects.filter(
+        phone=phone, purpose=purpose, is_resend=True,
+        created_at__gt=now - timedelta(hours=1),
+    ).order_by("created_at")
+    resend_count = resends.count()
+    if resend_count >= MAX_OTP_RESENDS_PER_HOUR:
+        # Legacy windows can contain more than three sends after migration.
+        release = resends[resend_count - MAX_OTP_RESENDS_PER_HOUR]
+        retry_after = max(1, int((release.created_at + timedelta(hours=1) - now).total_seconds()) + 1)
+        response = Response({
+            "error": {"code": "RATE_LIMITED", "message": "Tối đa 3 lần gửi lại OTP mỗi giờ theo mục đích."},
+            "meta": {"correlationId": correlation_id},
+        }, status=429)
+        response["Retry-After"] = str(retry_after)
+        return response
+    return None
+
+
+def issue_otp(user, purpose, correlation_id, *, is_resend):
+    """Failed delivery keeps the previously issued code usable."""
+    code = f"{secrets.randbelow(900000) + 100000:06d}"
+    expires_at = timezone.now() + timedelta(minutes=5)
+    with transaction.atomic():
+        otp = OtpRequest(
+            user=user, phone=user.phone, email=user.email, purpose=purpose,
+            expires_at=expires_at, attempts=0, is_resend=is_resend,
+        )
+        otp.set_code(code)
+        otp.save()
+        error = send_otp(user.email, code, purpose, correlation_id)
+        if error is not None:
+            transaction.set_rollback(True)
+    return expires_at, error
+
+
+def otp_accepted(correlation_id):
+    return Response({
+        "data": {"accepted": True, "retryAfterSeconds": 60},
+        "meta": {"correlationId": correlation_id},
+    }, status=200)
 
 # ==============================================================================
 # IA-001: ĐĂNG KÝ TÀI KHOẢN PATIENT
@@ -109,31 +164,33 @@ def register_view(request):
     if not existing_user:
         user = User(phone=phone, email=email, actor_type="PATIENT", status="PENDING_VERIFICATION")
         user.set_password(password)
-        user.save()
-        from app.application.access_events import publish_access
-        publish_access(user)
-    else:
+        user, created = User.objects.get_or_create(phone=phone, defaults={
+            "email": email, "password_hash": user.password_hash,
+            "actor_type": "PATIENT", "status": "PENDING_VERIFICATION",
+        })
+        # Lock even when another registration won the first-insert race.
+        user = User.objects.select_for_update().get(pk=user.pk)
+        if created:
+            from app.application.access_events import publish_access
+            publish_access(user)
+        else:
+            existing_user = user
+    if existing_user:
+        if existing_user.status != "PENDING_VERIFICATION" or existing_user.actor_type != "PATIENT":
+            return Response({"error": {"code": "PHONE_ALREADY_REGISTERED", "message": "Số điện thoại này đã được đăng ký."},
+                             "meta": {"correlationId": correlation_id}}, status=409)
+        cooldown = otp_cooldown(phone, "REGISTER", correlation_id)
+        if cooldown is not None:
+            return cooldown
         user = existing_user
         user.email = email
         user.set_password(password)
         user.save(update_fields=["password_hash", "email"])
 
-    # Sinh mã OTP 6 số ngẫu nhiên an toàn
-    otp_code = f"{secrets.randbelow(900000) + 100000:06d}"
-    expires_at = timezone.now() + timedelta(minutes=5)
-    otp_request = OtpRequest(
-        user=user,
-        phone=phone,
-        email=email,
-        purpose="REGISTER",
-        expires_at=expires_at,
-        attempts=0
+    expires_at, send_error = issue_otp(
+        user, "REGISTER", correlation_id, is_resend=existing_user is not None,
     )
-    otp_request.set_code(otp_code)
-    otp_request.save()
-
-    send_error = send_otp(email, otp_code, "REGISTER", correlation_id)
-    if send_error:
+    if send_error is not None:
         return send_error
 
     return Response({
@@ -157,12 +214,14 @@ def otp_verify_view(request):
     purpose = str(request.data.get("purpose", "")).strip().upper()
     otp_code = str(request.data.get("otpCode", "")).strip()
 
-    if not phone or not purpose or not otp_code:
+    if not phone or purpose not in OTP_PURPOSES or not re.fullmatch(r"[0-9]{6}", otp_code):
         return Response({
             "error": {"code": "VALIDATION_ERROR", "message": "phone không hợp lệ, purpose và otpCode là bắt buộc."},
             "meta": {"correlationId": correlation_id}
         }, status=400)
 
+    # Same User -> OTP order as issuance; avoid lock inversion with resend.
+    User.objects.select_for_update().filter(phone=phone).first()
     otp_req = OtpRequest.objects.select_for_update().filter(phone=phone, purpose=purpose).order_by("-created_at").first()
     if not otp_req:
         return Response({
@@ -237,56 +296,62 @@ def otp_verify_view(request):
 @api_view(["POST"])
 @transaction.atomic
 def otp_resend_view(request):
-    """IA-003: Gửi lại OTP cho đúng purpose khi hết thời gian chờ (cooldown 60s)."""
+    """IA-003: replay before limits; RESET responses do not reveal account state."""
     correlation_id = get_correlation_id(request)
     phone = normalize_phone(request.data.get("phone"))
     purpose = str(request.data.get("purpose", "")).strip().upper()
 
-    if not phone or not purpose:
+    key = request.headers.get("Idempotency-Key", "").strip()
+    try:
+        key = str(uuid.UUID(key))
+    except (ValueError, AttributeError):
+        key = None
+    if not phone or purpose not in OTP_PURPOSES or key is None:
         return Response({
-            "error": {"code": "VALIDATION_ERROR", "message": "phone không hợp lệ hoặc thiếu purpose."},
+            "error": {"code": "VALIDATION_ERROR", "message": "Cần phone hợp lệ, purpose REGISTER/RESET và Idempotency-Key dạng UUID."},
             "meta": {"correlationId": correlation_id}
         }, status=400)
 
-    latest_otp = OtpRequest.objects.select_for_update().filter(phone=phone, purpose=purpose).order_by("-created_at").first()
-    if latest_otp:
-        time_elapsed = (timezone.now() - latest_otp.created_at).total_seconds()
-        if time_elapsed < 60:
-            return Response({
-                "error": {"code": "OTP_NOT_RESENDABLE_YET", "message": f"Chưa hết thời gian chờ ({int(60 - time_elapsed)}s)."},
-                "meta": {"correlationId": correlation_id}
-            }, status=409)
+    # Public endpoint: scope by normalized account phone without storing it in scope.
+    scope = "IA-003:" + hashlib.sha256(phone.encode()).hexdigest()[:32]
+    fingerprint = canonical_hash({"phone": phone, "purpose": purpose})
+    record, created = IdempotencyRecord.objects.get_or_create(
+        scope=scope, key=key, defaults={"request_hash": fingerprint, "response": {}},
+    )
+    if not created:
+        if record.request_hash != fingerprint:
+            return conflict_response(request, correlation_id)
+        saved = record.response
+        response = Response(saved["body"], status=saved["status"])
+        for header, value in saved.get("headers", {}).items():
+            response[header] = value
+        return response
+
+    def finish(response):
+        record.response = {
+            "body": response.data, "status": response.status_code,
+            "headers": {"Retry-After": response["Retry-After"]} if response.has_header("Retry-After") else {},
+        }
+        record.save(update_fields=["response"])
+        return response
 
     user = User.objects.select_for_update().filter(phone=phone).first()
-    if purpose == "REGISTER" and (not user or user.actor_type != "PATIENT" or user.status != "PENDING_VERIFICATION"):
-        return Response({"error": {"code": "ACCOUNT_NOT_ACTIVATABLE", "message": "Account cannot be activated."}}, status=409)
+    if purpose == "RESET":
+        if user and user.status == "ACTIVE" and otp_cooldown(phone, purpose, correlation_id) is None:
+            issue_otp(user, purpose, correlation_id, is_resend=True)
+        # Same response for unknown/blocked accounts, limits and adapter failures.
+        return finish(otp_accepted(correlation_id))
 
-    target_email = (user.email if user else None) or (latest_otp.email if latest_otp else None)
-
-    otp_code = f"{secrets.randbelow(900000) + 100000:06d}"
-    expires_at = timezone.now() + timedelta(minutes=5)
-    otp_request = OtpRequest(
-        user=user,
-        phone=phone,
-        email=target_email,
-        purpose=purpose,
-        expires_at=expires_at,
-        attempts=0
-    )
-    otp_request.set_code(otp_code)
-    otp_request.save()
-
-    send_error = send_otp(target_email, otp_code, purpose, correlation_id)
-    if send_error:
-        return send_error
-
-    return Response({
-        "data": {
-            "accepted": True,
-            "retryAfterSeconds": 60
-        },
-        "meta": {"correlationId": correlation_id}
-    }, status=200)
+    if not user or user.actor_type != "PATIENT" or user.status != "PENDING_VERIFICATION":
+        return finish(Response({
+            "error": {"code": "ACCOUNT_NOT_ACTIVATABLE", "message": "Account cannot be activated."},
+            "meta": {"correlationId": correlation_id},
+        }, status=409))
+    cooldown = otp_cooldown(phone, purpose, correlation_id)
+    if cooldown is not None:
+        return finish(cooldown)
+    _, send_error = issue_otp(user, purpose, correlation_id, is_resend=True)
+    return finish(send_error if send_error is not None else otp_accepted(correlation_id))
 
 # ==============================================================================
 # IA-007: YÊU CẦU QUÊN MẬT KHẨU
@@ -304,22 +369,13 @@ def forgot_password_view(request):
         }, status=400)
 
     user = User.objects.select_for_update().filter(phone=phone).first()
-    if user and user.status == "ACTIVE":
-        target_email = user.email
-        otp_code = f"{secrets.randbelow(900000) + 100000:06d}"
-        expires_at = timezone.now() + timedelta(minutes=5)
-        otp_request = OtpRequest(
-            user=user,
-            phone=phone,
-            email=target_email,
-            purpose="RESET",
-            expires_at=expires_at,
-            attempts=0
+    if user and user.status == "ACTIVE" and otp_cooldown(phone, "RESET", correlation_id) is None:
+        _, send_error = issue_otp(
+            user, "RESET", correlation_id,
+            is_resend=OtpRequest.objects.filter(phone=phone, purpose="RESET").exists(),
         )
-        otp_request.set_code(otp_code)
-        otp_request.save()
         # Kênh giao lỗi không được làm lộ việc số này có tài khoản hay không
-        if send_otp(target_email, otp_code, "RESET", correlation_id) is not None:
+        if send_error is not None:
             logger.warning("Không gửi được OTP RESET nhưng vẫn trả accepted để chống enumeration")
 
     # Luôn trả về 200 accepted theo chuẩn bảo mật chống enumeration
@@ -356,7 +412,8 @@ def reset_password_view(request):
             "meta": {"correlationId": correlation_id}
         }, status=400)
 
-    otp_req = OtpRequest.objects.filter(phone=phone, purpose="RESET").order_by("-created_at").first()
+    User.objects.select_for_update().filter(phone=phone).first()
+    otp_req = OtpRequest.objects.select_for_update().filter(phone=phone, purpose="RESET").order_by("-created_at").first()
     if not otp_req:
         return Response({
             "error": {"code": "VALIDATION_ERROR", "message": "Không tìm thấy yêu cầu đặt lại mật khẩu."},

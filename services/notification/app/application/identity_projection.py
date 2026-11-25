@@ -2,7 +2,7 @@
 import uuid
 from django.db import transaction
 from django.utils.dateparse import parse_datetime
-from app.application.messages import digest, receive
+from app.application.messages import digest, receive, validate_envelope
 from app.domain.models import IdentityAccessProjection
 
 PAYLOAD_FIELDS = {'userId', 'status', 'actorType', 'capabilities', 'tokenVersion', 'phoneVerified', 'version'}
@@ -19,9 +19,7 @@ def wire_uuid(value):
 
 
 def validate(envelope):
-    from app.worker.consumer import REQUIRED
-    if not isinstance(envelope, dict) or set(envelope) != REQUIRED:
-        raise ValueError('Invalid identity envelope')
+    validate_envelope(envelope)
     if (envelope['messageKind'] != 'EVENT' or envelope['messageType'] != 'IdentityAccessChanged'
             or envelope['producer'] != 'identity' or type(envelope['schemaVersion']) is not int
             or envelope['schemaVersion'] != 1 or not positive_int(envelope['aggregateVersion'])):
@@ -38,8 +36,10 @@ def validate(envelope):
     if not isinstance(occurred, str) or parse_datetime(occurred) is None:
         raise ValueError('Invalid event timestamp')
     payload = envelope['payload']
-    if not isinstance(payload, dict) or set(payload) != PAYLOAD_FIELDS:
+    if not isinstance(payload, dict) or (set(payload) - {'phone'}) != PAYLOAD_FIELDS:
         raise ValueError('Invalid identity payload')
+    if 'phone' in payload and (not isinstance(payload['phone'], str) or not 8 <= len(payload['phone']) <= 20):
+        raise ValueError('Invalid optional phone')
     user_id = wire_uuid(payload['userId'])
     if (user_id != wire_uuid(envelope['aggregateId']) or not positive_int(payload['version'])
             or payload['version'] != envelope['aggregateVersion'] or not positive_int(payload['tokenVersion'])

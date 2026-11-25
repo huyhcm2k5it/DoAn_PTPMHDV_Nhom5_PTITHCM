@@ -1,10 +1,12 @@
+const { getAppointmentRepository } = require('./appointment.repository');
+const { resolveDoctorMapping } = require('./doctor-mapping.service');
 const { createHash, randomUUID } = require('node:crypto');
+const { refreshPatientIntervals } = require('./patient-time-lock.service');
 const { withMongoTransaction } = require('../../../../mongo/transaction.js');
 const {
   getHoldModel,
   getScheduleModel,
   getSlotModel,
-  getAppointmentModel,
   getPatientTimeLockModel,
   getIdempotencyModel,
   getOutboxModel,
@@ -84,7 +86,7 @@ async function createAppointment({
   const hash = requestHash({ holdId, patientId });
   const Hold = getHoldModel(connection);
   const Slot = getSlotModel(connection);
-  const Appointment = getAppointmentModel(connection);
+  const Appointment = getAppointmentRepository(connection);
   const Idempotency = getIdempotencyModel(connection);
   const Outbox = getOutboxModel(connection);
   const replay = await existingIdempotency(
@@ -112,7 +114,9 @@ async function createAppointment({
         throw new ApiError(409, 'HOLD_EXPIRED', 'Hold đã hết hạn.');
       if (
         !hold.priceSnapshot ||
+        !Number.isSafeInteger(Number(hold.priceSnapshot.amountVnd)) ||
         hold.priceSnapshot.amountVnd == null ||
+        !hold.priceSnapshot.priceVersionId ||
         !hold.priceSnapshot.snapshotHash
       )
         throw new ApiError(
@@ -126,10 +130,9 @@ async function createAppointment({
         {
           id: holdId,
           status: 'HELD',
-          version: hold.version,
           expiresAt: { $gt: now },
         },
-        { $set: { status: 'CONSUMED', consumedAt: now }, $inc: { version: 1 } },
+        { $set: { status: 'CONSUMED', consumedAt: now } },
         { session },
       );
       if (!changed.modifiedCount)
@@ -143,6 +146,21 @@ async function createAppointment({
         .lean();
       if (!slot)
         throw new ApiError(404, 'SLOT_NOT_FOUND', 'Slot không tồn tại.');
+      const schedule = await getScheduleModel(connection)
+        .findOne({ id: slot.scheduleId })
+        .session(session)
+        .lean();
+      if (!schedule)
+        throw new ApiError(
+          503,
+          'SCHEDULE_UNAVAILABLE',
+          'Booking schedule is unavailable.',
+        );
+      const mapping = await resolveDoctorMapping(
+        connection,
+        schedule.doctorId,
+        session,
+      );
       const recipientUserId = await resolveRecipient(
         connection,
         patientId,
@@ -157,25 +175,27 @@ async function createAppointment({
         patientId,
         principalId,
         slotId: hold.slotId,
-        scheduleId: hold.scheduleId,
-        doctorId: hold.doctorId,
-        doctorUserId: hold.doctorUserId,
-        departmentId: hold.departmentId,
-        serviceId: hold.serviceId,
-        startAt: hold.slotStartAt,
-        endAt: hold.slotEndAt,
+        scheduleId: slot.scheduleId,
+        doctorId: schedule.doctorId,
+        doctorUserId: mapping.doctorUserId,
+        departmentId: mapping.departmentId,
+        serviceId: schedule.serviceId,
+        startAt: slot.startAt,
+        endAt: slot.endAt,
         state: 'PENDING_PAYMENT',
         stateHistory: [{ state: 'PENDING_PAYMENT', at: now }],
         chargeSync: 'PENDING',
         settlementState: 'NONE',
         settlementVersion: 0,
-        priceSnapshot: hold.priceSnapshot || null,
-        paymentDueAt: new Date(now.getTime() + 10 * 60 * 1000),
+        priceSnapshotVnd: BigInt(hold.priceSnapshot.amountVnd),
+        priceVersion: hold.priceSnapshot.priceVersionId,
+        expiresAt: new Date(now.getTime() + 10 * 60 * 1000),
         version: 1,
         createdAt: now,
         updatedAt: now,
       };
       await Appointment.create([appointment], { session });
+      await refreshPatientIntervals(connection, patientId, session);
       const messageId = createId();
       await Outbox.create(
         [
@@ -196,7 +216,7 @@ async function createAppointment({
               sourceRevision: 1,
               patientId,
               recipientUserId,
-              expiresAt: appointment.paymentDueAt.toISOString(),
+              expiresAt: appointment.expiresAt.toISOString(),
               linesSnapshot: hold.priceSnapshot ? [hold.priceSnapshot] : [],
               amountVnd: hold.priceSnapshot?.amountVnd ?? null,
               snapshotHash: hold.priceSnapshot?.snapshotHash ?? null,
@@ -237,20 +257,25 @@ async function createAppointment({
 }
 
 async function getAppointment({ connection, appointmentId, principalId }) {
-  const Appointment = getAppointmentModel(connection);
+  const Appointment = getAppointmentRepository(connection);
   const appointment = await Appointment.findOne({
     id: appointmentId,
     ...(principalId
       ? { $or: [{ principalId }, { recipientUserId: principalId }] }
       : {}),
-  }).lean();
+  })
+    .select('-_id')
+    .lean();
   if (!appointment)
     throw new ApiError(404, 'NOT_FOUND', 'Không tìm thấy lịch hẹn.');
   return {
     appointment,
     chargeStatus: appointment.chargeStatus || 'PENDING',
-    refundStatus: appointment.refundStatus || null,
-    chargeSync: appointment.chargeSync,
+    refundStatus: appointment.refundStatus || 'NONE',
+    chargeSync: {
+      state: appointment.chargeSync ?? 'PENDING',
+      chargeId: appointment.chargeId ?? null,
+    },
   };
 }
 async function listPatientAppointments({
@@ -286,16 +311,17 @@ async function listPatientAppointments({
       ...(from ? { $gte: new Date(from + 'T00:00:00+07:00') } : {}),
       ...(to ? { $lt: new Date(to + 'T00:00:00+07:00') } : {}),
     };
-  const Appointment = getAppointmentModel(connection);
+  const Appointment = getAppointmentRepository(connection);
   const [items, total] = await Promise.all([
     Appointment.find(query)
+      .select('-_id')
       .sort({ startAt: 1 })
       .skip((parsedPage - 1) * parsedLimit)
       .limit(parsedLimit)
       .lean(),
     Appointment.countDocuments(query),
   ]);
-  return { items, total, page: parsedPage, limit: parsedLimit };
+  return { items, total };
 }
 
 function assertExpectedVersion(value) {
@@ -348,7 +374,7 @@ async function rescheduleAppointment({
   const version = assertExpectedVersion(expectedVersion);
   const route = `POST /api/v1/appointments/${appointmentId}/reschedule`;
   const hash = requestHash({ newSlotId, expectedVersion: version });
-  const Appointment = getAppointmentModel(connection);
+  const Appointment = getAppointmentRepository(connection);
   const Schedule = getScheduleModel(connection);
   const Slot = getSlotModel(connection);
   const Lock = getPatientTimeLockModel(connection);
@@ -425,11 +451,22 @@ async function rescheduleAppointment({
           'PRICE_PROJECTION_STALE',
           'New slot price projection is unavailable.',
         );
+      const acceptedSnapshot =
+        appointment.priceSnapshot ??
+        (
+          await getHoldModel(connection)
+            .findOne({ id: appointment.holdId })
+            .select('priceSnapshot')
+            .session(session)
+            .lean()
+        )?.priceSnapshot;
       if (
-        priceSnapshot.snapshotHash !==
-          appointment.priceSnapshot?.snapshotHash ||
+        priceSnapshot.priceVersionId !==
+          (appointment.priceVersion ?? acceptedSnapshot?.priceVersionId) ||
+        (priceSnapshot.currency ?? 'VND') !==
+          (acceptedSnapshot?.currency ?? 'VND') ||
         Number(priceSnapshot.amountVnd) !==
-          Number(appointment.priceSnapshot?.amountVnd)
+          Number(appointment.priceSnapshotVnd ?? acceptedSnapshot?.amountVnd)
       )
         throw new ApiError(
           409,
@@ -440,17 +477,23 @@ async function rescheduleAppointment({
         throw new ApiError(409, 'SLOT_UNAVAILABLE', 'New slot is in the past.');
       await Lock.updateOne(
         { patientId },
-        { $set: { updatedAt: now }, $inc: { version: 1 } },
+        { $inc: { version: 1 } },
         { upsert: true, session },
       );
+      const overlappingSlots = await Slot.find({
+        startAt: { $lt: slot.endAt },
+        endAt: { $gt: slot.startAt },
+      })
+        .select('id')
+        .session(session)
+        .lean();
       const [activeHold, activeAppointment] = await Promise.all([
         getHoldModel(connection)
           .findOne({
             patientId,
             status: 'HELD',
             expiresAt: { $gt: now },
-            slotStartAt: { $lt: slot.endAt },
-            slotEndAt: { $gt: slot.startAt },
+            slotId: { $in: overlappingSlots.map((item) => item.id) },
           })
           .session(session)
           .lean(),
@@ -512,7 +555,7 @@ async function rescheduleAppointment({
             slotHistory,
             updatedAt: now,
           },
-          $inc: { version: 1, sourceRevision: 1 },
+          $inc: { version: 1 },
         },
         { session },
       );
@@ -537,8 +580,9 @@ async function rescheduleAppointment({
         endAt: slot.endAt,
         slotHistory,
         version: nextVersion,
-        sourceRevision: appointment.sourceRevision + 1,
+        sourceRevision: appointment.sourceRevision,
       };
+      await refreshPatientIntervals(connection, patientId, session);
       const response = responseForChange(updated);
       await Outbox.create(
         [
@@ -631,7 +675,7 @@ async function cancelAppointment({
   const version = assertExpectedVersion(expectedVersion);
   const route = `POST /api/v1/appointments/${appointmentId}/cancel`;
   const hash = requestHash({ reasonCode, expectedVersion: version });
-  const Appointment = getAppointmentModel(connection);
+  const Appointment = getAppointmentRepository(connection);
   const Slot = getSlotModel(connection);
   const Idempotency = getIdempotencyModel(connection);
   const Outbox = getOutboxModel(connection);
@@ -700,7 +744,6 @@ async function cancelAppointment({
             state: 'CANCELLED',
             refundStatus,
             cancellationId,
-            cancelledAt: now,
             updatedAt: now,
           },
           $push: { stateHistory: { state: 'CANCELLED', at: now, reasonCode } },
@@ -710,6 +753,7 @@ async function cancelAppointment({
       );
       if (!changed.modifiedCount)
         throw new ApiError(409, 'VERSION_CONFLICT', 'Appointment changed.');
+      await refreshPatientIntervals(connection, patientId, session);
       const response = responseForChange({
         ...appointment,
         state: 'CANCELLED',

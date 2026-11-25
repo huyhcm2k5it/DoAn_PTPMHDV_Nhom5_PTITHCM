@@ -42,7 +42,13 @@ export function useAppointmentPolling(
         setData(result);
         setLoading(false);
         const state = String(result.appointment?.state ?? result.state);
-        if (!TERMINAL_STATES.has(state)) {
+        const refund = String(
+          result.refundStatus ?? result.appointment?.refundStatus ?? '',
+        );
+        const awaitingRefund =
+          state === 'CANCELLED' &&
+          ['PENDING_SYNC', 'REQUESTED', 'FAILED'].includes(refund);
+        if (!TERMINAL_STATES.has(state) || awaitingRefund) {
           delay = intervalMs;
           schedule();
         }

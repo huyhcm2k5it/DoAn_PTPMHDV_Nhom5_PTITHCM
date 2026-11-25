@@ -4,8 +4,6 @@ function getScheduleModel(connection) {
     {
       id: { type: String, required: true },
       doctorId: { type: String, required: true },
-      doctorUserId: String,
-      departmentId: String,
       serviceId: { type: String, required: true },
       room: String,
       startAt: { type: Date, required: true },
@@ -53,13 +51,6 @@ function getHoldModel(connection) {
       idempotencyKey: { type: String, required: true },
       patientId: { type: String, required: true },
       slotId: { type: String, required: true },
-      doctorId: { type: String, required: true },
-      doctorUserId: String,
-      departmentId: String,
-      serviceId: { type: String, required: true },
-      scheduleId: { type: String, required: true },
-      slotStartAt: { type: Date, required: true },
-      slotEndAt: { type: Date, required: true },
       status: {
         type: String,
         required: true,
@@ -67,13 +58,11 @@ function getHoldModel(connection) {
       },
       expiresAt: { type: Date, required: true },
       createdAt: { type: Date, required: true },
-      releasedAt: Date,
       consumedAt: Date,
       priceSnapshot: {
         type: connection.base.Schema.Types.Mixed,
         default: null,
       },
-      version: { type: Number, default: 1 },
     },
     { collection: 'holds', versionKey: false, strict: 'throw' },
   );
@@ -89,20 +78,11 @@ function getAppointmentModel(connection) {
   const schema = new connection.base.Schema(
     {
       id: { type: String, required: true },
-      requestId: { type: String, required: true },
-      sourceRevision: { type: Number, required: true },
       holdId: { type: String, required: true },
       patientId: { type: String, required: true },
-      principalId: { type: String, required: true },
-      recipientUserId: String,
       slotId: { type: String, required: true },
-      scheduleId: { type: String, required: true },
       doctorId: { type: String, required: true },
-      doctorUserId: String,
-      departmentId: String,
       serviceId: { type: String, required: true },
-      startAt: { type: Date, required: true },
-      endAt: { type: Date, required: true },
       state: {
         type: String,
         required: true,
@@ -118,48 +98,24 @@ function getAppointmentModel(connection) {
           'COMPLETED',
         ],
       },
-      chargeSync: {
-        type: String,
-        required: true,
-        enum: ['PENDING', 'CREATED', 'REJECTED'],
-      },
       chargeId: String,
-      chargeStatus: String,
-      refundStatus: String,
-      cancellationId: String,
-      cancelledAt: Date,
-      priceSnapshot: {
-        type: connection.base.Schema.Types.Mixed,
-        default: null,
-      },
+      priceSnapshotVnd: connection.base.Schema.Types.BigInt,
+      priceVersion: String,
       slotHistory: { type: [connection.base.Schema.Types.Mixed], default: [] },
-      stateHistory: { type: [connection.base.Schema.Types.Mixed], default: [] },
-      paymentDueAt: Date,
+      expiresAt: Date,
       settlementId: String,
-      fence: Number,
-      fenceCounter: Number,
-      reserveAttemptVersion: Number,
       settlementState: {
         type: String,
         enum: ['NONE', 'PENDING', 'UNKNOWN', 'FAILED', 'SUCCEEDED'],
       },
       settlementVersion: Number,
-      paidEvidence: connection.base.Schema.Types.Mixed,
-      refundVersion: Number,
-      refundAsOf: Date,
-      visitId: String,
-      checkedInAt: Date,
-      checkedInBy: String,
-      noShowReason: String,
       version: { type: Number, default: 1 },
-      createdAt: { type: Date, required: true },
-      updatedAt: { type: Date, required: true },
     },
     { collection: 'appointments', versionKey: false, strict: 'throw' },
   );
   schema.index({ holdId: 1 }, { unique: true, name: 'uq_appointment_hold' });
   schema.index(
-    { patientId: 1, startAt: 1 },
+    { patientId: 1, slotId: 1, state: 1 },
     { name: 'ix_appointment_patient_start' },
   );
   return connection.model('Appointment', schema);
@@ -170,32 +126,19 @@ function getQueueTicketModel(connection) {
     {
       id: { type: String, required: true },
       appointmentId: { type: String, required: true },
-      patientId: { type: String, required: true },
-      doctorId: { type: String, required: true },
-      doctorUserId: String,
-      departmentId: String,
       ticketType: { type: String, required: true, enum: ['FIRST', 'RETURN'] },
       returnRound: { type: Number, required: true, min: 0 },
-      appointmentDate: { type: String, required: true },
       state: {
         type: String,
         required: true,
-        enum: ['WAITING', 'CALLED', 'CLAIMED', 'IN_SERVICE', 'NO_SHOW', 'DONE'],
+        enum: ['WAITING', 'CALLED', 'CLAIMED', 'NO_SHOW', 'DONE'],
       },
       claimId: String,
       visitId: String,
       version: { type: Number, required: true, min: 1 },
       calledAt: Date,
-      calledBy: String,
-      claimedAt: Date,
       claimedBy: String,
-      inServiceAt: Date,
-      completedAt: Date,
       noShowReason: String,
-      noShowAt: Date,
-      stateHistory: { type: [connection.base.Schema.Types.Mixed], default: [] },
-      createdAt: { type: Date, required: true },
-      updatedAt: { type: Date, required: true },
     },
     { collection: 'queue_tickets', versionKey: false, strict: 'throw' },
   );
@@ -208,7 +151,7 @@ function getQueueTicketModel(connection) {
     { unique: true, sparse: true, name: 'uq_queue_claim' },
   );
   schema.index(
-    { state: 1, ticketType: 1, doctorId: 1, createdAt: 1 },
+    { state: 1, ticketType: 1, appointmentId: 1, id: 1 },
     { name: 'ix_queue_today_state' },
   );
   return connection.model('QueueTicket', schema);
@@ -220,7 +163,21 @@ function getPatientTimeLockModel(connection) {
     {
       patientId: { type: String, required: true },
       version: { type: Number, default: 1 },
-      updatedAt: { type: Date, required: true },
+      intervals: {
+        type: [
+          new connection.base.Schema(
+            {
+              holdId: { type: String, required: true },
+              appointmentId: String,
+              startAt: { type: Date, required: true },
+              endAt: { type: Date, required: true },
+              state: { type: String, required: true },
+            },
+            { _id: false, strict: 'throw' },
+          ),
+        ],
+        default: [],
+      },
     },
     { collection: 'patient_time_locks', versionKey: false, strict: 'throw' },
   );
@@ -284,6 +241,8 @@ function getInboxModel(connection) {
       message_id: { type: String, required: true },
       consumer_name: { type: String, required: true },
       payload_hash: String,
+      message_type: String,
+      payload: connection.base.Schema.Types.Mixed,
       received_at: { type: Date, required: true },
     },
     { collection: 'inbox', versionKey: false, strict: 'throw' },

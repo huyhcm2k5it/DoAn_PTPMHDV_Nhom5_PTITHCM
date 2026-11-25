@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { PharmacyApi } from '../types';
 import { statusLabel } from '../status';
@@ -20,6 +20,18 @@ export function PrescriptionDetail({
   const intention = useRef<{ signature: string; key: string } | undefined>(
     undefined,
   );
+  const expiry =
+    data?.latestHoldState === 'HELD'
+      ? Date.parse(data.holds?.[0]?.expiresAt ?? '')
+      : NaN;
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    if (!Number.isFinite(expiry)) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [expiry]);
+  const remaining = Math.max(0, Math.ceil((expiry - now) / 1000));
   if (error) return <ErrorPanel error={error} onRetry={reload} />;
   if (!data) return <Loading label="Đang tải chi tiết toa thuốc" />;
   const hold = data.holds?.[0];
@@ -124,7 +136,11 @@ export function PrescriptionDetail({
               </div>
               <div>
                 <dt>Tiền thuốc</dt>
-                <dd>{hold.amountVnd.toLocaleString('vi-VN')} ₫</dd>
+                <dd>
+                  {typeof hold.amountVnd === 'number'
+                    ? hold.amountVnd.toLocaleString('vi-VN') + ' ₫'
+                    : 'Chưa có dữ liệu'}
+                </dd>
               </div>
               <div>
                 <dt>Hạn giữ theo máy chủ</dt>
@@ -140,6 +156,27 @@ export function PrescriptionDetail({
             <p className="state-card" role="status">
               Đang chờ xác nhận thanh toán từ quầy thu ngân. Thuốc chỉ được cấp
               khi máy chủ xác nhận sẵn sàng.
+            </p>
+          )}
+          {Number.isFinite(expiry) && (
+            <p className="state-card">
+              {remaining > 0 ? (
+                <>
+                  Còn giữ thuốc{' '}
+                  <strong>
+                    {Math.floor(remaining / 60)}:
+                    {String(remaining % 60).padStart(2, '0')}
+                  </strong>
+                </>
+              ) : (
+                'Đã đến hạn giữ thuốc. Đang chờ máy chủ cập nhật trạng thái.'
+              )}
+            </p>
+          )}
+          {data.latestHoldState === 'EXPIRED' && (
+            <p className="state-card" role="status">
+              Hệ thống đã xác nhận hết hạn giữ thuốc. Có thể kiểm tra tồn và giữ
+              lại toàn toa.
             </p>
           )}
           <div className="pharmacy-actions" aria-busy={busy}>

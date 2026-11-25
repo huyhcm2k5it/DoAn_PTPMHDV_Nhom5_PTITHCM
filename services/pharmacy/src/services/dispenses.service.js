@@ -1,3 +1,8 @@
+const {
+  loadMedicationHold,
+  replaceMedicationHold,
+  hydrateMedicationHold,
+} = require('./medication-hold.repository');
 const { randomUUID } = require('node:crypto');
 const { uuid, integer, mutate, outbox, failure } = require('./common');
 async function dispenseMedication(args) {
@@ -13,11 +18,19 @@ async function dispenseMedication(args) {
   return mutate(
     { ...args, now, route: 'PH-008:' + holdId, input: { expectedVersion } },
     async (session) => {
-      const hold = await connection
-        .collection('medication_holds')
-        .findOne({ id: holdId }, { session });
+      const hold = await loadMedicationHold(
+        connection,
+        { id: holdId },
+        { session },
+      );
       if (!hold) throw failure(404, 'NOT_FOUND', 'Hold not found.');
-      if (hold.status === 'DISPENSED')
+      const alreadyDispensed = await connection
+        .collection('dispenses')
+        .findOne(
+          { prescriptionId: hold.prescriptionId, revision: hold.revision },
+          { session },
+        );
+      if (hold.status === 'DISPENSED' || alreadyDispensed)
         throw failure(
           409,
           'ALREADY_DISPENSED',
@@ -89,7 +102,7 @@ async function dispenseMedication(args) {
       await connection.collection('medication_holds').updateOne(
         { id: holdId, version: expectedVersion },
         {
-          $set: { status: 'DISPENSED', dispensedAt: now },
+          $set: { status: 'COMMITTED' },
           $inc: { version: 1 },
         },
         { session },

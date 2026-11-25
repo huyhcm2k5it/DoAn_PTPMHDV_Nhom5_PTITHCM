@@ -10,7 +10,9 @@ class AccessOutboxTests(TestCase):
         user = User.objects.create(phone="0900090909",status="ACTIVE")
         event = publish_access(user)
         self.assertEqual(event["messageType"], "IdentityAccessChanged")
-        self.assertNotIn("phone", event["payload"])
+        self.assertEqual(event["payload"]["phone"], user.phone)
+        for field in ("password", "password_hash", "email", "otpCode", "code_hash"):
+            self.assertNotIn(field, event["payload"])
         self.assertEqual(IdentityOutbox.objects.count(), 1)
         try:
             with transaction.atomic():

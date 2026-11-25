@@ -32,6 +32,7 @@ class GatewayRoutes(unittest.TestCase):
             ("/api/v1/patients/4b03c44e-d62c-4ab0-b808-0e9b16dbd65a/published-results", "diagnostic_service", "GET"),
             ("/api/v1/results/4b03c44e-d62c-4ab0-b808-0e9b16dbd65a", "diagnostic_service", "PUT"),
             ("/api/v1/admin/appointments/summary", "appointment_service", "GET"),
+            ("/api/v1/schedules", "appointment_service", "GET"),
         ]:
             with self.subTest(path=path):
                 found = next((r for r in routes if matches(r["match"], path, method)), {})

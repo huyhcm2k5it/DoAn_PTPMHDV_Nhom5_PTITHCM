@@ -167,6 +167,8 @@ jobs:
           NODE
       - name: Reproduce Pharmacy OpenAPI contract
         run: node tools/quan/generate-pharmacy-contract.js --check
+      - name: Validate ERD field lists and validator snapshot
+        run: node tools/quan/check-erd-schema.js
       - name: Validate Pharmacy quorum receiver bindings
         run: node tools/quan/check-pharmacy-topology.js
       - name: Validate Compose structure without resolving local secrets

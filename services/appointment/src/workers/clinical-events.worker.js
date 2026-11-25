@@ -1,8 +1,13 @@
+const {
+  getAppointmentRepository,
+  getQueueTicketRepository,
+} = require('../services/appointment.repository');
 const { createHash, randomUUID } = require('node:crypto');
+const {
+  refreshPatientIntervals,
+} = require('../services/patient-time-lock.service');
 const { withMongoTransaction } = require('../../../../mongo/transaction.js');
 const {
-  getAppointmentModel,
-  getQueueTicketModel,
   getInboxModel,
   getOutboxModel,
 } = require('../models/appointment.model.js');
@@ -121,8 +126,8 @@ async function handleClaimQueueTicketCommand({
       );
     return existingRequest.response;
   }
-  const Appointment = getAppointmentModel(connection);
-  const QueueTicket = getQueueTicketModel(connection);
+  const Appointment = getAppointmentRepository(connection);
+  const QueueTicket = getQueueTicketRepository(connection);
   const Inbox = getInboxModel(connection);
   const Outbox = getOutboxModel(connection);
   try {
@@ -200,7 +205,6 @@ async function handleClaimQueueTicketCommand({
               state: 'CLAIMED',
               claimId,
               ...(visitId ? { visitId } : {}),
-              claimedAt: now,
               claimedBy: ticket.doctorUserId || null,
               updatedAt: now,
             },
@@ -238,6 +242,7 @@ async function handleClaimQueueTicketCommand({
             },
             { session },
           );
+          await refreshPatientIntervals(connection, ticket.patientId, session);
         }
         response = {
           requestId: payload.requestId,
@@ -326,8 +331,8 @@ async function handleClinicalMessage({
       );
     return { duplicate: true };
   }
-  const Appointment = getAppointmentModel(connection);
-  const QueueTicket = getQueueTicketModel(connection);
+  const Appointment = getAppointmentRepository(connection);
+  const QueueTicket = getQueueTicketRepository(connection);
   return withMongoTransaction(connection, async (session) => {
     await Inbox.create(
       [
@@ -391,7 +396,6 @@ async function handleClinicalMessage({
             state: 'CLAIMED',
             claimId: payload.claimId,
             visitId: payload.visitId || undefined,
-            claimedAt: now,
             claimedBy: ticket.doctorUserId || null,
             updatedAt: now,
           },
@@ -428,6 +432,7 @@ async function handleClinicalMessage({
         },
         { session },
       );
+      await refreshPatientIntervals(connection, ticket.patientId, session);
       return { duplicate: false, state: 'ACCEPTED', claimId: payload.claimId };
     }
     if (message.messageType === 'VisitSigned') {
@@ -463,6 +468,7 @@ async function handleClinicalMessage({
         },
         { session },
       );
+      await refreshPatientIntervals(connection, appointment.patientId, session);
       const completing = {
         appointmentId: appointment.id,
         state: { $in: ['CLAIMED', 'IN_SERVICE'] },
@@ -473,7 +479,7 @@ async function handleClinicalMessage({
       await QueueTicket.updateMany(
         completing,
         {
-          $set: { state: 'DONE', completedAt: now, updatedAt: now },
+          $set: { state: 'DONE', visitId: payload.visitId, updatedAt: now },
           $push: { stateHistory: { state: 'DONE', at: now } },
           $inc: { version: 1 },
         },

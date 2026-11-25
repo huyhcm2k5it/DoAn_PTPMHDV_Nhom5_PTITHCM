@@ -96,7 +96,7 @@ test('owner slot and queue lookups use their business indexes', async () => {
     .find({ state: 'WAITING', ticketType: 'FIRST', doctorId: row.doctorId })
     .sort({ createdAt: 1 })
     .explain('queryPlanner');
-  assert.match(JSON.stringify(queue.queryPlanner.winningPlan), /ix_queue_today_state/);
+  assert.match(JSON.stringify(queue.queryPlanner.winningPlan), /ix_queue_state_appointment/);
 });
 
 const { checkInAppointment } = require('../../services/appointment/src/services/queue.service');
@@ -143,6 +143,7 @@ test('check-in commits the trusted Clinical ticket event atomically', async () =
     state: 'CONFIRMED',
     chargeStatus: 'PAID',
     startAt: now,
+    endAt: new Date(+now + 30 * 60 * 1000),
     version: 1,
   });
   const result = await checkInAppointment({
@@ -192,7 +193,12 @@ test('FIRST and RETURN claims persist the assigned Identity user instead of the 
     await handleClaimQueueTicketCommand({ connection: h.connection, message });
     const saved = await tickets.findOne({ id: row.id });
     assert.equal(saved.claimedBy, row.doctorUserId);
-    assert.equal(saved.stateHistory.at(-1).by, row.doctorUserId);
-    assert.equal(saved.stateHistory.length, 1);
+    assert.equal(saved.stateHistory, undefined);
+    const event = await h.connection.collection('outbox').findOne({
+      aggregate_id: row.id,
+      message_type: 'QueueTicketChanged',
+      'payload.state': 'CLAIMED',
+    });
+    assert.equal(event.payload.doctorUserId, row.doctorUserId);
   }
 });

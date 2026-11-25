@@ -10,19 +10,19 @@ export function createPharmacyApi(
   async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const method = init?.method || 'GET';
     const action = path.startsWith('/stock/receipts')
-      ? 'PH002'
+      ? 'PH-002'
       : path.startsWith('/prescriptions/queue')
-        ? 'PH003'
+        ? 'PH-003'
         : path.startsWith('/prescriptions/')
           ? method === 'POST'
-            ? 'PH005'
-            : 'PH004'
+            ? 'PH-005'
+            : 'PH-004'
           : path.includes('/dispense')
-            ? 'PH008'
+            ? 'PH-008'
             : path.includes('/commit')
-              ? 'PH007'
+              ? 'PH-007'
               : path.startsWith('/holds/')
-                ? 'PH006'
+                ? 'PH-006'
                 : undefined;
     const headers = new Headers(init?.headers);
     if (action) {

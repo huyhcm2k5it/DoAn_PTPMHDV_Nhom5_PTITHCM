@@ -24,7 +24,7 @@ def publish_access(user, bump=True):
         "causationId":str(uuid.uuid4()),"requestId":str(uuid.uuid4()),"occurredAt":timezone.now().isoformat(),
         "payload":{"userId":str(current.id),"status":wire_status(current),"actorType":current.actor_type,
                    "capabilities":capabilities,"tokenVersion":current.token_version,
-                   "phoneVerified":current.phone_verified_at is not None,"version":current.access_version},
+                   "phoneVerified":current.phone_verified_at is not None,"version":current.access_version,"phone":current.phone},
     }
     IdentityOutbox.objects.get_or_create(aggregate_id=current.id,version=current.access_version,defaults={"envelope":event})
     user.access_version = current.access_version
@@ -32,11 +32,11 @@ def publish_access(user, bump=True):
 
 
 def export_snapshot():
-    """Owner-only CLI bootstrap: no password, OTP or phone leaves Identity."""
+    """Owner-only CLI bootstrap: no password or OTP leaves Identity; phone supports Patient owner resolution."""
     rows=[]
     for user in User.objects.order_by("id"):
         rows.append({"userId":str(user.id),"status":wire_status(user),"actorType":user.actor_type,
                      "capabilities":list(user.capabilities.filter(enabled=True).values_list("capability",flat=True)),
                      "tokenVersion":user.token_version,"phoneVerified":user.phone_verified_at is not None,
-                     "version":user.access_version})
+                     "version":user.access_version,"phone":user.phone})
     return rows

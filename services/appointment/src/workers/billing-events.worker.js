@@ -1,7 +1,14 @@
+const { isForeignBillingEvent } = require('../../../../mongo/billing-scope');
+const {
+  getAppointmentRepository,
+} = require('../services/appointment.repository');
 const { createHash, randomUUID } = require('node:crypto');
+const {
+  refreshPatientIntervals,
+} = require('../services/patient-time-lock.service');
 const { withMongoTransaction } = require('../../../../mongo/transaction.js');
 const {
-  getAppointmentModel,
+  getHoldModel,
   getSlotModel,
   getInboxModel,
   getSettlementDecisionModel,
@@ -80,7 +87,7 @@ async function handleReserveSettlementCommand({
     return await withMongoTransaction(connection, async (session) => {
       const prior = await replay(session);
       if (prior) return prior;
-      const Appointment = getAppointmentModel(connection);
+      const Appointment = getAppointmentRepository(connection);
       const a = await Appointment.findOne({ id: p.sourceId })
         .session(session)
         .lean();
@@ -95,6 +102,18 @@ async function handleReserveSettlementCommand({
         .lean();
       const locked =
         a?.state === 'SETTLEMENT_LOCKED' && a.settlementId === p.settlementId;
+      const expiresAt = a?.expiresAt ?? a?.paymentDueAt;
+      const acceptedSnapshot =
+        a?.priceSnapshot ??
+        (a
+          ? (
+              await getHoldModel(connection)
+                .findOne({ id: a.holdId })
+                .select('priceSnapshot')
+                .session(session)
+                .lean()
+            )?.priceSnapshot
+          : undefined);
       let reasonCode;
       if (
         !a ||
@@ -105,9 +124,7 @@ async function handleReserveSettlementCommand({
       else if (
         failed ||
         (!locked &&
-          (a.state !== 'PENDING_PAYMENT' ||
-            !a.paymentDueAt ||
-            a.paymentDueAt <= now))
+          (a.state !== 'PENDING_PAYMENT' || !expiresAt || expiresAt <= now))
       )
         reasonCode = 'SOURCE_EXPIRED_OR_CLOSED';
       else if (!a.chargeId && a.chargeSync === 'PENDING')
@@ -118,7 +135,8 @@ async function handleReserveSettlementCommand({
         );
       else if (
         p.chargeId !== a.chargeId ||
-        p.amountHash !== a.priceSnapshot?.snapshotHash ||
+        !acceptedSnapshot?.snapshotHash ||
+        p.amountHash !== acceptedSnapshot.snapshotHash ||
         !Number.isSafeInteger(p.attemptVersion) ||
         p.attemptVersion !==
           (locked
@@ -153,6 +171,7 @@ async function handleReserveSettlementCommand({
         );
         if (!changed.modifiedCount)
           throw new ApiError(409, 'VERSION_CONFLICT', 'Appointment changed.');
+        await refreshPatientIntervals(connection, a.patientId, session);
       }
       const responseId = randomUUID();
       await getOutboxModel(connection).create(
@@ -178,7 +197,7 @@ async function handleReserveSettlementCommand({
               ...(reasonCode
                 ? {}
                 : {
-                    amountHash: a.priceSnapshot.snapshotHash,
+                    amountHash: acceptedSnapshot.snapshotHash,
                     lockedAt: now.toISOString(),
                   }),
             },
@@ -189,6 +208,8 @@ async function handleReserveSettlementCommand({
       await results.insertOne(
         {
           command_id: message.messageId,
+          command_type: message.messageType,
+          request: p,
           request_id: intent,
           request_hash: hash,
           response,
@@ -219,7 +240,7 @@ async function handleBillingMessage({
       'INVALID_MESSAGE',
       'Billing message is incomplete.',
     );
-  const Appointment = getAppointmentModel(connection);
+  const Appointment = getAppointmentRepository(connection);
   const Inbox = getInboxModel(connection);
   const Decision = getSettlementDecisionModel(connection);
   const identity = {
@@ -241,17 +262,32 @@ async function handleBillingMessage({
   if (await alreadyProcessed()) return { duplicate: true };
   const processMessage = () =>
     withMongoTransaction(connection, async (session) => {
-      await Inbox.create(
-        [
-          {
-            ...identity,
-            payload_hash: fingerprint,
-            received_at: now,
-          },
-        ],
-        { session },
-      );
+      const saveDelivery = () =>
+        Inbox.create(
+          [
+            {
+              ...identity,
+              payload_hash: fingerprint,
+              message_type: message.messageType,
+              payload: message.payload,
+              received_at: now,
+            },
+          ],
+          { session },
+        );
       const payload = message.payload;
+      if (
+        await isForeignBillingEvent(
+          connection,
+          message,
+          ['APPOINTMENT'],
+          'appointments',
+          session,
+        )
+      ) {
+        await saveDelivery();
+        return { ignored: true, reason: 'OTHER_SOURCE_OWNER' };
+      }
       if (message.messageType === 'BillingStatusChanged') {
         if (
           message.producer !== 'billing' ||
@@ -276,18 +312,24 @@ async function handleBillingMessage({
           );
         if (payload.sourceId && payload.sourceId !== appointment.id)
           throw new ApiError(409, 'SOURCE_MISMATCH', 'Billing source differs.');
-        if ((appointment.billingStatusVersion || 0) < payload.version)
-          await connection.collection('appointments').updateOne(
+        const refundVersion = Math.max(
+          appointment.refundVersion ?? 0,
+          appointment.billingStatusVersion ?? 0,
+        );
+        if (refundVersion < payload.version) {
+          await Appointment.updateOne(
             { id: appointment.id },
             {
               $set: {
-                billingStatusVersion: payload.version,
-                refundStatus: payload.refundStatus || appointment.refundStatus,
-                billingAsOf: payload.asOf || now.toISOString(),
+                refundVersion: payload.version,
+                ...(payload.refundStatus
+                  ? { refundStatus: payload.refundStatus }
+                  : {}),
               },
             },
             { session },
           );
+        }
       } else if (message.messageType === 'ChargePrepared') {
         const appointment = await Appointment.findOne({ id: payload.sourceId })
           .session(session)
@@ -300,7 +342,7 @@ async function handleBillingMessage({
               $set: {
                 chargeSync: 'CREATED',
                 chargeId: payload.chargeId,
-                chargeStatus: 'OPEN',
+                chargeStatus: appointment.state === 'EXPIRED' ? 'VOID' : 'OPEN',
               },
               $inc: { version: 1 },
             },
@@ -463,6 +505,12 @@ async function handleBillingMessage({
             },
             { session },
           );
+          if (failed)
+            await refreshPatientIntervals(
+              connection,
+              appointment.patientId,
+              session,
+            );
         }
       } else if (message.messageType === 'ChargePaid') {
         const appointment = await Appointment.findOne({ id: payload.sourceId })
@@ -486,10 +534,11 @@ async function handleBillingMessage({
             'INVALID_MESSAGE',
             'Payment fence must be a positive integer.',
           );
+        const acceptedAmount =
+          appointment.priceSnapshotVnd ?? appointment.priceSnapshot?.amountVnd;
         if (
-          appointment.priceSnapshot?.amountVnd != null &&
-          Number(appointment.priceSnapshot.amountVnd) !==
-            Number(payload.amountVnd)
+          acceptedAmount != null &&
+          Number(acceptedAmount) !== Number(payload.amountVnd)
         )
           throw new ApiError(
             409,
@@ -516,7 +565,10 @@ async function handleBillingMessage({
           },
           { session },
         );
-        if (!changed.modifiedCount) return { duplicate: false };
+        if (!changed.modifiedCount) {
+          await saveDelivery();
+          return { duplicate: false };
+        }
         const Slot = getSlotModel(connection);
         const slotChanged = await Slot.updateOne(
           { id: appointment.slotId, heldCount: { $gt: 0 } },
@@ -529,12 +581,60 @@ async function handleBillingMessage({
             'CAPACITY_INVARIANT_BROKEN',
             'Slot counters cannot confirm the appointment.',
           );
+        const recipientUserId =
+          appointment.recipientUserId ??
+          (
+            await connection
+              .collection('patient_access_projection')
+              .findOne(
+                { patientId: appointment.patientId, active: true },
+                { session },
+              )
+          )?.ownerUserId;
+        if (!recipientUserId)
+          throw new ApiError(
+            503,
+            'AUTH_PROJECTION_UNAVAILABLE',
+            'Cannot route appointment confirmation.',
+          );
+        const version = appointment.version + 1;
+        await refreshPatientIntervals(
+          connection,
+          appointment.patientId,
+          session,
+        );
+        await getOutboxModel(connection).create(
+          [
+            {
+              message_id: randomUUID(),
+              message_kind: 'EVENT',
+              message_type: 'AppointmentChanged',
+              schema_version: 1,
+              producer: 'appointment',
+              aggregate_id: appointment.id,
+              aggregate_version: version,
+              correlation_id: message.correlationId || appointment.requestId,
+              request_id: appointment.requestId,
+              causation_id: message.messageId,
+              occurred_at: now,
+              payload: {
+                appointmentId: appointment.id,
+                patientId: appointment.patientId,
+                recipientUserId,
+                changeType: 'CONFIRMED',
+                version,
+              },
+            },
+          ],
+          { session },
+        );
       } else
         throw new ApiError(
           400,
           'INVALID_MESSAGE',
           'Unsupported Billing message.',
         );
+      await saveDelivery();
       return { duplicate: false };
     });
   try {

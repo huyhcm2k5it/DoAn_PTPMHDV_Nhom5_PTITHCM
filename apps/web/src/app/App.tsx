@@ -53,6 +53,8 @@ import { DiagnosticFeature } from '../features/diagnostic/DiagnosticFeature';
 import type { DiagnosticApi } from '../features/diagnostic/types';
 import { createPharmacyApi } from '../features/pharmacy/api';
 import type { PharmacyApi } from '../features/pharmacy/types';
+import { createBillingApi } from '../features/billing/api';
+import type { BillingApi } from '../features/billing/types';
 import { StockPage } from '../features/pharmacy/pages/StockPage';
 import { PrescriptionQueue } from '../features/pharmacy/pages/PrescriptionQueue';
 import { PrescriptionDetail } from '../features/pharmacy/pages/PrescriptionDetail';
@@ -595,6 +597,8 @@ function AppRoutes({
   clinicalApi,
   diagnosticApi,
   pharmacyApi,
+  billingApi,
+  transport,
   session,
 }: {
   patientApi: PatientApi;
@@ -603,6 +607,8 @@ function AppRoutes({
   clinicalApi: ClinicalApi;
   diagnosticApi: DiagnosticApi;
   pharmacyApi: PharmacyApi;
+  billingApi: BillingApi;
+  transport: WebRuntime['transport'];
   session?: WebRuntime['session'];
 }) {
   return (
@@ -663,7 +669,9 @@ function AppRoutes({
         />
         <Route
           path="/patient/appointments/review"
-          element={<BookingReview api={appointmentApi} />}
+          element={
+            <BookingReview api={appointmentApi} billingApi={billingApi} />
+          }
         />
         <Route
           path="/patient/appointments"
@@ -694,7 +702,13 @@ function AppRoutes({
         />
         <Route
           path="/staff/summary"
-          element={<AdminSummary api={appointmentApi} />}
+          element={
+            <AdminSummary
+              api={appointmentApi}
+              catalog={catalogApi}
+              transport={transport}
+            />
+          }
         />
         <Route
           path="/staff/cashier"
@@ -810,7 +824,16 @@ function AppRoutes({
         />
         <Route
           path="/patient/appointments/:appointmentId"
-          element={<AppointmentDetail api={appointmentApi} />}
+          element={
+            <AppointmentDetail
+              api={appointmentApi}
+              records={
+                session?.actorType === 'PATIENT'
+                  ? { clinical: clinicalApi, diagnostic: diagnosticApi }
+                  : undefined
+              }
+            />
+          }
         />
         <Route
           path="/patient/appointments/:appointmentId/reschedule"
@@ -899,6 +922,10 @@ export function App({ runtime: propRuntime }: { runtime?: WebRuntime } = {}) {
       }),
     [apiTransport, runtime?.session?.lease],
   );
+  const billingApi = useMemo(
+    () => createBillingApi(apiTransport, runtime?.session?.lease),
+    [apiTransport, runtime?.session?.lease],
+  );
   return (
     <BrowserRouter>
       <AppRoutes
@@ -909,6 +936,8 @@ export function App({ runtime: propRuntime }: { runtime?: WebRuntime } = {}) {
         clinicalApi={clinicalApi}
         diagnosticApi={diagnosticApi}
         pharmacyApi={pharmacyApi}
+        billingApi={billingApi}
+        transport={apiTransport}
         session={runtime?.session}
       />
     </BrowserRouter>

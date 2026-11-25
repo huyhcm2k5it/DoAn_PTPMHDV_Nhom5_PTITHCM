@@ -3,6 +3,7 @@ import hashlib
 import json
 import uuid
 from django.utils import timezone
+from django.db import connection
 
 FIELDS = {"messageId", "messageKind", "messageType", "schemaVersion", "producer", "aggregateId", "aggregateVersion", "correlationId", "causationId", "requestId", "occurredAt", "payload"}
 OWNERS = {"APPOINTMENT": "appointment", "LAB_ORDER": "diagnostic", "MED_HOLD": "pharmacy"}
@@ -11,6 +12,16 @@ MAX_SAFE_INTEGER = 9007199254740991
 
 def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+
+
+def lock_source(source_type, source_id):
+    # Both producers of charge state use this transaction-scoped lock, even
+    # when the ChargeSource row has not yet been created.
+    if connection.vendor == "postgresql":
+        key = int.from_bytes(hashlib.sha256(
+            f"{source_type}:{source_id}".encode()).digest()[:8], "big", signed=True)
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_advisory_xact_lock(%s)", [key])
 
 
 def positive_int(value, minimum=1):

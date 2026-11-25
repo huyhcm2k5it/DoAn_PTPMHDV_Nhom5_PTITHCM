@@ -6,7 +6,7 @@ from django.db import OperationalError
 from django.utils import timezone
 from app.worker.consumer import route_event
 from app.api.authz import authenticate, AuthError
-from app.domain.models import MessageInbox, Notification
+from app.domain.models import MessageInbox, Notification, IdentityAccessProjection
 
 ROUTE = 'identity.identity-access-changed.v1'
 
@@ -45,6 +45,11 @@ class IdentityAccessTests(TestCase):
             route_event(ROUTE, changed)
         self.assertEqual(MessageInbox.objects.count(), 1)
 
+    def test_optional_phone_is_accepted_without_changing_projection(self):
+        event = self.event(phone='0900000917')
+        route_event(ROUTE, event)
+        self.assertTrue(IdentityAccessProjection.objects.filter(user_id=event['aggregateId']).exists())
+
     def test_untrusted_or_invalid_identity_event_has_no_effect(self):
         mutations = [('producer', 'billing'), ('aggregateId', str(uuid.uuid4())),
                      ('aggregateVersion', True), ('messageId', 123)]
@@ -54,7 +59,7 @@ class IdentityAccessTests(TestCase):
             with self.assertRaises(ValueError):
                 route_event(ROUTE, event)
         for key, value in [('tokenVersion', True), ('status', 'UNKNOWN'), ('version', 0),
-                           ('phoneVerified', 'true'), ('capabilities', [1]), ('userId', 123)]:
+                           ('phone', 123), ('phoneVerified', 'true'), ('capabilities', [1]), ('userId', 123)]:
             event = self.event()
             event['payload'][key] = value
             with self.assertRaises(ValueError):
