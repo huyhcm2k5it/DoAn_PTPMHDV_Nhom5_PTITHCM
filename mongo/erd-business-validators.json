@@ -1,0 +1,772 @@
+{
+  "source": "docs/HQH_Care_ERD_9_Service_v5_20261017.md",
+  "sourceSHA256": "11a2fef2ad359903194fd4e4f586b09a7efd027f3b4b8914653792587251585c",
+  "validators": {
+    "patients": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "ownerUserId",
+          "relation",
+          "fullName",
+          "birthDate",
+          "version",
+          "createdAt",
+          "updatedAt",
+          "active",
+          "policyVersion"
+        ],
+        "properties": {
+          "_id": {},
+          "id": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "ownerUserId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "relation": {
+            "bsonType": "string",
+            "enum": ["SELF", "OTHER"]
+          },
+          "fullName": {
+            "bsonType": "string"
+          },
+          "birthDate": {
+            "bsonType": "date"
+          },
+          "sex": {
+            "bsonType": ["string", "null"],
+            "enum": ["MALE", "FEMALE", "OTHER", "UNKNOWN", null]
+          },
+          "bhytSelfDeclared": {
+            "bsonType": ["string", "null"]
+          },
+          "version": {
+            "bsonType": ["int", "long"],
+            "minimum": 1
+          },
+          "contactPhone": {
+            "bsonType": ["string", "null"]
+          },
+          "address": {
+            "bsonType": ["string", "null"]
+          },
+          "createdAt": {
+            "bsonType": "date"
+          },
+          "updatedAt": {
+            "bsonType": "date"
+          },
+          "active": {
+            "bsonType": "bool"
+          },
+          "policyVersion": {
+            "bsonType": ["int", "long"],
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "profile_audit": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "additionalProperties": false,
+        "required": ["id", "patientId", "actorUserId", "action", "changedFields", "at"],
+        "properties": {
+          "_id": {},
+          "id": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "patientId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "actorUserId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "action": {
+            "bsonType": "string"
+          },
+          "changedFields": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "string"
+            }
+          },
+          "at": {
+            "bsonType": "date"
+          }
+        }
+      }
+    },
+    "schedules": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "doctorId",
+          "serviceId",
+          "room",
+          "startAt",
+          "endAt",
+          "capacityPerSlot",
+          "status",
+          "version",
+          "slotMinutes"
+        ],
+        "properties": {
+          "_id": {},
+          "id": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "doctorId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "serviceId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "room": {
+            "bsonType": "string"
+          },
+          "startAt": {
+            "bsonType": "date"
+          },
+          "endAt": {
+            "bsonType": "date"
+          },
+          "capacityPerSlot": {
+            "bsonType": ["int", "long"],
+            "minimum": 1
+          },
+          "status": {
+            "bsonType": "string",
+            "enum": ["OPEN", "CLOSED"]
+          },
+          "version": {
+            "bsonType": ["int", "long"],
+            "minimum": 1
+          },
+          "slotMinutes": {
+            "bsonType": ["int", "long"],
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "slots": {
+      "$and": [
+        {
+          "$jsonSchema": {
+            "bsonType": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "scheduleId",
+              "startAt",
+              "endAt",
+              "capacity",
+              "heldCount",
+              "confirmedCount",
+              "version"
+            ],
+            "properties": {
+              "_id": {},
+              "id": {
+                "bsonType": "string",
+                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+              },
+              "scheduleId": {
+                "bsonType": "string",
+                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+              },
+              "startAt": {
+                "bsonType": "date"
+              },
+              "endAt": {
+                "bsonType": "date"
+              },
+              "capacity": {
+                "bsonType": ["int", "long"],
+                "minimum": 1
+              },
+              "heldCount": {
+                "bsonType": ["int", "long"],
+                "minimum": 0
+              },
+              "confirmedCount": {
+                "bsonType": ["int", "long"],
+                "minimum": 0
+              },
+              "version": {
+                "bsonType": ["int", "long"],
+                "minimum": 1
+              }
+            }
+          }
+        },
+        {
+          "$expr": {
+            "$lte": [
+              {
+                "$add": ["$heldCount", "$confirmedCount"]
+              },
+              "$capacity"
+            ]
+          }
+        }
+      ]
+    },
+    "holds": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "slotId",
+          "patientId",
+          "status",
+          "expiresAt",
+          "principalId",
+          "idempotencyKey",
+          "createdAt",
+          "priceSnapshot"
+        ],
+        "properties": {
+          "_id": {},
+          "id": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "slotId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "patientId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "status": {
+            "bsonType": "string",
+            "enum": ["HELD", "CONSUMED", "RELEASED", "EXPIRED"]
+          },
+          "expiresAt": {
+            "bsonType": "date"
+          },
+          "principalId": {
+            "bsonType": "string"
+          },
+          "idempotencyKey": {
+            "bsonType": "string"
+          },
+          "createdAt": {
+            "bsonType": "date"
+          },
+          "priceSnapshot": {
+            "bsonType": "object"
+          },
+          "consumedAt": {
+            "bsonType": ["date", "null"]
+          }
+        }
+      }
+    },
+    "appointments": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "holdId",
+          "patientId",
+          "slotId",
+          "serviceId",
+          "doctorId",
+          "priceSnapshotVnd",
+          "state",
+          "version",
+          "slotHistory",
+          "expiresAt",
+          "priceVersion",
+          "settlementState",
+          "settlementVersion"
+        ],
+        "properties": {
+          "_id": {},
+          "id": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "holdId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "patientId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "slotId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "serviceId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "doctorId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "priceSnapshotVnd": {
+            "bsonType": "long",
+            "minimum": 0
+          },
+          "state": {
+            "bsonType": "string",
+            "enum": [
+              "PENDING_PAYMENT",
+              "SETTLEMENT_LOCKED",
+              "CONFIRMED",
+              "CHECKED_IN",
+              "IN_SERVICE",
+              "EXPIRED",
+              "CANCELLED",
+              "NO_SHOW",
+              "COMPLETED"
+            ]
+          },
+          "version": {
+            "bsonType": ["int", "long"],
+            "minimum": 1
+          },
+          "slotHistory": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "object"
+            }
+          },
+          "chargeId": {
+            "bsonType": ["string", "null"],
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "expiresAt": {
+            "bsonType": "date"
+          },
+          "priceVersion": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "settlementId": {
+            "bsonType": ["string", "null"],
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "settlementState": {
+            "bsonType": "string",
+            "enum": ["NONE", "PENDING", "UNKNOWN", "FAILED", "SUCCEEDED"]
+          },
+          "settlementVersion": {
+            "bsonType": ["int", "long"],
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "queue_tickets": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "additionalProperties": false,
+        "required": ["id", "appointmentId", "ticketType", "returnRound", "state", "version"],
+        "properties": {
+          "_id": {},
+          "id": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "appointmentId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "ticketType": {
+            "bsonType": "string",
+            "enum": ["FIRST", "RETURN"]
+          },
+          "visitId": {
+            "bsonType": ["string", "null"],
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "returnRound": {
+            "bsonType": ["int", "long"],
+            "enum": [0, 1]
+          },
+          "state": {
+            "bsonType": "string",
+            "enum": ["WAITING", "CALLED", "CLAIMED", "NO_SHOW", "DONE"]
+          },
+          "calledAt": {
+            "bsonType": ["date", "null"]
+          },
+          "claimId": {
+            "bsonType": ["string", "null"],
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "claimedBy": {
+            "bsonType": ["string", "null"],
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "noShowReason": {
+            "bsonType": ["string", "null"]
+          },
+          "version": {
+            "bsonType": ["int", "long"],
+            "minimum": 1
+          }
+        },
+        "oneOf": [
+          {
+            "properties": {
+              "ticketType": {
+                "enum": ["FIRST"]
+              },
+              "returnRound": {
+                "enum": [0]
+              }
+            }
+          },
+          {
+            "properties": {
+              "ticketType": {
+                "enum": ["RETURN"]
+              },
+              "returnRound": {
+                "enum": [1]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "patient_time_locks": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "additionalProperties": false,
+        "required": ["patientId", "intervals", "version"],
+        "properties": {
+          "_id": {},
+          "patientId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "intervals": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "object",
+              "additionalProperties": false,
+              "required": ["holdId", "startAt", "endAt", "state"],
+              "properties": {
+                "holdId": {
+                  "bsonType": "string",
+                  "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+                },
+                "appointmentId": {
+                  "bsonType": "string",
+                  "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+                },
+                "startAt": {
+                  "bsonType": "date"
+                },
+                "endAt": {
+                  "bsonType": "date"
+                },
+                "state": {
+                  "bsonType": "string"
+                }
+              }
+            }
+          },
+          "version": {
+            "bsonType": ["int", "long"],
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "inventory": {
+      "$and": [
+        {
+          "$jsonSchema": {
+            "bsonType": "object",
+            "additionalProperties": false,
+            "required": ["id", "medicineId", "onHand", "reserved", "version", "updatedAt"],
+            "properties": {
+              "_id": {},
+              "id": {
+                "bsonType": "string",
+                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+              },
+              "medicineId": {
+                "bsonType": "string",
+                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+              },
+              "onHand": {
+                "bsonType": ["int", "long"],
+                "minimum": 0
+              },
+              "reserved": {
+                "bsonType": ["int", "long"],
+                "minimum": 0
+              },
+              "version": {
+                "bsonType": ["int", "long"],
+                "minimum": 1
+              },
+              "updatedAt": {
+                "bsonType": "date"
+              }
+            }
+          }
+        },
+        {
+          "$expr": {
+            "$lte": ["$reserved", "$onHand"]
+          }
+        }
+      ]
+    },
+    "stock_receipts": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "additionalProperties": false,
+        "required": ["id", "receiptKey", "actorUserId", "items", "receivedAt"],
+        "properties": {
+          "_id": {},
+          "id": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "receiptKey": {
+            "bsonType": "string"
+          },
+          "actorUserId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "items": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "object",
+              "additionalProperties": false,
+              "required": ["medicineId", "quantity"],
+              "properties": {
+                "medicineId": {
+                  "bsonType": "string",
+                  "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+                },
+                "quantity": {
+                  "bsonType": ["int", "long"],
+                  "minimum": 1
+                },
+                "batchRef": {
+                  "bsonType": ["string", "null"]
+                }
+              }
+            }
+          },
+          "receivedAt": {
+            "bsonType": "date"
+          }
+        }
+      }
+    },
+    "prescription_projection": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "prescriptionId",
+          "revision",
+          "visitId",
+          "linesSnapshot",
+          "sourceEventId",
+          "patientId"
+        ],
+        "properties": {
+          "_id": {},
+          "id": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "prescriptionId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "revision": {
+            "bsonType": ["int", "long"],
+            "minimum": 1
+          },
+          "visitId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "linesSnapshot": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "object"
+            }
+          },
+          "sourceEventId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "patientId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          }
+        }
+      }
+    },
+    "medication_holds": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "prescriptionId",
+          "revision",
+          "attemptNo",
+          "status",
+          "itemsSnapshot",
+          "expiresAt",
+          "version",
+          "attemptHistory",
+          "patientId",
+          "settlementState",
+          "settlementVersion"
+        ],
+        "properties": {
+          "_id": {},
+          "id": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "prescriptionId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "revision": {
+            "bsonType": ["int", "long"],
+            "minimum": 1
+          },
+          "attemptNo": {
+            "bsonType": ["int", "long"],
+            "minimum": 1
+          },
+          "status": {
+            "bsonType": "string",
+            "enum": ["HELD", "SETTLEMENT_LOCKED", "COMMITTED", "RELEASED", "EXPIRED"]
+          },
+          "itemsSnapshot": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "object"
+            }
+          },
+          "expiresAt": {
+            "bsonType": "date"
+          },
+          "chargeId": {
+            "bsonType": ["string", "null"],
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "version": {
+            "bsonType": ["int", "long"],
+            "minimum": 1
+          },
+          "attemptHistory": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "object"
+            }
+          },
+          "patientId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "settlementId": {
+            "bsonType": ["string", "null"],
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "settlementState": {
+            "bsonType": "string",
+            "enum": ["NONE", "PENDING", "UNKNOWN", "FAILED", "SUCCEEDED"]
+          },
+          "settlementVersion": {
+            "bsonType": ["int", "long"],
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "dispenses": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "holdId",
+          "prescriptionId",
+          "revision",
+          "actorUserId",
+          "itemsSnapshot",
+          "dispensedAt",
+          "attemptNo"
+        ],
+        "properties": {
+          "_id": {},
+          "id": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "holdId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "prescriptionId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "revision": {
+            "bsonType": ["int", "long"],
+            "minimum": 1
+          },
+          "actorUserId": {
+            "bsonType": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$"
+          },
+          "itemsSnapshot": {
+            "bsonType": "array",
+            "items": {
+              "bsonType": "object"
+            }
+          },
+          "dispensedAt": {
+            "bsonType": "date"
+          },
+          "attemptNo": {
+            "bsonType": ["int", "long"],
+            "minimum": 1
+          }
+        }
+      }
+    }
+  }
+}

@@ -16,7 +16,26 @@ const now = new Date('2026-11-21T01:00:00Z');
 const doctorId = randomUUID();
 const serviceId = randomUUID();
 
-function create(fields = {}) {
+async function create(fields = {}) {
+  const id = fields.doctorId || doctorId;
+  await h.connection.collection('catalog_projection').updateOne(
+    { entityKey: 'DOCTOR:' + id },
+    {
+      $setOnInsert: {
+        entityType: 'DOCTOR',
+        entityId: id,
+        active: true,
+        entityVersion: 1,
+        fullSnapshot: {
+          id,
+          identityUserId: fields.doctorUserId || randomUUID(),
+          departmentId: fields.departmentId || randomUUID(),
+          status: 'ACTIVE',
+        },
+      },
+    },
+    { upsert: true },
+  );
   return createSchedule({
     connection: h.connection,
     authContext,
@@ -345,4 +364,61 @@ test('schedule HTTP writes validate the schema and replay the original intent', 
   assert.equal(changed.status, 409);
   assert.equal(changed.body.error.code, 'IDEMPOTENCY_KEY_REUSED');
   assert.equal((await h.connection.collection('schedules').findOne({ id })).version, 2);
+});
+
+test('ERD schedule fields book using Catalog mapping without storing Identity mapping on schedules', async () => {
+  const created = await create();
+  const stored = await h.connection.collection('schedules').findOne({ id: created.schedule.id });
+  assert.deepEqual(
+    Object.keys(stored)
+      .filter((key) => key !== '_id')
+      .sort(),
+    [
+      'id',
+      'doctorId',
+      'serviceId',
+      'room',
+      'startAt',
+      'endAt',
+      'capacityPerSlot',
+      'status',
+      'version',
+      'slotMinutes',
+    ].sort(),
+  );
+  const { getScheduleModel } = require('../../services/appointment/src/models/appointment.model');
+  await assert.rejects(
+    getScheduleModel(h.connection).updateOne(
+      { id: stored.id },
+      { $set: { doctorUserId: randomUUID() } },
+    ),
+    /strict|schema/i,
+  );
+  const options = {
+    connection: h.connection,
+    patientId: randomUUID(),
+    principalId: randomUUID(),
+    slotId: created.slots[0].id,
+    idempotencyKey: randomUUID(),
+    now,
+    resolvePriceSnapshot: async () => ({
+      amountVnd: 100000,
+      snapshotHash: 'catalog-mapping',
+      priceVersionId: randomUUID(),
+    }),
+  };
+  const projection = h.connection.collection('catalog_projection');
+  await projection.updateOne({ entityId: stored.doctorId }, { $set: { active: false } });
+  await assert.rejects(
+    createHold(options),
+    (error) => error.code === 'CLINICAL_MAPPING_UNAVAILABLE',
+  );
+  assert.equal(await h.connection.collection('holds').countDocuments(), 0);
+  await projection.updateOne({ entityId: stored.doctorId }, { $set: { active: true } });
+  const hold = await createHold(options);
+  assert.ok(hold.holdId);
+  assert.equal(
+    (await h.connection.collection('slots').findOne({ id: options.slotId })).heldCount,
+    1,
+  );
 });

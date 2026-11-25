@@ -361,7 +361,7 @@ func TestProjectionImportAndLiveShareRevisionGuard(t *testing.T) {
 	}
 	live := func(version int, status string) error {
 		return s.Handle(ctx, "umc.events.identity.v1", "identity.identity-access-changed.v1", func() domain.Envelope {
-			m := msg("IdentityAccessChanged", "EVENT", "identity", user, domain.NewID(), map[string]any{"userId": user, "actorType": "STAFF", "status": status, "tokenVersion": 1, "capabilities": []string{"LAB_TECH"}, "phoneVerified": true, "version": version})
+			m := msg("IdentityAccessChanged", "EVENT", "identity", user, domain.NewID(), map[string]any{"userId": user, "actorType": "STAFF", "status": status, "tokenVersion": 1, "capabilities": []string{"LAB_TECH"}, "phoneVerified": true, "phone": "0900000917", "version": version})
 			m.AggregateVersion = version
 			return m
 		}())

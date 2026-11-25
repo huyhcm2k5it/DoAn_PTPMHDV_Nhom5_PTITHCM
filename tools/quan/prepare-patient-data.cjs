@@ -128,15 +128,15 @@ function prepare(data, { startDate, days = 14 }) {
       for (const hour of [8, 13]) {
         const scheduleStart = Date.parse(`${date}T${String(hour).padStart(2, '0')}:00:00+07:00`);
         const schedule = add(appointment.schedules, {
-          id: id('schedule', `${doctor.id}-${date}-${hour}`), doctorId: doctor.id, doctorUserId: doctor.identity_user_id,
-          departmentId: doctor.department_id, serviceId: service.id, room: `P-${String(index + 1).padStart(3, '0')}`,
+          id: id('schedule', `${doctor.id}-${date}-${hour}`), doctorId: doctor.id,
+          serviceId: service.id, room: `P-${String(index + 1).padStart(3, '0')}`,
           startAt: iso(scheduleStart), endAt: iso(scheduleStart + 4 * 3600000),
           capacityPerSlot: 3, status: 'OPEN', slotMinutes: 30, version: 1,
         });
         for (let slot = 0; slot < 8; slot++) add(appointment.slots, {
           id: id('slot', `${schedule.id}-${slot}`), scheduleId: schedule.id,
           startAt: iso(scheduleStart + slot * 30 * MINUTE), endAt: iso(scheduleStart + (slot + 1) * 30 * MINUTE),
-          capacity: 3, heldCount: 0, confirmedCount: 0,
+          capacity: 3, heldCount: 0, confirmedCount: 0, version: 1,
         });
       }
     });
@@ -227,10 +227,11 @@ function validate(data, { start, end, days }) {
     assert(schedule, 'Unknown schedule');
     assert(doctorById.has(schedule.doctorId));
     const service = catalog.medical_services.find(item => item.id === schedule.serviceId);
-    assert(service && service.department_id === schedule.departmentId);
     const doctor = doctorById.get(schedule.doctorId);
-    assert.equal(doctor.identity_user_id, schedule.doctorUserId);
-    assert.equal(doctor.department_id, schedule.departmentId);
+    assert(service && service.department_id === doctor.department_id);
+    assert(identity.users.some(user => user.id === doctor.identity_user_id && user.actor_type === 'DOCTOR'));
+    assert.equal(schedule.doctorUserId, undefined);
+    assert.equal(schedule.departmentId, undefined);
     assert(Date.parse(slot.startAt) >= Date.parse(schedule.startAt) && Date.parse(slot.endAt) <= Date.parse(schedule.endAt));
     assert.equal(Date.parse(slot.endAt) - Date.parse(slot.startAt), 30 * MINUTE);
     assert(slot.heldCount >= 0 && slot.confirmedCount >= 0 && slot.heldCount + slot.confirmedCount <= slot.capacity);

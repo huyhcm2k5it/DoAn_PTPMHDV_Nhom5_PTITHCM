@@ -1,5 +1,5 @@
+const { getAppointmentRepository } = require('./appointment.repository');
 const {
-  getAppointmentModel,
   getHoldModel,
   getSlotModel,
   getPatientTimeLockModel,
@@ -19,7 +19,7 @@ async function refreshPatientIntervals(connection, patientId, session) {
     .select('id slotId')
     .session(session)
     .lean();
-  const appointments = await getAppointmentModel(connection)
+  const appointments = await getAppointmentRepository(connection)
     .find({ patientId, state: { $in: activeAppointmentStates } })
     .select('id holdId startAt endAt state')
     .session(session)

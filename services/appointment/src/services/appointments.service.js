@@ -1,3 +1,5 @@
+const { getAppointmentRepository } = require('./appointment.repository');
+const { resolveDoctorMapping } = require('./doctor-mapping.service');
 const { createHash, randomUUID } = require('node:crypto');
 const { refreshPatientIntervals } = require('./patient-time-lock.service');
 const { withMongoTransaction } = require('../../../../mongo/transaction.js');
@@ -5,7 +7,6 @@ const {
   getHoldModel,
   getScheduleModel,
   getSlotModel,
-  getAppointmentModel,
   getPatientTimeLockModel,
   getIdempotencyModel,
   getOutboxModel,
@@ -85,7 +86,7 @@ async function createAppointment({
   const hash = requestHash({ holdId, patientId });
   const Hold = getHoldModel(connection);
   const Slot = getSlotModel(connection);
-  const Appointment = getAppointmentModel(connection);
+  const Appointment = getAppointmentRepository(connection);
   const Idempotency = getIdempotencyModel(connection);
   const Outbox = getOutboxModel(connection);
   const replay = await existingIdempotency(
@@ -155,6 +156,11 @@ async function createAppointment({
           'SCHEDULE_UNAVAILABLE',
           'Booking schedule is unavailable.',
         );
+      const mapping = await resolveDoctorMapping(
+        connection,
+        schedule.doctorId,
+        session,
+      );
       const recipientUserId = await resolveRecipient(
         connection,
         patientId,
@@ -171,8 +177,8 @@ async function createAppointment({
         slotId: hold.slotId,
         scheduleId: slot.scheduleId,
         doctorId: schedule.doctorId,
-        doctorUserId: schedule.doctorUserId,
-        departmentId: schedule.departmentId,
+        doctorUserId: mapping.doctorUserId,
+        departmentId: mapping.departmentId,
         serviceId: schedule.serviceId,
         startAt: slot.startAt,
         endAt: slot.endAt,
@@ -251,7 +257,7 @@ async function createAppointment({
 }
 
 async function getAppointment({ connection, appointmentId, principalId }) {
-  const Appointment = getAppointmentModel(connection);
+  const Appointment = getAppointmentRepository(connection);
   const appointment = await Appointment.findOne({
     id: appointmentId,
     ...(principalId
@@ -305,7 +311,7 @@ async function listPatientAppointments({
       ...(from ? { $gte: new Date(from + 'T00:00:00+07:00') } : {}),
       ...(to ? { $lt: new Date(to + 'T00:00:00+07:00') } : {}),
     };
-  const Appointment = getAppointmentModel(connection);
+  const Appointment = getAppointmentRepository(connection);
   const [items, total] = await Promise.all([
     Appointment.find(query)
       .select('-_id')
@@ -368,7 +374,7 @@ async function rescheduleAppointment({
   const version = assertExpectedVersion(expectedVersion);
   const route = `POST /api/v1/appointments/${appointmentId}/reschedule`;
   const hash = requestHash({ newSlotId, expectedVersion: version });
-  const Appointment = getAppointmentModel(connection);
+  const Appointment = getAppointmentRepository(connection);
   const Schedule = getScheduleModel(connection);
   const Slot = getSlotModel(connection);
   const Lock = getPatientTimeLockModel(connection);
@@ -455,7 +461,10 @@ async function rescheduleAppointment({
             .lean()
         )?.priceSnapshot;
       if (
-        priceSnapshot.snapshotHash !== acceptedSnapshot?.snapshotHash ||
+        priceSnapshot.priceVersionId !==
+          (appointment.priceVersion ?? acceptedSnapshot?.priceVersionId) ||
+        (priceSnapshot.currency ?? 'VND') !==
+          (acceptedSnapshot?.currency ?? 'VND') ||
         Number(priceSnapshot.amountVnd) !==
           Number(appointment.priceSnapshotVnd ?? acceptedSnapshot?.amountVnd)
       )
@@ -666,7 +675,7 @@ async function cancelAppointment({
   const version = assertExpectedVersion(expectedVersion);
   const route = `POST /api/v1/appointments/${appointmentId}/cancel`;
   const hash = requestHash({ reasonCode, expectedVersion: version });
-  const Appointment = getAppointmentModel(connection);
+  const Appointment = getAppointmentRepository(connection);
   const Slot = getSlotModel(connection);
   const Idempotency = getIdempotencyModel(connection);
   const Outbox = getOutboxModel(connection);

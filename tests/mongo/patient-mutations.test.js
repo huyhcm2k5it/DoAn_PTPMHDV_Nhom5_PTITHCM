@@ -11,15 +11,13 @@ const {
 const h = mongoHarness(ensurePatientStorage, 'patient_db');
 async function input(actorType = 'PATIENT') {
   const userId = randomUUID();
-  await h.connection
-    .collection('user_access_projection')
-    .insertOne({
-      userId,
-      status: 'ACTIVE',
-      actorType,
-      capabilities: ['RECEPTION'],
-      tokenVersion: 1,
-    });
+  await h.connection.collection('user_access_projection').insertOne({
+    userId,
+    status: 'ACTIVE',
+    actorType,
+    capabilities: ['RECEPTION'],
+    tokenVersion: 1,
+  });
   return {
     connection: h.connection,
     Patient: getPatientModel(h.connection),
@@ -53,9 +51,10 @@ test('reception cannot assign unverified account', async () => {
     actorType: 'PATIENT',
     status: 'ACTIVE',
     phoneVerified: false,
+    phone: '0901234567',
   });
   await assert.rejects(
-    createPatient({ ...args, body: { ...args.body, ownerUserId } }),
+    createPatient({ ...args, body: { ...args.body, ownerPhone: '0901234567' } }),
     (e) => e.status === 403 || e.statusCode === 403,
   );
 });
@@ -76,7 +75,10 @@ test('audit records only actual profile field changes and no-op replay stays qui
   const audit = h.connection.collection('profile_audit');
   const auditFields = ['action', 'actorUserId', 'at', 'changedFields', 'id', 'patientId'];
   const initial = await audit.findOne({ action: 'CREATED' });
-  const storedFields = (record) => Object.keys(record).filter((key) => key !== '_id').sort();
+  const storedFields = (record) =>
+    Object.keys(record)
+      .filter((key) => key !== '_id')
+      .sort();
   assert.deepEqual(storedFields(initial), auditFields);
   assert.ok(initial.changedFields.includes('birthDate'));
   assert.ok(initial.changedFields.includes('sex'));

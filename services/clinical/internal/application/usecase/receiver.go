@@ -106,6 +106,7 @@ func (s *Service) HandleProjection(ctx context.Context, exchange string, event d
 				Version                   int
 				Capabilities              []string
 				PhoneVerified             *bool
+				Phone                     *string
 			}
 			if strictJSON(event.Payload, &p) != nil || !domain.ValidID(p.UserID) || domain.ID(p.UserID) != domain.ID(event.AggregateID) || p.Version != event.AggregateVersion || p.Version < 1 || p.TokenVersion == nil || *p.TokenVersion < 0 || *p.TokenVersion > 2147483647 || p.Capabilities == nil || p.PhoneVerified == nil || (p.ActorType != "DOCTOR" && p.ActorType != "PATIENT" && p.ActorType != "STAFF") || p.Status == "" || len(p.Status) > 32 {
 				return domain.Fail("INVALID_MESSAGE", "Invalid Identity projection")

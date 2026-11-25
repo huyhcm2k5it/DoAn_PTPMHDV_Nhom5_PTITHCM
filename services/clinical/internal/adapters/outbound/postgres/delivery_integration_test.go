@@ -113,7 +113,7 @@ func TestOriginalRedeliveryAcknowledgesScheduledRetryWithoutRunningHandler(t *te
 	id := domain.NewID()
 	event := domain.Envelope{MessageID: domain.NewID(), MessageKind: "EVENT", MessageType: "IdentityAccessChanged", SchemaVersion: 1,
 		Producer: "identity", AggregateID: id, AggregateVersion: 1, CorrelationID: domain.NewID(), CausationID: domain.NewID(), RequestID: domain.NewID(), OccurredAt: time.Now().UTC()}
-	event.Payload, _ = json.Marshal(map[string]any{"userId": id, "actorType": "DOCTOR", "status": "ACTIVE", "tokenVersion": 1, "version": 1, "capabilities": []string{}, "phoneVerified": true})
+	event.Payload, _ = json.Marshal(map[string]any{"userId": id, "actorType": "DOCTOR", "status": "ACTIVE", "tokenVersion": 1, "version": 1, "capabilities": []string{}, "phoneVerified": true, "phone": "0900000917"})
 	body, _ := json.Marshal(event)
 	d := ports.Incoming{MessageID: event.MessageID, Exchange: "umc.events.identity.v1", RoutingKey: "identity.identity-access-changed.v1", Body: body}
 	if err := db.ScheduleRetry(ctx, d, 1, 5*time.Second); err != nil {

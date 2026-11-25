@@ -1,10 +1,10 @@
+const { getAppointmentRepository } = require('./appointment.repository');
 const { randomUUID } = require('node:crypto');
 const { withMongoTransaction } = require('../../../../mongo/transaction.js');
 const {
   getScheduleModel,
   getSlotModel,
   getHoldModel,
-  getAppointmentModel,
   getIdempotencyModel,
 } = require('../models/appointment.model.js');
 const { ApiError } = require('../core/errors.js');
@@ -40,10 +40,6 @@ function parseSchedule(body, { partial = false } = {}) {
     throw new ApiError(400, 'VALIDATION_ERROR', 'doctorId must be a UUID.');
   if (value.serviceId != null && !UUID.test(value.serviceId))
     throw new ApiError(400, 'VALIDATION_ERROR', 'serviceId must be a UUID.');
-  if (value.doctorUserId != null && !UUID.test(value.doctorUserId))
-    throw new ApiError(400, 'VALIDATION_ERROR', 'doctorUserId must be a UUID.');
-  if (value.departmentId != null && !UUID.test(value.departmentId))
-    throw new ApiError(400, 'VALIDATION_ERROR', 'departmentId must be a UUID.');
   if (
     Object.hasOwn(value, 'room') &&
     (typeof value.room !== 'string' || !value.room.trim())
@@ -74,12 +70,12 @@ function parseSchedule(body, { partial = false } = {}) {
   if (
     value.slotMinutes != null &&
     (!Number.isInteger(Number(value.slotMinutes)) ||
-      Number(value.slotMinutes) < 5)
+      Number(value.slotMinutes) < 1)
   )
     throw new ApiError(
       400,
       'VALIDATION_ERROR',
-      'slotMinutes must be at least 5 minutes.',
+      'slotMinutes must be a positive integer.',
     );
   if (value.status != null && !['OPEN', 'CLOSED'].includes(value.status))
     throw new ApiError(
@@ -90,8 +86,6 @@ function parseSchedule(body, { partial = false } = {}) {
   return {
     ...(value.doctorId != null ? { doctorId: value.doctorId } : {}),
     ...(value.serviceId != null ? { serviceId: value.serviceId } : {}),
-    ...(value.doctorUserId != null ? { doctorUserId: value.doctorUserId } : {}),
-    ...(value.departmentId != null ? { departmentId: value.departmentId } : {}),
     ...(value.room != null ? { room: String(value.room).trim() } : {}),
     ...(startAt ? { startAt } : {}),
     ...(endAt ? { endAt } : {}),
@@ -232,7 +226,7 @@ async function assertSlotsCanChange(connection, ids, session) {
   const hold = await getHoldModel(connection)
     .exists({ slotId: references })
     .session(session);
-  const appointment = await getAppointmentModel(connection)
+  const appointment = await getAppointmentRepository(connection)
     .exists({
       $or: [
         { slotId: references },
@@ -261,12 +255,9 @@ async function syncScheduleSlots(
     Number(current.startAt) !== Number(next.startAt) ||
     Number(current.endAt) !== Number(next.endAt) ||
     current.slotMinutes !== next.slotMinutes;
-  const bookingFieldsChanged = [
-    'doctorId',
-    'doctorUserId',
-    'departmentId',
-    'serviceId',
-  ].some((field) => current[field] !== next[field]);
+  const bookingFieldsChanged = ['doctorId', 'serviceId'].some(
+    (field) => current[field] !== next[field],
+  );
   if (
     !gridChanged &&
     !bookingFieldsChanged &&

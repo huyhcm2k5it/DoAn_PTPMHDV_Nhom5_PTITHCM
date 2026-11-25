@@ -1,3 +1,8 @@
+const {
+  loadMedicationHold,
+  replaceMedicationHold,
+  hydrateMedicationHold,
+} = require('./medication-hold.repository');
 const { randomUUID } = require('node:crypto');
 const { withMongoTransaction } = require('../../../../mongo/transaction');
 const { resolveCatalogPrice } = require('../../../../mongo/catalog-projection');
@@ -49,7 +54,8 @@ async function createMedicationHold(args) {
           'Prescription revision changed.',
         );
       const holdColl = connection.collection('medication_holds');
-      const old = await holdColl.findOne(
+      const old = await loadMedicationHold(
+        connection,
         { prescriptionId, revision: prescriptionRevision },
         { session },
       );
@@ -184,7 +190,8 @@ async function createMedicationHold(args) {
             ]
           : [],
       };
-      await holdColl.replaceOne(
+      await replaceMedicationHold(
+        connection,
         { prescriptionId, revision: prescriptionRevision },
         value,
         {
@@ -245,7 +252,7 @@ async function returnReservation({ connection, session, hold, state, now }) {
   await connection.collection('medication_holds').updateOne(
     { id: hold.id, version: hold.version, status: 'HELD' },
     {
-      $set: { status: state, cancellationId },
+      $set: { status: state },
       $inc: { version: 1 },
     },
     { session },
@@ -272,9 +279,11 @@ async function releaseMedicationHold(args) {
   return mutate(
     { ...args, now, route: 'PH-006:' + holdId, input: { expectedVersion } },
     async (session) => {
-      const hold = await connection
-        .collection('medication_holds')
-        .findOne({ id: holdId }, { session });
+      const hold = await loadMedicationHold(
+        connection,
+        { id: holdId },
+        { session },
+      );
       if (!hold) throw failure(404, 'NOT_FOUND', 'Hold not found.');
       if (hold.status !== 'HELD' || hold.version !== expectedVersion)
         throw failure(409, 'STATE_CONFLICT', 'Hold cannot be released.');
@@ -306,7 +315,8 @@ async function expireMedicationHolds({
   let expired = 0;
   for (const candidate of candidates) {
     const changed = await withMongoTransaction(connection, async (session) => {
-      const hold = await connection.collection('medication_holds').findOne(
+      const hold = await loadMedicationHold(
+        connection,
         {
           id: candidate.id,
           status: 'HELD',

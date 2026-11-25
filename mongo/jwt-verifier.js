@@ -46,7 +46,11 @@ function createJwtVerifier({
     if (p.iat != null && p.iat > current + clockSkewSeconds)
       throw new Error('JWT was issued in the future.');
     if (options.action) {
-      if (p.action !== options.action) throw new Error('Authorization lease action is invalid.');
+      const allowedActions = Array.isArray(options.expectedActions)
+        ? options.expectedActions
+        : [options.action];
+      if (!allowedActions.includes(p.action))
+        throw new Error('Authorization lease action is invalid.');
       if (!Number.isFinite(p.iat) || p.exp <= p.iat || p.exp - p.iat > 30)
         throw new Error('Authorization lease is too long or missing issued-at.');
       if (

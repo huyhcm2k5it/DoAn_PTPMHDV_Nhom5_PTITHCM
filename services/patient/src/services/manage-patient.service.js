@@ -22,11 +22,7 @@ function assertProjection(authContext, projection) {
     throw new ApiError(403, 'FORBIDDEN', 'Token has been revoked.');
 }
 
-function cleanPatient(patient) {
-  if (!patient) return null;
-  const { _id, ...data } = patient;
-  return data;
-}
+const { patientDto: cleanPatient } = require('./patient-dto');
 
 function isCalendarDate(value) {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value))
@@ -167,7 +163,39 @@ async function createPatient({
       'Actor cannot create patient profiles.',
     );
   const profile = validateProfile(body);
-  const ownerUserId = isReception ? body.ownerUserId : authContext.userId;
+  let ownerUserId = authContext.userId;
+  let resolvedOwnerPhone;
+  if (isReception) {
+    const phone =
+      typeof body.ownerPhone === 'string'
+        ? body.ownerPhone.trim().replace(/ /g, '')
+        : '';
+    if (!/^[0-9]{9,11}$/.test(phone))
+      throw new ApiError(
+        400,
+        'VALIDATION_ERROR',
+        'ownerPhone must be a valid account phone.',
+      );
+    resolvedOwnerPhone = phone;
+    const owners = await connection
+      .collection('user_access_projection')
+      .find({ phone })
+      .limit(2)
+      .toArray();
+    if (owners.length !== 1)
+      throw new ApiError(
+        503,
+        'AUTH_PROJECTION_UNAVAILABLE',
+        'A unique Identity account phone projection is required.',
+      );
+    ownerUserId = owners[0].userId;
+    if (body.ownerUserId && body.ownerUserId !== ownerUserId)
+      throw new ApiError(
+        403,
+        'FORBIDDEN',
+        'Account owner does not match the Identity phone projection.',
+      );
+  }
   assertUuid(ownerUserId, 'ownerUserId');
   if (
     !isReception &&
@@ -215,16 +243,42 @@ async function createPatient({
       now,
     },
     async (session) => {
-      const duplicate = await Patient.findOne({
-        ownerUserId,
-        active: { $ne: false },
-        $or: [
-          ...(patient.relation === 'SELF' ? [{ relation: 'SELF' }] : []),
-          { fullName: patient.fullName, birthDate: patient.birthDate },
-        ],
-      })
-        .session(session)
-        .lean();
+      if (isReception) {
+        const owner = await connection
+          .collection('user_access_projection')
+          .findOne({ userId: ownerUserId }, { session });
+        if (
+          !owner ||
+          owner.phone !== resolvedOwnerPhone ||
+          owner.status !== 'ACTIVE' ||
+          owner.actorType !== 'PATIENT' ||
+          owner.phoneVerified !== true
+        )
+          throw new ApiError(
+            403,
+            'ACCOUNT_PROOF_REQUIRED',
+            'Current verified Identity ownership is required.',
+          );
+      }
+      const duplicate = await connection.collection('patients').findOne(
+        {
+          ownerUserId,
+          active: { $ne: false },
+          $or: [
+            ...(patient.relation === 'SELF' ? [{ relation: 'SELF' }] : []),
+            {
+              fullName: patient.fullName,
+              birthDate: {
+                $in: [
+                  patient.birthDate,
+                  new Date(patient.birthDate + 'T00:00:00.000Z'),
+                ],
+              },
+            },
+          ],
+        },
+        { session },
+      );
       if (duplicate)
         throw new ApiError(
           409,
@@ -336,7 +390,7 @@ async function updatePatient({
       if (current.version !== Number(expectedVersion))
         throw new ApiError(409, 'VERSION_CONFLICT', 'Patient changed.');
       const profile = validateProfile(
-        { ...current, ...body },
+        { ...cleanPatient(current), ...body },
         {
           validateBirthDate: Object.hasOwn(body || {}, 'birthDate'),
           validateSex: Object.hasOwn(body || {}, 'sex'),
@@ -344,7 +398,8 @@ async function updatePatient({
       );
       const changedFields = Object.keys(profile).filter(
         (field) =>
-          Object.hasOwn(body || {}, field) && profile[field] !== current[field],
+          Object.hasOwn(body || {}, field) &&
+          profile[field] !== cleanPatient(current)[field],
       );
       if (!changedFields.length) return cleanPatient(current);
 
@@ -364,15 +419,21 @@ async function updatePatient({
         changedFields.includes('fullName') ||
         changedFields.includes('birthDate')
       ) {
-        const dup = await Patient.findOne({
-          ownerUserId: current.ownerUserId,
-          fullName: next.fullName,
-          birthDate: next.birthDate,
-          id: { $ne: patientId },
-          active: { $ne: false },
-        })
-          .session(session)
-          .lean();
+        const dup = await connection.collection('patients').findOne(
+          {
+            ownerUserId: current.ownerUserId,
+            fullName: next.fullName,
+            birthDate: {
+              $in: [
+                cleanPatient(next).birthDate,
+                new Date(cleanPatient(next).birthDate + 'T00:00:00.000Z'),
+              ],
+            },
+            id: { $ne: patientId },
+            active: { $ne: false },
+          },
+          { session },
+        );
         if (dup)
           throw new ApiError(
             409,

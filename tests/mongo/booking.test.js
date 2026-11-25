@@ -1,3 +1,6 @@
+const {
+  getAppointmentRepository,
+} = require('../../services/appointment/src/services/appointment.repository');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
@@ -78,13 +81,19 @@ async function setup(t) {
   await connection
     .collection('patient_access_projection')
     .insertOne({ patientId: patientA, ownerUserId: ownerA, active: true, policyVersion: 1 });
+  await connection.collection('catalog_projection').insertOne({
+    entityKey: 'DOCTOR:' + doctor,
+    entityType: 'DOCTOR',
+    entityId: doctor,
+    active: true,
+    entityVersion: 1,
+    fullSnapshot: { id: doctor, identityUserId: doctor, departmentId: service, status: 'ACTIVE' },
+  });
   const Schedule = getScheduleModel(connection);
   const Slot = getSlotModel(connection);
   await Schedule.create({
     id: 'schedule-1',
     doctorId: doctor,
-    doctorUserId: doctor,
-    departmentId: service,
     serviceId: service,
     startAt: new Date('2026-10-31T01:00:00Z'),
     endAt: new Date('2026-10-31T02:00:00Z'),
@@ -219,8 +228,12 @@ test('AP-008 reserves the last slot once and AP-009 releases it', async (t) => {
   assert.equal(conflict.status, 409);
   const timeLocks = connection.collection('patient_time_locks');
   const locked = await timeLocks.findOne({ patientId: patientA });
-  assert.deepEqual(Object.keys(locked).filter((key) => key !== '_id').sort(),
-    ['intervals', 'patientId', 'version']);
+  assert.deepEqual(
+    Object.keys(locked)
+      .filter((key) => key !== '_id')
+      .sort(),
+    ['intervals', 'patientId', 'version'],
+  );
   assert.equal(locked.intervals[0].holdId, payload.data.holdId);
   assert.equal(locked.intervals[0].state, 'HELD');
 
@@ -356,8 +369,6 @@ test('patient overlap lock rejects a second overlapping slot but allows adjacent
   await Schedule.create({
     id: 'schedule-2',
     doctorId: doctor,
-    doctorUserId: doctor,
-    departmentId: service,
     serviceId: service,
     startAt: new Date('2026-10-31T02:00:00Z'),
     endAt: new Date('2026-10-31T03:00:00Z'),
@@ -515,11 +526,14 @@ test('Billing messages require matching source and fence before CONFIRMED', asyn
   );
   const row = await connection.collection('appointments').findOne({ id: appointmentId });
   assert.equal(row.state, 'CONFIRMED');
-  const events = await connection.collection('outbox').find({
-    message_type: 'AppointmentChanged',
-    aggregate_id: appointmentId,
-    'payload.changeType': 'CONFIRMED',
-  }).toArray();
+  const events = await connection
+    .collection('outbox')
+    .find({
+      message_type: 'AppointmentChanged',
+      aggregate_id: appointmentId,
+      'payload.changeType': 'CONFIRMED',
+    })
+    .toArray();
   assert.equal(events.length, 1);
   assert.deepEqual(events[0].payload, {
     appointmentId,
@@ -561,7 +575,8 @@ test('AP-015 check-in is date/payment guarded and creates one FIRST ticket', asy
   });
   const appointmentId = (await response.json()).data.appointmentId;
   const Appointment = getAppointmentModel(connection);
-  await Appointment.updateOne(
+  // Legacy-storage fixture used to test readers during migration.
+  await Appointment.collection.updateOne(
     { id: appointmentId },
     { $set: { state: 'CONFIRMED', chargeStatus: 'PAID', chargeSync: 'CREATED' } },
   );
@@ -625,7 +640,8 @@ test('AP-016/AP-017/AP-018 list, call and no-show use a compare-and-set version'
   });
   const appointmentId = (await response.json()).data.appointmentId;
   const Appointment = getAppointmentModel(connection);
-  await Appointment.updateOne(
+  // Legacy-storage fixture used to test readers during migration.
+  await Appointment.collection.updateOne(
     { id: appointmentId },
     { $set: { state: 'CONFIRMED', chargeStatus: 'PAID', chargeSync: 'CREATED' } },
   );
@@ -700,8 +716,6 @@ test('AP-013 reschedules atomically and AP-014 cancels with one refund request',
   await Schedule.create({
     id: 'schedule-2',
     doctorId: doctor,
-    doctorUserId: doctor,
-    departmentId: service,
     serviceId: service,
     startAt: new Date('2026-10-31T03:00:00Z'),
     endAt: new Date('2026-10-31T04:00:00Z'),
@@ -740,13 +754,34 @@ test('AP-013 reschedules atomically and AP-014 cancels with one refund request',
   });
   const Appointment = getAppointmentModel(connection);
   const appointmentId = committed.appointmentId;
-  await Appointment.updateOne(
+  // Legacy-storage fixture used to test readers during migration.
+  await Appointment.collection.updateOne(
     { id: appointmentId },
     {
       $set: { state: 'CONFIRMED', chargeStatus: 'PAID', chargeSync: 'CREATED' },
     },
   );
   await Slot.updateOne({ id: 'slot-1' }, { $inc: { heldCount: -1, confirmedCount: 1 } });
+  await assert.rejects(
+    rescheduleAppointment({
+      connection,
+      appointmentId,
+      principalId: ownerA,
+      patientId: patientA,
+      newSlotId: 'slot-2',
+      expectedVersion: 1,
+      idempotencyKey: 'cccccccc-cccc-4ccc-8ccc-cccccccccc09',
+      now: new Date('2026-10-30T00:00:00Z'),
+      resolvePriceSnapshot: async () => ({
+        priceVersionId: 'changed-price-version',
+        amountVnd: 100000,
+        currency: 'VND',
+        snapshotHash: 'hash-1',
+      }),
+    }),
+    (error) => error.code === 'PRICE_CHANGED',
+  );
+  assert.equal((await Slot.findOne({ id: 'slot-2' })).confirmedCount, 0);
   const moved = await rescheduleAppointment({
     connection,
     appointmentId,
@@ -760,7 +795,7 @@ test('AP-013 reschedules atomically and AP-014 cancels with one refund request',
       priceVersionId: 'price-1',
       amountVnd: 100000,
       currency: 'VND',
-      snapshotHash: 'hash-1',
+      snapshotHash: 'new-quote-time-hash',
     }),
     createId: () => 'reschedule-event-1',
   });
@@ -780,10 +815,12 @@ test('AP-013 reschedules atomically and AP-014 cancels with one refund request',
     createId: () => 'cancel-event-1',
   });
   const sourceEvent = await connection.collection('outbox').findOne({
-    message_type: 'AppointmentChanged', 'payload.changeType': 'RESCHEDULED',
+    message_type: 'AppointmentChanged',
+    'payload.changeType': 'RESCHEDULED',
   });
   const cancelledEvent = await connection.collection('outbox').findOne({
-    message_type: 'AppointmentChanged', 'payload.changeType': 'CANCELLED',
+    message_type: 'AppointmentChanged',
+    'payload.changeType': 'CANCELLED',
   });
   assert.equal(sourceEvent.payload.sourceRevision, 1);
   assert.equal(cancelledEvent.payload.cancelledSourceRevision, 1);
@@ -857,12 +894,15 @@ test('pending payment expiry releases capacity once and emits AppointmentChanged
       messageId: randomUUID(),
       messageType: 'ChargePrepared',
       payload: {
-        sourceType: 'APPOINTMENT', sourceId: appointmentId,
-        sourceRevision: 1, state: 'CREATED', chargeId: randomUUID(),
+        sourceType: 'APPOINTMENT',
+        sourceId: appointmentId,
+        sourceRevision: 1,
+        state: 'CREATED',
+        chargeId: randomUUID(),
       },
     },
   });
-  const expired = await connection.collection('appointments').findOne({ id: appointmentId });
+  const expired = await getAppointmentRepository(connection).findOne({ id: appointmentId }).lean();
   assert.equal(expired.state, 'EXPIRED');
   assert.equal(expired.chargeStatus, 'VOID');
 });
@@ -912,7 +952,7 @@ test('outbox publisher marks RequestCharge only after confirm', async (t) => {
   );
 });
 
-test('holds reject unusable clinical mapping without consuming capacity, then accept an admin repair', async (t) => {
+test('holds reject unusable clinical mapping without consuming capacity, then accept a trusted Catalog repair', async (t) => {
   const { connection, Schedule, Slot } = await setup(t);
   const options = {
     connection,
@@ -923,18 +963,25 @@ test('holds reject unusable clinical mapping without consuming capacity, then ac
     now: new Date('2026-10-31T00:00:00Z'),
     resolvePriceSnapshot: async () => ({ amountVnd: 100000, snapshotHash: 'mapping-test' }),
   };
-  const trustedMapping = { doctorUserId: doctor, departmentId: service };
+  const trustedMapping = {
+    'fullSnapshot.identityUserId': doctor,
+    'fullSnapshot.departmentId': service,
+  };
   for (const invalidMapping of [
-    { $unset: { doctorUserId: '' } },
-    { $unset: { departmentId: '' } },
-    { $set: { doctorUserId: [doctor] } },
-    { $set: { departmentId: [service] } },
-    { $set: { doctorUserId: 'not-a-uuid' } },
-    { $set: { departmentId: '' } },
+    { $unset: { 'fullSnapshot.identityUserId': '' } },
+    { $unset: { 'fullSnapshot.departmentId': '' } },
+    { $set: { 'fullSnapshot.identityUserId': [doctor] } },
+    { $set: { 'fullSnapshot.departmentId': [service] } },
+    { $set: { 'fullSnapshot.identityUserId': 'not-a-uuid' } },
+    { $set: { 'fullSnapshot.departmentId': '' } },
   ]) {
     // Raw collection writes reproduce malformed legacy data without schema coercion.
-    await Schedule.collection.updateOne({ id: 'schedule-1' }, { $set: trustedMapping });
-    await Schedule.collection.updateOne({ id: 'schedule-1' }, invalidMapping);
+    await connection
+      .collection('catalog_projection')
+      .updateOne({ entityKey: 'DOCTOR:' + doctor }, { $set: trustedMapping });
+    await connection
+      .collection('catalog_projection')
+      .updateOne({ entityKey: 'DOCTOR:' + doctor }, invalidMapping);
     await assert.rejects(
       createHold(options),
       (error) => error.status === 409 && error.code === 'CLINICAL_MAPPING_UNAVAILABLE',
@@ -943,13 +990,27 @@ test('holds reject unusable clinical mapping without consuming capacity, then ac
     assert.equal(await connection.collection('holds').countDocuments({}), 0);
     assert.equal(await connection.collection('idempotency_records').countDocuments({}), 0);
   }
-  await Schedule.updateOne({ id: 'schedule-1' }, { $set: trustedMapping });
+  await connection
+    .collection('catalog_projection')
+    .updateOne({ entityKey: 'DOCTOR:' + doctor }, { $set: trustedMapping });
   const result = await createHold(options);
   const stored = await connection.collection('holds').findOne({ id: result.holdId });
-  assert.deepEqual(Object.keys(stored).filter((key) => key !== '_id').sort(), [
-    'id', 'slotId', 'patientId', 'status', 'expiresAt', 'principalId',
-    'idempotencyKey', 'createdAt', 'priceSnapshot',
-  ].sort());
+  assert.deepEqual(
+    Object.keys(stored)
+      .filter((key) => key !== '_id')
+      .sort(),
+    [
+      'id',
+      'slotId',
+      'patientId',
+      'status',
+      'expiresAt',
+      'principalId',
+      'idempotencyKey',
+      'createdAt',
+      'priceSnapshot',
+    ].sort(),
+  );
   assert.equal((await Slot.findOne({ id: 'slot-1' }).lean()).heldCount, 1);
 });
 
@@ -986,10 +1047,9 @@ test('reception booking sends the patient owner as charge recipient', async (t) 
   });
   const event = await connection.collection('outbox').findOne({ message_type: 'RequestCharge' });
   assert.equal(event.payload.recipientUserId, ownerA);
-  const stored = await connection.collection('appointments').findOne(
-    { id: created.appointmentId },
-    { useBigInt64: true },
-  );
+  const stored = await connection
+    .collection('appointments')
+    .findOne({ id: created.appointmentId }, { useBigInt64: true });
   assert.equal(stored.priceSnapshotVnd, 100000n);
   assert.equal(stored.priceVersion, '41bd471b-486c-4d8a-8688-44676bbcba0d');
   assert.ok(stored.expiresAt instanceof Date);

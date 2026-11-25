@@ -87,8 +87,8 @@ const appointmentStorage = [
     [
       { name: 'uq_appointment_hold', key: { holdId: 1 }, unique: true },
       {
-        name: 'ix_appointment_patient_time',
-        key: { patientId: 1, startAt: 1, endAt: 1, state: 1 },
+        name: 'ix_appointment_patient_slot_state',
+        key: { patientId: 1, slotId: 1, state: 1 },
       },
     ],
     ['holdId'],
@@ -108,8 +108,8 @@ const appointmentStorage = [
         partialFilterExpression: { claimId: { $type: 'string' } },
       },
       {
-        name: 'ix_queue_today_state',
-        key: { state: 1, ticketType: 1, doctorId: 1, createdAt: 1 },
+        name: 'ix_queue_state_appointment',
+        key: { state: 1, ticketType: 1, appointmentId: 1, id: 1 },
       },
     ],
     ['appointmentId', 'ticketType', 'returnRound'],
@@ -181,6 +181,51 @@ const appointmentStorage = [
     ],
   },
   { name: 'schedule_write_locks', indexes: [] },
+  {
+    name: 'outbox',
+    indexes: [
+      {
+        name: 'ix_appointment_source_messages',
+        key: { aggregate_id: 1, message_type: 1, occurred_at: 1 },
+      },
+      {
+        name: 'ix_appointment_queue_events',
+        key: { message_type: 1, 'payload.appointmentId': 1 },
+      },
+    ],
+  },
+  {
+    name: 'inbox',
+    indexes: [
+      {
+        name: 'ix_appointment_delivery_source',
+        key: { consumer_name: 1, 'payload.sourceId': 1 },
+      },
+      {
+        name: 'ix_appointment_delivery_charge',
+        key: { consumer_name: 1, 'payload.chargeId': 1 },
+      },
+    ],
+  },
+  {
+    name: 'command_results',
+    indexes: [
+      {
+        name: 'ix_appointment_reserve_source',
+        key: { command_type: 1, 'request.sourceId': 1 },
+      },
+    ],
+  },
+  {
+    name: 'slots',
+    indexes: [{ name: 'ix_slot_time_window', key: { startAt: 1, endAt: 1 } }],
+  },
+  {
+    name: 'queue_tickets',
+    indexes: [
+      { name: 'ix_queue_visit_lookup', key: { appointmentId: 1, visitId: 1 } },
+    ],
+  },
   ...technicalStorage,
 ];
 

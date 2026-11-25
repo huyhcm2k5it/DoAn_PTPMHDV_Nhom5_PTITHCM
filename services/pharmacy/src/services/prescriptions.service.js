@@ -1,3 +1,8 @@
+const {
+  loadMedicationHold,
+  replaceMedicationHold,
+  hydrateMedicationHold,
+} = require('./medication-hold.repository');
 const { uuid, integer, staffAccess, failure } = require('./common');
 const { prescriptionLines } = require('./prescription-projection.service');
 
@@ -96,10 +101,13 @@ async function prescriptionDetail({
     revision: prescription.revision,
     ...(holdId ? { id: holdId } : {}),
   };
-  const holds = await connection
+  const holdRows = await connection
     .collection('medication_holds')
     .find(query)
     .toArray();
+  const holds = await Promise.all(
+    holdRows.map((row) => hydrateMedicationHold(connection, row)),
+  );
   const hold = holds[0];
   const dispense = hold
     ? await connection

@@ -1,3 +1,6 @@
+const {
+  loadMedicationHold,
+} = require('../../services/pharmacy/src/services/medication-hold.repository');
 const { test, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
@@ -59,53 +62,45 @@ beforeEach(async () => {
   await h.connection
     .collection('patient_access_projection')
     .insertOne({ patientId: patient, ownerUserId: owner, active: true, policyVersion: 1 });
-  await h.connection
-    .collection('catalog_projection')
-    .insertOne({
-      entityKey: 'MEDICINE:' + medicine,
-      entityType: 'MEDICINE',
-      entityId: medicine,
-      active: true,
-      fullSnapshot: { code: 'MED-1', name: 'Medicine', status: 'ACTIVE' },
-    });
+  await h.connection.collection('catalog_projection').insertOne({
+    entityKey: 'MEDICINE:' + medicine,
+    entityType: 'MEDICINE',
+    entityId: medicine,
+    active: true,
+    fullSnapshot: { code: 'MED-1', name: 'Medicine', status: 'ACTIVE' },
+  });
   await h.connection
     .collection('inventory')
     .insertOne({ id: randomUUID(), medicineId: medicine, onHand: 10, reserved: 2, version: 1 });
-  await h.connection
-    .collection('prescription_projection')
-    .insertOne({
-      id: rx,
-      prescriptionId: rx,
+  await h.connection.collection('prescription_projection').insertOne({
+    id: rx,
+    prescriptionId: rx,
+    revision: 1,
+    state: 'FINAL',
+    patientId: patient,
+    visitId: randomUUID(),
+    itemsSnapshot: [{ medicineCode: 'MED-1', quantity: 1 }],
+  });
+  await h.connection.collection('catalog_projection').insertOne({
+    entityKey: 'PRICE:' + medicine,
+    entityType: 'PRICE_VERSION',
+    entityId: randomUUID(),
+    active: true,
+    entityVersion: 1,
+    fullSnapshot: {
+      itemId: medicine,
+      amountVnd: 1000,
+      effectiveFrom: '2026-01-01T00:00:00Z',
+      priceVersionId: randomUUID(),
       revision: 1,
-      state: 'FINAL',
-      patientId: patient,
-      visitId: randomUUID(),
-      itemsSnapshot: [{ medicineCode: 'MED-1', quantity: 1 }],
-    });
-  await h.connection
-    .collection('catalog_projection')
-    .insertOne({
-      entityKey: 'PRICE:' + medicine,
-      entityType: 'PRICE_VERSION',
-      entityId: randomUUID(),
-      active: true,
-      entityVersion: 1,
-      fullSnapshot: {
-        itemId: medicine,
-        amountVnd: 1000,
-        effectiveFrom: '2026-01-01T00:00:00Z',
-        priceVersionId: randomUUID(),
-        revision: 1,
-      },
-    });
-  await h.connection
-    .collection('projection_checkpoints')
-    .insertOne({
-      projectionName: 'CatalogChanged',
-      gap: false,
-      lastCheckpointAt: now,
-      streamSequence: 1,
-    });
+    },
+  });
+  await h.connection.collection('projection_checkpoints').insertOne({
+    projectionName: 'CatalogChanged',
+    gap: false,
+    lastCheckpointAt: now,
+    streamSequence: 1,
+  });
 });
 async function api(t) {
   const app = createApp({
@@ -162,7 +157,9 @@ test('Pharmacy requires a signed lease bound to action subject version and a str
   ]) {
     assert.equal(
       (await request(path, 'owner', { headers: { 'x-authorization-lease': token } })).status,
-      token && JSON.parse(Buffer.from(token.split('.')[1], 'base64url')).exp <= now.getTime()/1000 ? 401 : 403,
+      token && JSON.parse(Buffer.from(token.split('.')[1], 'base64url')).exp <= now.getTime() / 1000
+        ? 401
+        : 403,
     );
   }
   assert.equal((await request(path, 'owner')).status, 200);
@@ -261,7 +258,7 @@ test('PH-003 and PH-005..008 use actual HTTP responses validated against OpenAPI
     202,
   );
   async function event(type, extra = {}) {
-    const hold = await h.connection.collection('medication_holds').findOne({ id: holdId });
+    const hold = await loadMedicationHold(h.connection, { id: holdId });
     return handleBillingMessage({
       connection: h.connection,
       now,
@@ -279,7 +276,12 @@ test('PH-003 and PH-005..008 use actual HTTP responses validated against OpenAPI
           settlementId: hold.settlementId,
           fence: hold.fence,
           amountHash: hold.snapshotHash,
-          attemptVersion: type === 'ReserveSettlement' ? (extra.settlementId && extra.settlementId !== hold.settlementId ? (hold.reserveAttemptVersion || 0) + 1 : (hold.reserveAttemptVersion || 1)) : hold.version,
+          attemptVersion:
+            type === 'ReserveSettlement'
+              ? extra.settlementId && extra.settlementId !== hold.settlementId
+                ? (hold.reserveAttemptVersion || 0) + 1
+                : hold.reserveAttemptVersion || 1
+              : hold.version,
           amountVnd: hold.amountVnd,
           ...extra,
         },
@@ -316,7 +318,8 @@ test('PH-003 and PH-005..008 use actual HTTP responses validated against OpenAPI
   const staffAfterDispense = await request('/prescriptions/' + rx, 'staff');
   assert.equal(staffAfterDispense.body.data.holds[0].status, 'DISPENSED');
   const duplicateDispense = await request(
-    '/holds/' + holdId + '/dispense', 'staff',
+    '/holds/' + holdId + '/dispense',
+    'staff',
     post({ expectedVersion: storedHold.version }),
   );
   assert.equal(duplicateDispense.status, 409);

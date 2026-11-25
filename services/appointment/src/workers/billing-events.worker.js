@@ -1,10 +1,13 @@
+const { isForeignBillingEvent } = require('../../../../mongo/billing-scope');
+const {
+  getAppointmentRepository,
+} = require('../services/appointment.repository');
 const { createHash, randomUUID } = require('node:crypto');
 const {
   refreshPatientIntervals,
 } = require('../services/patient-time-lock.service');
 const { withMongoTransaction } = require('../../../../mongo/transaction.js');
 const {
-  getAppointmentModel,
   getHoldModel,
   getSlotModel,
   getInboxModel,
@@ -84,7 +87,7 @@ async function handleReserveSettlementCommand({
     return await withMongoTransaction(connection, async (session) => {
       const prior = await replay(session);
       if (prior) return prior;
-      const Appointment = getAppointmentModel(connection);
+      const Appointment = getAppointmentRepository(connection);
       const a = await Appointment.findOne({ id: p.sourceId })
         .session(session)
         .lean();
@@ -205,6 +208,8 @@ async function handleReserveSettlementCommand({
       await results.insertOne(
         {
           command_id: message.messageId,
+          command_type: message.messageType,
+          request: p,
           request_id: intent,
           request_hash: hash,
           response,
@@ -235,7 +240,7 @@ async function handleBillingMessage({
       'INVALID_MESSAGE',
       'Billing message is incomplete.',
     );
-  const Appointment = getAppointmentModel(connection);
+  const Appointment = getAppointmentRepository(connection);
   const Inbox = getInboxModel(connection);
   const Decision = getSettlementDecisionModel(connection);
   const identity = {
@@ -257,17 +262,32 @@ async function handleBillingMessage({
   if (await alreadyProcessed()) return { duplicate: true };
   const processMessage = () =>
     withMongoTransaction(connection, async (session) => {
-      await Inbox.create(
-        [
-          {
-            ...identity,
-            payload_hash: fingerprint,
-            received_at: now,
-          },
-        ],
-        { session },
-      );
+      const saveDelivery = () =>
+        Inbox.create(
+          [
+            {
+              ...identity,
+              payload_hash: fingerprint,
+              message_type: message.messageType,
+              payload: message.payload,
+              received_at: now,
+            },
+          ],
+          { session },
+        );
       const payload = message.payload;
+      if (
+        await isForeignBillingEvent(
+          connection,
+          message,
+          ['APPOINTMENT'],
+          'appointments',
+          session,
+        )
+      ) {
+        await saveDelivery();
+        return { ignored: true, reason: 'OTHER_SOURCE_OWNER' };
+      }
       if (message.messageType === 'BillingStatusChanged') {
         if (
           message.producer !== 'billing' ||
@@ -545,7 +565,10 @@ async function handleBillingMessage({
           },
           { session },
         );
-        if (!changed.modifiedCount) return { duplicate: false };
+        if (!changed.modifiedCount) {
+          await saveDelivery();
+          return { duplicate: false };
+        }
         const Slot = getSlotModel(connection);
         const slotChanged = await Slot.updateOne(
           { id: appointment.slotId, heldCount: { $gt: 0 } },
@@ -611,6 +634,7 @@ async function handleBillingMessage({
           'INVALID_MESSAGE',
           'Unsupported Billing message.',
         );
+      await saveDelivery();
       return { duplicate: false };
     });
   try {

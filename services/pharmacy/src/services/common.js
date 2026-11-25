@@ -167,7 +167,14 @@ async function consume(
       }
       const result = await work(session);
       await inbox.insertOne(
-        { ...query, payload_hash, result, received_at: now },
+        {
+          ...query,
+          payload_hash,
+          result,
+          received_at: now,
+          message_type: message.messageType,
+          payload: message.payload,
+        },
         { session },
       );
       return { duplicate: false, ...result };

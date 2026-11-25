@@ -40,3 +40,8 @@ python services/notification/manage.py makemigrations --check --dry-run
 ```
 
 SQLite bỏ qua test concurrency/recovery PostgreSQL. Để kiểm thật, cấu hình IDENTITY_DB_* hoặc NOTIFICATION_DB_* đến DB PostgreSQL cô lập có tên bắt đầu `umc_be_test_`, rồi chạy `python tools/be/test_django.py identity` hoặc `python tools/be/test_django.py notification`. Runner tạo và hủy test DB; tài khoản phải có quyền tạo test DB. Không dùng tên/credential DB demo hoặc DB chung cho bước này. Chỉ áp dụng migration triển khai sau khi các kiểm tra đã đạt.
+
+
+## Identity access event and Patient ownerPhone
+
+IdentityAccessChanged v1 now includes optional phone for the Patient ownerPhone lookup. Deploy updated Clinical, Diagnostic and Notification strict consumers before enabling the publisher. Old events without phone remain valid. Republish current users through the Identity owner with an increased access version (or use an owner snapshot) to populate existing Patient projections; never derive ownership from a patient contact phone. Passwords, password hashes and OTP values remain excluded. See docs/ban-giao-hqh-care/mapping-erd-quan.md for migration and retention requirements.
