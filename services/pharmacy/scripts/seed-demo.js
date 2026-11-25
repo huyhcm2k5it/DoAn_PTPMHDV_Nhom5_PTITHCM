@@ -9,6 +9,7 @@ async function seed({ connection, dryRun = true } = {}) {
     onHand: 30,
     reserved: 0,
     version: 1,
+    updatedAt: new Date(),
   };
   if (!dryRun) {
     if (!connection) throw new Error('Owner database connection required.');

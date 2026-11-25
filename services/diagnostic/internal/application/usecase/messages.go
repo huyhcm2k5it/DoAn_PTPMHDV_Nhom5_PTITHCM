@@ -143,6 +143,7 @@ func (s *Service) project(ctx context.Context, t ports.Tx, m domain.Envelope) er
 			Version                   int
 			Capabilities              []string
 			PhoneVerified             *bool
+			Phone                     *string
 		}
 		if strictJSON(m.Payload, &p) != nil || !domain.ValidID(p.UserID) || domain.ID(p.UserID) != domain.ID(m.AggregateID) || p.Version != m.AggregateVersion || p.TokenVersion == nil || p.Capabilities == nil || p.PhoneVerified == nil || *p.TokenVersion < 0 {
 			return domain.Fail("INVALID_MESSAGE", "Invalid identity projection")

@@ -1,11 +1,11 @@
+const {
+  getAppointmentRepository,
+  getQueueTicketRepository,
+} = require('./appointment.repository');
 const { randomUUID } = require('node:crypto');
 const { refreshPatientIntervals } = require('./patient-time-lock.service');
 const { withMongoTransaction } = require('../../../../mongo/transaction.js');
-const {
-  getAppointmentModel,
-  getQueueTicketModel,
-  getIdempotencyModel,
-} = require('../models/appointment.model.js');
+const { getIdempotencyModel } = require('../models/appointment.model.js');
 const { ApiError } = require('../core/errors.js');
 const { requestHash } = require('./holds.service.js');
 const {
@@ -137,8 +137,8 @@ async function checkInAppointment({
     );
   const route = `POST /api/v1/appointments/${appointmentId}/check-in`;
   const hash = requestHash({ appointmentId });
-  const Appointment = getAppointmentModel(connection);
-  const QueueTicket = getQueueTicketModel(connection);
+  const Appointment = getAppointmentRepository(connection);
+  const QueueTicket = getQueueTicketRepository(connection);
   const Idempotency = getIdempotencyModel(connection);
   const replay = await getReplay(
     Idempotency,
@@ -326,7 +326,7 @@ async function listTodayQueue({
   };
   if (ticketType) query.ticketType = ticketType;
   if (doctorId) query.doctorId = doctorId;
-  const QueueTicket = getQueueTicketModel(connection);
+  const QueueTicket = getQueueTicketRepository(connection);
   const [items, total] = await Promise.all([
     QueueTicket.find(query)
       .sort({ createdAt: 1, id: 1 })
@@ -378,7 +378,7 @@ async function callNextQueueTicket({
     hash,
   );
   if (replay) return replay;
-  const QueueTicket = getQueueTicketModel(connection);
+  const QueueTicket = getQueueTicketRepository(connection);
   const query = {
     appointmentDate: vietnamDate(now),
     ticketType,
@@ -446,8 +446,8 @@ async function markNoShow({
   const version = assertVersion(expectedVersion);
   const route = `POST /api/v1/queues/${ticketId}/no-show`;
   const hash = requestHash({ ticketId, reasonCode, expectedVersion: version });
-  const QueueTicket = getQueueTicketModel(connection);
-  const Appointment = getAppointmentModel(connection);
+  const QueueTicket = getQueueTicketRepository(connection);
+  const Appointment = getAppointmentRepository(connection);
   const Idempotency = getIdempotencyModel(connection);
   const replay = await getReplay(
     Idempotency,

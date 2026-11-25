@@ -1,11 +1,13 @@
+const {
+  getAppointmentRepository,
+  getQueueTicketRepository,
+} = require('../services/appointment.repository');
 const { createHash, randomUUID } = require('node:crypto');
 const {
   refreshPatientIntervals,
 } = require('../services/patient-time-lock.service');
 const { withMongoTransaction } = require('../../../../mongo/transaction.js');
 const {
-  getAppointmentModel,
-  getQueueTicketModel,
   getInboxModel,
   getOutboxModel,
 } = require('../models/appointment.model.js');
@@ -124,8 +126,8 @@ async function handleClaimQueueTicketCommand({
       );
     return existingRequest.response;
   }
-  const Appointment = getAppointmentModel(connection);
-  const QueueTicket = getQueueTicketModel(connection);
+  const Appointment = getAppointmentRepository(connection);
+  const QueueTicket = getQueueTicketRepository(connection);
   const Inbox = getInboxModel(connection);
   const Outbox = getOutboxModel(connection);
   try {
@@ -329,8 +331,8 @@ async function handleClinicalMessage({
       );
     return { duplicate: true };
   }
-  const Appointment = getAppointmentModel(connection);
-  const QueueTicket = getQueueTicketModel(connection);
+  const Appointment = getAppointmentRepository(connection);
+  const QueueTicket = getQueueTicketRepository(connection);
   return withMongoTransaction(connection, async (session) => {
     await Inbox.create(
       [
@@ -477,7 +479,7 @@ async function handleClinicalMessage({
       await QueueTicket.updateMany(
         completing,
         {
-          $set: { state: 'DONE', updatedAt: now },
+          $set: { state: 'DONE', visitId: payload.visitId, updatedAt: now },
           $push: { stateHistory: { state: 'DONE', at: now } },
           $inc: { version: 1 },
         },

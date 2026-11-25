@@ -56,6 +56,7 @@ async function listAvailableSlots({
       serviceId,
       startAt: slot.startAt,
       endAt: slot.endAt,
+      available: slot.capacity - slot.heldCount - slot.confirmedCount,
       remainingCapacity: slot.capacity - slot.heldCount - slot.confirmedCount,
     }));
 }

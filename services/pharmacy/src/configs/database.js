@@ -1,3 +1,4 @@
+const { installBusinessValidators } = require('../../../../mongo/erd-storage');
 const mongoose = require('mongoose');
 const { ensurePharmacyStorage } = require('../dbs/indexes.js');
 const DATABASE = 'pharmacy_db';
@@ -16,6 +17,7 @@ async function connectDatabase(uri) {
     .asPromise();
   try {
     await ensurePharmacyStorage(connection);
+    await installBusinessValidators(connection, 'pharmacy');
     return connection;
   } catch (error) {
     await connection.close();

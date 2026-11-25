@@ -1,5 +1,7 @@
 const { withMongoTransaction } = require('../../../mongo/transaction');
-const { getQueueTicketModel } = require('../src/models/appointment.model');
+const {
+  getQueueTicketRepository,
+} = require('../src/services/appointment.repository');
 const {
   clinicalTicketSnapshot,
   enqueueClinicalTicket,
@@ -12,7 +14,7 @@ async function exportClinicalTickets({ connection, date, enqueue = false }) {
   )
     throw new Error('Valid --date=YYYY-MM-DD is required.');
   return withMongoTransaction(connection, async (session) => {
-    const rows = await getQueueTicketModel(connection)
+    const rows = await getQueueTicketRepository(connection)
       .find({ appointmentDate: date })
       .sort({ id: 1 })
       .limit(1001)

@@ -65,6 +65,7 @@ const hash = (value) =>
 function snapshot(value) {
   return {
     userId: value.userId,
+    ...(value.phone !== undefined ? { phone: value.phone } : {}),
     actorType: value.actorType,
     capabilities: [...value.capabilities].sort(),
     status: value.status,
@@ -96,7 +97,12 @@ function validate(message) {
     invalid();
   const p = message.payload;
   if (
-    !exactFields(p, payloadFields) ||
+    !exactFields(p, [
+      ...payloadFields,
+      ...(Object.hasOwn(p || {}, 'phone') ? ['phone'] : []),
+    ]) ||
+    (p.phone !== undefined &&
+      (typeof p.phone !== 'string' || !/^[0-9]{9,11}$/.test(p.phone))) ||
     !isUuid(p.userId) ||
     p.userId !== message.aggregateId ||
     p.version !== message.aggregateVersion ||

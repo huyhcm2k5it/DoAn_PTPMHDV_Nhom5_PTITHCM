@@ -1,3 +1,6 @@
+const {
+  loadMedicationHold,
+} = require('../../services/pharmacy/src/services/medication-hold.repository');
 const { test, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
@@ -63,7 +66,7 @@ async function hold(id = rx, idempotencyKey = key()) {
   });
 }
 async function row(id) {
-  return h.connection.collection('medication_holds').findOne({ id });
+  return loadMedicationHold(h.connection, { id });
 }
 async function billing(type, holdId, extra = {}) {
   const r = await row(holdId);
@@ -297,9 +300,37 @@ test('FINAL projection replays, rejects same revision changed content and reject
   assert.match(stored.id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   assert.deepEqual(stored.linesSnapshot, m.payload.itemsSnapshot);
   assert.equal(stored.itemsSnapshot, undefined);
-  assert.deepEqual(Object.keys(stored).filter((k) => k !== '_id').sort(), ['id', 'prescriptionId', 'revision', 'visitId', 'linesSnapshot', 'sourceEventId', 'patientId'].sort());
-  await applyPrescriptionFinalized({ connection: h.connection, message: { ...m, messageId: key() }, now });
-  await assert.rejects(applyPrescriptionFinalized({ connection: h.connection, message: { ...m, messageId: key(), payload: { ...m.payload, finalizedAt: new Date(+now + 1000).toISOString() } }, now }), bad('PROJECTION_CONFLICT'));
+  assert.deepEqual(
+    Object.keys(stored)
+      .filter((k) => k !== '_id')
+      .sort(),
+    [
+      'id',
+      'prescriptionId',
+      'revision',
+      'visitId',
+      'linesSnapshot',
+      'sourceEventId',
+      'patientId',
+    ].sort(),
+  );
+  await applyPrescriptionFinalized({
+    connection: h.connection,
+    message: { ...m, messageId: key() },
+    now,
+  });
+  await assert.rejects(
+    applyPrescriptionFinalized({
+      connection: h.connection,
+      message: {
+        ...m,
+        messageId: key(),
+        payload: { ...m.payload, finalizedAt: new Date(+now + 1000).toISOString() },
+      },
+      now,
+    }),
+    bad('PROJECTION_CONFLICT'),
+  );
   assert.equal(
     (await applyPrescriptionFinalized({ connection: h.connection, message: m, now })).duplicate,
     true,
@@ -405,6 +436,14 @@ test('release and expiry race returns reservation once and rehold increments sta
   assert.equal(next.holdId, first.holdId);
   assert.equal((await row(next.holdId)).attemptNo, 2);
   assert.equal((await row(next.holdId)).attemptHistory.length, 1);
+  const late = await billing('ChargePrepared', next.holdId, {
+    sourceRevision: 1,
+    requestId: first.requestId,
+    state: 'CREATED',
+    chargeId: key(),
+  });
+  assert.equal(late.state, 'IGNORED');
+  assert.equal((await row(next.holdId)).chargeId, null);
   await assert.rejects(
     billing('ChargePaid', next.holdId, { sourceRevision: 1 }),
     bad('SOURCE_MISMATCH'),

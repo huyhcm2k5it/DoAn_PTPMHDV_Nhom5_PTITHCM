@@ -8,7 +8,7 @@ function getPatientModel(connection) {
       ownerUserId: { type: String, required: true },
       relation: { type: String, required: true, enum: ['SELF', 'OTHER'] },
       fullName: { type: String, required: true },
-      birthDate: { type: String, required: true },
+      birthDate: { type: Date, required: true },
       sex: { type: String, enum: PATIENT_SEX },
       bhytSelfDeclared: String,
       contactPhone: String,

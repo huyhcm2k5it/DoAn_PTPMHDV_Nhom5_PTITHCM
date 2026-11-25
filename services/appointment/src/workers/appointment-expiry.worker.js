@@ -1,3 +1,6 @@
+const {
+  getAppointmentRepository,
+} = require('../services/appointment.repository');
 const { randomUUID } = require('node:crypto');
 const { ApiError } = require('../core/errors');
 const {
@@ -5,7 +8,6 @@ const {
 } = require('../services/patient-time-lock.service');
 const { withMongoTransaction } = require('../../../../mongo/transaction.js');
 const {
-  getAppointmentModel,
   getSlotModel,
   getOutboxModel,
 } = require('../models/appointment.model.js');
@@ -16,7 +18,7 @@ async function expirePendingAppointments({
   batchSize = 100,
   createId = randomUUID,
 }) {
-  const Appointment = getAppointmentModel(connection);
+  const Appointment = getAppointmentRepository(connection);
   const candidates = await Appointment.find({
     state: 'PENDING_PAYMENT',
     $or: [

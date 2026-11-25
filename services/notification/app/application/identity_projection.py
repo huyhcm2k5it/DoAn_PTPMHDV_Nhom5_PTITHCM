@@ -36,8 +36,10 @@ def validate(envelope):
     if not isinstance(occurred, str) or parse_datetime(occurred) is None:
         raise ValueError('Invalid event timestamp')
     payload = envelope['payload']
-    if not isinstance(payload, dict) or set(payload) != PAYLOAD_FIELDS:
+    if not isinstance(payload, dict) or (set(payload) - {'phone'}) != PAYLOAD_FIELDS:
         raise ValueError('Invalid identity payload')
+    if 'phone' in payload and (not isinstance(payload['phone'], str) or not 8 <= len(payload['phone']) <= 20):
+        raise ValueError('Invalid optional phone')
     user_id = wire_uuid(payload['userId'])
     if (user_id != wire_uuid(envelope['aggregateId']) or not positive_int(payload['version'])
             or payload['version'] != envelope['aggregateVersion'] or not positive_int(payload['tokenVersion'])

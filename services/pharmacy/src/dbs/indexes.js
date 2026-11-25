@@ -138,6 +138,28 @@ const pharmacyStorage = [
       },
     ],
   },
+  {
+    name: 'inbox',
+    indexes: [
+      {
+        name: 'ix_pharmacy_delivery_source',
+        key: { consumer_name: 1, 'payload.sourceId': 1, message_type: 1 },
+      },
+      {
+        name: 'ix_pharmacy_delivery_charge',
+        key: { consumer_name: 1, 'payload.chargeId': 1, message_type: 1 },
+      },
+    ],
+  },
+  {
+    name: 'outbox',
+    indexes: [
+      {
+        name: 'ix_pharmacy_source_messages',
+        key: { aggregate_id: 1, message_type: 1, 'payload.sourceRevision': 1 },
+      },
+    ],
+  },
   ...technicalStorage,
 ];
 

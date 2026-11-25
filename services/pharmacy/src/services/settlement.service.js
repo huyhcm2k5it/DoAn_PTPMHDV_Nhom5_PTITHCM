@@ -1,3 +1,9 @@
+const { isForeignBillingEvent } = require('../../../../mongo/billing-scope');
+const {
+  loadMedicationHold,
+  replaceMedicationHold,
+  hydrateMedicationHold,
+} = require('./medication-hold.repository');
 const { randomUUID } = require('node:crypto');
 const {
   consume,
@@ -23,9 +29,7 @@ async function maybeCommit(connection, session, hold) {
     status: 'COMMITTED',
     version: hold.version + 1,
   };
-  await connection
-    .collection('medication_holds')
-    .replaceOne({ id: hold.id }, next, { session });
+  await replaceMedicationHold(connection, { id: hold.id }, next, { session });
   return next;
 }
 async function handleBillingMessage({ connection, message, now = new Date() }) {
@@ -47,8 +51,19 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
     { connection, message, now, consumerName: 'pharmacy-billing' },
     async (session) => {
       const p = message.payload;
+      if (
+        await isForeignBillingEvent(
+          connection,
+          message,
+          ['MED_HOLD', 'PHARMACY'],
+          'medication_holds',
+          session,
+        )
+      )
+        return { ignored: true, reason: 'OTHER_SOURCE_OWNER' };
       const coll = connection.collection('medication_holds');
-      const hold = await coll.findOne(
+      const hold = await loadMedicationHold(
+        connection,
         type === 'BillingStatusChanged'
           ? { chargeId: p.chargeId }
           : { id: p.sourceId },
@@ -64,17 +79,7 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
         integer(p.version, 'version');
         if (p.sourceId && p.sourceId !== hold.id)
           throw failure(409, 'SOURCE_MISMATCH', 'Billing source differs.');
-        if ((hold.billingStatusVersion || 0) < p.version)
-          await coll.updateOne(
-            { id: hold.id },
-            {
-              $set: {
-                billingStatusVersion: p.version,
-                refundStatus: p.refundStatus || hold.refundStatus,
-              },
-            },
-            { session },
-          );
+        // The versioned Billing receipt is committed by consume in the same transaction.
         return { state: 'APPLIED' };
       }
       const rejectReserve = async (reasonCode) => {
@@ -98,6 +103,33 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
         });
         return { state: 'REJECTED', responseMessageId };
       };
+      if (
+        type === 'ChargePrepared' &&
+        hold &&
+        ['MED_HOLD', 'PHARMACY'].includes(p.sourceType) &&
+        Number.isSafeInteger(p.sourceRevision) &&
+        p.sourceRevision > 0 &&
+        p.sourceRevision < hold.attemptNo &&
+        (hold.attemptHistory || []).some(
+          (entry) =>
+            entry.attemptNo === p.sourceRevision &&
+            ['RELEASED', 'EXPIRED'].includes(entry.status),
+        )
+      ) {
+        const original = await connection.collection('outbox').findOne(
+          {
+            message_type: 'RequestCharge',
+            aggregate_id: hold.id,
+            'payload.sourceRevision': p.sourceRevision,
+            'payload.requestId': p.requestId,
+          },
+          { session },
+        );
+        if (original && ['CREATED', 'REJECTED'].includes(p.state)) {
+          if (p.state === 'CREATED') uuid(p.chargeId, 'chargeId');
+          return { state: 'IGNORED', reason: 'RETIRED_HOLD_ATTEMPT' };
+        }
+      }
       if (
         type === 'ReserveSettlement' &&
         ['MED_HOLD', 'PHARMACY'].includes(p.sourceType) &&
@@ -138,7 +170,6 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
           { id: hold.id },
           {
             $set: {
-              chargeSync: p.state,
               chargeId: p.state === 'CREATED' ? p.chargeId : null,
             },
           },
@@ -250,7 +281,9 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
             amountHash: hold.snapshotHash,
           },
         });
-        await coll.replaceOne({ id: hold.id }, locked, { session });
+        await replaceMedicationHold(connection, { id: hold.id }, locked, {
+          session,
+        });
         return {
           state: 'ACCEPTED',
           fence,
@@ -368,7 +401,9 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
             'A terminal source cannot receive payment.',
           );
         const changed = { ...hold, paidEvidence: evidence };
-        await coll.replaceOne({ id: hold.id }, changed, { session });
+        await replaceMedicationHold(connection, { id: hold.id }, changed, {
+          session,
+        });
         return {
           state: (await maybeCommit(connection, session, changed)).status,
         };
@@ -441,7 +476,9 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
           version: hold.version + 1,
           paidEvidence: null,
         };
-        await coll.replaceOne({ id: hold.id }, changed, { session });
+        await replaceMedicationHold(connection, { id: hold.id }, changed, {
+          session,
+        });
         if (new Date(changed.expiresAt) <= now) {
           await returnReservation({
             connection,
@@ -454,7 +491,9 @@ async function handleBillingMessage({ connection, message, now = new Date() }) {
         }
         return { state: 'HELD' };
       }
-      await coll.replaceOne({ id: hold.id }, changed, { session });
+      await replaceMedicationHold(connection, { id: hold.id }, changed, {
+        session,
+      });
       return {
         state: (await maybeCommit(connection, session, changed)).status,
       };
@@ -468,9 +507,11 @@ async function reconcileMedicationHold(args) {
   return mutate(
     { ...args, now, route: 'PH-007:' + holdId, input: { expectedAttemptNo } },
     async (session) => {
-      const hold = await connection
-        .collection('medication_holds')
-        .findOne({ id: holdId }, { session });
+      const hold = await loadMedicationHold(
+        connection,
+        { id: holdId },
+        { session },
+      );
       if (!hold) throw failure(404, 'NOT_FOUND', 'Hold not found.');
       if (hold.attemptNo !== expectedAttemptNo)
         throw failure(409, 'STATE_CONFLICT', 'Attempt changed.');
@@ -489,24 +530,65 @@ async function queryUnresolvedSettlements({
   const { withMongoTransaction } = require('../../../../mongo/transaction');
   const rows = await connection
     .collection('medication_holds')
-    .find({
-      status: 'SETTLEMENT_LOCKED',
-      $or: [{ queryAfter: null }, { queryAfter: { $lte: now } }],
-    })
-    .limit(100)
+    .aggregate([
+      { $match: { status: 'SETTLEMENT_LOCKED' } },
+      {
+        $lookup: {
+          from: 'outbox',
+          let: { source: '$id', settlement: '$settlementId' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$aggregate_id', '$$source'] },
+                    { $eq: ['$message_type', 'QuerySettlement'] },
+                    { $eq: ['$payload.settlementId', '$$settlement'] },
+                  ],
+                },
+              },
+            },
+            { $sort: { occurred_at: -1 } },
+            { $limit: 1 },
+          ],
+          as: 'queries',
+        },
+      },
+      {
+        $match: {
+          $or: [
+            { 'queries.0': { $exists: false } },
+            { 'queries.0.occurred_at': { $lte: new Date(+now - intervalMs) } },
+          ],
+        },
+      },
+      { $sort: { 'queries.0.occurred_at': 1, id: 1 } },
+      { $limit: 100 },
+      { $project: { id: 1 } },
+    ])
     .toArray();
   let count = 0;
   for (const row of rows) {
     const changed = await withMongoTransaction(connection, async (session) => {
-      const hold = await connection.collection('medication_holds').findOne(
+      const hold = await loadMedicationHold(
+        connection,
         {
           id: row.id,
           status: 'SETTLEMENT_LOCKED',
-          $or: [{ queryAfter: null }, { queryAfter: { $lte: now } }],
         },
         { session },
       );
       if (!hold) return false;
+      const lastQuery = await connection.collection('outbox').findOne(
+        {
+          aggregate_id: hold.id,
+          message_type: 'QuerySettlement',
+          'payload.settlementId': hold.settlementId,
+        },
+        { session, sort: { occurred_at: -1 } },
+      );
+      if (lastQuery && +new Date(lastQuery.occurred_at) + intervalMs > +now)
+        return false;
       const requestId = randomUUID();
       await outbox(connection, session, {
         type: 'QuerySettlement',
@@ -525,11 +607,7 @@ async function queryUnresolvedSettlements({
       });
       await connection
         .collection('medication_holds')
-        .updateOne(
-          { id: hold.id },
-          { $set: { queryAfter: new Date(now.getTime() + intervalMs) } },
-          { session },
-        );
+        .updateOne({ id: hold.id }, { $inc: { version: 1 } }, { session });
       return true;
     });
     if (changed) count++;

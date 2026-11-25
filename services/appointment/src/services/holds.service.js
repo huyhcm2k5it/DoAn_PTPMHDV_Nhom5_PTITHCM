@@ -1,3 +1,5 @@
+const { getAppointmentRepository } = require('./appointment.repository');
+const { resolveDoctorMapping } = require('./doctor-mapping.service');
 const { createHash, randomUUID } = require('node:crypto');
 const { refreshPatientIntervals } = require('./patient-time-lock.service');
 const { withMongoTransaction } = require('../../../../mongo/transaction.js');
@@ -5,7 +7,6 @@ const {
   getScheduleModel,
   getSlotModel,
   getHoldModel,
-  getAppointmentModel,
   getPatientTimeLockModel,
   getIdempotencyModel,
 } = require('../models/appointment.model.js');
@@ -91,7 +92,7 @@ async function createHold({
   const Schedule = getScheduleModel(connection);
   const Slot = getSlotModel(connection);
   const Hold = getHoldModel(connection);
-  const Appointment = getAppointmentModel(connection);
+  const Appointment = getAppointmentRepository(connection);
   const Lock = getPatientTimeLockModel(connection);
   const Idempotency = getIdempotencyModel(connection);
   const replay = await existingIdempotency({
@@ -120,20 +121,7 @@ async function createHold({
           'SCHEDULE_UNAVAILABLE',
           'Lịch khám không còn mở.',
         );
-      // Only an admin-owned schedule supplies the Identity doctor and department.
-      // Legacy schedules may exist without this mapping; they cannot be booked.
-      const uuid =
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      if (
-        ![schedule.doctorUserId, schedule.departmentId].every(
-          (value) => typeof value === 'string' && uuid.test(value),
-        )
-      )
-        throw new ApiError(
-          409,
-          'CLINICAL_MAPPING_UNAVAILABLE',
-          'Schedule requires a trusted doctor user and department mapping before booking.',
-        );
+      await resolveDoctorMapping(connection, schedule.doctorId, session);
       await Lock.updateOne(
         { patientId },
         { $inc: { version: 1 } },
