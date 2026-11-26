@@ -30,7 +30,7 @@ func (s *streamRecorder) PublishPending(ctx context.Context, publish func(contex
 	return true, publish(ctx, ports.Outgoing{})
 }
 func TestStreamCadenceDoesNotRepeatBootstrapOrHeartbeatPerDrain(t *testing.T) {
-	store := &streamRecorder{pending: 45}
+	store := &streamRecorder{pending: 3}
 	s := NewStream(store)
 	base := time.Now()
 	published := 0
@@ -40,7 +40,7 @@ func TestStreamCadenceDoesNotRepeatBootstrapOrHeartbeatPerDrain(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if store.bootstrap != 1 || store.checkpoints != 2 || published != 45 {
+	if store.bootstrap != 1 || store.checkpoints != 2 || published != 3 || store.drains != 4 {
 		t.Fatalf("unexpected cadence/delivery: %+v published=%d", store, published)
 	}
 }
@@ -61,5 +61,20 @@ func TestStreamRetriesFailedBookkeepingBeforePublishing(t *testing.T) {
 	store.checkpointErr = nil
 	if err := s.Tick(context.Background(), now, send); err != nil || store.bootstrap != 2 || store.checkpoints != 2 || store.pending != 0 {
 		t.Fatalf("bookkeeping did not recover: %+v %v", store, err)
+	}
+}
+
+func TestTickYieldsAfterOneConfirmedDelivery(t *testing.T) {
+	store := &streamRecorder{pending: 20}
+	stream := NewStream(store)
+	published := 0
+	if err := stream.Tick(context.Background(), time.Now(), func(context.Context, ports.Outgoing) error {
+		published++
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if published != 1 || store.pending != 19 {
+		t.Fatalf("one slow tick must not start an unbounded series of remote transactions: published=%d pending=%d", published, store.pending)
 	}
 }

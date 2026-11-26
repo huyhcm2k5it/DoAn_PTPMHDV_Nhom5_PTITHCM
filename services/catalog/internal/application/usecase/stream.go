@@ -23,7 +23,10 @@ type Stream struct {
 
 func NewStream(store StreamStore) *Stream { return &Stream{store: store} }
 
-// Tick bootstraps once, maintains the heartbeat, and drains a bounded outbox batch.
+// Tick bootstraps once, maintains the heartbeat, and confirms one outbox row.
+// A batch of remote database transactions can exhaust the worker deadline after
+// successful deliveries. One row per tick keeps heartbeat bookkeeping timely;
+// the ticker is already ready again when an online operation exceeds 250 ms.
 func (s *Stream) Tick(ctx context.Context, now time.Time, publish func(context.Context, ports.Outgoing) error) error {
 	if !s.bootstrapped {
 		if err := s.store.BootstrapCatalogStream(ctx); err != nil {
@@ -37,14 +40,6 @@ func (s *Stream) Tick(ctx context.Context, now time.Time, publish func(context.C
 		}
 		s.nextCheckpoint = now.Add(10 * time.Second)
 	}
-	for i := 0; i < 20; i++ {
-		sent, err := s.store.PublishPending(ctx, publish)
-		if err != nil {
-			return err
-		}
-		if !sent {
-			break
-		}
-	}
-	return nil
+	_, err := s.store.PublishPending(ctx, publish)
+	return err
 }
