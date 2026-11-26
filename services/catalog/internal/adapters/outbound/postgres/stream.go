@@ -344,6 +344,17 @@ func (s *Store) EnsureCheckpoint(ctx context.Context, now time.Time) error {
 	if last != nil && now.Sub(*last) < 10*time.Second {
 		return tx.Commit(ctx)
 	}
+	// The stream row lock serializes this check with other heartbeat writers.
+	// A delayed publisher needs only one pending heartbeat to advertise the
+	// watermark after delivery resumes.
+	var waiting bool
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM outbox WHERE status='PENDING'
+		AND message_type='CatalogChanged' AND payload->'payload'->>'mode'='CHECKPOINT')`).Scan(&waiting); err != nil {
+		return err
+	}
+	if waiting {
+		return tx.Commit(ctx)
+	}
 	messageID := domain.NewID()
 	streamID := "00000000-0000-4000-8000-000000000000"
 	payload := map[string]any{"entityType": "STREAM", "entityId": streamID, "entityVersion": 1, "fullSnapshot": map[string]any{"sequence": sequence, "at": now}, "effectiveAt": now, "streamSequence": sequence, "mode": "CHECKPOINT"}

@@ -50,3 +50,8 @@ Chỉ sự kiện đổi quyền `UPSERT` tăng sequence. Clinical phát `CHECKP
 Triển khai Diagnostic API/worker trước, rồi Clinical API/worker. Consumer vẫn nhận checkpoint tăng sequence của phiên bản cũ khi không có marker, phục vụ giai đoạn chuyển phiên bản. Không rollback consumer cũ khi publisher mới còn chạy. Không cần migration hoặc đổi env. Bản sửa ngăn lỗi mới; backlog/DLQ cũ cần phân loại và xử lý riêng, không tự purge hay bỏ kiểm tra freshness 30 giây.
 
 Mỗi tick Catalog chỉ phát và confirm một outbox row để không gom 20 transaction online vào cùng deadline 30 giây. Tick chậm vẫn tiếp tục phát row kế tiếp qua ticker đang chờ; không đánh dấu SENT khi chưa confirm, không bỏ message hoặc gộp checkpoint lịch sử. Nhịp chờ 250 ms giới hạn tối đa khoảng 4 message/giây khi mạng nhanh; đây không phải thay đổi semantics của stream.
+
+
+Catalog giữ tối đa một checkpoint PENDING khi publisher đang chờ. Checkpoint mới tiếp tục được tạo sau khi checkpoint trước đã phát thành công và đến nhịp kế tiếp.
+
+Khi thay dữ liệu trực tiếp trên DB online, cần đồng bộ lại projection từ snapshot owner của dữ liệu hiện tại. Dùng `/snapshot` của Catalog, `/import-catalog` của Clinical/Diagnostic và `/recover-visit-grants` của Diagnostic theo hướng dẫn operator ở trên. Giữ sequence nguồn tăng liên tục và kiểm tra ID liên kết giữa user, bác sĩ, hồ sơ và lượt khám trước khi demo. Thay đổi qua API bình thường dùng outbox của owner để đồng bộ. Import trực tiếp bằng SQL cần bước snapshot này vì SQL ngoài ứng dụng không tạo event nghiệp vụ.

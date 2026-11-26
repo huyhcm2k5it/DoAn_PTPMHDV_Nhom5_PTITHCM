@@ -223,6 +223,9 @@ func TestCatalogStreamBootstrapCheckpoint(t *testing.T) {
 	}
 	var checkpoints int
 	_ = db.pool.QueryRow(ctx, `SELECT count(*) FROM outbox WHERE message_type='CatalogChanged' AND payload->'payload'->>'mode'='CHECKPOINT'`).Scan(&checkpoints)
+	if _, e = db.pool.Exec(ctx, `UPDATE outbox SET status='SENT' WHERE message_type='CatalogChanged' AND payload->'payload'->>'mode'='CHECKPOINT'`); e != nil {
+		t.Fatal(e)
+	}
 	if _, e = db.pool.Exec(ctx, `UPDATE catalog_stream SET checkpoint_at=NULL WHERE singleton=true`); e != nil {
 		t.Fatal(e)
 	}
@@ -248,8 +251,19 @@ func TestCatalogStreamBootstrapCheckpoint(t *testing.T) {
 	}
 	var afterTen int
 	_ = db.pool.QueryRow(ctx, `SELECT count(*) FROM outbox WHERE message_type='CatalogChanged' AND payload->'payload'->>'mode'='CHECKPOINT'`).Scan(&afterTen)
-	if afterTen != afterFirst+1 {
-		t.Fatal("10-second checkpoint not emitted", afterTen, afterFirst)
+	if afterTen != afterFirst {
+		t.Fatal("blocked publisher accumulated redundant heartbeats", afterTen, afterFirst)
+	}
+	if _, e = db.pool.Exec(ctx, `UPDATE outbox SET status='SENT' WHERE message_type='CatalogChanged' AND payload->'payload'->>'mode'='CHECKPOINT'`); e != nil {
+		t.Fatal(e)
+	}
+	if e = db.EnsureCheckpoint(ctx, base.Add(11*time.Second)); e != nil {
+		t.Fatal(e)
+	}
+	var afterDelivery int
+	_ = db.pool.QueryRow(ctx, `SELECT count(*) FROM outbox WHERE message_type='CatalogChanged' AND payload->'payload'->>'mode'='CHECKPOINT'`).Scan(&afterDelivery)
+	if afterDelivery != afterFirst+1 {
+		t.Fatal("heartbeat did not resume after pending delivery", afterDelivery, afterFirst)
 	}
 	if e = db.BootstrapCatalogStream(ctx); e != nil {
 		t.Fatal("bootstrap replay must be idempotent", e)
