@@ -9,6 +9,7 @@ import (
 )
 
 // Only integration tests embed fictional fixtures; production binaries cannot seed them.
+//
 //go:embed testdata/catalog.sql
 var catalogTestFiles embed.FS
 
