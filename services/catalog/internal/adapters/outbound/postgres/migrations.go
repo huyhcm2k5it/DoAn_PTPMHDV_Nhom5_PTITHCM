@@ -17,6 +17,7 @@ var catalogMigrations = [...]struct {
 	{3, "000003_doctor_mapping.up.sql"},
 	{4, "000004_catalog_erd_alignment.up.sql"},
 	{5, "000005_broker_delivery.up.sql"},
+	{6, "000006_outbox_stream_order.up.sql"},
 }
 
 func (s *Store) Ready(ctx context.Context) error {
@@ -64,22 +65,6 @@ func (s *Store) Migrate(ctx context.Context) error {
 		if _, err = tx.Exec(ctx, "INSERT INTO schema_migrations(version) VALUES($1)", migration.version); err != nil {
 			return fmt.Errorf("record Catalog migration %d: %w", migration.version, err)
 		}
-	}
-	return tx.Commit(ctx)
-}
-
-func (s *Store) Seed(ctx context.Context) error {
-	sql, err := migrations.Files.ReadFile("seed.sql")
-	if err != nil {
-		return fmt.Errorf("read Catalog seed: %w", err)
-	}
-	tx, err := s.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-	if _, err = tx.Exec(ctx, string(sql)); err != nil {
-		return err
 	}
 	return tx.Commit(ctx)
 }

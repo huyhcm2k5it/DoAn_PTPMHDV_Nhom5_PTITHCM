@@ -339,9 +339,11 @@ Bên gửi Clinical. Bên nhận Diagnostic.
 | --- | --- | --- |
 | umc.events.clinical.v1 | clinical.visit-doctor-grant-changed.v1 | evt.diagnostic.v1 |
 
-Payload gồm mode, sequence, visitId?, patientId?, doctorUserId?, active?, canCancel?.
+Payload gồm mode, sequence, watermarkOnly?, visitId?, patientId?, doctorUserId?, active?, canCancel?.
 
-UPSERT quyền theo lượt khám. CHECKPOINT kiểm tra tiến độ và độ mới của luồng quyền.
+UPSERT tăng sequence khi cấp hoặc thu hồi quyền theo lượt khám. CHECKPOINT mới dùng `watermarkOnly: true`, mang watermark hiện tại và không tăng sequence. Diagnostic chỉ làm mới checkpoint khi đã áp dụng đủ dữ liệu đến watermark; thiếu dù một sequence vẫn chặn quyền. Checkpoint không xóa gap cao hơn, không đổi quyền đã thu hồi và vẫn hết hạn sau 30 giây.
+
+Cập nhật Diagnostic consumer trước Clinical publisher. Consumer vẫn nhận checkpoint tăng sequence của bản cũ khi không có marker; không rollback consumer cũ trong khi publisher mới đang chạy. Không cần đổi HTTP API, migration hoặc env.
 
 Schema tại [visit-doctor-grant-changed.v1.schema.json](../contracts/messages/visit-doctor-grant-changed.v1.schema.json).
 

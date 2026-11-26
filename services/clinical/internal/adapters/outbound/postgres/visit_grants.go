@@ -37,6 +37,10 @@ func (t clinicalTx) appendGrantEvent(ctx context.Context, aggregate string, body
 	if err := t.tx.QueryRow(ctx, "UPDATE visit_grant_stream SET sequence=sequence+1 WHERE singleton RETURNING sequence").Scan(&sequence); err != nil {
 		return err
 	}
+	return t.appendGrantEnvelope(ctx, aggregate, body, now, meta, sequence)
+}
+
+func (t clinicalTx) appendGrantEnvelope(ctx context.Context, aggregate string, body map[string]any, now time.Time, meta domain.Meta, sequence int) error {
 	body["sequence"] = sequence
 	payload, err := json.Marshal(body)
 	if err != nil {
@@ -93,11 +97,20 @@ func (p *Probe) ReconcileVisitGrant(ctx context.Context, id string, revoke bool,
 func (p *Probe) PublishGrantCheckpoint(ctx context.Context, now time.Time) error {
 	return p.Within(ctx, "visit-grant-checkpoint", func(raw ports.ClinicalTx) error {
 		t := raw.(clinicalTx)
+		// A heartbeat advertises the committed watermark. Only a grant change
+		// consumes a sequence, so losing a heartbeat cannot create a data gap.
+		var sequence int
+		if err := t.tx.QueryRow(ctx, "SELECT sequence FROM visit_grant_stream WHERE singleton FOR UPDATE").Scan(&sequence); err != nil {
+			return err
+		}
+		if sequence == 0 {
+			return nil
+		}
 		var waiting bool
 		if err := t.tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM outbox WHERE status='PENDING' AND routing_key=$1
 			AND aggregate_id=$2)`, grantRoute, grantStreamID).Scan(&waiting); err != nil || waiting {
 			return err
 		}
-		return t.appendGrantEvent(ctx, grantStreamID, map[string]any{"mode": "CHECKPOINT"}, now, domain.Meta{})
+		return t.appendGrantEnvelope(ctx, grantStreamID, map[string]any{"mode": "CHECKPOINT", "watermarkOnly": true}, now, domain.Meta{}, sequence)
 	})
 }

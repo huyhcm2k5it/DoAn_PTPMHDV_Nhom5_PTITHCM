@@ -1,38 +1,69 @@
 # HQH Care web
 
-Frontend React/TypeScript dùng chung cho ba actor PATIENT, DOCTOR và STAFF. Phân công chi tiết theo frame tại [phân công frontend ba thành viên](../../docs/PHAN_CONG_FRONTEND_WEB_3_THANH_VIEN.md).
+Web React/TypeScript dùng chung cho PATIENT, DOCTOR và STAFF. **Phân công cập nhật 25/11/2026 theo 138 PDF trong `HQH_Care_web.zip`, code hiện có và backend của từng người** nằm ngay trong thư mục frontend:
 
-Quy định làm việc ngay trong thư mục web: [Phân công màn hình, thư mục và file chung](PHAN_CONG_VA_QUY_DINH_FRONTEND.md).
+**[Phân công chi tiết: màn → người làm → file → API → phần còn lại → tiêu chí bàn giao](PHAN_CONG_VA_QUY_DINH_FRONTEND.md)**
 
-## Chạy Docker với env nhóm
+Tài liệu có kiểm kê tên **đủ 138 PDF** (gồm 21 biến thể thông báo đã đọc), việc đã có code, việc cần sửa/thêm, khoảng trống backend và thứ tự ghép. “Có code” không đồng nghĩa đã kiểm thử đầy đủ. Đã đồng bộ `origin/develop` tại commit `b355d60` vào `huy_task` trước phần hoàn thiện Huy; trạng thái bên dưới được cập nhật theo nền này.
 
-Chạy project theo [hướng dẫn Docker chung](../../infra/compose/README.md) bằng đúng ba file env của nhóm. Web ở http://127.0.0.1:15173, phục vụ bằng Nginx và chuyển `/api/v1` về Gateway. API/worker dùng database, RabbitMQ, Redis online và cặp JWT hiện có của nhóm; không tạo bộ dữ liệu hoặc môi trường khác để thay thế.
+## Ai làm phần nào
 
-## Phạm vi từng người
+| Người    | Backend                         | Màn/frontend chốt đầu ra                                                                                                                      | File chính                                                                                           |
+| -------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **Quân** | Patient, Appointment, Pharmacy  | Shell/menu/router, trang chủ, 02 hồ sơ, 03 đặt lịch, màn cha 05, 08 tiếp nhận, 11/11.07 nhà thuốc; khung 12, 12.02 lịch ca                    | `src/app/App.tsx`, CSS shell, `src/shared/ui/`; `src/features/patient/`, `appointment/`, `pharmacy/` |
+| **Huy**  | Catalog, Clinical, Diagnostic   | 06 gồm 06.05/06.06/06.07/06.10; 07; 10; trang 05.06 LAB, 05.07 toa FINAL; 12.01/12.06 giá và danh mục dùng chung                              | `src/features/catalog/`, `clinical/`, `diagnostic/`                                                  |
+| **Hưng** | Identity, Billing, Notification | 01; Billing trong 04; 09 thu/hoàn/biên nhận; 12.03 quyền, 12.04 audit, phần Billing của 12.05 báo cáo; thông báo; JWT/lease/refresh/transport | `src/features/identity/`, `billing/`, `notification/`; `src/app/runtime.ts`, `src/shared/api/`       |
 
-| Owner | Màn và chức năng                                                                                                       | Thư mục chính                                                                           |
-| ----- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Quân  | Shell/sidebar/header/router; trang chủ, 02 hồ sơ, 03 đặt lịch, 05 lịch khám, 08 tiếp nhận, 11 nhà thuốc, 12 tổng quan  | `src/app/`, `src/features/patient/`, `appointment/`, `pharmacy/`, shared UI             |
-| Huy   | 06 bàn khám, 07 chỉ định/kê đơn, 10 xét nghiệm; khối 05.06 kết quả LAB và 05.07 toa FINAL; Catalog                     | `src/features/clinical/`, `diagnostic/`, `catalog/`                                     |
-| Hưng  | 01 tài khoản, 04 thanh toán, 09 thu ngân/hoàn tiền; JWT, lease, phiên và transport chung; Notification khi có thiết kế | `src/features/identity/`, `billing/`, `notification/`, `src/app/runtime.ts`, shared API |
+- **05.06/05.07 giữ trang riêng** như ZIP: `/patient/lab-results`, `/patient/medical-records`. Quân thêm tab/nút từ lịch khám và giữ hồ sơ/ngữ cảnh; Huy hoàn thiện nội dung. Không chép Clinical/Diagnostic vào Appointment.
+- **04 giữ route review hiện có**: Quân bàn giao hold/Appointment, Hưng ghép Billing. Chưa có FE Billing adapter đầy đủ; không coi tạo lịch là đã thanh toán.
+- **12 chia theo service**: Quân điều phối khung và ca, Huy giá, Hưng quyền/audit/số thu hoàn; các KPI thiếu API phải ghi rõ chờ nguồn.
+- **Thông báo đã đọc làm một lần dùng chung**: Hưng cung cấp component/API, Quân gắn shell. Không sao chép từng page theo biến thể PDF.
 
-Màn 05 vẫn do Quân phụ trách. Huy bàn giao `PublishedLabResults`, `MedicalHistory`, `SignedPrescription` để ghép; Hưng cung cấp phần thanh toán/hoàn tiền. Không làm thêm bản sao màn 05 trong feature riêng. Toa đã ký lấy từ Clinical; trạng thái cấp thuốc lấy từ Pharmacy.
+## Hiện có và việc cần làm trước
 
-## Phối hợp và tránh xung đột
+Có các feature Patient/Appointment/Pharmacy, Catalog/Clinical/Diagnostic và page tài khoản Identity. Hai trang Huy đọc kết quả/toa theo hồ sơ đã có adapter, Develop đã có tab/nút và AppointmentRecords của Quân để ghép theo lịch; trang riêng Huy hiển thị theo hồ sơ, giữ patientId qua ba tab và đường quay lại.
 
-- Người phụ trách feature sửa page, CSS, API client và test trong feature đó. Khi cần sửa phần của người khác, thống nhất phạm vi và ghi rõ trong PR.
-- Quân chủ trì `src/app/App.tsx` và router/menu; Hưng chủ trì `src/app/runtime.ts` và shared HTTP/session. Huy cung cấp component, kiểu props, đường dẫn route, yêu cầu quyền và callback để tích hợp.
-- File chung không có cơ chế khóa tự động. Hai người sửa cùng vùng code vẫn có thể conflict; thay đổi hai file khác nhau cũng có thể lệch props, route hoặc quyền. Cần review cả hành vi sau khi merge.
-- Trước khi tích hợp, cập nhật bản `develop` mới nhất và kiểm tra diff trên nhánh đang làm. Giữ thay đổi chưa commit an toàn; không reset hoặc ghi đè phần của người khác để giải quyết conflict.
-- Nếu conflict, đọc cả hai thay đổi, giữ chức năng của hai bên và chạy lại kiểm tra. Không chọn toàn bộ ours/theirs khi chưa đối chiếu.
-- Lần tích hợp màn Huy hiện có thay đổi ở `App.tsx` (route, menu, API adapter) và `runtime.ts` (401 do lease hết hạn không đăng xuất nhầm phiên JWT). Hai phần này cần Quân/Hưng review khi gộp.
+Thu ngân `/staff/cashier` hiện còn khung tĩnh; Billing đã có api.ts/types.ts và phần thanh toán ở BookingReview; Notification chưa có FE component. Các page quản trị quyền/audit/Billing report chưa có. Huy đã bổ sung trang `/staff/prices`, API CA-007 đọc lịch sử giá và lease CA-004 khi tạo giá, không thay schema DB. Tài liệu phân công giao rõ Q-01–Q-08, H-01–H-07, U-01–U-09 và B-01–B-08 để xử lý các phần này.
 
-## Chạy và kiểm tra
+Thứ tự làm: (1) chốt session/props/route/nguồn API; (2) hồ sơ → đặt lịch → thanh toán → 05 và hai trang Huy; (3) tiếp nhận → khám → LAB → ký → thuốc/hoàn; (4) quản trị/thông báo và đối chiếu đủ PDF. Mỗi owner tiếp tục sửa phần đã có, không dựng lại ứng dụng.
 
-Từ `apps/web`, chạy `npm ci`, rồi `npm run dev`. Vite mở tại `http://127.0.0.1:5173` và chuyển `/api/v1` tới Gateway `http://127.0.0.1:8080`. Đăng nhập thật cần Gateway và Identity đang chạy; từng nghiệp vụ còn cần API/worker tương ứng. Không đưa mật khẩu DB, RabbitMQ, Redis hoặc private key vào mã frontend.
+## Quy tắc tích hợp
 
-Chạy `npm run typecheck`, `npm test`, `npm run build` trước khi gộp. Kiểm thủ công route/menu theo vai trò, thao tác giữa hai feature, hết phiên và đổi tài khoản. Quyền ADMIN không tự động thay vai trò DOCTOR/PATIENT hoặc bỏ quy tắc không tự duyệt LAB.
+Quân chốt `App.tsx` và UI chung; Hưng chốt `runtime.ts`/`shared/api/`; owner feature chốt page/API/types/CSS nghiệp vụ. Gửi props, route, capability, callback và bước kiểm tra cho owner nhận trước khi ghép. Tách thư mục không loại bỏ conflict hoặc lệch hợp đồng.
 
-Dữ liệu mô phỏng Huy ở `tests/fixtures/huy-demo.json`, chỉ dành cho kiểm thử. Ứng dụng chính không tự dùng file này khi API lỗi. Test mô phỏng/build thành công chưa chứng minh tích hợp DB, JWT và RabbitMQ online đã hoàn tất. Phạm vi kiểm tra giao diện Huy hiện tập trung web desktop theo yêu cầu.
+Mỗi frame trạng thái dùng dữ liệu/trạng thái API tương ứng, không là một route riêng. SELF/OTHER dùng cùng luồng theo owner. Backend quyết định quyền và kết quả nghiệp vụ; FE không tự giả CONFIRMED, PAID, PUBLISHED hoặc FINAL. Không dùng tên/giá/đồng hồ/số đếm trong PDF làm fallback khi API lỗi.
 
-Xem [Clinical](src/features/clinical/README.md), [Diagnostic](src/features/diagnostic/README.md) và [runtime/shell](src/app/README.md) để biết đầu vào và luồng bàn giao.
+Các thay đổi local đang có phải được giữ an toàn trước khi cập nhật `develop` và tích hợp; không reset hay chép đè phần người khác. Không tự tạo nhánh/preview/stack/env riêng. Bảng owner chi tiết và hợp đồng đi/về ở [mục 6–7 của phân công](PHAN_CONG_VA_QUY_DINH_FRONTEND.md#6-quy-định-file-và-route).
+
+## Chạy ứng dụng chung
+
+### Docker của nhóm
+
+Theo [hướng dẫn Compose chung](../../infra/compose/README.md), nạp đúng ba file env của nhóm. Web tại http://127.0.0.1:15173, Nginx chuyển `/api/v1` về Gateway. Các API/worker dùng database, RabbitMQ, Redis online và cặp JWT hiện có. FE không nhận mật khẩu DB/broker/Redis hoặc private key.
+
+### Phát triển FE bằng Vite
+
+Tại `apps/web`:
+
+```powershell
+npm ci
+npm run dev
+```
+
+Vite mặc định http://127.0.0.1:5173, proxy `/api/v1` tới Gateway http://127.0.0.1:8080. Có thể đặt `HQH_GATEWAY_URL` trong môi trường chạy Vite nếu Gateway ở địa chỉ khác; biến này là URL kết nối, không phải bí mật. Đăng nhập cần Identity/Gateway; dữ liệu nghiệp vụ cần API/worker liên quan. Bộ dữ liệu minh họa không thay thế server thật.
+
+## Nghiệm thu khi code hoàn tất
+
+Trong `apps/web`, các lệnh kiểm tra hiện có:
+
+```powershell
+npm run typecheck
+npm test
+npm run build
+```
+
+Sau đó đối chiếu luồng đi/về, refresh/deep link, đổi hồ sơ/tài khoản, loading/rỗng/lỗi, double click/retry/idempotency, expectedVersion/409, hết phiên/lease và quyền. 202 chưa là kết quả cuối, polling phải hủy khi rời màn. ADMIN không tự thay actor DOCTOR/PATIENT hoặc bỏ quy tắc người duyệt độc lập. Phạm vi hiện tại là **web desktop** theo yêu cầu; không mặc định mở rộng kiểm điện thoại.
+
+`tests/fixtures/huy-demo.json` chỉ là fixture kiểm thử. Không fallback fixture thành dữ liệu online khi request lỗi. Không commit env thật, private PEM, token hay log có bí mật. Chạy test mô phỏng/build thành công chưa chứng minh DB/JWT/message liên service đã thông suốt.
+
+Sau cập nhật phân công đã thực hiện code phần Huy, chạy kiểm tra tự động phù hợp; chưa chạy E2E online hoặc ghi/migrate dữ liệu Neon. Runtime Catalog/Clinical đã gỡ seed demo; fixture chỉ dành cho test, không được đưa vào binary. Xem [Clinical](src/features/clinical/README.md), [Diagnostic](src/features/diagnostic/README.md), [shell](src/app/README.md), [shared API](src/shared/api/README.md), [HTTP contracts](../../contracts/http/README.md) và [phân công đầy đủ](PHAN_CONG_VA_QUY_DINH_FRONTEND.md).

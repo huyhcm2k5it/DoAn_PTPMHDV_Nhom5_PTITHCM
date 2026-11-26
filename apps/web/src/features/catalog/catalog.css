@@ -232,3 +232,36 @@
     }
   }
 }
+.umc-catalog .catalog-price-history {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border, #d9e4ed);
+}
+.umc-catalog .catalog-price-history label {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 20rem;
+  margin: 1rem 0;
+}
+.umc-catalog .catalog-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+.umc-catalog .catalog-table-scroll table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.umc-catalog .catalog-table-scroll th,
+.umc-catalog .catalog-table-scroll td {
+  padding: 0.85rem;
+  border-bottom: 1px solid var(--border, #d9e4ed);
+  vertical-align: top;
+}
+.umc-catalog .catalog-price-history nav {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}

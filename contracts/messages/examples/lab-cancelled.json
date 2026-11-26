@@ -16,6 +16,7 @@
     "cancellationId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
     "noSpecimen": true,
     "reasonCode": "DOCTOR_REQUEST",
-    "version": 2
+    "version": 2,
+    "sourceRevision": 1
   }
 }

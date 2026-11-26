@@ -2,8 +2,8 @@
 
 Nhánh làm việc là `huy_task`, đồng bộ từ `develop`. Huy phụ trách Catalog, Clinical và Diagnostic, gồm HTTP API, PostgreSQL, Redis cho cả ba service, worker RabbitMQ và hợp đồng giao tiếp.
 
-1. Đọc `services/catalog/README.md`: DB, migrate, seed, API, lệnh chạy/test.
-2. Xem `contracts/http/catalog.openapi.json` và `catalog-integration.md`: schema/claim/quyền/seed ID/điểm nối còn chờ.
+1. Đọc `services/catalog/README.md`: DB online, schema migration, API, lệnh chạy/test.
+2. Xem `contracts/http/catalog.openapi.json` và `catalog-integration.md`: schema/claim/quyền/ID từ dữ liệu online/điểm nối còn chờ.
 3. Chạy web tại `apps/web` qua Gateway. Các màn Catalog, Clinical và Diagnostic dùng chung phiên đăng nhập, router và runner kiểm thử của web.
 4. Clinical đã có nhận lượt, ghi nháp, chỉ định LAB, toa, ký khám và đọc lịch sử. Diagnostic có thanh toán LAB, mẫu, kết quả, duyệt, công bố, hủy và nhận trạng thái hoàn. Đọc `contracts/http/clinical-integration.md` và `diagnostic-integration.md` trước khi nối frontend.
 
@@ -24,3 +24,29 @@ Image Clinical có sẵn `/visit-grant` cho tác vụ đồng bộ lại quyền
 Với hướng EC2 và Vercel, backend chạy sau Gateway HTTPS. Web gọi đường dẫn tương đối `/api/v1`, nên cấu hình triển khai web phải chuyển `/api/v1/*` tới Gateway. `HQH_GATEWAY_URL` của Vite cấu hình proxy của Vite khi phát triển. Cấu hình DB, RabbitMQ, Redis và khóa triển khai nằm ở môi trường backend.
 
 Xem `tools/huy/VERIFICATION.md` để đối chiếu các đợt kiểm thử backend trước đó.
+
+## Runtime không có seed giả
+
+Catalog không còn cờ -seed hoặc migrations/seed.sql; Clinical không còn -seed-demo/SeedDemo. Migration chỉ áp schema. Fixture SQL của Catalog chỉ embed trong file integration_test.go và không vào binary. Import projection vẫn giữ vì nhận snapshot owner có căn cứ, không thay bằng dữ liệu tự tạo. Các bài test fixture không là cách nạp dữ liệu vào Neon.
+
+## Phục hồi projection quyền bác sĩ Diagnostic
+
+Khi Diagnostic bị gap stream, dùng `services/diagnostic/cmd/recover-visit-grants` theo quyền operator Huy. Công cụ chỉ đọc nguồn Clinical bằng transaction repeatable-read/read-only, yêu cầu mọi lượt đều có grant tường minh, giữ nguyên cả quyền đã thu hồi và quyền hủy của lượt đã ký. Target chỉ ghi `objects` cho grant, metadata version và watermark trong cùng transaction khóa `diagnostic:business`. Không ghi bảng nghiệp vụ, inbox hoặc DLQ.
+
+Nạp `CLINICAL_DATABASE_URL` và `DIAGNOSTIC_DATABASE_URL` từ env Huy hiện có vào môi trường tiến trình. Tại `services/diagnostic`, chạy `go run ./cmd/recover-visit-grants` để dry-run; chỉ thêm `-apply` khi đã kiểm kết quả và được phép phục hồi projection shared. Công cụ từ chối sai database, snapshot thiếu quyền, watermark lùi/đã có gap mới hơn hoặc snapshot quá hạn. Không cấp DSN Clinical cho API/worker Diagnostic; đây là lệnh operator riêng, không có HTTP endpoint hoặc worker mới. Image Diagnostic có binary `/recover-visit-grants` sau khi build lại.
+
+Sau recovery, phải kiểm checkpoint mới tiếp tục đến, Last bắt kịp GapThrough và checkpoint chưa quá 30 giây, rồi thử đúng/sai bác sĩ và quyền đã thu hồi. Snapshot không thay thế việc xử lý backlog RabbitMQ. Không bỏ guard hoặc tự điền timestamp mới để làm health giả. Các checkpoint backlog hoặc DLQ chỉ được xử lý theo quy trình đã được duyệt; giữ bằng chứng nguồn và trạng thái nghiệp vụ.
+
+## Độ bền stream Catalog và lỗi Gateway
+
+Publisher Catalog chạy độc lập với consumer Identity, dùng một publisher duy nhất và join khi shutdown trước khi đóng channel. Bootstrap chỉ chạy lại nếu chưa thành công; checkpoint được kiểm theo nhịp 10 giây bằng thời gian thực lúc tick. Lỗi broker giữ event đầu stream PENDING và backoff 5/15/60 giây (capped 60), không chuyển FAILED rồi vượt qua sequence. Channel publisher đóng sẽ kết thúc lượt worker để cơ chế restart kết nối lại. Không tự gộp, bỏ qua hoặc xóa checkpoint cũ.
+
+Ba adapter FE Huy giữ mã lỗi nghiệp vụ từ JSON. Với phản hồi text của Gateway, 401/403/5xx lần lượt được thể hiện là UNAUTHENTICATED/FORBIDDEN/SERVICE_UNAVAILABLE và giữ X-Correlation-ID khi có. HTTP 2xx thiếu data vẫn là INVALID_RESPONSE; không đổi lỗi kết nối thành dữ liệu demo hoặc danh sách trống.
+
+### Heartbeat quyền bác sĩ Clinical → Diagnostic
+
+Chỉ sự kiện đổi quyền `UPSERT` tăng sequence. Clinical phát `CHECKPOINT` với `watermarkOnly: true` tại sequence hiện tại, tối đa một checkpoint đang chờ trong outbox. Khi cùng sequence, publisher gửi dữ liệu trước checkpoint. Diagnostic chỉ làm mới thời điểm checkpoint khi đã áp dụng đủ dữ liệu; checkpoint đi trước dù chỉ một sequence cũng ghi nhận gap và chặn quyền. Checkpoint không xóa gap cao hơn, không đổi hash dữ liệu cuối, không mở lại quyền đã thu hồi và không kéo lùi thời điểm freshness.
+
+Triển khai Diagnostic API/worker trước, rồi Clinical API/worker. Consumer vẫn nhận checkpoint tăng sequence của phiên bản cũ khi không có marker, phục vụ giai đoạn chuyển phiên bản. Không rollback consumer cũ khi publisher mới còn chạy. Không cần migration hoặc đổi env. Bản sửa ngăn lỗi mới; backlog/DLQ cũ cần phân loại và xử lý riêng, không tự purge hay bỏ kiểm tra freshness 30 giây.
+
+Mỗi tick Catalog chỉ phát và confirm một outbox row để không gom 20 transaction online vào cùng deadline 30 giây. Tick chậm vẫn tiếp tục phát row kế tiếp qua ticker đang chờ; không đánh dấu SENT khi chưa confirm, không bỏ message hoặc gộp checkpoint lịch sử. Nhịp chờ 250 ms giới hạn tối đa khoảng 4 message/giây khi mạng nhanh; đây không phải thay đổi semantics của stream.

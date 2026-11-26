@@ -72,9 +72,11 @@ export function SignedPrescription({
 export function MedicalHistory({
   api,
   patientId,
+  prescriptionsOnly = false,
 }: {
   api: ClinicalApi;
   patientId: string;
+  prescriptionsOnly?: boolean;
 }) {
   const [page, setPage] = useState(1),
     [reload, setReload] = useState(0);
@@ -84,6 +86,8 @@ export function MedicalHistory({
   });
   const [loading, setLoading] = useState(true),
     [error, setError] = useState<unknown>();
+  const queryKey = `${patientId}:${page}:${reload}`;
+  const [loadedFor, setLoadedFor] = useState('');
   useEffect(() => {
     setPage(1);
     setData({ items: [], total: 0 });
@@ -104,14 +108,18 @@ export function MedicalHistory({
         if (active) setError(e);
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) {
+          setLoadedFor(queryKey);
+          setLoading(false);
+        }
       });
     return () => {
       active = false;
       abort.abort();
     };
   }, [api, patientId, page, reload]);
-  if (loading) return <Loading>Đang tải lịch sử khám…</Loading>;
+  if (loading || loadedFor !== queryKey)
+    return <Loading>Đang tải lịch sử khám…</Loading>;
   if (error)
     return (
       <Notice tone="error">
@@ -121,25 +129,37 @@ export function MedicalHistory({
         </button>
       </Notice>
     );
+  const records = data.items.filter(
+    (record) =>
+      record.visit.state === 'SIGNED' &&
+      (!prescriptionsOnly ||
+        record.prescriptions.some((p) => p.state === 'FINAL')),
+  );
   return (
-    <section className="huy-medical-history" aria-label="Lịch sử khám đã ký">
-      {!data.items.length ? (
-        <Empty>Chưa có bệnh án đã ký được phép xem.</Empty>
+    <section
+      className="huy-medical-history"
+      aria-label={prescriptionsOnly ? 'Toa thuốc đã ký' : 'Lịch sử khám đã ký'}
+    >
+      {!records.length ? (
+        <Empty>
+          {prescriptionsOnly
+            ? data.total > 0
+              ? 'Trang bệnh án này chưa có toa đã ký. Bạn có thể xem các trang khác bên dưới.'
+              : 'Chưa có toa thuốc đã ký được phép xem.'
+            : 'Chưa có bệnh án đã ký được phép xem.'}
+        </Empty>
       ) : (
-        data.items
-          .filter((record) => record.visit.state === 'SIGNED')
-          .map((record) => (
-            <article className="huy-history-record" key={record.visit.id}>
-              <header>
-                <FileText size={20} aria-hidden="true" />
-                <div>
-                  <h3>Lượt khám {shortId(record.visit.id)}</h3>
-                  <p className="huy-muted">
-                    {timeLabel(record.visit.signedAt)}
-                  </p>
-                </div>
-                <span className="huy-badge success">Đã ký</span>
-              </header>
+        records.map((record) => (
+          <article className="huy-history-record" key={record.visit.id}>
+            <header>
+              <FileText size={20} aria-hidden="true" />
+              <div>
+                <h3>Lượt khám {shortId(record.visit.id)}</h3>
+                <p className="huy-muted">{timeLabel(record.visit.signedAt)}</p>
+              </div>
+              <span className="huy-badge success">Đã ký</span>
+            </header>
+            {!prescriptionsOnly && (
               <dl>
                 <dt>Lý do khám & bệnh sử</dt>
                 <dd>{record.note.symptoms || 'Chưa ghi nhận'}</dd>
@@ -150,13 +170,14 @@ export function MedicalHistory({
                 <dt>Chẩn đoán</dt>
                 <dd>{record.note.diagnosis || 'Chưa ghi nhận'}</dd>
               </dl>
-              {record.prescriptions
-                .filter((p) => p.state === 'FINAL')
-                .map((p) => (
-                  <SignedPrescription key={p.id} prescription={p} />
-                ))}
-            </article>
-          ))
+            )}
+            {record.prescriptions
+              .filter((p) => p.state === 'FINAL')
+              .map((p) => (
+                <SignedPrescription key={p.id} prescription={p} />
+              ))}
+          </article>
+        ))
       )}
       <nav className="huy-pagination" aria-label="Phân trang lịch sử khám">
         <button
@@ -167,7 +188,7 @@ export function MedicalHistory({
           Trước
         </button>
         <span>
-          Trang {page} · {data.total} lượt
+          Trang {page} · {data.total} lượt khám đã ký
         </span>
         <button
           type="button"

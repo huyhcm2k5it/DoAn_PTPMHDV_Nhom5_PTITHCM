@@ -178,6 +178,12 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 2147483647
+            },
+            "sourceRevision": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647,
+              "description": "Revision of the cancelled billing source. New producers always supply this; absence is accepted only for legacy deliveries."
             }
           },
           "required": [

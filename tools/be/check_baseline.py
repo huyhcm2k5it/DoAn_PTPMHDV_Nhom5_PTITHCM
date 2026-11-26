@@ -65,9 +65,9 @@ def validate(manifest):
     current = build()
     if manifest != current:
         raise ValueError("Baseline drift: review source/decision changes and explicitly regenerate.")
-    assert len(manifest["http"]) == 86
-    assert len({r["id"] for r in manifest["http"]}) == 86
-    assert sum(r["profile"] == "normal" for r in manifest["http"]) == 83
+    assert len(manifest["http"]) == 87
+    assert len({r["id"] for r in manifest["http"]}) == 87
+    assert sum(r["profile"] == "normal" for r in manifest["http"]) == 84
     assert len(manifest["events"]) == 20 and len(manifest["commands"]) == 5
     assert len(manifest["decisions"]) == 10
 
@@ -79,4 +79,4 @@ if __name__ == "__main__":
     if args.write:
         MANIFEST.write_text(json.dumps(build(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     validate(json.loads(MANIFEST.read_text(encoding="utf-8")))
-    print("PASS baseline: 86 HTTP, 20 events, 5 commands; human review PENDING.")
+    print("PASS baseline: 87 HTTP, 20 events, 5 commands; human review PENDING.")

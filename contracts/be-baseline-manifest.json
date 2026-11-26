@@ -5,19 +5,19 @@
   "sources": [
     {
       "path": "docs/HQH_Care_API_86_9_Service_v5_2 - 01_HTTP_86.csv",
-      "sha256": "0c5ab4c5a7a827c35be39002ce746a50c9e932783a68f81453649f26a137c492"
+      "sha256": "b9695a36f93e0fb7b38b6b0a1fda64b34f3275587ec5690aa1348c5ce2be7e21"
     },
     {
       "path": "docs/HQH_Care_API_86_9_Service_v5_2 - 02_ThamSo.csv",
-      "sha256": "cbfb2d417c1352f6b1010f8ff528ebf599642031f8980337fb27678652e3d2bb"
+      "sha256": "f3741298c9120bb3994dfad7e89b9a3777820e9b1cfabf1bf65bda3c2c388317"
     },
     {
       "path": "docs/HQH_Care_API_86_9_Service_v5_2 - 03_PhanHoi.csv",
-      "sha256": "e843f9b89cea98893df37fc4cdaaf5fed2bb66fb1ec32d53e6e3b09366ddf6ae"
+      "sha256": "47aedd274cc23fe31bd43e644249f456367f261a222ad3ba4814dbf6f3158305"
     },
     {
       "path": "docs/HQH_Care_API_86_9_Service_v5_2 - 04_Events_18.csv",
-      "sha256": "f8a70c3caccd5d7bacf89cf7806923a04268454fc128bbec8a8138e5fcd7fa67"
+      "sha256": "1be09f4506a642dded21d997188a946e57d079eb6eb307630841e465b5093d49"
     },
     {
       "path": "docs/HQH_Care_API_86_9_Service_v5_2 - 05_Commands_5.csv",
@@ -986,6 +986,17 @@
       "errors": "400, 401, 403, 503",
       "poll": "",
       "profile": "normal"
+    },
+    {
+      "id": "CA-007",
+      "service": "catalog",
+      "method": "GET",
+      "path": "/api/v1/prices",
+      "actor": "STAFF[ADMIN]",
+      "success": "200",
+      "errors": "400, 401, 403, 503",
+      "poll": "",
+      "profile": "normal"
     }
   ],
   "events": [
@@ -1013,11 +1024,11 @@
       "Event": "LabCancelled",
       "Producer": "Diagnostic",
       "Consumer": "Billing Clinical",
-      "Payload fields (? = tùy chọn)": "orderId, visitId, cancellationId, noSpecimen, reasonCode, version",
+      "Payload fields (? = tùy chọn)": "orderId, visitId, sourceRevision, cancellationId, noSpecimen, reasonCode, version",
       "Exchange": "umc.events.{producer}.v1",
       "Routing key": "diagnostic.lab-cancelled.v1",
       "Queue nhận": "evt.billing.v1, evt.clinical.v1",
-      "Quy tắc nghiệp vụ": "orderId, visitId, cancellationId, noSpecimen, reasonCode, version. Hủy order; xét lại điều kiện ký và tiền"
+      "Quy tắc nghiệp vụ": "Hủy LAB chưa lấy mẫu; sourceRevision khớp nguồn tính phí; chưa thu thì void, đã thu thì Billing đối soát hoàn. orderId, visitId, sourceRevision, cancellationId, noSpecimen, reasonCode, version. Hủy order; xét lại điều kiện ký và tiền"
     },
     {
       "Event": "LabResultPublished",
@@ -1183,11 +1194,11 @@
       "Event": "VisitDoctorGrantChanged",
       "Producer": "Clinical",
       "Consumer": "Diagnostic",
-      "Payload fields (? = tùy chọn)": "mode, sequence, visitId?, patientId?, doctorUserId?, active?, canCancel?",
+      "Payload fields (? = tùy chọn)": "mode, sequence, watermarkOnly?, visitId?, patientId?, doctorUserId?, active?, canCancel?",
       "Exchange": "umc.events.clinical.v1",
       "Routing key": "clinical.visit-doctor-grant-changed.v1",
       "Queue nhận": "evt.diagnostic.v1",
-      "Quy tắc nghiệp vụ": "UPSERT quyền theo lượt khám. CHECKPOINT kiểm tra tiến độ và độ mới của luồng quyền."
+      "Quy tắc nghiệp vụ": "UPSERT tăng sequence khi đổi quyền. CHECKPOINT mới có watermarkOnly=true và không tăng sequence; không thay thế dữ liệu chưa nhận. Consumer nhận kiểu cũ không marker khi triển khai chuyển phiên bản."
     }
   ],
   "commands": [

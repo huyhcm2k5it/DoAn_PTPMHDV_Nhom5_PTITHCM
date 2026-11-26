@@ -44,3 +44,44 @@ describe('Catalog contract adapter', () => {
     } satisfies Partial<ApiError>);
   });
 });
+
+it('obtains a fresh CA-004 lease per retry while preserving the price intent and key', async () => {
+  const transport = vi.fn().mockImplementation(
+    async () =>
+      new Response(
+        JSON.stringify({
+          data: {
+            priceVersionId: 'price',
+            revision: 2,
+            effectiveFrom: '2030-01-01T00:00:00Z',
+          },
+        }),
+      ),
+  );
+  const lease = vi
+    .fn()
+    .mockResolvedValueOnce('lease-one')
+    .mockResolvedValueOnce('lease-two');
+  const api = createCatalogApi(transport, { authorizationLease: lease });
+  const input = {
+    itemType: 'EXAM' as const,
+    itemId: 'item',
+    amountVnd: 25000,
+    effectiveFrom: '2030-01-01T00:00:00Z',
+  };
+  await api.createPrice(input, 'same-intent');
+  await api.createPrice(input, 'same-intent');
+  expect(lease.mock.calls).toEqual([['CA-004'], ['CA-004']]);
+  const first = transport.mock.calls[0][1] as RequestInit;
+  const second = transport.mock.calls[1][1] as RequestInit;
+  expect(new Headers(first.headers).get('X-Authorization-Lease')).toBe(
+    'lease-one',
+  );
+  expect(new Headers(second.headers).get('X-Authorization-Lease')).toBe(
+    'lease-two',
+  );
+  expect(new Headers(second.headers).get('Idempotency-Key')).toBe(
+    'same-intent',
+  );
+  expect(second.body).toBe(first.body);
+});

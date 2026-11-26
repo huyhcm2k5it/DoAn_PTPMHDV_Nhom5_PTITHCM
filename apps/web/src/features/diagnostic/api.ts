@@ -16,6 +16,7 @@ export class DiagnosticError extends Error {
 export function diagnosticMessage(error: unknown): string {
   if (error instanceof DiagnosticError) {
     const messages: Record<string, string> = {
+      UNAUTHENTICATED: 'Vui lòng đăng nhập lại để tiếp tục.',
       FORBIDDEN:
         'Bạn không có quyền thực hiện thao tác này. Người đã tham gia nhập kết quả không được duyệt kết quả đó.',
       STATE_CONFLICT:
@@ -46,9 +47,19 @@ export function createDiagnosticApi(
     if (!res.ok)
       throw new DiagnosticError(
         res.status,
-        b?.error?.code ?? 'INVALID_RESPONSE',
+        b?.error?.code ??
+          (res.status === 401
+            ? 'UNAUTHENTICATED'
+            : res.status === 403
+              ? 'FORBIDDEN'
+              : res.status >= 500
+                ? 'SERVICE_UNAVAILABLE'
+                : 'INVALID_RESPONSE'),
         b?.error?.message ?? 'Không đọc được phản hồi',
-        b?.meta?.correlationId,
+        b?.meta?.correlationId ??
+          b?.correlationId ??
+          res.headers?.get('X-Correlation-ID') ??
+          undefined,
       );
     if (res.status !== status || !b || !Object.hasOwn(b, 'data'))
       throw new DiagnosticError(

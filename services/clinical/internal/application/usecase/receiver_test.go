@@ -73,7 +73,7 @@ func validDelivery() ports.Incoming {
 }
 func TestReceiveCommitsRetryBeforeAcknowledgement(t *testing.T) {
 	store := &fakeDeliveryStore{}
-	handler := &fakeHandler{err: errors.New("database unavailable")}
+	handler := &fakeHandler{err: domain.Fail("SERVICE_UNAVAILABLE", "projection unavailable")}
 	r := NewReceiver(handler, store)
 	delivery := validDelivery()
 	if e := r.Receive(context.Background(), delivery); e != nil {
@@ -114,6 +114,24 @@ func TestReceiveRejectsUnknownEnvelopeFieldsAndNegativeAttempt(t *testing.T) {
 		r := NewReceiver(handler, store)
 		if err := r.Receive(context.Background(), d); err != nil || store.dead != 1 || handler.calls != 0 {
 			t.Fatal("invalid delivery was handled", store, handler, err)
+		}
+	}
+}
+
+func TestReceiveRetainsDeliveryOnInfrastructureFailure(t *testing.T) {
+	for _, attempt := range []int{0, 3} {
+		for _, failure := range []error{errors.New("database disconnected"), context.DeadlineExceeded} {
+			store := &fakeDeliveryStore{}
+			handler := &fakeHandler{err: failure}
+			delivery := validDelivery()
+			delivery.Attempt = attempt
+			if attempt > 0 {
+				delivery.RetryToken = domain.NewID()
+			}
+			err := NewReceiver(handler, store).Receive(context.Background(), delivery)
+			if !errors.Is(err, failure) || store.dead != 0 || store.scheduled != 0 {
+				t.Fatalf("infrastructure error must stay unacknowledged: err=%v dead=%d retry=%d", err, store.dead, store.scheduled)
+			}
 		}
 	}
 }

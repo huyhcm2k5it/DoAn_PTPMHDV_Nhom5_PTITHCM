@@ -510,6 +510,7 @@ function Order({
               Hoàn tiền:{' '}
               {(
                 {
+                  NOT_REQUIRED: 'Chưa thu tiền · Không phát sinh hoàn tiền',
                   PENDING_SYNC: 'Đang chờ viện phí xác nhận',
                   REQUESTED: 'Đã yêu cầu',
                   FAILED: 'Thất bại — cần viện phí kiểm tra',

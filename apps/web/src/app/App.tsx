@@ -67,6 +67,7 @@ import {
 } from './runtime';
 import type { WebRuntime } from './runtime';
 import { LoginPage } from '../features/identity/LoginPage';
+import { PriceVersionsPage } from '../features/catalog/PriceVersionsPage';
 import './app.css';
 import './quan-workflow.css';
 import { RegisterPage } from '../features/identity/RegisterPage';
@@ -132,6 +133,7 @@ function AppLayout({ session }: { session?: WebRuntime['session'] }) {
     '/doctor/treatment': 'Bác sĩ / Chỉ định & kê đơn',
     '/staff/diagnostic': 'Xét nghiệm / Hàng chờ & kết quả',
     '/catalog': 'Danh mục / Dịch vụ & giá',
+    '/staff/prices': 'Quản trị / Phiên bản giá',
     '/patient/lab-results': 'Hồ sơ sức khỏe / Kết quả xét nghiệm',
     '/patient/medical-records': 'Hồ sơ sức khỏe / Bệnh án & toa đã ký',
   };
@@ -359,6 +361,15 @@ function AppLayout({ session }: { session?: WebRuntime['session'] }) {
                   >
                     <CalendarClock className="sidebar-nav-icon" />
                     <span>Quản trị ca khám</span>
+                  </NavLink>
+                  <NavLink
+                    to="/staff/prices"
+                    className={({ isActive }) =>
+                      `sidebar-nav-item ${isActive ? 'is-active' : ''}`
+                    }
+                  >
+                    <LayoutDashboard className="sidebar-nav-icon" />
+                    <span>Phiên bản giá</span>
                   </NavLink>
                   <NavLink
                     to="/staff/summary"
@@ -701,6 +712,10 @@ function AppRoutes({
           element={<ScheduleAdmin api={appointmentApi} />}
         />
         <Route
+          path="/staff/prices"
+          element={<PriceVersionsPage api={catalogApi} session={session} />}
+        />
+        <Route
           path="/staff/summary"
           element={
             <AdminSummary
@@ -896,8 +911,11 @@ export function App({ runtime: propRuntime }: { runtime?: WebRuntime } = {}) {
     [apiTransport, runtime?.session?.lease],
   );
   const catalogApi = useMemo(
-    () => createCatalogApi(apiTransport),
-    [apiTransport],
+    () =>
+      createCatalogApi(apiTransport, {
+        authorizationLease: runtime?.session?.lease,
+      }),
+    [apiTransport, runtime?.session?.lease],
   );
   const clinicalApi = useMemo(
     () =>

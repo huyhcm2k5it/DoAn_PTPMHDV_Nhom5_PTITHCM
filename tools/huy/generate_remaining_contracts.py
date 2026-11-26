@@ -86,6 +86,8 @@ cancelled_payload = obj({
     "reasonCode": {"type": "string", "minLength": 1, "maxLength": 128},
     "version": VERSION,
 })
+# Legacy deliveries may omit this extension; current Diagnostic always emits it.
+cancelled_payload["properties"]["sourceRevision"] = {"type":"integer","minimum":1,"maximum":2147483647,"description":"Revision of the cancelled billing source. New producers always supply this; absence is accepted only for legacy deliveries."}
 lab_lifecycle = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "urn:umc-care:diagnostic-lifecycle:v1",
@@ -129,7 +131,7 @@ examples["lab-cancelled.json"] = {
     **copy.deepcopy(base), "messageId": "11111111-1111-4111-8111-111111111102", "messageType": "LabCancelled",
     "payload": {"orderId": base["aggregateId"], "visitId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
                 "cancellationId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc", "noSpecimen": True,
-                "reasonCode": "DOCTOR_REQUEST", "version": 2}}
+                "reasonCode": "DOCTOR_REQUEST", "version": 2, "sourceRevision": 1}}
 for name, value in examples.items():
     (EXAMPLES / name).write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 

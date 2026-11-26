@@ -65,15 +65,11 @@ func (s *Store) PublishPending(ctx context.Context, publish func(context.Context
 		if scanErr := tx.QueryRow(ctx, `SELECT retry_count FROM outbox WHERE message_id=$1`, message.MessageID).Scan(&retries); scanErr != nil {
 			return false, scanErr
 		}
-		if retries >= 3 {
-			if _, err = tx.Exec(ctx, `UPDATE outbox SET status='FAILED',retry_count=retry_count+1,last_error=$2 WHERE message_id=$1`, message.MessageID, err.Error()); err != nil {
-				return false, err
-			}
-		} else {
-			delay := []int{5, 15, 60}[retries]
-			if _, err = tx.Exec(ctx, `UPDATE outbox SET retry_count=retry_count+1,next_attempt_at=now()+$2*interval '1 second',last_error=$3 WHERE message_id=$1`, message.MessageID, delay, err.Error()); err != nil {
-				return false, err
-			}
+		// Broker/transport failures must not remove the stream head: skipping
+		// it would create a permanent sequence gap in every consumer.
+		delay := publishRetryDelay(retries)
+		if _, err = tx.Exec(ctx, `UPDATE outbox SET retry_count=retry_count+1,next_attempt_at=now()+$2*interval '1 second',last_error=$3 WHERE message_id=$1`, message.MessageID, delay, err.Error()); err != nil {
+			return false, err
 		}
 		if commitErr := tx.Commit(ctx); commitErr != nil {
 			return false, commitErr
@@ -87,6 +83,18 @@ func (s *Store) PublishPending(ctx context.Context, publish func(context.Context
 		return false, err
 	}
 	return true, nil
+}
+
+// Retries remain pending, with bounded backoff rather than a terminal FAILED
+// state for a transient broker failure. The ordered stream must not skip a row.
+func publishRetryDelay(retries int) int {
+	if retries <= 0 {
+		return 5
+	}
+	if retries == 1 {
+		return 15
+	}
+	return 60
 }
 
 type catalogStreamEntity struct {

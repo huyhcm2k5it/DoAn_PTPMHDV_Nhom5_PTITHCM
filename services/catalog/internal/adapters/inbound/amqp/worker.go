@@ -130,12 +130,40 @@ func Run(ctx context.Context, url string, store Store, stream Stream, declare bo
 	if err != nil {
 		return err
 	}
-	ticker := time.NewTicker(250 * time.Millisecond)
-	defer ticker.Stop()
+	// Drain outbox independently: a slow online publish must not block the
+	// Identity consumer or its acknowledgements. Join before closing pubCh.
+	streamCtx, stopStream := context.WithCancel(ctx)
+	streamDone := make(chan struct{})
+	streamErrors := make(chan error, 1)
+	go func() {
+		defer close(streamDone)
+		ticker := time.NewTicker(250 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-streamCtx.Done():
+				return
+			case <-ticker.C:
+				call, cancel := context.WithTimeout(streamCtx, 30*time.Second)
+				tickErr := stream.Tick(call, time.Now().UTC(), publisher.Publish)
+				cancel()
+				if pubCh.IsClosed() && streamCtx.Err() == nil {
+					streamErrors <- errors.New("Catalog publisher channel closed")
+					return
+				}
+				if tickErr != nil && streamCtx.Err() == nil {
+					slog.Error("Catalog stream tick failed", "error", tickErr)
+				}
+			}
+		}
+	}()
+	defer func() { stopStream(); <-streamDone }()
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
+		case streamErr := <-streamErrors:
+			return streamErr
 		case d, open := <-deliveries:
 			if !open {
 				return errors.New("Catalog consumer channel closed")
@@ -165,14 +193,6 @@ func Run(ctx context.Context, url string, store Store, stream Stream, declare bo
 			cancel()
 			if err = d.Ack(false); err != nil {
 				return err
-			}
-		case now := <-ticker.C:
-			call, cancel := context.WithTimeout(ctx, 10*time.Second)
-			err = stream.Tick(call, now.UTC(), publisher.Publish)
-			cancel()
-			if err != nil {
-				slog.Error("Catalog stream tick failed", "error", err)
-				continue
 			}
 		}
 	}

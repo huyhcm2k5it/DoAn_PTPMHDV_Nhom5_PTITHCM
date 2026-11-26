@@ -29,7 +29,7 @@ func TestPublicHealthAndErrors(t *testing.T) {
 		path   string
 		status int
 		code   string
-	}{{"/health/live", 200, ""}, {"/health/ready", 503, "SERVICE_UNAVAILABLE"}, {"/api/v1/departments", 200, ""}, {"/api/v1/doctors?page=bad", 400, "VALIDATION_ERROR"}, {"/api/v1/doctors?page=0", 400, "VALIDATION_ERROR"}, {"/api/v1/prices", 405, "METHOD_NOT_ALLOWED"}, {"/unknown", 404, "NOT_FOUND"}} {
+	}{{"/health/live", 200, ""}, {"/health/ready", 503, "SERVICE_UNAVAILABLE"}, {"/api/v1/departments", 200, ""}, {"/api/v1/doctors?page=bad", 400, "VALIDATION_ERROR"}, {"/api/v1/doctors?page=0", 400, "VALIDATION_ERROR"}, {"/api/v1/prices", 401, "UNAUTHENTICATED"}, {"/unknown", 404, "NOT_FOUND"}} {
 		t.Run(tc.path, func(t *testing.T) {
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, tc.path, nil)

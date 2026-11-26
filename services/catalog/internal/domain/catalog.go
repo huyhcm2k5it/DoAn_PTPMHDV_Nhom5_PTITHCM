@@ -97,6 +97,12 @@ type PriceResult struct {
 	Revision       int       `json:"revision"`
 	EffectiveFrom  time.Time `json:"effectiveFrom"`
 }
+type PriceVersion struct {
+	Price
+	ItemCode  string `json:"itemCode"`
+	ItemName  string `json:"itemName"`
+	CreatedBy string `json:"createdBy"`
+}
 type Access struct {
 	UserID       string
 	ActorType    string

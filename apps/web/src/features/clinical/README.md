@@ -23,7 +23,7 @@ Màn 06 Bàn khám và 07 Chỉ định/kê đơn được triển khai theo b�
 4. REJECTED chưa kết thúc nghĩa vụ LAB. Tạo lại dùng replacesRequestId và expectedSourceVersion do server cung cấp; không tự sửa registry cũ.
 5. Ký khám chỉ khi IN_PROGRESS, có chẩn đoán đã lưu, không còn LAB chưa xử lý, chỉ định chưa gửi hoặc toa đang sửa. Chỉ PUBLISHED/CANCELLED/SUPERSEDED kết thúc nghĩa vụ LAB. Backend kiểm tra lại tất cả điều kiện.
 6. CL-010 ký kết luận và CL-009 đưa toa sang FINAL là hai thao tác riêng, có xác nhận và kết quả riêng. Không ký toa thứ hai nếu lượt đã có FINAL. Toa FINAL chỉ đọc; nhà thuốc nhận qua backend/message queue.
-7. Hủy LAB đọc DI-002 để kiểm tra PAID, đã thanh toán, chưa từng lấy mẫu rồi gọi DI-012 kèm lý do và expectedVersion. Hủy không đồng nghĩa hoàn tiền thành công; trạng thái hoàn tiền do Billing cập nhật.
+7. Hủy LAB kiểm tra chưa từng lấy mẫu, chưa thu hoặc đã thu xong và không có settlement đang đối soát rồi gọi DI-012 kèm lý do và expectedVersion. Hủy không đồng nghĩa hoàn tiền thành công; trạng thái hoàn tiền do Billing cập nhật.
 
 ## Phiên và an toàn thao tác
 
@@ -46,7 +46,7 @@ LeaveGuard bảo vệ liên kết và đóng/tải lại trang. Không cam kết
 
 ## Bàn giao và kiểm tra
 
-MedicalHistory, SignedPrescription và PublishedLabResults có thể ghép vào chi tiết lịch của Quân (05.06–05.07). Route bệnh nhân dùng Patient API để chọn hồ sơ thuộc tài khoản; ghép trực tiếp từng lịch thuộc màn 05 của Quân.
+MedicalHistory, SignedPrescription và PublishedLabResults phục vụ 05.06–05.07. Develop đã có AppointmentRecords của Quân ghép theo lịch; giữ component đó. Hai route riêng của Huy xem theo hồ sơ, có ba tab và đường quay lại lịch giữ patientId. Trang Đơn thuốc dùng prescriptionsOnly để không lẫn nội dung bệnh án. Không có kết quả một trang không đồng nghĩa cả hồ sơ không có dữ liệu.
 
 Chạy `npm ci`, `npm run typecheck`, `npm test`, `npm run build` trong `apps/web`. Kiểm thử Huy tại `tests/huy-workspaces.test.tsx`, `tests/huy-clinical-regression.test.tsx` và `tests/huy-treatment-regression.test.tsx`. Các màn và bài kiểm tra dùng chung React và dependencies của web.
 
@@ -55,3 +55,7 @@ Fixture chỉ dành cho kiểm thử. Nghiệm thu online cần tài khoản th�
 ## Điều hướng và lượt khám đang chọn
 
 `ClinicalRoute` đồng bộ chuyển Bàn khám/Chỉ định với router; `visitId` được giữ trên URL khi đã chọn lượt. Menu bên trái, vị trí ở thanh trên và tiêu đề trang phải cùng màn. Khi mở Chỉ định mà chưa chọn lượt, giao diện hiển thị hướng dẫn và nút về Bàn khám; không tự chọn người bệnh hoặc tạo lượt mới. Danh sách bên trái là lượt đã được phân công, không phải danh sách vé chờ do Appointment quản lý.
+
+## Dữ liệu và điều hướng 25/11/2026
+
+Clinical/Diagnostic chỉ hiển thị thông tin API cung cấp. Không tự điền dị ứng/sinh hiệu hay tên bác sĩ mẫu. Chọn SELF/OTHER giữ trên URL, hồ sơ không thuộc danh sách owner không tự đổi sang người khác. Parent AppointmentRecords của Quân cung cấp view theo lịch; các trang riêng đọc tất cả dữ liệu đã ký/công bố theo hồ sơ. Migration Clinical không còn cờ seed-demo; importer chỉ nhận export có căn cứ từ owner.

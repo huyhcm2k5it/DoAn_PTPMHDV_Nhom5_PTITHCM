@@ -35,12 +35,16 @@ func (s *Service) handleLabTerminal(ctx context.Context, exchange string, m doma
 			OrderID        string `json:"orderId"`
 			VisitID        string `json:"visitId"`
 			CancellationID string `json:"cancellationId"`
+			SourceRevision *int   `json:"sourceRevision,omitempty"`
 			NoSpecimen     *bool  `json:"noSpecimen"`
 			ReasonCode     string `json:"reasonCode"`
 			Version        int    `json:"version"`
 		}
 		if strictJSON(m.Payload, &p) != nil || !domain.ValidID(p.CancellationID) || p.NoSpecimen == nil || !*p.NoSpecimen || p.ReasonCode == "" || len(p.ReasonCode) > 128 {
 			return domain.Fail("INVALID_MESSAGE", "Invalid cancelled LAB event")
+		}
+		if p.SourceRevision != nil && (*p.SourceRevision < 1 || *p.SourceRevision > 2147483647) {
+			return domain.Fail("INVALID_MESSAGE", "Invalid cancelled LAB source revision")
 		}
 		order, visit, version, state = p.OrderID, p.VisitID, p.Version, "CANCELLED"
 		hash = domain.Hash(p)

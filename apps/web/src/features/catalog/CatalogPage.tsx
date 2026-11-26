@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { DependencyList } from 'react';
 import type {
   CatalogApi,
@@ -13,6 +13,7 @@ import type {
 import { can } from './types';
 import { errorMessage } from './api';
 import { PriceForm } from './PriceForm';
+import { PriceHistory } from './PriceHistory';
 import type { PriceChoice } from './PriceForm';
 import './catalog.css';
 
@@ -20,21 +21,23 @@ function useLoad<T>(
   load: (signal: AbortSignal) => Promise<T>,
   deps: DependencyList,
 ) {
+  const requestKey = useMemo(() => Symbol(), deps);
   const [state, setState] = useState<{
+    key: symbol;
     data?: T;
     pending: boolean;
     error?: unknown;
-  }>({ pending: true });
+  }>({ key: requestKey, pending: true });
   useEffect(() => {
     const controller = new AbortController();
     let current = true;
-    setState({ pending: true });
+    setState({ key: requestKey, pending: true });
     load(controller.signal).then(
       (data) => {
-        if (current) setState({ pending: false, data });
+        if (current) setState({ key: requestKey, pending: false, data });
       },
       (error) => {
-        if (current) setState({ pending: false, error });
+        if (current) setState({ key: requestKey, pending: false, error });
       },
     );
     return () => {
@@ -42,7 +45,10 @@ function useLoad<T>(
       controller.abort();
     };
   }, deps);
-  return state;
+  // Clear the previous request during render, before the loading effect runs.
+  return state.key === requestKey
+    ? state
+    : { key: requestKey, pending: true, data: undefined, error: undefined };
 }
 export function formatPrice(price: Price | null) {
   if (!price) return 'Chưa có giá hiệu lực';
@@ -132,7 +138,7 @@ export function CatalogPage({
   return (
     <section className="umc-catalog" aria-labelledby="catalog-heading">
       <header className="catalog-header">
-        <p className="catalog-eyebrow">UMC CARE · ĐỒ ÁN NHÓM 5</p>
+        <p className="catalog-eyebrow">HQH CARE · DANH MỤC</p>
         <h1 id="catalog-heading">
           Chọn chuyên khoa.
           <br />
@@ -341,6 +347,7 @@ export function CatalogPage({
           onSaved={() => setRefresh((x) => x + 1)}
         />
       )}
+      {admin && <PriceHistory api={api} revision={refresh} />}
       <footer className="catalog-note">
         Dữ liệu đồ án phục vụ học tập. Danh mục thuốc không thể hiện tồn kho và
         không thay thế chỉ định khám.

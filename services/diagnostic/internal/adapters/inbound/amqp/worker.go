@@ -159,15 +159,19 @@ func Run(ctx context.Context, url string, store Store, receiver Receiver, declar
 	}
 	defer stopRetries()
 
-	ticker := time.NewTicker(250 * time.Millisecond)
-	defer ticker.Stop()
-	nextPublish := time.Time{}
+	pumpErrors, stopPump := startOutboxPump(ctx, store, publisher.Publish)
+	defer stopPump()
+	publisherClosed := pubCh.NotifyClose(make(chan *amqp.Error, 1))
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case retryErr := <-retryErrors:
 			return retryErr
+		case pumpErr := <-pumpErrors:
+			return pumpErr
+		case <-publisherClosed:
+			return errors.New("publisher channel closed")
 
 		case d, open := <-deliveries:
 			if !open {
@@ -186,26 +190,7 @@ func Run(ctx context.Context, url string, store Store, receiver Receiver, declar
 			if json.Unmarshal(d.Body, &envelope) == nil {
 				slog.Info("Diagnostic delivery recorded", "messageId", envelope.MessageID, "messageType", envelope.MessageType, "correlationId", envelope.CorrelationID)
 			}
-		case <-ticker.C:
-			if !time.Now().Before(nextPublish) {
-				for i := 0; i < 20; i++ {
-					call, cancel := context.WithTimeout(ctx, 5*time.Second)
-					var sent bool
-					sent, e = store.PublishPending(call, publisher.Publish)
-					cancel()
-					if errors.Is(e, ErrUnroutable) {
-						nextPublish = time.Now().Add(5 * time.Second)
-						slog.Warn("Diagnostic outbox waiting for target binding")
-						break
-					}
-					if e != nil {
-						return e
-					}
-					if !sent {
-						break
-					}
-				}
-			}
+
 		}
 	}
 }
@@ -237,4 +222,48 @@ func mergeDeliveries(ctx context.Context, events, commands <-chan amqp.Delivery)
 		}
 	}()
 	return out
+}
+
+// The dedicated publisher never holds up the event consumer. Shutdown cancels
+// and joins it before Run closes the AMQP publisher channel.
+func startOutboxPump(parent context.Context, store Store, publish func(context.Context, ports.Outgoing) error) (<-chan error, func()) {
+	ctx, cancel := context.WithCancel(parent)
+	errors := make(chan error, 1)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		if err := runOutboxPump(ctx, store, publish); err != nil && ctx.Err() == nil {
+			errors <- err
+		}
+	}()
+	return errors, func() { cancel(); <-done }
+}
+
+func runOutboxPump(ctx context.Context, store Store, publish func(context.Context, ports.Outgoing) error) error {
+	timer := time.NewTimer(0)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-timer.C:
+		}
+
+		// Bound each delivery individually; a long batch must not starve the
+		// heartbeat or consumer. Drain immediately only after a confirmed row.
+		call, cancel := context.WithTimeout(ctx, 5*time.Second)
+		sent, err := store.PublishPending(call, publish)
+		cancel()
+		delay := time.Duration(0)
+		if errors.Is(err, ErrUnroutable) {
+			delay = 5 * time.Second
+			slog.Warn("Diagnostic outbox waiting for target binding")
+		} else if err != nil {
+			return err
+		} else if !sent {
+			delay = time.Second
+		}
+		timer.Reset(delay)
+	}
 }

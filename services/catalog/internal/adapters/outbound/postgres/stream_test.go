@@ -49,3 +49,11 @@ func TestCatalogChangedEnvelopeCanonical(t *testing.T) {
 		t.Fatalf("payload mismatch: %+v", message.Payload)
 	}
 }
+
+func TestPublishBackoffRemainsBoundedAfterBusinessRetryLimit(t *testing.T) {
+	for _, test := range []struct{ attempt, want int }{{0, 5}, {1, 15}, {2, 60}, {3, 60}, {4, 60}, {100000, 60}} {
+		if got := publishRetryDelay(test.attempt); got != test.want {
+			t.Fatalf("attempt %d: delay %d, want %d", test.attempt, got, test.want)
+		}
+	}
+}

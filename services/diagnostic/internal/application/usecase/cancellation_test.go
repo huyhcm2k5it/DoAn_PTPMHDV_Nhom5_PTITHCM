@@ -27,7 +27,7 @@ func TestCancellationNeedsGrantAndPreservesSpecimenHistory(t *testing.T) {
 	doctor := domain.NewID()
 	p := domain.Principal{UserID: doctor, ActorType: "DOCTOR", TokenVersion: 1, LeaseAction: "DI-012", LeaseExpiresAt: now.Add(time.Minute)}
 	_ = m.Put(ctx, "access", doctor, domain.Access{UserID: doctor, ActorType: "DOCTOR", Status: "ACTIVE", TokenVersion: 1})
-	o := domain.Order{ID: domain.NewID(), RequestID: domain.NewID(), VisitID: domain.NewID(), State: "PENDING_PAYMENT", Version: 1}
+	o := domain.Order{ID: domain.NewID(), RequestID: domain.NewID(), VisitID: domain.NewID(), State: "PENDING_PAYMENT", Version: 1, SourceRevision: 1}
 	m.orders = []domain.Order{o}
 	in := domain.CancelInput{ReasonCode: "NOT_NEEDED", ExpectedVersion: 1}
 	if _, err := New(m, func() time.Time { return now }).CancelOrder(ctx, p, o.ID, domain.NewID(), in, domain.ResultMeta{CorrelationID: "test"}); domain.Code(err) != "SERVICE_UNAVAILABLE" {
@@ -103,7 +103,7 @@ func TestCancellationNeedsGrantAndPreservesSpecimenHistory(t *testing.T) {
 	}
 }
 
-func TestCancellationRejectsChargeOrSettlementStillInFlight(t *testing.T) {
+func TestCancellationRejectsUnresolvedSettlement(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC()
 	m := &memory{objects: map[string]json.RawMessage{}}
@@ -112,13 +112,60 @@ func TestCancellationRejectsChargeOrSettlementStillInFlight(t *testing.T) {
 	p := domain.Principal{UserID: doctor, ActorType: "DOCTOR", TokenVersion: 1, LeaseAction: "DI-012", LeaseExpiresAt: now.Add(time.Minute)}
 	s := New(grantStore{m}, func() time.Time { return now })
 	for _, order := range []domain.Order{
-		{ID: domain.NewID(), State: "PENDING_PAYMENT", ChargeState: "PENDING", Version: 1},
-		{ID: domain.NewID(), State: "PENDING_PAYMENT", ChargeState: "CREATED", ChargeID: domain.NewID(), Version: 1},
+		{ID: domain.NewID(), State: "PENDING_PAYMENT", ChargeState: "CREATED", SettlementState: "UNKNOWN", SourceRevision: 1, Version: 1},
+		{ID: domain.NewID(), State: "PENDING_PAYMENT", ChargeState: "CREATED", SettlementState: "RESERVED", SourceRevision: 1, ChargeID: domain.NewID(), Version: 1},
 		{ID: domain.NewID(), State: "SETTLEMENT_LOCKED", ChargeState: "CREATED", ChargeID: domain.NewID(), SettlementID: domain.NewID(), SettlementState: "RESERVED", Version: 1},
 	} {
 		m.orders = []domain.Order{order}
 		if _, err := s.CancelOrder(ctx, p, order.ID, domain.NewID(), domain.CancelInput{ReasonCode: "NOT_NEEDED", ExpectedVersion: 1}, domain.ResultMeta{CorrelationID: "test"}); domain.Code(err) != "STATE_CONFLICT" {
 			t.Fatalf("cancellation accepted with active charge/settlement %+v: %v", order, err)
 		}
+	}
+}
+
+func TestUnpaidCancellationPublishesRevisionAndSurvivesLateChargePreparation(t *testing.T) {
+	for _, chargeState := range []string{"PENDING", "CREATED", "REJECTED"} {
+		t.Run(chargeState, func(t *testing.T) {
+			ctx := context.Background()
+			now := time.Now().UTC()
+			m := &memory{objects: map[string]json.RawMessage{}}
+			doctor := domain.NewID()
+			_ = m.Put(ctx, "access", doctor, domain.Access{UserID: doctor, ActorType: "DOCTOR", Status: "ACTIVE", TokenVersion: 1})
+			o := domain.Order{ID: domain.NewID(), RequestID: domain.NewID(), VisitID: domain.NewID(), PatientID: domain.NewID(),
+				State: "PENDING_PAYMENT", ChargeState: chargeState, ChargeRequestID: domain.NewID(), Version: 1, SourceRevision: 3}
+			if chargeState == "CREATED" {
+				o.ChargeID = domain.NewID()
+			}
+			m.orders = []domain.Order{o}
+			s := New(grantStore{m}, func() time.Time { return now })
+			p := domain.Principal{UserID: doctor, ActorType: "DOCTOR", TokenVersion: 1, LeaseAction: "DI-012", LeaseExpiresAt: now.Add(30 * time.Second)}
+			key := domain.NewID()
+			in := domain.CancelInput{ExpectedVersion: 1, ReasonCode: "NOT_NEEDED"}
+			out, err := s.CancelOrder(ctx, p, o.ID, key, in, domain.ResultMeta{CorrelationID: "cancel-unpaid"})
+			if err != nil || out.Order.State != "CANCELLED" || out.RefundStatus != "NOT_REQUIRED" || len(m.out) != 1 {
+				t.Fatalf("invalid unpaid cancellation: %+v %v", out, err)
+			}
+			var payload struct {
+				SourceRevision int    `json:"sourceRevision"`
+				CancellationID string `json:"cancellationId"`
+			}
+			if err = json.Unmarshal(m.out[0].Payload, &payload); err != nil || payload.SourceRevision != 3 || payload.CancellationID != out.CancellationID {
+				t.Fatalf("lost source/refund evidence: %s", m.out[0].Payload)
+			}
+			if chargeState == "PENDING" {
+				body, _ := json.Marshal(map[string]any{"requestId": o.ChargeRequestID, "sourceType": "LAB_ORDER", "sourceId": o.ID, "sourceRevision": 3, "chargeId": domain.NewID(), "state": "CREATED", "reasonCode": nil})
+				if err = m.Within(ctx, "diagnostic:business", func(tx ports.Tx) error {
+					return s.billing(ctx, tx, domain.Envelope{MessageType: "ChargePrepared", Payload: body})
+				}); err != nil {
+					t.Fatal(err)
+				}
+				if m.orders[0].State != "CANCELLED" {
+					t.Fatal("late charge preparation reopened cancelled order")
+				}
+			}
+			if _, err = s.CancelOrder(ctx, p, o.ID, key, in, domain.ResultMeta{}); err != nil || len(m.out) != 1 {
+				t.Fatalf("retry duplicated cancellation: %v", err)
+			}
+		})
 	}
 }

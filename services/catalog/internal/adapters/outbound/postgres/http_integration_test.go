@@ -18,7 +18,7 @@ import (
 	"umccare/catalog/internal/domain"
 )
 
-// Exercise all six real handlers with real RSA signatures and the real database.
+// Exercise the seven real handlers with RSA signatures and the isolated test DB.
 func testHTTP(t *testing.T, db *Store) {
 	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -78,6 +78,8 @@ func testHTTP(t *testing.T, db *Store) {
 	call("GET", "/api/v1/catalog/medicines", pharmacy, "", nil, 200, "")
 	call("GET", "/api/v1/catalog/lab-tests", pharmacy, "", nil, 403, "Error")
 	call("GET", "/api/v1/catalog/lab-tests", lab, "", nil, 200, "")
+	call("GET", "/api/v1/prices?itemType=LAB&page=1&limit=20", admin, "", nil, 200, "PriceHistoryResponse")
+	call("GET", "/api/v1/prices", pharmacy, "", nil, 403, "")
 	call("GET", "/api/v1/catalog/medicines", lab, "", nil, 403, "")
 	call("POST", "/api/v1/prices", admin, "", raw, 401, "Error")
 	tooPrecise := input
