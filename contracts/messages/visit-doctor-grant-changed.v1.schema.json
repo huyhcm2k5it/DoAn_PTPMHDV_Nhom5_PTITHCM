@@ -33,6 +33,10 @@
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 9007199254740991
+                },
+                "watermarkOnly": {
+                  "const": true,
+                  "description": "New publishers set true: checkpoint must never advance applied data sequence. Absent only for legacy incrementing checkpoints."
                 }
               }
             },
@@ -95,5 +99,6 @@
         }
       }
     }
-  ]
+  ],
+  "description": "Clinical-owned doctor/visit grant stream. UPSERT advances sequence. CHECKPOINT with watermarkOnly=true advertises the current committed watermark and must never advance the consumer. Legacy checkpoints without the marker remain accepted during rollout. Deploy Diagnostic consumer before Clinical publisher."
 }

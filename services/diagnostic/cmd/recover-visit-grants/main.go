@@ -66,7 +66,8 @@ func loadSnapshot(ctx context.Context, conn *pgx.Conn) (snapshot, error) {
 	}
 	var raw []byte
 	if err = tx.QueryRow(ctx, `SELECT envelope->'payload' FROM outbox WHERE routing_key='clinical.visit-doctor-grant-changed.v1'
- AND (envelope->'payload'->>'sequence')::bigint=$1`, out.Sequence).Scan(&raw); err != nil {
+ AND (envelope->'payload'->>'sequence')::bigint=$1
+ ORDER BY CASE WHEN envelope->'payload'->>'mode'='UPSERT' THEN 0 ELSE 1 END,created_at,message_id LIMIT 1`, out.Sequence).Scan(&raw); err != nil {
 		return out, err
 	}
 	if err = json.Unmarshal(raw, &out.Last); err != nil {
@@ -114,15 +115,15 @@ func validateSnapshot(s snapshot) error {
 	if s.Last.Mode != "CHECKPOINT" && s.Last.Mode != "UPSERT" {
 		return domain.Fail("VALIDATION_ERROR", "Invalid owner stream tail")
 	}
-	if s.Last.Mode == "UPSERT" && (!domain.ValidID(s.Last.VisitID) || !domain.ValidID(s.Last.PatientID) || !domain.ValidID(s.Last.DoctorUserID) || s.Last.Active == nil || s.Last.CanCancel == nil || (!*s.Last.Active && *s.Last.CanCancel)) {
+	if s.Last.Mode == "UPSERT" && (s.Last.WatermarkOnly != nil || !domain.ValidID(s.Last.VisitID) || !domain.ValidID(s.Last.PatientID) || !domain.ValidID(s.Last.DoctorUserID) || s.Last.Active == nil || s.Last.CanCancel == nil || (!*s.Last.Active && *s.Last.CanCancel)) {
 		return domain.Fail("VALIDATION_ERROR", "Invalid owner stream tail assignment")
 	}
-	if s.Last.Mode == "CHECKPOINT" && (s.Last.VisitID != "" || s.Last.PatientID != "" || s.Last.DoctorUserID != "" || s.Last.Active != nil || s.Last.CanCancel != nil) {
+	if s.Last.Mode == "CHECKPOINT" && (s.Last.VisitID != "" || s.Last.PatientID != "" || s.Last.DoctorUserID != "" || s.Last.Active != nil || s.Last.CanCancel != nil || (s.Last.WatermarkOnly != nil && !*s.Last.WatermarkOnly)) {
 		return domain.Fail("VALIDATION_ERROR", "Invalid owner checkpoint tail")
 	}
 	seen := map[string]bool{}
 	for _, g := range s.Grants {
-		if !domain.ValidID(g.VisitID) || !domain.ValidID(g.PatientID) || !domain.ValidID(g.DoctorUserID) || g.Sequence != s.Sequence || g.Mode != "UPSERT" || g.Active == nil || g.CanCancel == nil || (!*g.Active && *g.CanCancel) || seen[g.VisitID] {
+		if !domain.ValidID(g.VisitID) || !domain.ValidID(g.PatientID) || !domain.ValidID(g.DoctorUserID) || g.Sequence != s.Sequence || g.Mode != "UPSERT" || g.WatermarkOnly != nil || g.Active == nil || g.CanCancel == nil || (!*g.Active && *g.CanCancel) || seen[g.VisitID] {
 			return domain.Fail("VALIDATION_ERROR", "Invalid or duplicate owner grant")
 		}
 		seen[g.VisitID] = true

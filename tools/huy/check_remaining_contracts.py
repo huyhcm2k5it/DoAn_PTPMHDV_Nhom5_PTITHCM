@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 from jsonschema import Draft202012Validator, FormatChecker
+from referencing import Registry, Resource
 
 ROOT = Path(__file__).resolve().parents[2]
 MESSAGES = ROOT / "contracts/messages"
@@ -51,3 +52,22 @@ for name in ["lab-invalid-order-id.json", "lab-invalid-envelope-version.json"]:
     assert event_identity_errors(item), name
 assert "valueText" not in lifecycle["oneOf"][0]["properties"]["payload"]["properties"]
 print("PASS: CatalogChanged and lab lifecycle schemas, valid examples, invalid producer/ID/revision/medical field")
+
+# Check both deployed legacy checkpoints and non-advancing watermark heartbeats.
+grant = read(MESSAGES / "visit-doctor-grant-changed.v1.schema.json")
+common = read(MESSAGES / "common-envelope.v1.schema.json")
+Draft202012Validator.check_schema(grant)
+registry = Registry().with_resource(common["$id"], Resource.from_contents(common))
+grant_validator = Draft202012Validator(grant, registry=registry, format_checker=FormatChecker())
+message = dict(read(EXAMPLES / "catalog-checkpoint.json"), producer="clinical",
+               messageType="VisitDoctorGrantChanged", aggregateVersion=7)
+for payload in [{"mode": "CHECKPOINT", "sequence": 7},
+                {"mode": "CHECKPOINT", "sequence": 7, "watermarkOnly": True}]:
+    grant_validator.validate(dict(message, payload=payload))
+for payload in [{"mode": "CHECKPOINT", "sequence": 7, "watermarkOnly": False},
+                {"mode": "CHECKPOINT", "sequence": 0, "watermarkOnly": True},
+                {"mode": "UPSERT", "sequence": 7, "watermarkOnly": True,
+                 "visitId": message["aggregateId"], "patientId": message["aggregateId"],
+                 "doctorUserId": message["aggregateId"], "active": True, "canCancel": True}]:
+    assert list(grant_validator.iter_errors(dict(message, payload=payload))), payload
+print("PASS: Clinical grant legacy/watermark checkpoints and invalid protocol markers")

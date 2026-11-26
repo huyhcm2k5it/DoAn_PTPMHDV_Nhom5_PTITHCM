@@ -23,7 +23,7 @@ func (p *Probe) PublishPending(ctx context.Context, publish func(context.Context
 		return false, e
 	}
 	var m ports.Outgoing
-	e = tx.QueryRow(ctx, `SELECT message_id::text,destination,routing_key,envelope FROM outbox WHERE status='PENDING' ORDER BY CASE WHEN routing_key='clinical.visit-doctor-grant-changed.v1' THEN (envelope->'payload'->>'sequence')::bigint ELSE 0 END,created_at,message_id LIMIT 1 FOR UPDATE`).Scan(&m.MessageID, &m.Exchange, &m.RoutingKey, &m.Body)
+	e = tx.QueryRow(ctx, `SELECT message_id::text,destination,routing_key,envelope FROM outbox WHERE status='PENDING' ORDER BY CASE WHEN routing_key='clinical.visit-doctor-grant-changed.v1' THEN (envelope->'payload'->>'sequence')::bigint ELSE 0 END,CASE WHEN routing_key='clinical.visit-doctor-grant-changed.v1' AND envelope->'payload'->>'mode'='CHECKPOINT' THEN 1 ELSE 0 END,created_at,message_id LIMIT 1 FOR UPDATE`).Scan(&m.MessageID, &m.Exchange, &m.RoutingKey, &m.Body)
 	if errors.Is(e, pgx.ErrNoRows) {
 		return false, nil
 	}

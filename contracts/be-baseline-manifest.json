@@ -17,7 +17,7 @@
     },
     {
       "path": "docs/HQH_Care_API_86_9_Service_v5_2 - 04_Events_18.csv",
-      "sha256": "acd328541ec047c267eccbaf47576c97d2e2c5e8a40f01adb3fa1db9b98009fd"
+      "sha256": "1be09f4506a642dded21d997188a946e57d079eb6eb307630841e465b5093d49"
     },
     {
       "path": "docs/HQH_Care_API_86_9_Service_v5_2 - 05_Commands_5.csv",
@@ -1194,11 +1194,11 @@
       "Event": "VisitDoctorGrantChanged",
       "Producer": "Clinical",
       "Consumer": "Diagnostic",
-      "Payload fields (? = tùy chọn)": "mode, sequence, visitId?, patientId?, doctorUserId?, active?, canCancel?",
+      "Payload fields (? = tùy chọn)": "mode, sequence, watermarkOnly?, visitId?, patientId?, doctorUserId?, active?, canCancel?",
       "Exchange": "umc.events.clinical.v1",
       "Routing key": "clinical.visit-doctor-grant-changed.v1",
       "Queue nhận": "evt.diagnostic.v1",
-      "Quy tắc nghiệp vụ": "UPSERT quyền theo lượt khám. CHECKPOINT kiểm tra tiến độ và độ mới của luồng quyền."
+      "Quy tắc nghiệp vụ": "UPSERT tăng sequence khi đổi quyền. CHECKPOINT mới có watermarkOnly=true và không tăng sequence; không thay thế dữ liệu chưa nhận. Consumer nhận kiểu cũ không marker khi triển khai chuyển phiên bản."
     }
   ],
   "commands": [

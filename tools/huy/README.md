@@ -42,3 +42,9 @@ Sau recovery, phải kiểm checkpoint mới tiếp tục đến, Last bắt k�
 Publisher Catalog chạy độc lập với consumer Identity, dùng một publisher duy nhất và join khi shutdown trước khi đóng channel. Bootstrap chỉ chạy lại nếu chưa thành công; checkpoint được kiểm theo nhịp 10 giây bằng thời gian thực lúc tick. Lỗi broker giữ event đầu stream PENDING và backoff 5/15/60 giây (capped 60), không chuyển FAILED rồi vượt qua sequence. Channel publisher đóng sẽ kết thúc lượt worker để cơ chế restart kết nối lại. Không tự gộp, bỏ qua hoặc xóa checkpoint cũ.
 
 Ba adapter FE Huy giữ mã lỗi nghiệp vụ từ JSON. Với phản hồi text của Gateway, 401/403/5xx lần lượt được thể hiện là UNAUTHENTICATED/FORBIDDEN/SERVICE_UNAVAILABLE và giữ X-Correlation-ID khi có. HTTP 2xx thiếu data vẫn là INVALID_RESPONSE; không đổi lỗi kết nối thành dữ liệu demo hoặc danh sách trống.
+
+### Heartbeat quyền bác sĩ Clinical → Diagnostic
+
+Chỉ sự kiện đổi quyền `UPSERT` tăng sequence. Clinical phát `CHECKPOINT` với `watermarkOnly: true` tại sequence hiện tại, tối đa một checkpoint đang chờ trong outbox. Khi cùng sequence, publisher gửi dữ liệu trước checkpoint. Diagnostic chỉ làm mới thời điểm checkpoint khi đã áp dụng đủ dữ liệu; checkpoint đi trước dù chỉ một sequence cũng ghi nhận gap và chặn quyền. Checkpoint không xóa gap cao hơn, không đổi hash dữ liệu cuối, không mở lại quyền đã thu hồi và không kéo lùi thời điểm freshness.
+
+Triển khai Diagnostic API/worker trước, rồi Clinical API/worker. Consumer vẫn nhận checkpoint tăng sequence của phiên bản cũ khi không có marker, phục vụ giai đoạn chuyển phiên bản. Không rollback consumer cũ khi publisher mới còn chạy. Không cần migration hoặc đổi env. Bản sửa ngăn lỗi mới; backlog/DLQ cũ cần phân loại và xử lý riêng, không tự purge hay bỏ kiểm tra freshness 30 giây.

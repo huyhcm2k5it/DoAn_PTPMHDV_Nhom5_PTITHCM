@@ -167,3 +167,55 @@ func TestVisitGrantPublisherUsesTheSharedDeploymentLock(t *testing.T) {
 		t.Fatalf("publisher ignored the shared deployment lock: sent=%v called=%v err=%v", sent, called, err)
 	}
 }
+
+func TestGrantCheckpointReusesCommittedWatermarkAndWaitsBehindData(t *testing.T) {
+	db := testDB(t)
+	ctx := context.Background()
+	if _, err := db.pool.Exec(ctx, "TRUNCATE outbox; UPDATE visit_grant_stream SET sequence=7 WHERE singleton"); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	if err := db.PublishGrantCheckpoint(ctx, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.PublishGrantCheckpoint(ctx, now.Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	var sequence, pending int
+	if err := db.pool.QueryRow(ctx, "SELECT sequence,(SELECT count(*) FROM outbox WHERE status='PENDING') FROM visit_grant_stream WHERE singleton").Scan(&sequence, &pending); err != nil || sequence != 7 || pending != 1 {
+		t.Fatalf("idle checkpoints advanced stream or duplicated pending work: sequence=%d pending=%d err=%v", sequence, pending, err)
+	}
+	// A data event can have a later created_at than its same-watermark heartbeat.
+	// It must still publish first, so the consumer cannot refresh unapplied data.
+	appendVisitGrant(t, db, 7)
+	for _, want := range []string{"UPSERT", "CHECKPOINT"} {
+		got := ""
+		sent, err := db.PublishPending(ctx, func(_ context.Context, out ports.Outgoing) error {
+			var event domain.Envelope
+			if err := json.Unmarshal(out.Body, &event); err != nil {
+				return err
+			}
+			var payload struct {
+				Mode          string `json:"mode"`
+				WatermarkOnly bool   `json:"watermarkOnly"`
+			}
+			if err := json.Unmarshal(event.Payload, &payload); err != nil {
+				return err
+			}
+			got = payload.Mode
+			if event.AggregateVersion != 7 || (got == "CHECKPOINT" && !payload.WatermarkOnly) {
+				t.Errorf("wrong heartbeat protocol: %s", event.Payload)
+			}
+			return nil
+		})
+		if err != nil || !sent || got != want {
+			t.Fatalf("want %s first, got %s sent=%v err=%v", want, got, sent, err)
+		}
+	}
+	if err := db.PublishGrantCheckpoint(ctx, now.Add(10*time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.pool.QueryRow(ctx, "SELECT sequence FROM visit_grant_stream WHERE singleton").Scan(&sequence); err != nil || sequence != 7 {
+		t.Fatalf("next heartbeat advanced watermark: %d %v", sequence, err)
+	}
+}

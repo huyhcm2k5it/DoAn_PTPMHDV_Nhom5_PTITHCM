@@ -12,13 +12,14 @@ import (
 const VisitGrantStreamID = "00000000-0000-4000-8000-000000000013"
 
 type VisitGrantEvent struct {
-	Mode         string `json:"mode"`
-	Sequence     int    `json:"sequence"`
-	VisitID      string `json:"visitId,omitempty"`
-	PatientID    string `json:"patientId,omitempty"`
-	DoctorUserID string `json:"doctorUserId,omitempty"`
-	Active       *bool  `json:"active,omitempty"`
-	CanCancel    *bool  `json:"canCancel,omitempty"`
+	Mode          string `json:"mode"`
+	WatermarkOnly *bool  `json:"watermarkOnly,omitempty"`
+	Sequence      int    `json:"sequence"`
+	VisitID       string `json:"visitId,omitempty"`
+	PatientID     string `json:"patientId,omitempty"`
+	DoctorUserID  string `json:"doctorUserId,omitempty"`
+	Active        *bool  `json:"active,omitempty"`
+	CanCancel     *bool  `json:"canCancel,omitempty"`
 }
 
 type visitStream struct {
@@ -50,11 +51,11 @@ func ApplyVisitGrant(ctx context.Context, t ports.Tx, m domain.Envelope, p Visit
 	}
 	switch p.Mode {
 	case "CHECKPOINT":
-		if domain.ID(m.AggregateID) != VisitGrantStreamID || p.VisitID != "" || p.PatientID != "" || p.DoctorUserID != "" || p.Active != nil || p.CanCancel != nil {
+		if domain.ID(m.AggregateID) != VisitGrantStreamID || p.VisitID != "" || p.PatientID != "" || p.DoctorUserID != "" || p.Active != nil || p.CanCancel != nil || (p.WatermarkOnly != nil && !*p.WatermarkOnly) {
 			return false, domain.Fail("INVALID_MESSAGE", "Invalid visit grant checkpoint")
 		}
 	case "UPSERT":
-		if !domain.ValidID(p.VisitID) || !domain.ValidID(p.PatientID) || !domain.ValidID(p.DoctorUserID) || domain.ID(p.VisitID) != domain.ID(m.AggregateID) || p.Active == nil || p.CanCancel == nil || (!*p.Active && *p.CanCancel) {
+		if p.WatermarkOnly != nil || !domain.ValidID(p.VisitID) || !domain.ValidID(p.PatientID) || !domain.ValidID(p.DoctorUserID) || domain.ID(p.VisitID) != domain.ID(m.AggregateID) || p.Active == nil || p.CanCancel == nil || (!*p.Active && *p.CanCancel) {
 			return false, domain.Fail("INVALID_MESSAGE", "Invalid visit grant assignment")
 		}
 		p.VisitID, p.PatientID, p.DoctorUserID = domain.ID(p.VisitID), domain.ID(p.PatientID), domain.ID(p.DoctorUserID)
@@ -67,18 +68,30 @@ func ApplyVisitGrant(ctx context.Context, t ports.Tx, m domain.Envelope, p Visit
 		return false, err
 	}
 	hash := domain.Hash(p)
+	if p.Mode == "CHECKPOINT" && p.Sequence == state.Last {
+		// Refresh only a fully applied watermark. Preserve the data-event hash
+		// so replaying the last UPSERT remains idempotent. An existing higher
+		// GapThrough still denies access until the missing data is applied.
+		if m.OccurredAt.After(state.CheckpointAt) {
+			state.CheckpointAt = m.OccurredAt
+			return false, t.Put(ctx, "visit_grant_stream", "current", state)
+		}
+		return false, nil
+	}
 	if p.Sequence <= state.Last {
 		if p.Sequence == state.Last && state.LastHash != hash {
 			return false, domain.Fail("INVALID_MESSAGE", "Conflicting visit grant sequence")
 		}
 		return false, nil
 	}
-	if p.Sequence > state.Last+1 {
+	if p.Sequence > state.Last+1 || (p.Mode == "CHECKPOINT" && p.WatermarkOnly != nil && p.Sequence > state.Last) {
 		state.GapThrough = max(state.GapThrough, p.Sequence)
 		return true, t.Put(ctx, "visit_grant_stream", "current", state)
 	}
 	if p.Mode == "CHECKPOINT" {
-		state.CheckpointAt = m.OccurredAt
+		if m.OccurredAt.After(state.CheckpointAt) {
+			state.CheckpointAt = m.OccurredAt
+		}
 	} else if err = Put(ctx, t, "visit_grant", p.VisitID, p.Sequence, p); err != nil {
 		return false, err
 	}
