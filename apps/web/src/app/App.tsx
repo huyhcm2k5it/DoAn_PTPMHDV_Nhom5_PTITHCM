@@ -133,6 +133,7 @@ function AppLayout({ session }: { session?: WebRuntime['session'] }) {
     '/doctor/treatment': 'Bác sĩ / Chỉ định & kê đơn',
     '/staff/diagnostic': 'Xét nghiệm / Hàng chờ & kết quả',
     '/catalog': 'Danh mục / Dịch vụ & giá',
+    '/staff/prices': 'Quản trị / Phiên bản giá',
     '/patient/lab-results': 'Hồ sơ sức khỏe / Kết quả xét nghiệm',
     '/patient/medical-records': 'Hồ sơ sức khỏe / Bệnh án & toa đã ký',
   };

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { DependencyList } from 'react';
 import type {
   CatalogApi,
@@ -21,21 +21,23 @@ function useLoad<T>(
   load: (signal: AbortSignal) => Promise<T>,
   deps: DependencyList,
 ) {
+  const requestKey = useMemo(() => Symbol(), deps);
   const [state, setState] = useState<{
+    key: symbol;
     data?: T;
     pending: boolean;
     error?: unknown;
-  }>({ pending: true });
+  }>({ key: requestKey, pending: true });
   useEffect(() => {
     const controller = new AbortController();
     let current = true;
-    setState({ pending: true });
+    setState({ key: requestKey, pending: true });
     load(controller.signal).then(
       (data) => {
-        if (current) setState({ pending: false, data });
+        if (current) setState({ key: requestKey, pending: false, data });
       },
       (error) => {
-        if (current) setState({ pending: false, error });
+        if (current) setState({ key: requestKey, pending: false, error });
       },
     );
     return () => {
@@ -43,7 +45,10 @@ function useLoad<T>(
       controller.abort();
     };
   }, deps);
-  return state;
+  // Clear the previous request during render, before the loading effect runs.
+  return state.key === requestKey
+    ? state
+    : { key: requestKey, pending: true, data: undefined, error: undefined };
 }
 export function formatPrice(price: Price | null) {
   if (!price) return 'Chưa có giá hiệu lực';
