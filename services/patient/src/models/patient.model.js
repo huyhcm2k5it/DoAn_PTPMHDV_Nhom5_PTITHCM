@@ -21,7 +21,11 @@ function getPatientModel(connection) {
     },
     { collection: 'patients', versionKey: false, strict: 'throw' },
   );
-  schema.index({ ownerUserId: 1 }, { name: 'ix_patients_owner' });
+  const { patientStorage } = require('../dbs/indexes.js');
+  for (const { key, ...options } of patientStorage.find(
+    (item) => item.name === 'patients',
+  ).indexes)
+    schema.index(key, options);
   return connection.model('Patient', schema);
 }
 module.exports = { getPatientModel, PATIENT_SEX };

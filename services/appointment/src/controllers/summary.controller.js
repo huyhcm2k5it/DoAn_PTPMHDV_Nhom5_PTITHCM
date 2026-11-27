@@ -7,12 +7,15 @@ function createSummaryController(dependencies) {
         const data = await getAdminSummary({
           connection: dependencies.connection,
           authContext: req.authContext,
-          date: req.query.date,
+          from: req.query.from,
+          to: req.query.to,
+          now: dependencies.now?.() || new Date(),
         });
         res.status(200).json({
           data: {
             ...data.appointments.metrics,
-            asOf: new Date().toISOString(),
+            asOf: data.asOf,
+            syncStatus: data.syncStatus,
           },
           meta: { correlationId: req.correlationId },
         });

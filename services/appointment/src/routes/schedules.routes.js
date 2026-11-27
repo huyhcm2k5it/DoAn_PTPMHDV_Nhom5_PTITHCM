@@ -1,5 +1,6 @@
 const { requireLease } = require('../auth/lease.middleware');
 const express = require('express');
+const { currentIdentity } = require('../auth/current-identity.middleware.js');
 const { createAuthContext } = require('../auth/auth.middleware.js');
 const {
   createSchedulesController,
@@ -11,7 +12,7 @@ function schedulesRoutes(dependencies) {
     verifyBearerToken: dependencies.verifyBearerToken,
   });
   const controller = createSchedulesController(dependencies);
-  router.get('/', authenticate, controller.list);
+  router.get('/', authenticate, currentIdentity(dependencies), controller.list);
   router.post(
     '/',
     authenticate,

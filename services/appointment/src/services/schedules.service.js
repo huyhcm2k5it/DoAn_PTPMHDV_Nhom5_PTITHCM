@@ -1,3 +1,4 @@
+const { businessDateRange } = require('../utils/business-date.js');
 const { getAppointmentRepository } = require('./appointment.repository');
 const { randomUUID } = require('node:crypto');
 const { withMongoTransaction } = require('../../../../mongo/transaction.js');
@@ -21,6 +22,37 @@ function assertAdmin({ actorType, capabilities }) {
 
 function parseSchedule(body, { partial = false } = {}) {
   const value = body || {};
+  const allowed = partial
+    ? [
+        'room',
+        'startAt',
+        'endAt',
+        'capacityPerSlot',
+        'slotMinutes',
+        'expectedVersion',
+      ]
+    : [
+        'doctorId',
+        'serviceId',
+        'room',
+        'startAt',
+        'endAt',
+        'capacityPerSlot',
+        'slotMinutes',
+      ];
+  if (
+    Array.isArray(value) ||
+    typeof value !== 'object' ||
+    Object.keys(value).some((key) => !allowed.includes(key))
+  )
+    throw new ApiError(
+      400,
+      'VALIDATION_ERROR',
+      'Request contains unsupported schedule fields.',
+    );
+  for (const field of allowed)
+    if (Object.hasOwn(value, field) && value[field] == null)
+      throw new ApiError(400, 'VALIDATION_ERROR', `${field} cannot be null.`);
   const required = [
     'doctorId',
     'serviceId',
@@ -49,6 +81,20 @@ function parseSchedule(body, { partial = false } = {}) {
       'VALIDATION_ERROR',
       'room must be a nonempty string.',
     );
+  for (const field of ['startAt', 'endAt']) {
+    if (
+      value[field] != null &&
+      (typeof value[field] !== 'string' ||
+        !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(
+          value[field],
+        ))
+    )
+      throw new ApiError(
+        400,
+        'VALIDATION_ERROR',
+        `${field} is invalid (date-time required).`,
+      );
+  }
   const startAt = value.startAt == null ? undefined : new Date(value.startAt);
   const endAt = value.endAt == null ? undefined : new Date(value.endAt);
   if (startAt && !Number.isFinite(startAt.getTime()))
@@ -59,7 +105,7 @@ function parseSchedule(body, { partial = false } = {}) {
     throw new ApiError(400, 'VALIDATION_ERROR', 'endAt must be after startAt.');
   if (
     value.capacityPerSlot != null &&
-    (!Number.isInteger(Number(value.capacityPerSlot)) ||
+    (!Number.isInteger(value.capacityPerSlot) ||
       Number(value.capacityPerSlot) < 1)
   )
     throw new ApiError(
@@ -69,8 +115,7 @@ function parseSchedule(body, { partial = false } = {}) {
     );
   if (
     value.slotMinutes != null &&
-    (!Number.isInteger(Number(value.slotMinutes)) ||
-      Number(value.slotMinutes) < 1)
+    (!Number.isInteger(value.slotMinutes) || Number(value.slotMinutes) < 1)
   )
     throw new ApiError(
       400,
@@ -456,11 +501,8 @@ async function listSchedules({
   )
     throw new ApiError(400, 'VALIDATION_ERROR', 'page/limit is invalid.');
   const query = {};
-  if (from || to)
-    query.startAt = {
-      ...(from ? { $gte: new Date(`${from}T00:00:00+07:00`) } : {}),
-      ...(to ? { $lt: new Date(`${to}T00:00:00+07:00`) } : {}),
-    };
+  const range = businessDateRange({ from, to });
+  if (Object.keys(range).length) query.startAt = range;
   const Schedule = getScheduleModel(connection);
   const [items, total] = await Promise.all([
     Schedule.find(query)

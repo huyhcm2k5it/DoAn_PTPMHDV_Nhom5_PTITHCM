@@ -6,6 +6,20 @@ const { PATIENT_SEX } = require('../models/patient.model.js');
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+function assertFields(body, allowed) {
+  if (
+    !body ||
+    Array.isArray(body) ||
+    typeof body !== 'object' ||
+    Object.keys(body).some((key) => !allowed.includes(key))
+  )
+    throw new ApiError(
+      400,
+      'VALIDATION_ERROR',
+      'Request contains unsupported fields.',
+    );
+}
+
 function assertUuid(value, field) {
   if (!UUID.test(value || ''))
     throw new ApiError(400, 'VALIDATION_ERROR', `${field} must be a UUID.`);
@@ -58,13 +72,21 @@ function validateProfile(
       'VALIDATION_ERROR',
       'relation must be SELF or OTHER.',
     );
-  const sex = value.sex == null || value.sex === '' ? undefined : value.sex;
+  const sex = value.sex == null ? undefined : value.sex;
   if (validateSex && sex !== undefined && !PATIENT_SEX.includes(sex))
     throw new ApiError(
       400,
       'VALIDATION_ERROR',
       'sex must be MALE, FEMALE, OTHER or UNKNOWN.',
     );
+  for (const field of ['bhytSelfDeclared', 'contactPhone', 'address']) {
+    if (value[field] != null && typeof value[field] !== 'string')
+      throw new ApiError(
+        400,
+        'VALIDATION_ERROR',
+        `${field} must be a string or null.`,
+      );
+  }
   return {
     fullName: value.fullName.trim(),
     birthDate: value.birthDate,
@@ -130,6 +152,15 @@ async function mutatePatient(
     if (error.code === 11000) {
       const old = await replay();
       if (old) return old;
+      if (
+        error.keyPattern?.ownerUserId ||
+        /uq_patients_active_(identity|self)/.test(error.message)
+      )
+        throw new ApiError(
+          409,
+          'DUPLICATE_PATIENT_PROFILE',
+          'An active patient profile already exists for this account.',
+        );
     }
     throw error;
   }
@@ -207,6 +238,16 @@ async function createPatient({
       'FORBIDDEN',
       'Owner comes from authenticated identity.',
     );
+  assertFields(body, [
+    'ownerPhone',
+    'relation',
+    'fullName',
+    'birthDate',
+    'sex',
+    'bhytSelfDeclared',
+    'contactPhone',
+    'address',
+  ]);
   if (isReception) {
     const owner = await connection
       .collection('user_access_projection')
@@ -345,7 +386,16 @@ async function updatePatient({
   now = new Date(),
 }) {
   assertUuid(patientId, 'patientId');
-  if (!Number.isInteger(Number(expectedVersion)) || Number(expectedVersion) < 1)
+  assertFields(body, [
+    'fullName',
+    'birthDate',
+    'sex',
+    'bhytSelfDeclared',
+    'contactPhone',
+    'address',
+    'expectedVersion',
+  ]);
+  if (!Number.isInteger(expectedVersion) || expectedVersion < 1)
     throw new ApiError(
       400,
       'VALIDATION_ERROR',
@@ -388,7 +438,7 @@ async function updatePatient({
       if (!isReception && current.ownerUserId !== authContext.userId)
         throw new ApiError(403, 'FORBIDDEN', 'Actor is not the patient owner.');
       if (current.version !== Number(expectedVersion))
-        throw new ApiError(409, 'VERSION_CONFLICT', 'Patient changed.');
+        throw new ApiError(409, 'STATE_CONFLICT', 'Patient changed.');
       const profile = validateProfile(
         { ...cleanPatient(current), ...body },
         {
@@ -451,7 +501,7 @@ async function updatePatient({
         { session },
       );
       if (!changed.modifiedCount)
-        throw new ApiError(409, 'VERSION_CONFLICT', 'Patient changed.');
+        throw new ApiError(409, 'STATE_CONFLICT', 'Patient changed.');
       next.updatedAt = now;
       next.version += 1;
       next.policyVersion += 1;

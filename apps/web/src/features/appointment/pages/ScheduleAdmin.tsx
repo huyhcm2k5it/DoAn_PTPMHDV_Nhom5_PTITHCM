@@ -20,7 +20,6 @@ const initial: ScheduleInput = {
   endAt: '',
   capacityPerSlot: 1,
   slotMinutes: 30,
-  status: 'OPEN',
 };
 const local = (v: string) => {
   if (!v) return '';

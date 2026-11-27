@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { GatewayTransport } from '../../../app/runtime';
 import type { CatalogApi, MedicalService } from '../../catalog/types';
@@ -16,6 +16,11 @@ const addDays = (day: string, n: number) =>
   new Date(Date.parse(day + 'T00:00:00Z') + n * 86400000)
     .toISOString()
     .slice(0, 10);
+const syncLabels: Record<Summary['syncStatus'], string> = {
+  PENDING: 'Đang chờ đồng bộ',
+  DEGRADED: 'Đồng bộ cần kiểm tra',
+  UNKNOWN: 'Chưa xác nhận đồng bộ đầy đủ',
+};
 const money = (n: number) => n.toLocaleString('vi-VN') + ' ₫';
 export function AdminSummary({
   api,
@@ -142,7 +147,14 @@ export function AdminSummary({
           </div>
           {selected && (
             <p className="field-hint">
-              Dữ liệu cập nhật {formatAppointmentTime(selected.asOf)}
+              Báo cáo được đọc lúc {formatAppointmentTime(selected.asOf)}
+              <br />
+              <span role="status">
+                {syncLabels[selected.syncStatus] ?? syncLabels.UNKNOWN}
+              </span>
+              {
+                ' · Tình trạng đồng bộ chung của Appointment, không riêng ngày đang chọn.'
+              }
             </p>
           )}
         </section>

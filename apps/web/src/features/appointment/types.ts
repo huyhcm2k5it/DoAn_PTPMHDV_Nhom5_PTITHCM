@@ -59,6 +59,7 @@ export type AdminSummary = {
   checkedIn: number;
   completed: number;
   asOf: string;
+  syncStatus: 'PENDING' | 'DEGRADED' | 'UNKNOWN';
 };
 export interface AppointmentApi {
   listAvailable(

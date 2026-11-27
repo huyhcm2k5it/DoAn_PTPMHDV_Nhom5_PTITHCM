@@ -2448,6 +2448,11 @@
           "expectedVersion": {
             "type": "integer",
             "minimum": 1
+          },
+          "slotMinutes": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Minutes per slot; changing booked slot boundaries is forbidden."
           }
         },
         "required": [
@@ -3031,7 +3036,17 @@
               },
               "asOf": {
                 "type": "string",
-                "format": "date-time"
+                "format": "date-time",
+                "description": "Thời điểm bắt đầu đọc báo cáo từ DB cục bộ, không phải watermark xác nhận event đã đến đủ."
+              },
+              "syncStatus": {
+                "type": "string",
+                "enum": [
+                  "PENDING",
+                  "DEGRADED",
+                  "UNKNOWN"
+                ],
+                "description": "Trạng thái đồng bộ chung của Appointment, không chỉ riêng khoảng ngày. DEGRADED: có dead letter QUARANTINED; PENDING: có retry PENDING hoặc outbox chưa publish; UNKNOWN: không thấy backlog cục bộ nhưng chưa có watermark đầu cuối để xác nhận đồng bộ đầy đủ. Ưu tiên DEGRADED > PENDING > UNKNOWN. Không suy ra SYNCED từ DB yên lặng."
               }
             },
             "required": [
@@ -3039,7 +3054,8 @@
               "cancelled",
               "checkedIn",
               "completed",
-              "asOf"
+              "asOf",
+              "syncStatus"
             ],
             "additionalProperties": false
           },

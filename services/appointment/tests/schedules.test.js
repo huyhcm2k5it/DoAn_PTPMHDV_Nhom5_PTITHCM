@@ -37,8 +37,8 @@ test('schedule parser rejects invalid ranges and normalizes admin input', () => 
     serviceId,
     startAt: '2026-11-20T08:00:00Z',
     endAt: '2026-11-20T10:00:00Z',
-    capacityPerSlot: '2',
-    slotMinutes: '30',
+    capacityPerSlot: 2,
+    slotMinutes: 30,
     room: ' A-101 ',
   });
   assert.equal(parsed.capacityPerSlot, 2);

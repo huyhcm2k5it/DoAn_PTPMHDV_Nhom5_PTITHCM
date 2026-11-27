@@ -1,3 +1,4 @@
+const { businessDateRange } = require('../utils/business-date.js');
 const { getAppointmentRepository } = require('./appointment.repository');
 const { resolveDoctorMapping } = require('./doctor-mapping.service');
 const { createHash, randomUUID } = require('node:crypto');
@@ -306,11 +307,8 @@ async function listPatientAppointments({
       : {}),
   };
   if (state) query.state = state;
-  if (from || to)
-    query.startAt = {
-      ...(from ? { $gte: new Date(from + 'T00:00:00+07:00') } : {}),
-      ...(to ? { $lt: new Date(to + 'T00:00:00+07:00') } : {}),
-    };
+  const range = businessDateRange({ from, to });
+  if (Object.keys(range).length) query.startAt = range;
   const Appointment = getAppointmentRepository(connection);
   const [items, total] = await Promise.all([
     Appointment.find(query)

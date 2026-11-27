@@ -208,7 +208,7 @@ AP-018,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có
 AP-018,404,Lỗi,NOT_FOUND,NOT_FOUND: Tài nguyên không tồn tại hoặc không được phép thấy.,ErrorResponse
 AP-018,409,Lỗi,STATE_CONFLICT,STATE_CONFLICT: Trạng thái hiện tại không cho phép thao tác này.,ErrorResponse
 AP-018,503,Lỗi,SERVICE_UNAVAILABLE,SERVICE_UNAVAILABLE: Dependency hoặc projection cần thiết chưa sẵn sàng; không xác nhận nghiệp vụ thành công.,ErrorResponse
-AP-019,200,Thành công,,Hoàn tất thao tác summary đặt/hủy/completed kèm asof và syncstatus theo ngày việt nam. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"booked: integer:int32, cancelled: integer:int32, checkedIn: integer:int32, completed: integer:int32, asOf: string:date-time"
+AP-019,200,Thành công,,Hoàn tất thao tác summary đặt/hủy/checkedIn/completed kèm asOf và syncStatus theo khoảng from/to ngày Việt Nam. Kết quả nằm trong data; meta.correlationId dùng để truy vết yêu cầu.,"booked: integer:int32, cancelled: integer:int32, checkedIn: integer:int32, completed: integer:int32, asOf: string:date-time, syncStatus: string"
 AP-019,400,Lỗi,VALIDATION_ERROR,"VALIDATION_ERROR: Request sai kiểu, thiếu trường hoặc vi phạm ràng buộc đầu vào.",ErrorResponse
 AP-019,401,Lỗi,UNAUTHENTICATED,UNAUTHENTICATED: Thiếu hoặc hết hạn thông tin xác thực.,ErrorResponse
 AP-019,403,Lỗi,FORBIDDEN,FORBIDDEN: Actor thiếu capability hoặc không có quyền trên tài nguyên.,ErrorResponse

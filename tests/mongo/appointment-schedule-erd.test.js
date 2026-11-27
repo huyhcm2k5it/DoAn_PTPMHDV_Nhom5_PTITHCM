@@ -49,7 +49,7 @@ async function create(fields = {}) {
       endAt: '2026-11-22T02:00:00Z',
       capacityPerSlot: 3,
       slotMinutes: 30,
-      ...fields,
+      ...Object.fromEntries(Object.entries(fields).filter(([key]) => !['doctorUserId', 'departmentId'].includes(key))),
     },
   });
 }

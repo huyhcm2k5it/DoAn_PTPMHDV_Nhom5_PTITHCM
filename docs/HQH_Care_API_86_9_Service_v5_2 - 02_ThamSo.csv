@@ -56,6 +56,8 @@ PT-003,body,fullName,string,Có,,Họ tên bệnh nhân dùng trên hồ sơ và
 PT-003,body,birthDate,string:date,Có,,Ngày sinh bệnh nhân theo định dạng date.
 PT-003,body,sex,string,Không,,Giới tính được khai báo trong hồ sơ bệnh nhân.
 PT-003,body,bhytSelfDeclared,string,Không,,Thông tin BHYT tự khai; demo không tích hợp cổng kiểm tra BHYT thật.
+PT-003,body,contactPhone,string,Không,string or null,contactPhone (ERD patients).
+PT-003,body,address,string,Không,string or null,address (ERD patients).
 PT-002,query,phone,string,Không,,Số điện thoại dùng định danh hoặc tra cứu tài khoản; server chuẩn hóa trước khi so khớp.
 PT-002,query,name,string,Không,,Chuỗi tên dùng tìm bác sĩ hoặc danh mục theo API.
 PT-002,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
@@ -67,6 +69,8 @@ PT-005,body,fullName,string,Không,,Họ tên bệnh nhân dùng trên hồ sơ 
 PT-005,body,birthDate,string:date,Không,,Ngày sinh bệnh nhân theo định dạng date.
 PT-005,body,sex,string,Không,,Giới tính được khai báo trong hồ sơ bệnh nhân.
 PT-005,body,bhytSelfDeclared,string,Không,,Thông tin BHYT tự khai; demo không tích hợp cổng kiểm tra BHYT thật.
+PT-005,body,contactPhone,string,Không,string or null,contactPhone (ERD patients).
+PT-005,body,address,string,Không,string or null,address (ERD patients).
 PT-005,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
 CA-002,query,departmentId,string:uuid,Không,,"ID khoa dùng lọc bác sĩ, dịch vụ hoặc tài khoản theo ngữ cảnh API."
 CA-002,query,page,integer,Không,minimum=1; default=1,Số trang bắt đầu từ 1; bỏ qua dùng mặc định trong schema.
@@ -90,6 +94,7 @@ AP-006,body,room,string,Không,,Mã/phòng khám dùng bố trí ca làm việc.
 AP-006,body,startAt,string:date-time,Không,,Thời điểm bắt đầu ca làm việc theo UTC ISO-8601.
 AP-006,body,endAt,string:date-time,Không,,Thời điểm kết thúc ca làm việc theo UTC ISO-8601; phải sau startAt.
 AP-006,body,capacityPerSlot,integer:int32,Không,,Số lượt tối đa có thể giữ/đặt trong mỗi slot.
+AP-006,body,slotMinutes,integer,Không,minimum=1,Minutes per slot; booked slot boundaries cannot change.
 AP-006,body,expectedVersion,integer:int32,Có,,Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409.
 CA-004,header,Idempotency-Key,string:uuid,Có,,UUID của một ý định ghi. Khi retry giữ nguyên key và payload; cùng key với payload khác phải trả 409.
 CA-004,body,itemType,string,Có,"enum=['EXAM', 'LAB', 'MEDICINE']",Loại mục danh mục được định giá hoặc tra cứu.
