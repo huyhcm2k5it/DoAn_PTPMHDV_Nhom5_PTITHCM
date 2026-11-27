@@ -70,6 +70,8 @@ import { LoginPage } from '../features/identity/LoginPage';
 import { PriceVersionsPage } from '../features/catalog/PriceVersionsPage';
 import './app.css';
 import './quan-workflow.css';
+import './quan-redesign.css';
+import { NotificationBell } from '../features/notification/NotificationBell';
 import { RegisterPage } from '../features/identity/RegisterPage';
 import { VerifyOtpPage } from '../features/identity/VerifyOtpPage';
 import { ForgotPasswordPage } from '../features/identity/ForgotPasswordPage';
@@ -124,7 +126,13 @@ export function homeForSession(session?: WebRuntime['session']) {
   return '/patient/home';
 }
 
-function AppLayout({ session }: { session?: WebRuntime['session'] }) {
+function AppLayout({
+  session,
+  transport,
+}: {
+  session?: WebRuntime['session'];
+  transport: WebRuntime['transport'];
+}) {
   const location = useLocation();
   const pathname = location.pathname;
   const search = location.search;
@@ -147,15 +155,17 @@ function AppLayout({ session }: { session?: WebRuntime['session'] }) {
       (/^\/patient\/appointments\/[^/]+$/.test(pathname) &&
         !pathname.includes('/new') &&
         !pathname.includes('/review'))) &&
-    !search.includes('tab=lab');
+    !search.includes('tab=lab') &&
+    !search.includes('tab=prescription');
   const isProfileActive = pathname.startsWith('/patient/profiles');
   const isLabResultsActive =
     pathname === '/patient/lab-results' ||
-    (pathname === '/patient/appointments' && search.includes('tab=lab'));
+    (pathname.startsWith('/patient/appointments/') &&
+      search.includes('tab=lab'));
   const isPrescriptionActive =
     pathname.startsWith('/patient/medications') ||
     pathname.startsWith('/patient/prescriptions') ||
-    (pathname === '/patient/appointments' &&
+    (pathname.startsWith('/patient/appointments/') &&
       search.includes('tab=prescription'));
 
   const roleCaption =
@@ -173,7 +183,11 @@ function AppLayout({ session }: { session?: WebRuntime['session'] }) {
         : 'CỔNG BỆNH NHÂN';
 
   return (
-    <div className="app-shell">
+    <div
+      className={
+        'app-shell' + (session?.actorType === 'PATIENT' ? ' patient-shell' : '')
+      }
+    >
       <aside className="app-sidebar" aria-label="Điều hướng">
         <Link className="brand-section" to={homeForSession(session)}>
           <div className="brand-logo-icon" aria-hidden="true">
@@ -424,18 +438,13 @@ function AppLayout({ session }: { session?: WebRuntime['session'] }) {
           </span>
           <div className="header-right">
             <span className="header-date">{formatCurrentDateVi()}</span>
-            <button
-              type="button"
-              className="header-bell-btn"
-              aria-label="Thông báo"
-            >
-              <img
-                src="/images/hqh/imgBell.svg"
-                width="20"
-                height="20"
-                alt=""
+            {session && (
+              <NotificationBell
+                key={session.userId}
+                transport={transport}
+                actorType={session.actorType}
               />
-            </button>
+            )}
             <div className="header-user-profile">
               <span className="header-user-name">
                 {session?.userId
@@ -448,10 +457,7 @@ function AppLayout({ session }: { session?: WebRuntime['session'] }) {
         </header>
 
         <main className="app-content">
-          <div
-            key={location.pathname + location.search}
-            className="page-transition-enter"
-          >
+          <div key={location.pathname} className="page-transition-enter">
             <Outlet />
           </div>
         </main>
@@ -630,7 +636,7 @@ function AppRoutes({
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/forgot-password/reset" element={<ResetPasswordPage />} />
 
-      <Route element={<AppLayout session={session} />}>
+      <Route element={<AppLayout session={session} transport={transport} />}>
         <Route
           path="/"
           element={<Navigate to={homeForSession(session)} replace />}
@@ -709,7 +715,7 @@ function AppRoutes({
         />
         <Route
           path="/staff/schedules"
-          element={<ScheduleAdmin api={appointmentApi} />}
+          element={<ScheduleAdmin api={appointmentApi} catalog={catalogApi} />}
         />
         <Route
           path="/staff/prices"
@@ -757,7 +763,12 @@ function AppRoutes({
           path="/patient/medications"
           element={
             session?.actorType === 'PATIENT' ? (
-              <PatientMedicationStatus key={session.userId} api={pharmacyApi} />
+              <PatientMedicationStatus
+                key={session.userId}
+                api={pharmacyApi}
+                patientApi={patientApi}
+                clinicalApi={clinicalApi}
+              />
             ) : (
               <section role="alert">
                 Vui lòng đăng nhập bằng tài khoản bệnh nhân.

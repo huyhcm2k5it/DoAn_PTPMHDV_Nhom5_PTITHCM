@@ -125,6 +125,7 @@ export function ProfileList({
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
+    if (isSaving) return;
     setIsSaving(true);
     setSaveSuccess('');
     setFormError(null);
@@ -386,7 +387,7 @@ export function ProfileList({
               </div>
             )}
 
-            <form onSubmit={handleSave} noValidate>
+            <form onSubmit={handleSave}>
               <div className="profile-form-grid">
                 <div className="profile-form-field">
                   <label htmlFor="pf-fullname">
@@ -429,9 +430,10 @@ export function ProfileList({
                     }
                   >
                     <option value="">-- Chưa chọn --</option>
-                    <option value="Nam">Nam</option>
-                    <option value="Nữ">Nữ</option>
-                    <option value="Khác">Khác</option>
+                    <option value="MALE">Nam</option>
+                    <option value="FEMALE">Nữ</option>
+                    <option value="OTHER">Khác</option>
+                    <option value="UNKNOWN">Chưa xác định</option>
                   </select>
                 </div>
 

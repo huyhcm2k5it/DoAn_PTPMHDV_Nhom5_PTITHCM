@@ -1,0 +1,515 @@
+﻿/* Shared desktop presentation for Quân's patient and staff workflows. */
+.quan-workflow {
+  color: #193553;
+}
+.quan-workflow .page-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+.quan-workflow .page-heading h1 {
+  font-size: 28px;
+  letter-spacing: -0.6px;
+  margin: 6px 0;
+}
+.quan-workflow .page-heading p {
+  color: #637895;
+  margin: 6px 0;
+}
+.quan-workflow label {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #526985;
+}
+.quan-workflow input,
+.quan-workflow select,
+.quan-workflow textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid #dce5ef;
+  border-radius: 8px;
+  background: #fff;
+  color: #193553;
+  font: inherit;
+}
+.quan-workflow button {
+  cursor: pointer;
+}
+.quan-workflow button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.quan-workflow button:focus-visible,
+.quan-workflow a:focus-visible,
+.quan-workflow input:focus-visible,
+.quan-workflow select:focus-visible {
+  outline: 3px solid #80bedf;
+  outline-offset: 3px;
+}
+.quan-workflow .state-card {
+  padding: 24px;
+  margin-bottom: 20px;
+}
+.quan-workflow .state-card h2 {
+  font-size: 18px;
+  margin: 0 0 16px;
+}
+.quan-workflow table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+.quan-workflow table th,
+.quan-workflow table td {
+  padding: 14px 12px;
+  border-bottom: 1px solid #e7edf4;
+  vertical-align: top;
+}
+.quan-workflow thead {
+  background: #f4f8fc;
+  color: #637895;
+}
+.quan-workflow table small {
+  display: block;
+  margin-top: 5px;
+  font-weight: 400;
+  color: #637895;
+}
+.quan-workflow .back-link {
+  display: inline-block;
+  margin: 0 0 20px;
+  border: 0;
+  background: none;
+  color: #006c9c;
+  padding: 0;
+  font: inherit;
+}
+.booking-progress {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  list-style: none;
+  padding: 20px;
+  margin: 0 0 24px;
+  border: 1px solid #e0e8f1;
+  border-radius: 12px;
+  background: #fff;
+  gap: 12px;
+}
+.booking-progress li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #71839d;
+}
+.booking-progress li > span {
+  display: grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #eef4fa;
+}
+.booking-progress li[aria-current] {
+  color: #006c9c;
+  font-weight: 700;
+}
+.booking-progress li[aria-current] > span {
+  background: #006c9c;
+  color: white;
+}
+.booking-service-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+.booking-service-card {
+  padding: 24px;
+  border: 1px solid #e0e8f1;
+  border-radius: 10px;
+}
+.booking-service-card h3 {
+  font-size: 18px;
+  margin: 10px 0;
+}
+.booking-service-card p {
+  color: #006c9c;
+  font-weight: 700;
+}
+.booking-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(330px, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.booking-step-panel label {
+  margin-bottom: 16px;
+}
+.booking-doctor-list,
+.booking-profile-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 20px;
+}
+.booking-doctor-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid #e0e8f1;
+  border-radius: 10px;
+  background: white;
+  text-align: left;
+  padding: 18px;
+  color: #193553;
+}
+.booking-doctor-card small {
+  display: block;
+  margin-top: 6px;
+  color: #637895;
+}
+.booking-doctor-card .text-link {
+  margin-left: auto;
+  font-size: 12px;
+}
+.doctor-monogram {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  color: #006c9c;
+  background: #eaf5fb;
+  font-size: 24px;
+}
+.booking-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 16px 0;
+}
+.booking-slot-grid button {
+  padding: 12px;
+  border: 1px solid #dce5ef;
+  border-radius: 7px;
+  color: #006c9c;
+  background: white;
+}
+.booking-redesign .is-selected {
+  border-color: #0074a8;
+  background: #f0f9ff;
+  box-shadow: 0 0 0 1px #0074a8;
+}
+.booking-next {
+  width: 100%;
+  margin-top: 24px;
+}
+.booking-profile-option {
+  display: grid;
+  gap: 7px;
+  border: 1px solid #e0e8f1;
+  border-radius: 10px;
+  background: white;
+  text-align: left;
+  padding: 20px;
+  color: #193553;
+}
+.booking-profile-option span {
+  color: #637895;
+}
+.booking-profile-option small {
+  color: #006c9c;
+}
+.overview-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+.overview-cards article {
+  display: grid;
+  gap: 14px;
+}
+.overview-cards strong {
+  font-size: 32px;
+  color: #006c9c;
+}
+.overview-cards small {
+  font-size: 11px;
+  color: #637895;
+}
+.overview-panels {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 20px;
+}
+.overview-chart {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 16px;
+  min-height: 180px;
+  align-items: end;
+  padding-top: 24px;
+}
+.overview-chart > div {
+  display: grid;
+  text-align: center;
+  gap: 12px;
+}
+.overview-chart meter {
+  width: 100%;
+  height: 24px;
+  accent-color: #006c9c;
+}
+.schedule-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(320px, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.schedule-form fieldset {
+  display: grid;
+  gap: 16px;
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.schedule-form fieldset > button {
+  width: 100%;
+}
+.form-two-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.success-message {
+  background: #eaf8f3;
+  color: #18745e;
+  border-radius: 8px;
+  padding: 14px;
+}
+.notification-root {
+  position: relative;
+}
+.notification-count {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  background: #bc3346;
+  color: white;
+  border-radius: 20px;
+  min-width: 17px;
+  padding: 2px;
+  font-size: 10px;
+}
+.notification-panel {
+  position: absolute;
+  z-index: 100;
+  right: 0;
+  top: 42px;
+  width: 380px;
+  max-height: 72vh;
+  overflow: auto;
+  background: white;
+  padding: 20px;
+  border: 1px solid #dce5ef;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px #18334c24;
+}
+.notification-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.notification-panel h2 {
+  font-size: 18px;
+  margin: 0;
+}
+.notification-panel ul {
+  list-style: none;
+  padding: 0;
+}
+.notification-panel li {
+  display: grid;
+  gap: 8px;
+  padding: 16px 8px;
+  border-bottom: 1px solid #e3ebf2;
+  font-size: 13px;
+}
+.notification-panel .is-unread {
+  background: #eff8fe;
+}
+.notification-panel button {
+  border: 1px solid #dce5ef;
+  border-radius: 6px;
+  background: white;
+  padding: 6px 10px;
+  color: #006c9c;
+  cursor: pointer;
+}
+.prescription-option.is-complete {
+  border-color: #9ed4c8;
+  background: #f0faf7;
+}
+.patient-shell {
+  display: block;
+}
+.patient-shell .app-sidebar {
+  position: relative;
+  width: 100%;
+  height: auto;
+  padding: 0;
+  border-right: 0;
+  border-bottom: 1px solid #e1e9f2;
+  display: block;
+  background: #fff;
+}
+.patient-shell .brand-section {
+  position: absolute;
+  left: 40px;
+  top: 20px;
+  margin: 0;
+  padding: 0;
+}
+.patient-shell .sidebar-caption,
+.patient-shell .sidebar-support-card {
+  display: none;
+}
+.patient-shell .sidebar-nav {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 86px 40px 12px;
+}
+.patient-shell .sidebar-nav-item {
+  width: auto;
+  padding: 12px 16px;
+  white-space: nowrap;
+}
+.patient-shell .sidebar-logout-btn {
+  position: absolute;
+  right: 36px;
+  bottom: 22px;
+  margin: 0;
+  width: auto;
+}
+.patient-shell .app-main-container {
+  margin-left: 0;
+  width: 100%;
+}
+.patient-shell .app-header {
+  position: absolute;
+  left: 260px;
+  right: 140px;
+  top: 0;
+  height: 72px;
+  background: transparent;
+  border: 0;
+  padding: 0 20px;
+}
+.patient-shell .app-content {
+  padding: 32px 40px;
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+.patient-shell .app-footer {
+  padding-inline: 40px;
+}
+@media (max-width: 1180px) {
+  .schedule-columns,
+  .booking-columns {
+    grid-template-columns: minmax(0, 1fr) minmax(290px, 0.85fr);
+  }
+  .patient-shell .sidebar-nav {
+    gap: 0;
+    padding-inline: 20px;
+  }
+  .patient-shell .sidebar-nav-item {
+    padding: 12px 10px;
+  }
+  .patient-shell .header-tagline {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  .booking-columns,
+  .schedule-columns,
+  .overview-panels {
+    grid-template-columns: 1fr;
+  }
+  .overview-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .patient-shell .app-header {
+    position: static;
+    height: 60px;
+    padding: 0 20px;
+  }
+  .patient-shell .sidebar-nav {
+    padding-top: 72px;
+    flex-wrap: wrap;
+  }
+  .patient-shell .sidebar-logout-btn {
+    bottom: auto;
+    top: 24px;
+  }
+  .booking-progress {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.patient-shell {
+  position: relative;
+}
+.patient-shell .sidebar-nav {
+  flex-direction: row;
+  flex: initial;
+}
+.patient-shell .app-main-container {
+  position: static;
+}
+.patient-shell .app-header {
+  z-index: 10;
+}
+
+.patient-shell .app-header {
+  z-index: 30;
+}
+
+.quan-workflow .pagination {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 16px;
+}
+.quan-workflow .pagination button {
+  padding: 8px 12px;
+  border: 1px solid #dce5ef;
+  border-radius: 7px;
+  color: #006c9c;
+  background: white;
+}
+.schedule-design .pharmacy-table-wrap {
+  max-height: 650px;
+  overflow: auto;
+}
+.schedule-design thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.booking-review-layout .back-link {
+  border: 0;
+  background: none;
+  color: #006c9c;
+}

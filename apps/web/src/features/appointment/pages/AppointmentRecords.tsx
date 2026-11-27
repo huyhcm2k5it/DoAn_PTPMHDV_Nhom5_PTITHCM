@@ -11,12 +11,14 @@ import { ErrorPanel } from '../../../shared/ui/ErrorPanel';
 export function AppointmentRecords({
   appointmentId,
   patientId,
+  returnTo,
   view,
   clinical,
   diagnostic,
 }: {
   appointmentId: string;
   patientId: string;
+  returnTo?: string;
   view: 'lab' | 'prescription';
   clinical: ClinicalApi;
   diagnostic: DiagnosticApi;
@@ -111,7 +113,11 @@ export function AppointmentRecords({
         )}
         <Link
           className="button button-secondary"
-          to={'/patient/lab-results?patientId=' + encodeURIComponent(patientId)}
+          to={
+            '/patient/lab-results?patientId=' +
+            encodeURIComponent(patientId) +
+            (returnTo ? '&returnTo=' + encodeURIComponent(returnTo) : '')
+          }
         >
           Xem kết quả theo hồ sơ
         </Link>

@@ -225,7 +225,7 @@ describe('available slot screen', () => {
           code: 'EXAM',
           name: 'Khám tổng quát',
           status: 'ACTIVE',
-          price: null,
+          price: { amountVnd: 175000 },
         },
       ]),
     } as unknown as CatalogApi;
@@ -286,11 +286,13 @@ describe('available slot screen', () => {
     fireEvent.change(await screen.findByLabelText('Chuyên khoa'), {
       target: { value: 'dep-1' },
     });
-    fireEvent.click(await screen.findByRole('button', { name: 'Chọn bác sĩ' }));
-    fireEvent.change(await screen.findByLabelText('Dịch vụ khám'), {
-      target: { value: 'svc-1' },
-    });
-    expect(await screen.findByText('Không có khung giờ phù hợp')).toBeTruthy();
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Chọn dịch vụ' }),
+    );
+    fireEvent.click(await screen.findByRole('button', { name: /BS. An/ }));
+    expect(
+      await screen.findByText('Chưa có giờ trống trong ngày'),
+    ).toBeTruthy();
     expect(listAvailable).toHaveBeenCalledWith(
       { doctorId: 'doc-1', serviceId: 'svc-1', date: '2026-11-02' },
       expect.any(AbortSignal),
@@ -299,12 +301,18 @@ describe('available slot screen', () => {
       (screen.getByRole('button', { name: /Tiếp tục/ }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: /Ngày 3 tháng 11/ }));
+    fireEvent.click(screen.getByRole('button', { name: '2026-11-03' }));
     fireEvent.click(await screen.findByRole('button', { name: '08:30' }));
     fireEvent.click(screen.getByRole('button', { name: /Tiếp tục/ }));
-    expect(appointmentApi.createHold).toHaveBeenCalledWith(
-      { patientId: 'patient-1', slotId: 'slot-real-b' },
-      expect.any(String),
+    fireEvent.click(await screen.findByRole('button', { name: /Demo/ }));
+    fireEvent.click(
+      screen.getByRole('button', { name: /Giữ chỗ và tiếp tục/ }),
+    );
+    await waitFor(() =>
+      expect(appointmentApi.createHold).toHaveBeenCalledWith(
+        { patientId: 'patient-1', slotId: 'slot-real-b' },
+        expect.any(String),
+      ),
     );
   });
 });

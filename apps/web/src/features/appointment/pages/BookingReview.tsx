@@ -22,7 +22,7 @@ type BookingState =
   | 'payment_failed'
   | 'error';
 
-type PaymentMethodType = 'simulate' | 'momo' | 'atm' | 'counter';
+type PaymentMethodType = 'simulate' | 'counter';
 
 export function BookingReview({
   api,
@@ -58,8 +58,12 @@ export function BookingReview({
   }, [expiresAt]);
 
   const seconds = Math.max(0, Math.ceil((expiresAt - now) / 1000));
-  const expired = Number.isFinite(expiresAt) && seconds === 0;
-  const back = details?.returnTo ?? '/patient/appointments/new';
+  const holdExpired = Number.isFinite(expiresAt) && seconds === 0;
+  const back =
+    details?.returnTo?.startsWith('/patient/appointments/new') ||
+    details?.returnTo === '/staff/reception?tab=r02'
+      ? details.returnTo
+      : '/patient/appointments/new';
 
   const patientId = params.get('patientId') ?? '';
   const holdId = params.get('holdId') ?? '';
@@ -92,7 +96,7 @@ export function BookingReview({
   const [error, setError] = useState<unknown>();
   const idempotency = useRef<{ holdId: string; key: string } | null>(null);
 
-  const isExpired = expired;
+  const isExpired = holdExpired && !confirmedAppointmentId;
 
   const formatTimer = (totalSec: number) => {
     const m = Math.floor(totalSec / 60);
@@ -100,50 +104,112 @@ export function BookingReview({
     return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   };
 
+  const activeRequest = useRef<AbortController | null>(null);
+  const paymentIntents = useRef(
+    new Map<
+      string,
+      { key: string; transactionId: string; accepted: boolean }
+    >(),
+  );
+  const submitting = useRef(false);
+  useEffect(() => () => activeRequest.current?.abort(), []);
+  const pause = (signal: AbortSignal) =>
+    new Promise<void>((resolve, reject) => {
+      const onAbort = () => {
+        clearTimeout(timer);
+        reject(new DOMException('Aborted', 'AbortError'));
+      };
+      const timer = window.setTimeout(() => {
+        signal.removeEventListener('abort', onAbort);
+        resolve();
+      }, 1200);
+      signal.addEventListener('abort', onAbort, { once: true });
+    });
   async function handleSimulatePaymentProcess(apptId: string) {
+    if (!billingApi) return;
+    activeRequest.current?.abort();
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    const { signal } = controller;
     setBookingState('processing_simulate');
     setError(undefined);
-
-    if (billingApi) {
-      try {
-        // Tra cứu khoản thu OPEN của bệnh nhân
-        const chargesRes = await billingApi
-          .getPatientCharges(patientId, { state: 'OPEN' })
-          .catch(() => ({ items: [] }));
-        const targetCharge =
-          chargesRes.items.find(
-            (c) => c.sourceType === 'APPOINTMENT' && c.sourceId === apptId,
-          ) || chargesRes.items[0];
-
-        const chargeId = targetCharge?.id || `charge-${apptId}`;
-        const txnId = `TXN-SIM-${Date.now()}`;
-
-        // Gọi API mô phỏng thanh toán (BI-004)
-        const simResult = await billingApi.simulatePayment(
-          { chargeId, transactionId: txnId },
-          crypto.randomUUID(),
-        );
-
-        if (simResult.state === 'FAILED') {
-          setBookingState('payment_failed');
-          setError(
-            new Error('Giao dịch mô phỏng bị từ chối từ cổng thanh toán.'),
+    try {
+      let chargeId: string | undefined;
+      for (let attempt = 0; attempt < 60 && !chargeId; attempt++) {
+        for (let page = 1; ; page++) {
+          const data = await billingApi.getPatientCharges(
+            patientId,
+            { page, limit: 100 },
+            signal,
           );
-        } else {
-          setBookingState('confirmed');
+          const charge = data.items.find(
+            (c) => c.sourceType === 'APPOINTMENT' && c.sourceId === apptId,
+          );
+          if (charge) {
+            chargeId = charge.id;
+            break;
+          }
+          if (!data.items.length || page * 100 >= data.total) break;
         }
-      } catch (simErr) {
-        setBookingState('payment_failed');
-        setError(simErr);
+        if (!chargeId) await pause(signal);
       }
-    } else {
-      // Fallback môi trường test khi không có billingApi
-      setBookingState('confirmed');
+      if (!chargeId)
+        throw new Error(
+          'Khoản thu của lịch chưa đồng bộ. Xem chi tiết lịch trước khi thử lại.',
+        );
+      let intent = paymentIntents.current.get(apptId);
+      if (!intent) {
+        intent = {
+          key: crypto.randomUUID(),
+          transactionId: 'DEMO-' + crypto.randomUUID(),
+          accepted: false,
+        };
+        paymentIntents.current.set(apptId, intent);
+      }
+      if (!intent.accepted) {
+        const result = await billingApi.simulatePayment(
+          { chargeId, transactionId: intent.transactionId },
+          intent.key,
+          signal,
+        );
+        if (result.state === 'FAILED') {
+          paymentIntents.current.delete(apptId);
+          throw new Error('Thanh toán thất bại. Bạn có thể thử lại.');
+        }
+        intent.accepted = true;
+      }
+      for (let attempt = 0; attempt < 90; attempt++) {
+        const result = await api.getAppointment(apptId, signal);
+        const state = String(result.appointment?.state ?? result.state);
+        if (state === 'CONFIRMED') {
+          if (!signal.aborted) setBookingState('confirmed');
+          return;
+        }
+        if (['CANCELLED', 'EXPIRED'].includes(state))
+          throw new Error(
+            'Lịch đã hủy hoặc hết hạn. Kiểm tra chi tiết trước khi thao tác tiếp.',
+          );
+        await pause(signal);
+      }
+      if (!signal.aborted) {
+        setBookingState('created');
+        setError(
+          new Error(
+            'Thanh toán đang được đối soát. Theo dõi chi tiết lịch, không tạo giao dịch mới.',
+          ),
+        );
+      }
+    } catch (caught) {
+      if (!signal.aborted) {
+        setBookingState('payment_failed');
+        setError(caught);
+      }
     }
   }
 
   async function confirm() {
     if (
+      submitting.current ||
       !hasHoldDetails ||
       bookingState === 'creating' ||
       bookingState === 'created' ||
@@ -158,6 +224,7 @@ export function BookingReview({
     }
     const idempotencyKey = idempotency.current.key;
 
+    submitting.current = true;
     setBookingState('creating');
     setError(undefined);
 
@@ -187,9 +254,25 @@ export function BookingReview({
     } catch (caught) {
       setBookingState('error');
       setError(caught);
+    } finally {
+      submitting.current = false;
     }
   }
 
+  const releaseKey = useRef(crypto.randomUUID());
+  async function changeSelection() {
+    if (submitting.current || confirmedAppointmentId) return;
+    submitting.current = true;
+    try {
+      await api.releaseHold(holdId, releaseKey.current);
+      navigate(back);
+    } catch (caught) {
+      setError(caught);
+      setBookingState('error');
+    } finally {
+      submitting.current = false;
+    }
+  }
   function handleRetryPayment() {
     if (confirmedAppointmentId) {
       void handleSimulatePaymentProcess(confirmedAppointmentId);
@@ -307,6 +390,18 @@ export function BookingReview({
       className="page-content page-transition-enter"
       aria-labelledby="review-heading"
     >
+      {!confirmedAppointmentId && (
+        <button
+          className="back-link"
+          disabled={
+            bookingState === 'creating' ||
+            bookingState === 'processing_simulate'
+          }
+          onClick={() => void changeSelection()}
+        >
+          ← Chọn lại khung giờ hoặc người khám
+        </button>
+      )}
       {/* Header Banner theo Figma Frame 04 */}
       <div className="patient-header-banner">
         <span className="page-eyebrow">CHĂM SÓC SỨC KHỎE</span>
@@ -316,6 +411,20 @@ export function BookingReview({
         <p className="page-subtitle">{getPageSubtitle()}</p>
       </div>
 
+      {confirmedAppointmentId && (
+        <Link
+          className="back-link"
+          to={
+            '/patient/appointments/' +
+            encodeURIComponent(confirmedAppointmentId)
+          }
+        >
+          Theo dõi lịch và trạng thái thanh toán →
+        </Link>
+      )}
+      {error != null && bookingState === 'created' && (
+        <ErrorPanel error={error} />
+      )}
       <div className="booking-review-layout">
         {/* CỘT TRÁI (698px): Thông tin lịch & Phương thức thanh toán (Figma 1:3687) */}
         <div className="booking-review-main">
@@ -408,72 +517,6 @@ export function BookingReview({
                 </div>
               </div>
 
-              {/* Option 2: Ví MoMo */}
-              <div
-                role="radio"
-                tabIndex={0}
-                aria-checked={paymentMethod === 'momo'}
-                className={`payment-option-card ${paymentMethod === 'momo' ? 'is-selected' : ''}`}
-                onClick={() => {
-                  if (
-                    bookingState === 'idle' ||
-                    bookingState === 'payment_failed'
-                  ) {
-                    setPaymentMethod('momo');
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (
-                    (e.key === ' ' || e.key === 'Enter') &&
-                    (bookingState === 'idle' ||
-                      bookingState === 'payment_failed')
-                  ) {
-                    setPaymentMethod('momo');
-                  }
-                }}
-              >
-                <span className="payment-radio-circle" aria-hidden="true" />
-                <div className="payment-option-info">
-                  <span className="payment-option-title">Ví MoMo</span>
-                  <span className="payment-option-desc">
-                    Thanh toán với ví điện tử
-                  </span>
-                </div>
-              </div>
-
-              {/* Option 3: Thẻ ATM nội địa */}
-              <div
-                role="radio"
-                tabIndex={0}
-                aria-checked={paymentMethod === 'atm'}
-                className={`payment-option-card ${paymentMethod === 'atm' ? 'is-selected' : ''}`}
-                onClick={() => {
-                  if (
-                    bookingState === 'idle' ||
-                    bookingState === 'payment_failed'
-                  ) {
-                    setPaymentMethod('atm');
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (
-                    (e.key === ' ' || e.key === 'Enter') &&
-                    (bookingState === 'idle' ||
-                      bookingState === 'payment_failed')
-                  ) {
-                    setPaymentMethod('atm');
-                  }
-                }}
-              >
-                <span className="payment-radio-circle" aria-hidden="true" />
-                <div className="payment-option-info">
-                  <span className="payment-option-title">Thẻ ATM nội địa</span>
-                  <span className="payment-option-desc">
-                    Hỗ trợ ngân hàng trong nước
-                  </span>
-                </div>
-              </div>
-
               {/* Option 4: Thanh toán tại quầy */}
               <div
                 role="radio"
@@ -535,19 +578,23 @@ export function BookingReview({
                   ? 'Phí khám đã thanh toán'
                   : bookingState === 'created'
                     ? 'Khoản thu đang chờ xử lý'
-                    : isExpired
-                      ? 'Đã hết hạn giữ chỗ (10 phút)'
-                      : paymentMethod === 'counter' ||
-                          bookingState === 'waiting_counter'
-                        ? 'Thanh toán tại quầy trước khi hết hạn'
-                        : 'Giữ chỗ 10 phút · Còn lại'}
+                    : confirmedAppointmentId
+                      ? 'Theo dõi hạn thanh toán trong chi tiết lịch'
+                      : isExpired
+                        ? 'Đã hết hạn giữ chỗ'
+                        : paymentMethod === 'counter' ||
+                            bookingState === 'waiting_counter'
+                          ? 'Thanh toán tại quầy trước khi hết hạn'
+                          : 'Thời gian giữ chỗ còn lại'}
               </span>
               <span className="payment-countdown-timer">
                 {bookingState === 'confirmed' || bookingState === 'created'
                   ? formattedAmount
-                  : isExpired
-                    ? '00:00'
-                    : formatTimer(seconds)}
+                  : confirmedAppointmentId
+                    ? 'Theo dõi chi tiết lịch'
+                    : isExpired
+                      ? '00:00'
+                      : formatTimer(seconds)}
               </span>
             </div>
 
@@ -565,11 +612,11 @@ export function BookingReview({
               </div>
               <div className="payment-breakdown-row">
                 <span className="muted">Giảm trừ BHYT</span>
-                <span>0 đ</span>
+                <span>Chưa áp dụng</span>
               </div>
               <div className="payment-breakdown-row">
                 <span className="muted">Phí dịch vụ</span>
-                <span>0 đ</span>
+                <span>Chưa có khoản riêng</span>
               </div>
               <div className="payment-divider" />
               <div className="payment-total-row">
@@ -637,7 +684,7 @@ export function BookingReview({
                 className="btn-payment-action"
                 onClick={() =>
                   navigate(
-                    `/patient/appointments/${encodeURIComponent(confirmedAppointmentId || 'UMC091126')}`,
+                    `/patient/appointments/${encodeURIComponent(confirmedAppointmentId)}`,
                   )
                 }
               >

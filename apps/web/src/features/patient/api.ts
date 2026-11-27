@@ -39,6 +39,7 @@ export function createPatientApi(
     return body.data as T;
   }
 
+  const intents = new Map<string, { signature: string; key: string }>();
   async function mutate<T>(
     path: string,
     method: 'POST' | 'PATCH',
@@ -46,9 +47,13 @@ export function createPatientApi(
     input: unknown,
     signal?: AbortSignal,
   ): Promise<T> {
+    const scope = method + ':' + path;
+    const signature = JSON.stringify(input);
+    if (intents.get(scope)?.signature !== signature)
+      intents.set(scope, { signature, key: crypto.randomUUID() });
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Idempotency-Key': crypto.randomUUID(),
+      'Idempotency-Key': intents.get(scope)!.key,
     };
 
     if (options.authorizationLease) {
@@ -90,6 +95,7 @@ export function createPatientApi(
       error.code = code;
       throw error;
     }
+    intents.delete(scope);
     return body.data.patient as T;
   }
 

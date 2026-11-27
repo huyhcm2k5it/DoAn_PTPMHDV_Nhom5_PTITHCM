@@ -13,15 +13,17 @@ export function MyAppointments({
   api: AppointmentApi;
   patientApi?: PatientApi;
 }) {
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const [patientId, setPatientId] = useState(params.get('patientId') ?? '');
   const [items, setItems] = useState<AppointmentSummary[]>();
   const [error, setError] = useState<unknown>();
   const [loading, setLoading] = useState(false);
   const [profiles, setProfiles] = useState<PatientProfile[]>();
   const [profileError, setProfileError] = useState<unknown>();
-  const [filter, setFilter] = useState('all');
-  const [page, setPage] = useState(1);
+  const [filter, setFilter] = useState(params.get('state') ?? 'all');
+  const [page, setPage] = useState(
+    Math.max(1, Number(params.get('page')) || 1),
+  );
   const [total, setTotal] = useState(0);
   const [retry, setRetry] = useState(0);
   const [selectedId, setSelectedId] = useState<string>();
@@ -77,6 +79,17 @@ export function MyAppointments({
   const visible = items?.filter(
     (item) => filter === 'all' || item.state === filter,
   );
+  const returnTo =
+    '/patient/appointments?' +
+    new URLSearchParams({ patientId, state: filter, page: String(page) });
+  const detailQuery = '?returnTo=' + encodeURIComponent(returnTo);
+  useEffect(() => {
+    if (patientId)
+      setParams(
+        { patientId, state: filter, page: String(page) },
+        { replace: true },
+      );
+  }, [patientId, filter, page, setParams]);
   const selected =
     visible?.find((item) => item.appointmentId === selectedId) ?? visible?.[0];
   const patientName =
@@ -119,7 +132,8 @@ export function MyAppointments({
             selected
               ? '/patient/appointments/' +
                 encodeURIComponent(selected.appointmentId) +
-                '?tab=lab'
+                '?tab=lab&returnTo=' +
+                encodeURIComponent(returnTo)
               : '/patient/lab-results'
           }
         >
@@ -130,7 +144,8 @@ export function MyAppointments({
             selected
               ? '/patient/appointments/' +
                 encodeURIComponent(selected.appointmentId) +
-                '?tab=prescription'
+                '?tab=prescription&returnTo=' +
+                encodeURIComponent(returnTo)
               : '/patient/medical-records'
           }
         >
@@ -227,7 +242,7 @@ export function MyAppointments({
                 </div>
                 <Link
                   className="text-link"
-                  to={`/patient/appointments/${encodeURIComponent(item.appointmentId)}`}
+                  to={`/patient/appointments/${encodeURIComponent(item.appointmentId)}${detailQuery}`}
                 >
                   Xem chi tiết
                 </Link>
@@ -262,7 +277,8 @@ export function MyAppointments({
                   className="button button-secondary"
                   to={
                     '/patient/appointments/' +
-                    encodeURIComponent(selected.appointmentId)
+                    encodeURIComponent(selected.appointmentId) +
+                    detailQuery
                   }
                 >
                   Mở chi tiết lịch khám

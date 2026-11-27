@@ -34,6 +34,11 @@ export function AppointmentDetail({
 }) {
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const requestedBack = params.get('returnTo');
+  const back = requestedBack?.startsWith('/patient/appointments?')
+    ? requestedBack
+    : '/patient/appointments';
+  const context = 'returnTo=' + encodeURIComponent(back);
   const { appointmentId = '' } = useParams();
   const { data, error, retry } = useAppointmentPolling(api, appointmentId);
   const [reasonCode, setReasonCode] = useState('PATIENT_REQUEST');
@@ -156,7 +161,7 @@ export function AppointmentDetail({
 
   return (
     <section className="page-content quan-workflow">
-      <Link className="back-link" to="/patient/appointments">
+      <Link className="back-link" to={back}>
         ← Lịch hẹn
       </Link>
       <div className="page-heading">
@@ -176,23 +181,26 @@ export function AppointmentDetail({
           className="status-pill"
           title={appointmentLabels[appointmentState]}
         >
-          {appointmentState}
+          {appointmentLabels[appointmentState] ?? appointmentState}
         </span>
       </div>
       {!mode && records && patientId && (
         <nav className="quan-record-tabs" aria-label="Nội dung lịch khám">
-          <Link aria-current={!recordTab ? 'page' : undefined} to={detailPath}>
+          <Link
+            aria-current={!recordTab ? 'page' : undefined}
+            to={detailPath + '?' + context}
+          >
             Lịch hẹn của tôi
           </Link>
           <Link
             aria-current={recordTab === 'lab' ? 'page' : undefined}
-            to={detailPath + '?tab=lab'}
+            to={detailPath + '?tab=lab&' + context}
           >
             Kết quả xét nghiệm
           </Link>
           <Link
             aria-current={recordTab === 'prescription' ? 'page' : undefined}
-            to={detailPath + '?tab=prescription'}
+            to={detailPath + '?tab=prescription&' + context}
           >
             Đơn thuốc
           </Link>
@@ -203,6 +211,7 @@ export function AppointmentDetail({
           key={appointmentId + recordTab}
           appointmentId={appointmentId}
           patientId={patientId}
+          returnTo={detailPath + '?' + context}
           view={recordTab}
           {...records}
         />
@@ -215,7 +224,11 @@ export function AppointmentDetail({
             </div>
             <div>
               <dt>Đồng bộ phí</dt>
-              <dd>{data.chargeSync ?? 'PENDING'}</dd>
+              <dd>
+                {(typeof data.chargeSync === 'object'
+                  ? data.chargeSync?.state
+                  : data.chargeSync) ?? 'PENDING'}
+              </dd>
             </div>
             <div>
               <dt>Trạng thái phí</dt>
@@ -255,7 +268,7 @@ export function AppointmentDetail({
               {canReschedule && (
                 <Link
                   className="button button-secondary"
-                  to={detailPath + '/reschedule'}
+                  to={detailPath + '/reschedule?' + context}
                 >
                   Đổi lịch
                 </Link>
@@ -263,7 +276,7 @@ export function AppointmentDetail({
               {canCancel && (
                 <Link
                   className="button button-secondary"
-                  to={detailPath + '/cancel'}
+                  to={detailPath + '/cancel?' + context}
                 >
                   Hủy lịch
                 </Link>
@@ -292,7 +305,7 @@ export function AppointmentDetail({
                 </select>
               </label>
               <div className="quan-actions">
-                <Link to={detailPath}>Quay lại</Link>
+                <Link to={detailPath + '?' + context}>Quay lại</Link>
                 <button className="button quan-danger" disabled={busy}>
                   Xác nhận hủy lịch
                 </button>
@@ -342,7 +355,7 @@ export function AppointmentDetail({
                 </label>
               )}
               <div className="quan-actions">
-                <Link to={detailPath}>Quay lại</Link>
+                <Link to={detailPath + '?' + context}>Quay lại</Link>
                 <button
                   className="button button-primary"
                   disabled={!newSlotId || busy || searching}
@@ -357,7 +370,9 @@ export function AppointmentDetail({
             (mode === 'reschedule' && !canReschedule)) && (
             <p role="status">
               Trạng thái hiện tại không cho phép thao tác này.{' '}
-              <Link to={detailPath}>Xem chi tiết lịch khám</Link>
+              <Link to={detailPath + '?' + context}>
+                Xem chi tiết lịch khám
+              </Link>
             </p>
           )}
         </>
