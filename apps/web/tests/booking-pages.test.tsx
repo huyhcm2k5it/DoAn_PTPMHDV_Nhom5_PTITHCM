@@ -166,6 +166,7 @@ describe('appointment booking screens', () => {
       expect(billing.simulatePayment).toHaveBeenCalledWith(
         { chargeId: 'charge-1', transactionId: expect.any(String) },
         expect.any(String),
+        expect.any(AbortSignal),
       );
     });
 
@@ -322,7 +323,7 @@ describe('appointment booking screens', () => {
         <AppointmentDetail api={appointmentApi} />
       </MemoryRouter>,
     );
-    expect(await screen.findByText('CONFIRMED')).toBeTruthy();
+    expect(await screen.findByText('Đã xác nhận')).toBeTruthy();
     expect(appointmentApi.getAppointment).toHaveBeenCalledTimes(1);
   });
 });

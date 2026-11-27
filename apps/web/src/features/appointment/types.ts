@@ -26,7 +26,7 @@ export type AppointmentSummary = {
   appointment?: Record<string, unknown>;
   chargeStatus?: string;
   refundStatus?: string | null;
-  chargeSync?: string;
+  chargeSync?: string | { state: string; chargeId?: string | null };
 };
 export type QueueTicket = {
   ticketId: string;
@@ -54,13 +54,11 @@ export type ScheduleResult = {
   schedule: ScheduleInput & { id: string; version: number };
 };
 export type AdminSummary = {
-  date: string;
-  appointments: {
-    total: number;
-    byState: Record<string, number>;
-    metrics?: Record<string, number>;
-  };
-  queue: { total: number; byState: Record<string, number> };
+  booked: number;
+  cancelled: number;
+  checkedIn: number;
+  completed: number;
+  asOf: string;
 };
 export interface AppointmentApi {
   listAvailable(

@@ -204,3 +204,42 @@ describe('pharmacy UI and transport', () => {
     expect(signal?.aborted).toBe(true);
   });
 });
+
+it('blocks releasing a hold while settlement evidence is UNKNOWN', async () => {
+  const client = api({
+    detail: vi.fn().mockResolvedValue({
+      ...held,
+      holds: held.holds!.map((x) => ({ ...x, settlementState: 'UNKNOWN' })),
+    }),
+  });
+  render(
+    <MemoryRouter>
+      <PrescriptionDetail api={client} prescriptionId="rx" />
+    </MemoryRouter>,
+  );
+  expect(await screen.findByText(/Thanh toán đang đối soát/)).toBeTruthy();
+  expect(
+    screen.queryByRole('button', { name: 'Nhả thuốc đang giữ' }),
+  ).toBeNull();
+});
+it('keeps a dispensed prescription read-only even if an old hold DTO still says COMMITTED', async () => {
+  const client = api({
+    detail: vi.fn().mockResolvedValue({
+      ...held,
+      latestHoldState: 'DISPENSED',
+      dispensedAt: '2026-11-27T06:00:00Z',
+      holds: held.holds!.map((x) => ({ ...x, status: 'COMMITTED' })),
+    }),
+  });
+  render(
+    <MemoryRouter>
+      <PrescriptionDetail api={client} prescriptionId="rx" />
+    </MemoryRouter>,
+  );
+  expect(
+    await screen.findByRole('heading', { name: 'Toa đã cấp phát · Chỉ đọc' }),
+  ).toBeTruthy();
+  expect(
+    screen.queryByRole('button', { name: /Xác nhận cấp|Cấp phát/ }),
+  ).toBeNull();
+});

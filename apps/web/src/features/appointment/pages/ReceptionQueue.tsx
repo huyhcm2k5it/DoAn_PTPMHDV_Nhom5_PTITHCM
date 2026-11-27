@@ -1,6 +1,6 @@
 import { useSearchParams } from 'react-router-dom';
 import type { PatientApi, PatientProfile } from '../../patient/types';
-import type { CatalogApi } from '../../catalog/types';
+import type { CatalogApi, Doctor } from '../../catalog/types';
 import { formatAppointmentTime } from '../display';
 import { AvailableSlots } from './AvailableSlots';
 import { useEffect, useRef, useState } from 'react';
@@ -35,6 +35,27 @@ export function ReceptionQueue({
   const callIntent = useRef<
     { ticketType: QueueTicket['ticketType']; key: string } | undefined
   >(undefined);
+  const [doctorId, setDoctorId] = useState('');
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [doctorError, setDoctorError] = useState<unknown>();
+  useEffect(() => {
+    if (!catalog) return;
+    const c = new AbortController();
+    async function load() {
+      const all: Doctor[] = [];
+      for (let p = 1; ; p++) {
+        const result = await catalog!.doctors('', p, c.signal);
+        all.push(...result.items);
+        if (!result.items.length || p * 20 >= result.total) break;
+      }
+      if (!c.signal.aborted)
+        setDoctors(all.filter((x) => x.status === 'ACTIVE'));
+    }
+    load().catch((e) => {
+      if (!c.signal.aborted) setDoctorError(e);
+    });
+    return () => c.abort();
+  }, [catalog]);
   const [ticketType, setTicketType] = useState<'FIRST' | 'RETURN'>('FIRST');
   const [reload, setReload] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -44,7 +65,10 @@ export function ReceptionQueue({
     setLoading(true);
     setError(undefined);
     api
-      .listQueue?.({ ticketType }, controller.signal)
+      .listQueue?.(
+        { ticketType, ...(doctorId ? { doctorId } : {}) },
+        controller.signal,
+      )
       .then(
         (data) => {
           if (!controller.signal.aborted) setItems(data.items);
@@ -57,7 +81,7 @@ export function ReceptionQueue({
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [api, ticketType, reload, queueVisible]);
+  }, [api, ticketType, reload, queueVisible, doctorId]);
   async function callNext() {
     if (busy || !api.callNext) return;
     setBusy(true);
@@ -66,7 +90,12 @@ export function ReceptionQueue({
       if (callIntent.current?.ticketType !== ticketType) {
         callIntent.current = { ticketType, key: crypto.randomUUID() };
       }
-      setTicket(await api.callNext({ ticketType }, callIntent.current.key));
+      setTicket(
+        await api.callNext(
+          { ticketType, ...(doctorId ? { doctorId } : {}) },
+          callIntent.current.key,
+        ),
+      );
       callIntent.current = undefined;
       setHandoff('');
       setReload((value) => value + 1);

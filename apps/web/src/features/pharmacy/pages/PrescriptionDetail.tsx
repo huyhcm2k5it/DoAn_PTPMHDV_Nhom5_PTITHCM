@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { PharmacyApi } from '../types';
+import type { PharmacyApi, PrescriptionDetail as Detail } from '../types';
 import { statusLabel } from '../status';
 import { useMedicationPolling } from '../hooks/useMedicationPolling';
 import { ErrorPanel } from '../../../shared/ui/ErrorPanel';
@@ -9,11 +9,16 @@ import '../pharmacy.css';
 export function PrescriptionDetail({
   api,
   prescriptionId,
+  onChanged,
 }: {
   api: PharmacyApi;
   prescriptionId: string;
+  onChanged?: (data: Detail) => void;
 }) {
   const { data, error, reload } = useMedicationPolling(api, prescriptionId);
+  useEffect(() => {
+    if (data) onChanged?.(data);
+  }, [data, onChanged]);
   const [busy, setBusy] = useState(false),
     [actionError, setActionError] = useState<unknown>();
   const [confirming, setConfirming] = useState(false);
@@ -84,11 +89,13 @@ export function PrescriptionDetail({
         <div>
           <p className="eyebrow">CẤP PHÁT TOÀN TOA</p>
           <h1>
-            {confirming && hold?.status === 'COMMITTED'
-              ? 'Xác nhận cấp phát'
-              : data.latestHoldState === 'HELD'
-                ? 'Phiếu giữ thuốc đang hiệu lực'
-                : 'Kiểm tra khả dụng và giữ thuốc'}
+            {data.latestHoldState === 'DISPENSED'
+              ? 'Toa đã cấp phát · Chỉ đọc'
+              : confirming && hold?.status === 'COMMITTED'
+                ? 'Xác nhận cấp phát'
+                : data.latestHoldState === 'HELD'
+                  ? 'Phiếu giữ thuốc đang hiệu lực'
+                  : 'Kiểm tra khả dụng và giữ thuốc'}
           </h1>
           <p className="pharmacy-id">{prescriptionId}</p>
         </div>
@@ -179,6 +186,12 @@ export function PrescriptionDetail({
               lại toàn toa.
             </p>
           )}
+          {hold?.settlementState === 'UNKNOWN' && (
+            <p role="status" className="state-card">
+              Thanh toán đang đối soát. Không nhả thuốc hoặc giữ lại cho đến khi
+              máy chủ xác nhận.
+            </p>
+          )}
           <div className="pharmacy-actions" aria-busy={busy}>
             {['NOT_HELD', 'RELEASED', 'EXPIRED'].includes(
               data.latestHoldState,
@@ -191,7 +204,7 @@ export function PrescriptionDetail({
                 Giữ toàn toa
               </button>
             )}
-            {hold?.status === 'HELD' && (
+            {hold?.status === 'HELD' && hold.settlementState !== 'UNKNOWN' && (
               <button
                 className="button button-secondary"
                 disabled={busy}
@@ -218,19 +231,20 @@ export function PrescriptionDetail({
                 Quay lại
               </button>
             )}
-            {hold?.status === 'COMMITTED' && (
-              <button
-                className="button button-primary"
-                disabled={busy}
-                onClick={() =>
-                  confirming ? void act('dispense') : setConfirming(true)
-                }
-              >
-                {confirming
-                  ? 'Xác nhận đã bàn giao thuốc'
-                  : 'Kiểm tra trước khi cấp phát'}
-              </button>
-            )}
+            {hold?.status === 'COMMITTED' &&
+              data.latestHoldState === 'COMMITTED' && (
+                <button
+                  className="button button-primary"
+                  disabled={busy}
+                  onClick={() =>
+                    confirming ? void act('dispense') : setConfirming(true)
+                  }
+                >
+                  {confirming
+                    ? 'Xác nhận đã bàn giao thuốc'
+                    : 'Kiểm tra trước khi cấp phát'}
+                </button>
+              )}
             <button
               className="button button-secondary"
               disabled={busy}

@@ -28,6 +28,7 @@ export function ProfileForm({
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (saving) return;
     setSaving(true);
     setError(undefined);
 
@@ -91,7 +92,7 @@ export function ProfileForm({
 
         {error != null && <ErrorPanel error={error} />}
 
-        <form onSubmit={(event) => void submit(event)} noValidate>
+        <form onSubmit={(event) => void submit(event)}>
           <div className="profile-form-grid">
             <div className="profile-form-field">
               <label htmlFor="form-fullname">
@@ -143,9 +144,10 @@ export function ProfileForm({
                 onChange={(event) => setSex(event.target.value)}
               >
                 <option value="">-- Chưa chọn --</option>
-                <option value="Nam">Nam</option>
-                <option value="Nữ">Nữ</option>
-                <option value="Khác">Khác</option>
+                <option value="MALE">Nam</option>
+                <option value="FEMALE">Nữ</option>
+                <option value="OTHER">Khác</option>
+                <option value="UNKNOWN">Chưa xác định</option>
               </select>
             </div>
 

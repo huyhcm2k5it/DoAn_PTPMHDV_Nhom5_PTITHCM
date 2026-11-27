@@ -1,6 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import type { PharmacyApi, Prescription } from '../types';
+import type {
+  PharmacyApi,
+  Prescription,
+  PrescriptionDetail as Detail,
+} from '../types';
 import { ErrorPanel } from '../../../shared/ui/ErrorPanel';
 import { Loading } from '../../../shared/ui/Loading';
 import { EmptyState } from '../../../shared/ui/EmptyState';
@@ -9,6 +13,18 @@ import { PrescriptionDetail } from './PrescriptionDetail';
 
 export function PrescriptionQueue({ api }: { api: PharmacyApi }) {
   const { prescriptionId } = useParams();
+  const [selectedDetail, setSelectedDetail] = useState<Detail>();
+  const completedId = useRef('');
+  const onChanged = useCallback((data: Detail) => {
+    setSelectedDetail(data);
+    if (
+      data.latestHoldState === 'DISPENSED' &&
+      completedId.current !== data.prescriptionId
+    ) {
+      completedId.current = data.prescriptionId;
+      setGeneration((x) => x + 1);
+    }
+  }, []);
   const [page, setPage] = useState(1),
     [generation, setGeneration] = useState(0);
   const [items, setItems] = useState<Prescription[]>(),
@@ -54,6 +70,22 @@ export function PrescriptionQueue({ api }: { api: PharmacyApi }) {
           <aside className="state-card prescription-sidebar">
             <h2>Hàng chờ toa đã ký</h2>
             <p className="field-hint">{total} toa thuốc</p>
+            {selectedDetail &&
+              selectedDetail.prescriptionId === prescriptionId &&
+              selectedDetail.latestHoldState === 'DISPENSED' && (
+                <article className="prescription-option is-complete">
+                  <span className="status-pill">Đã cấp phát</span>
+                  <strong>Toa #{prescriptionId?.slice(0, 8)}</strong>
+                  <p>Toa đã cấp đang xem · Chỉ đọc</p>
+                  <small>
+                    {selectedDetail.dispensedAt
+                      ? new Date(selectedDetail.dispensedAt).toLocaleString(
+                          'vi-VN',
+                        )
+                      : ''}
+                  </small>
+                </article>
+              )}
             {items.map((rx) => {
               const id = rx.prescriptionId ?? rx.id;
               return (
@@ -75,6 +107,7 @@ export function PrescriptionQueue({ api }: { api: PharmacyApi }) {
               <PrescriptionDetail
                 key={prescriptionId ?? items[0]?.id}
                 api={api}
+                onChanged={onChanged}
                 prescriptionId={
                   prescriptionId ?? items[0].prescriptionId ?? items[0].id
                 }

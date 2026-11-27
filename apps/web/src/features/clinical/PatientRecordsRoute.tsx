@@ -63,7 +63,12 @@ export function PatientRecordsRoute({
   const query = selected
     ? '?' + new URLSearchParams({ patientId: selected })
     : '';
-  const appointments = '/patient/appointments' + query;
+  const requestedBack = params.get('returnTo');
+  const appointments =
+    requestedBack?.startsWith('/patient/appointments') &&
+    !requestedBack.startsWith('//')
+      ? requestedBack
+      : '/patient/appointments' + query;
   return (
     <section className="huy-workspace huy-patient-records">
       <header className="huy-page-heading">
