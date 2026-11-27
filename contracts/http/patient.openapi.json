@@ -299,7 +299,8 @@
                   },
                   "fullName": {
                     "type": "string",
-                    "description": "Họ tên bệnh nhân dùng trên hồ sơ và chứng từ mô phỏng."
+                    "description": "Họ tên bệnh nhân dùng trên hồ sơ và chứng từ mô phỏng.",
+                    "minLength": 2
                   },
                   "birthDate": {
                     "type": "string",
@@ -307,12 +308,39 @@
                     "description": "Ngày sinh bệnh nhân theo định dạng date."
                   },
                   "sex": {
-                    "type": "string",
-                    "description": "Giới tính được khai báo trong hồ sơ bệnh nhân."
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Giới tính được khai báo trong hồ sơ bệnh nhân.",
+                    "enum": [
+                      "MALE",
+                      "FEMALE",
+                      "OTHER",
+                      "UNKNOWN",
+                      null
+                    ]
                   },
                   "bhytSelfDeclared": {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
                     "description": "Thông tin BHYT tự khai; demo không tích hợp cổng kiểm tra BHYT thật."
+                  },
+                  "contactPhone": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "contactPhone (ERD patients)."
+                  },
+                  "address": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "address (ERD patients)."
                   }
                 },
                 "required": [
@@ -772,7 +800,8 @@
                 "properties": {
                   "fullName": {
                     "type": "string",
-                    "description": "Họ tên bệnh nhân dùng trên hồ sơ và chứng từ mô phỏng."
+                    "description": "Họ tên bệnh nhân dùng trên hồ sơ và chứng từ mô phỏng.",
+                    "minLength": 2
                   },
                   "birthDate": {
                     "type": "string",
@@ -780,17 +809,44 @@
                     "description": "Ngày sinh bệnh nhân theo định dạng date."
                   },
                   "sex": {
-                    "type": "string",
-                    "description": "Giới tính được khai báo trong hồ sơ bệnh nhân."
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Giới tính được khai báo trong hồ sơ bệnh nhân.",
+                    "enum": [
+                      "MALE",
+                      "FEMALE",
+                      "OTHER",
+                      "UNKNOWN",
+                      null
+                    ]
                   },
                   "bhytSelfDeclared": {
-                    "type": "string",
+                    "type": [
+                      "string",
+                      "null"
+                    ],
                     "description": "Thông tin BHYT tự khai; demo không tích hợp cổng kiểm tra BHYT thật."
                   },
                   "expectedVersion": {
                     "type": "integer",
                     "format": "int32",
                     "description": "Phiên bản tài nguyên client đã đọc để kiểm tra ghi cạnh tranh; lệch phiên bản trả 409."
+                  },
+                  "contactPhone": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "contactPhone (ERD patients)."
+                  },
+                  "address": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "address (ERD patients)."
                   }
                 },
                 "required": [

@@ -405,6 +405,8 @@ Kiểm kê 86 operation HTTP giữ ID từ bản 3.0: 83 endpoint client/tác v�
 | AP-018 | POST | /api/v1/queues/{ticketId}/no-show | Vắng mặt FIRST trước visit → NO\_SHOW; RETURN chỉ đánh dấu vé vắng, giữ visit chờ · STAFF[RECEPTION] |
 | AP-019 | GET | /api/v1/admin/appointments/summary | Summary đặt/hủy/COMPLETED kèm asOf và syncStatus theo ngày Việt Nam · STAFF[ADMIN] |
 
+Quy ước triển khai AP-019 bổ sung ngày 27/11/2026: Word SRS yêu cầu `syncStatus` nhưng chưa định nghĩa enum. API dùng `DEGRADED` khi có dead letter `QUARANTINED` của Appointment; `PENDING` khi có retry `PENDING` của Appointment hoặc outbox chưa publish; còn lại `UNKNOWN` vì chưa có watermark đầu cuối. Ưu tiên `DEGRADED > PENDING > UNKNOWN`. Đây là trạng thái chung của service, không khẳng định riêng khoảng ngày đã đồng bộ đầy đủ. `asOf` là lúc bắt đầu đọc báo cáo cục bộ, không chứng minh event đã tới đủ. Không thêm field lưu trữ nghiệp vụ hoặc tự trả `SYNCED` khi không có bằng chứng.
+
 ## Clinical gồm 11 API
 
 | **ID** | **Method** | **Route** | **Mục đích và quyền** |

@@ -1,4 +1,5 @@
 const express = require('express');
+const { createScopedReadPolicy } = require('./auth/scoped-read.policy.js');
 const { requestContext } = require('./utils/request-context.js');
 const { healthRoutes } = require('./routes/health.routes.js');
 const { patientsRoutes } = require('./routes/patients.routes.js');
@@ -28,7 +29,8 @@ function createApp({
         repository: createPatientsRepository(Patient),
         verifyBearerToken,
         verifyAuthorizationLease,
-        authorizeScopedRead,
+        authorizeScopedRead:
+          authorizeScopedRead || createScopedReadPolicy(connection),
         now,
         createId,
         getUserProjection: (userId) =>

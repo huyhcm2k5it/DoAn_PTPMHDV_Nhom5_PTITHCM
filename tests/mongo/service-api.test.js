@@ -321,6 +321,7 @@ test.describe('Appointment OpenAPI read responses', () => {
   });
 
   test('AP-019 returns only the summary fields declared in OpenAPI', async (t) => {
+    await h.connection.collection('user_access_projection').insertOne({ userId: ownerA, actorType: 'STAFF', status: 'ACTIVE', tokenVersion: 1, capabilities: ['ADMIN'] });
     const now = new Date('2026-11-24T01:00:00Z');
     await h.connection.collection('appointments').insertOne({
       id: randomUUID(),
@@ -342,13 +343,14 @@ test.describe('Appointment OpenAPI read responses', () => {
         connection: h.connection,
         verifyBearerToken: async () => ({
           sub: ownerA,
+          tokenVersion: 1,
           actorType: 'STAFF',
           capabilities: ['ADMIN'],
         }),
       }),
       t,
     );
-    const response = await fetch(base + '/api/v1/admin/appointments/summary?date=2026-11-24', {
+    const response = await fetch(base + '/api/v1/admin/appointments/summary?from=2026-11-24&to=2026-11-25', {
       headers: { authorization: 'Bearer staff' },
     });
     assert.equal(response.status, 200);
@@ -361,15 +363,16 @@ test.describe('Appointment OpenAPI read responses', () => {
     assert.ok(validate(body), JSON.stringify(validate.errors));
     assert.deepEqual(
       { ...body.data, asOf: undefined },
-      { booked: 1, cancelled: 0, checkedIn: 1, completed: 1, asOf: undefined },
+      { booked: 1, cancelled: 0, checkedIn: 1, completed: 1, asOf: undefined, syncStatus: 'UNKNOWN' },
     );
-    const invalid = await fetch(base + '/api/v1/admin/appointments/summary?date=2026-02-30', {
+    const invalid = await fetch(base + '/api/v1/admin/appointments/summary?from=2026-02-30&to=2026-03-02', {
       headers: { authorization: 'Bearer staff' },
     });
     assert.equal(invalid.status, 400);
   });
 
   test('AP-013 through AP-018 mutation responses match OpenAPI', async (t) => {
+    await h.connection.collection('user_access_projection').insertOne({ userId: ownerA, actorType: 'STAFF', status: 'ACTIVE', tokenVersion: 1, capabilities: ['RECEPTION'] });
     const now = new Date('2026-11-24T00:00:00Z');
     const holdId = randomUUID(),
       scheduleId = randomUUID();
@@ -455,6 +458,7 @@ test.describe('Appointment OpenAPI read responses', () => {
         resolvePriceSnapshot: async () => quote,
         verifyBearerToken: async () => ({
           sub: ownerA,
+          tokenVersion: 1,
           actorType: 'STAFF',
           capabilities: ['RECEPTION'],
         }),

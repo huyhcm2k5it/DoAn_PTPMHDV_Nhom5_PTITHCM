@@ -9,6 +9,18 @@ const patientStorage = [
   {
     ...entity('patients', [
       { name: 'ix_patients_owner', key: { ownerUserId: 1 } },
+      {
+        name: 'uq_patients_active_identity',
+        key: { ownerUserId: 1, fullName: 1, birthDate: 1 },
+        unique: true,
+        partialFilterExpression: { active: true },
+      },
+      {
+        name: 'uq_patients_active_self',
+        key: { ownerUserId: 1 },
+        unique: true,
+        partialFilterExpression: { active: true, relation: 'SELF' },
+      },
     ]),
     validator: requiredFields(['id', 'ownerUserId'], {
       id: { bsonType: 'string', minLength: 1 },

@@ -1,4 +1,4 @@
-﻿import {
+import {
   act,
   cleanup,
   fireEvent,
@@ -44,61 +44,73 @@ it('renders the real AP-011 chargeSync object without crashing', async () => {
     screen.getByRole('heading', { name: 'Chi tiết lịch khám' }),
   ).toBeTruthy();
 });
-it('renders the AP-019 flat metrics and sends an exclusive date range', async () => {
-  const transport = vi.fn().mockResolvedValue(
-    new Response(
-      JSON.stringify({
-        data: {
-          booked: 7,
-          cancelled: 1,
-          checkedIn: 4,
-          completed: 3,
-          asOf: '2026-11-27T06:00:00Z',
-        },
-      }),
-    ),
-  );
-  const api = createAppointmentApi(transport);
-  await api.getAdminSummary!('2026-11-27');
-  expect(transport.mock.calls[0][0]).toContain('date=2026-11-27');
-  expect(transport.mock.calls[0][0]).toContain('from=2026-11-27&to=2026-11-28');
-  const apiMock = {
-    getAdminSummary: vi.fn().mockResolvedValue({
-      booked: 7,
-      cancelled: 1,
-      checkedIn: 4,
-      completed: 3,
-      asOf: '2026-11-27T06:00:00Z',
-    }),
-  } as unknown as AppointmentApi;
-  const billing = vi.fn().mockImplementation(() =>
-    Promise.resolve(
+it.each([
+  ['PENDING', 'Đang chờ đồng bộ'],
+  ['DEGRADED', 'Đồng bộ cần kiểm tra'],
+  ['UNKNOWN', 'Chưa xác nhận đồng bộ đầy đủ'],
+])(
+  'renders AP-019 sync status %s and sends an exclusive date range',
+  async (syncStatus, label) => {
+    const transport = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
           data: {
-            receivedVnd: 125000,
-            refundedVnd: 0,
+            booked: 7,
+            cancelled: 1,
+            checkedIn: 4,
+            completed: 3,
             asOf: '2026-11-27T06:00:00Z',
+            syncStatus,
           },
         }),
       ),
-    ),
-  );
-  render(
-    <MemoryRouter>
-      <AdminSummary
-        api={apiMock}
-        catalog={
-          { services: vi.fn().mockResolvedValue([]) } as unknown as CatalogApi
-        }
-        transport={billing}
-      />
-    </MemoryRouter>,
-  );
-  expect(await screen.findByText('7')).toBeTruthy();
-  expect(screen.getByText('Lịch được đặt')).toBeTruthy();
-  expect(screen.queryByText('Cannot read')).toBeNull();
-});
+    );
+    const api = createAppointmentApi(transport);
+    await api.getAdminSummary!('2026-11-27');
+    expect(transport.mock.calls[0][0]).not.toContain('date=');
+    expect(transport.mock.calls[0][0]).toContain(
+      'from=2026-11-27&to=2026-11-28',
+    );
+    const apiMock = {
+      getAdminSummary: vi.fn().mockResolvedValue({
+        booked: 7,
+        cancelled: 1,
+        checkedIn: 4,
+        completed: 3,
+        asOf: '2026-11-27T06:00:00Z',
+        syncStatus,
+      }),
+    } as unknown as AppointmentApi;
+    const billing = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            data: {
+              receivedVnd: 125000,
+              refundedVnd: 0,
+              asOf: '2026-11-27T06:00:00Z',
+            },
+          }),
+        ),
+      ),
+    );
+    render(
+      <MemoryRouter>
+        <AdminSummary
+          api={apiMock}
+          catalog={
+            { services: vi.fn().mockResolvedValue([]) } as unknown as CatalogApi
+          }
+          transport={billing}
+        />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText('7')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toContain(label);
+    expect(screen.getByText('Lịch được đặt')).toBeTruthy();
+    expect(screen.queryByText('Cannot read')).toBeNull();
+  },
+);
 it('keeps patient mutation idempotency across network retry but changes it for a new intent', async () => {
   const transport = vi
     .fn()

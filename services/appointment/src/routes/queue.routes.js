@@ -1,5 +1,6 @@
 const { requireLease } = require('../auth/lease.middleware');
 const express = require('express');
+const { currentIdentity } = require('../auth/current-identity.middleware.js');
 const { createAuthContext } = require('../auth/auth.middleware.js');
 const { createQueueController } = require('../controllers/queue.controller.js');
 
@@ -9,7 +10,12 @@ function queueRoutes(dependencies) {
     verifyBearerToken: dependencies.verifyBearerToken,
   });
   const controller = createQueueController(dependencies);
-  router.get('/today', authenticate, controller.today);
+  router.get(
+    '/today',
+    authenticate,
+    currentIdentity(dependencies),
+    controller.today,
+  );
   router.post(
     '/call-next',
     authenticate,

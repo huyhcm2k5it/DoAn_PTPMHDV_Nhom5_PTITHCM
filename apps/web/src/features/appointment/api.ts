@@ -227,7 +227,7 @@ export function createAppointmentApi(
     },
     getAdminSummary(date, signal) {
       return request<AdminSummary>(
-        `/api/v1/admin/appointments/summary?${new URLSearchParams({ date, from: date, to: new Date(Date.parse(date + 'T00:00:00Z') + 86400000).toISOString().slice(0, 10) })}`,
+        `/api/v1/admin/appointments/summary?${new URLSearchParams({ from: date, to: new Date(Date.parse(date + 'T00:00:00Z') + 86400000).toISOString().slice(0, 10) })}`,
         { signal },
       );
     },

@@ -1,4 +1,5 @@
 const express = require('express');
+const { currentIdentity } = require('../auth/current-identity.middleware.js');
 const { createAuthContext } = require('../auth/auth.middleware.js');
 const {
   createSummaryController,
@@ -9,7 +10,12 @@ function summaryRoutes(dependencies) {
   const authenticate = createAuthContext({
     verifyBearerToken: dependencies.verifyBearerToken,
   });
-  router.get('/', authenticate, createSummaryController(dependencies).get);
+  router.get(
+    '/',
+    authenticate,
+    currentIdentity(dependencies),
+    createSummaryController(dependencies).get,
+  );
   return router;
 }
 
